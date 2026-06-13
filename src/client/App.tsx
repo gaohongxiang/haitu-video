@@ -2931,7 +2931,8 @@ function ProductCreationComposer({
     : [template, ...enabledTemplateOptions];
   const packingDisabled = isPacking || isSubmittingVideo;
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
-  const productFactsRows = Math.max(14, Math.min(20, importText.split(/\r?\n/).length + 1));
+  const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
+  const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
 
   useEffect(() => {
     setPendingImageFiles([]);
@@ -3028,7 +3029,7 @@ function ProductCreationComposer({
       className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] shadow-[0_22px_64px_rgba(30,42,68,.10)]"
     >
       <div className="product-creation-canvas overflow-visible">
-        <div className="product-control-bar grid gap-3 border-b border-[#e5ecf6] bg-white p-4">
+        <div className="product-control-bar grid gap-2 border-b border-[#e5ecf6] bg-white p-3 min-[1280px]:px-4">
           <div className="grid gap-3 min-[1280px]:grid-cols-[minmax(260px,1.45fr)_minmax(118px,.62fr)_minmax(108px,.55fr)_minmax(108px,.55fr)_minmax(130px,.7fr)_minmax(108px,.55fr)_minmax(220px,1fr)] min-[1280px]:items-end">
             <ProductCreationProductPicker
               className="product-creation-picker min-w-0"
@@ -3082,7 +3083,9 @@ function ProductCreationComposer({
               {isSubmittingVideo ? "创建生成任务中" : "整理资料并生成视频"}
             </Button>
           </div>
-          <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
+          {submitHint ? (
+            <div className="truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
+          ) : null}
           {provider !== "mock" ? (
             <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-[#7a4a12]">
               <input
@@ -3118,7 +3121,7 @@ function ProductCreationComposer({
           </div>
 
           <div className="grid min-w-0 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
+            <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
                 <Button className="min-h-9 w-fit rounded-[11px] px-3" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
@@ -3128,7 +3131,7 @@ function ProductCreationComposer({
               </div>
               <Textarea
                 ref={productFactsBodyRef}
-                className="product-facts-body h-full min-h-[520px] resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-7 shadow-none focus-visible:ring-0"
+                className="product-facts-body h-full min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
                 rows={productFactsRows}
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
@@ -3310,9 +3313,9 @@ function ProductComposerReferenceTray({
         </div>
         <Badge>{product ? `${productReferenceCount(product)} 张` : `${pendingFiles.length} 张`}</Badge>
       </div>
-      <label className="grid min-h-[74px] cursor-pointer place-items-center rounded-[14px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-3 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
-        <span className="grid justify-items-center gap-1 text-sm font-black text-[var(--accent)]">
-          <Plus size={18} />
+      <label className="grid min-h-[58px] cursor-pointer place-items-center rounded-[12px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-2 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
+        <span className="grid justify-items-center gap-0.5 text-sm font-black text-[var(--accent)]">
+          <Plus size={16} />
           添加图片
           <span className="text-[11px] font-bold text-[#8b9bb3]">可多选</span>
         </span>
@@ -3334,7 +3337,7 @@ function ProductComposerReferenceTray({
         </Button>
       ) : null}
       {images.length > 0 ? (
-        <div className="reference-image-list grid max-h-[312px] gap-2 overflow-auto pr-1">
+        <div className="reference-image-list grid max-h-[250px] gap-1.5 overflow-auto pr-1">
           {images.map((image, index) => (
             <ReferenceImageFigure
               key={`${image.original}-${index}`}
