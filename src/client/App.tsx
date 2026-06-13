@@ -2930,11 +2930,18 @@ function ProductCreationComposer({
     ? enabledTemplateOptions
     : [template, ...enabledTemplateOptions];
   const packingDisabled = isPacking || isSubmittingVideo;
-  const productFactsRows = Math.max(5, Math.min(8, importText.split(/\r?\n/).length + 1));
+  const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const productFactsRows = Math.max(14, Math.min(20, importText.split(/\r?\n/).length + 1));
 
   useEffect(() => {
     setPendingImageFiles([]);
     setPreviewReferenceIndex(undefined);
+    if (selectedProduct) {
+      setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)));
+    }
+    if (productFactsBodyRef.current) {
+      productFactsBodyRef.current.scrollTop = 0;
+    }
   }, [selectedProduct?.sku]);
 
   useEffect(() => {
@@ -3095,9 +3102,10 @@ function ProductCreationComposer({
           </div>
         ) : null}
 
-        <div className="grid items-start gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
+        <div className="grid items-stretch gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
           <div className="border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
             <ProductComposerReferenceTray
+              className="h-full"
               product={selectedProduct}
               pendingFiles={pendingImageFiles}
               onImportAssets={onImportAssets}
@@ -3109,8 +3117,8 @@ function ProductCreationComposer({
             />
           </div>
 
-          <div className="grid min-w-0 content-start gap-3 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <div className="product-facts-editor grid content-start gap-2">
+          <div className="grid min-w-0 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
+            <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
                 <Button className="min-h-9 w-fit rounded-[11px] px-3" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
@@ -3119,7 +3127,8 @@ function ProductCreationComposer({
                 </Button>
               </div>
               <Textarea
-                className="product-facts-body min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-7 shadow-none focus-visible:ring-0"
+                ref={productFactsBodyRef}
+                className="product-facts-body h-full min-h-[520px] resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-7 shadow-none focus-visible:ring-0"
                 rows={productFactsRows}
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
@@ -4249,7 +4258,7 @@ function ReferenceImageFigure({
 }) {
   const canPreview = Boolean(image.previewUrl);
   return (
-    <figure className="group m-0 grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-white p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
+    <figure className="group relative grid grid-cols-[72px_minmax(0,1fr)] m-0 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-white p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
       <button
         type="button"
         className="overflow-hidden rounded-[9px] border border-[#eef3f8] bg-[var(--panel2)]"
@@ -4269,7 +4278,7 @@ function ReferenceImageFigure({
         <div className="truncate text-xs font-black text-[#172033]">参考图 {index + 1}</div>
         <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</div>
       </figcaption>
-      <div className="reference-image-actions flex items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className="reference-image-actions pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-[10px] border border-[#e5ecf6] bg-white/95 p-1 opacity-0 shadow-[0_12px_28px_rgba(30,42,68,.14)] transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
         {image.status === "outside-project-root" ? (
           <Button className="h-8 w-8 p-0" size="icon" title="导入资产" onClick={() => void onImportAssets(sku)}>
             <Download size={12} />
