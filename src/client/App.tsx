@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
   BadgeJapaneseYen,
   Boxes,
   CheckCircle2,
@@ -44,8 +43,6 @@ import {
   defaultConsoleSection,
   productStudioProductSkuFromUrl,
   productStudioProductUrl,
-  productStudioStepFromUrl,
-  productStudioStepUrl,
   type ConsoleSection
 } from "./consoleNavigation.js";
 import {
@@ -53,10 +50,6 @@ import {
   isActiveVideoJobStatus,
   type CompletedVideoJobTransitions
 } from "./videoJobRefresh.js";
-import {
-  recommendedProductStudioStep,
-  type ProductStudioStepKey
-} from "./productStudioFlow.js";
 import { cn } from "./lib/utils.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
@@ -767,7 +760,6 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
 
 const NEW_PRODUCT_SELECT_VALUE = "__new_product__";
 const STORYBOARD_HISTORY_STORAGE_KEY = "haitu.storyboardHistory.v1";
-const STUDIO_STEP_STORAGE_KEY = "haitu.productStudio.step.v1";
 const STUDIO_PRODUCT_SKU_STORAGE_KEY = "haitu.productStudio.productSku.v1";
 const storyboardTemplateNames: TemplateName[] = ["scene", "pain-point", "benefit", "ugc", "unboxing"];
 
@@ -1452,6 +1444,8 @@ export function App() {
     const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(sku)}`);
     setSelectedProduct(response.product);
     setProductPath(response.product.path);
+    setProductDraft(productFactsToDraft(response.product));
+    setImportQuality(response.product.importQuality);
     persistProductStudioSku(response.product.sku);
   }
 
@@ -1463,10 +1457,16 @@ export function App() {
         setSelectedProduct(response.product);
         setProductPath(response.product.path);
         persistProductStudioSku(response.product.sku);
+        setProductDraft(productFactsToDraft(response.product));
+        setProductImportText("");
+        setImportNotes([]);
+        setImportQuality(response.product.importQuality);
+        setProductLibraryDialogMode(undefined);
+      } else {
+        setProductDraft(productFactsToDraft(response.product));
+        setProductEditorMode("manual");
+        setProductLibraryDialogMode("edit");
       }
-      setProductDraft(productFactsToDraft(response.product));
-      setProductEditorMode("manual");
-      setProductLibraryDialogMode("edit");
       setStatusText(`已载入商品到编辑草稿: ${response.product.title_ja}`);
     } catch (error) {
       showError(error);
@@ -1487,6 +1487,10 @@ export function App() {
       const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(product.sku)}`);
       setSelectedProduct(response.product);
       setProductPath(response.product.path);
+      setProductDraft(productFactsToDraft(response.product));
+      setProductImportText("");
+      setImportNotes([]);
+      setImportQuality(response.product.importQuality);
       persistProductStudioSku(response.product.sku);
       setProductStudioLoadError("");
       setStatusText(`已进入视频创作: ${response.product.title_ja}`);
@@ -1495,6 +1499,81 @@ export function App() {
       persistProductStudioSku("");
       setProductStudioLoadError(errorMessage(error));
       showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function startNewVideoProduct() {
+    setSelectedProduct(undefined);
+    setProductPath("");
+    persistProductStudioSku("");
+    setProductDraft(defaultProductDraft);
+    setProductImportText("");
+    setImportNotes([]);
+    setImportQuality(undefined);
+    setProductEditorMode("import");
+    setProductLibraryDialogMode(undefined);
+    setProductStudioLoadError("");
+    setPreflight(undefined);
+    setPreflightSignature("");
+    setStudioScriptDraft("");
+    setStudioStoryboardDraft("");
+    setStudioStoryboardCnDraft("");
+    setActiveSection("video");
+    setStatusText("已切换为新商品创作，可以直接填写资料并添加图片。");
+  }
+
+  async function organizeProductPackage(): Promise<ProductDetail | undefined> {
+    const importText = productImportText.trim();
+    if (importText && !ensureTextModelConfigured()) {
+      return undefined;
+    }
+    if (!importText && !productDraft.title_ja.trim()) {
+      setStatusText("请先填写商品资料，或选择一个已有商品。");
+      return undefined;
+    }
+
+    setIsBusy(true);
+    try {
+      if (importText) {
+        const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
+          text: importText
+        });
+        const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
+        setSelectedProduct(response.product);
+        setProductPath(response.product.path);
+        setProductDraft(productFactsToDraft(response.product));
+        setImportNotes(preview.notes);
+        setImportQuality(preview.quality);
+        setProductImportText("");
+        persistProductStudioSku(response.product.sku);
+        setPreflight(undefined);
+        setPreflightSignature("");
+        setStatusText([
+          `AI 已整理资料包: ${response.product.title_ja}`,
+          preview.quality.summary,
+          ...preview.notes.map((note) => `- ${note}`)
+        ].join("\n"));
+        await refreshConsole();
+        return response.product;
+      }
+
+      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts(productDraft));
+      setSelectedProduct(response.product);
+      setProductPath(response.product.path);
+      setProductDraft(productFactsToDraft(response.product));
+      setImportNotes([]);
+      setImportQuality(response.product.importQuality);
+      persistProductStudioSku(response.product.sku);
+      setPreflight(undefined);
+      setPreflightSignature("");
+      setStatusText(`资料包已保存: ${response.product.title_ja}`);
+      await refreshConsole();
+      return response.product;
+    } catch (error) {
+      showError(error);
+      throw error;
     } finally {
       setIsBusy(false);
     }
@@ -1777,9 +1856,9 @@ export function App() {
     }
   }
 
-  async function uploadProductReferenceImages(sku: string, files: FileList | null) {
+  async function uploadProductReferenceImages(sku: string, files: FileList | File[] | null): Promise<ProductDetail | undefined> {
     if (!sku || !files || files.length === 0) {
-      return;
+      return undefined;
     }
     setIsBusy(true);
     try {
@@ -1797,13 +1876,17 @@ export function App() {
         files: payloadFiles
       });
       setSelectedProduct(response.product);
+      setProductDraft(productFactsToDraft(response.product));
+      setImportQuality(response.product.importQuality);
       setStatusText([
         `已上传参考图: ${response.uploaded.length}`,
         ...response.uploaded.map((item) => `- ${item.originalName} -> ${item.reference}`)
       ].join("\n"));
       await refreshConsole();
+      return response.product;
     } catch (error) {
       showError(error);
+      throw error;
     } finally {
       setIsBusy(false);
     }
@@ -2083,21 +2166,17 @@ export function App() {
               selectedProduct={selectedProduct}
               loadError={productStudioLoadError}
               selectedProductGroup={selectedProductGroup}
+              ledgerJobs={ledger?.jobs ?? []}
               videoJobs={videoJobs}
               draft={productDraft}
               setDraft={setProductDraft}
-              editorMode={productEditorMode}
-              setEditorMode={setProductEditorMode}
               importText={productImportText}
               setImportText={setProductImportText}
               importNotes={importNotes}
               importQuality={importQuality}
-              libraryDialogMode={productLibraryDialogMode}
-              setLibraryDialogMode={setProductLibraryDialogMode}
-              onImportSave={importProductAndSave}
-              onSaveDraft={saveProductDraft}
+              onOrganizeProductPackage={organizeProductPackage}
               onSelectProduct={openProductStudio}
-              onEdit={loadProductIntoDraft}
+              onStartNewProduct={startNewVideoProduct}
               onGenerateVideo={queueProductVideoJobs}
               onCancelVideoJob={cancelVideoJob}
               onDeleteLedgerVideo={deleteLedgerVideo}
@@ -2551,21 +2630,17 @@ function ProductCreationWorkspace({
   selectedProduct,
   loadError,
   selectedProductGroup,
+  ledgerJobs,
   videoJobs,
   draft,
   setDraft,
-  editorMode,
-  setEditorMode,
   importText,
   setImportText,
   importNotes,
   importQuality,
-  libraryDialogMode,
-  setLibraryDialogMode,
-  onImportSave,
-  onSaveDraft,
+  onOrganizeProductPackage,
   onSelectProduct,
-  onEdit,
+  onStartNewProduct,
   onGenerateVideo,
   onCancelVideoJob,
   onDeleteLedgerVideo,
@@ -2601,21 +2676,17 @@ function ProductCreationWorkspace({
   selectedProduct?: ProductDetail;
   loadError?: string;
   selectedProductGroup?: ProductGroup;
+  ledgerJobs: LedgerJob[];
   videoJobs: VideoJob[];
   draft: ProductDraft;
   setDraft: (draft: ProductDraft) => void;
-  editorMode: ProductEditorMode;
-  setEditorMode: (mode: ProductEditorMode) => void;
   importText: string;
   setImportText: (text: string) => void;
   importNotes: string[];
   importQuality?: ProductImportQuality;
-  libraryDialogMode: ProductLibraryDialogMode;
-  setLibraryDialogMode: (mode: ProductLibraryDialogMode) => void;
-  onImportSave: () => Promise<void>;
-  onSaveDraft: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
-  onEdit: (sku: string) => Promise<void>;
+  onStartNewProduct: () => void;
   onGenerateVideo: (product: ProductSummary) => Promise<void>;
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
@@ -2623,7 +2694,7 @@ function ProductCreationWorkspace({
   onGenerateStoryboardDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
-  onUploadImages: (sku: string, files: FileList | null) => Promise<void>;
+  onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
   provider: ProviderName;
@@ -2646,159 +2717,94 @@ function ProductCreationWorkspace({
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
 }) {
-  const defaultProductSelectionRef = useRef<string | undefined>(undefined);
-  const openNewProductDialog = () => {
-    setEditorMode("import");
-    setLibraryDialogMode("import");
-  };
-  const ensureVideoProductSelection = () => {
-    if (selectedProduct || loadError || products.length === 0) return;
-    const restoredSku = restoreProductStudioSku(products);
-    const nextProduct = products.find((product) => product.sku === restoredSku) ?? products[0];
-    if (!nextProduct || defaultProductSelectionRef.current === nextProduct.sku) return;
-    defaultProductSelectionRef.current = nextProduct.sku;
-    void onSelectProduct(nextProduct).finally(() => {
-      if (defaultProductSelectionRef.current === nextProduct.sku) {
-        defaultProductSelectionRef.current = undefined;
-      }
-    });
-  };
-
-  useEffect(() => {
-    ensureVideoProductSelection();
-  }, [selectedProduct?.sku, loadError, products, onSelectProduct]);
-
+  const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
+  const studioProductOptions = selectedProduct && !products.some((product) => product.sku === selectedProduct.sku)
+    ? [productActionSummary(selectedProduct), ...products]
+    : products;
+  const actionProduct = selectedProduct ? productActionSummary(selectedProduct, selectedSummary) : undefined;
+  const selectedProductLedgerJobs = selectedProduct
+    ? mergeLedgerJobs(
+      selectedProductGroup?.jobs ?? [],
+      ledgerJobs.filter((job) => job.productSku === selectedProduct.sku)
+    )
+    : [];
+  const latestCreativeJobs = actionProduct
+    ? buildLatestCreativeJobs({
+      actionProduct,
+      ledgerJobs: selectedProductLedgerJobs,
+      videoJobs
+    })
+    : [];
   const selectedProductStoryboardHistory = selectedProduct
     ? storyboardHistory.filter((record) => record.productSku === selectedProduct.sku)
     : [];
 
   return (
-    <>
-      {selectedProduct ? (
-        <ProductStudio
-          products={products}
-          selectedProduct={selectedProduct}
-          selectedProductGroup={selectedProductGroup}
-          videoJobs={videoJobs}
-          onSelectProduct={onSelectProduct}
-          onAddProduct={openNewProductDialog}
-          onEdit={onEdit}
-          onGenerateVideo={onGenerateVideo}
-          onCancelVideoJob={onCancelVideoJob}
-          onDeleteLedgerVideo={onDeleteLedgerVideo}
-          onRetryVideoJob={onRetryVideoJob}
-          onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-          isGeneratingStoryboard={isGeneratingStoryboard}
-          onImportAssets={onImportAssets}
-          onUploadImages={onUploadImages}
-          onGenerateReferenceImages={onGenerateReferenceImages}
-          onSelectFinal={onSelectFinal}
-          provider={provider}
-          onProviderChange={onProviderChange}
-          duration={duration}
-          onDurationChange={onDurationChange}
-          versionCount={versionCount}
-          onVersionCountChange={onVersionCountChange}
-          confirmPaid={confirmPaid}
-          onConfirmPaidChange={onConfirmPaidChange}
-          template={template}
-          enabledTemplateOptions={enabledTemplateOptions}
-          onTemplateChange={onTemplateChange}
-          finalLanguage={finalLanguage}
-          onFinalLanguageChange={onFinalLanguageChange}
-          scriptDraft={scriptDraft}
-          onScriptDraftChange={onScriptDraftChange}
-          storyboardDraft={storyboardDraft}
-          onStoryboardDraftChange={onStoryboardDraftChange}
-          storyboardHistory={selectedProductStoryboardHistory}
-          onApplyStoryboardHistory={onApplyStoryboardHistory}
-        />
-      ) : (
-        <VideoCreationEmptyShell
-          products={products}
-          selectedSku={pendingProductSku}
-          loadError={loadError}
-          onSelectProduct={onSelectProduct}
-          onAddProduct={openNewProductDialog}
-        />
-      )}
-      <ProductLibraryDialogMount
-        dialogMode={libraryDialogMode}
-        draft={draft}
-        setDraft={setDraft}
-        editorMode={editorMode}
-        setEditorMode={setEditorMode}
-        importText={importText}
-        setImportText={setImportText}
-        importNotes={importNotes}
-        importQuality={importQuality}
-        setDialogMode={setLibraryDialogMode}
-        onImportSave={onImportSave}
-        onSaveDraft={onSaveDraft}
-      />
-    </>
+    <ProductCreationComposer
+      products={studioProductOptions}
+      pendingProductSku={pendingProductSku}
+      selectedProduct={selectedProduct}
+      actionProduct={actionProduct}
+      latestCreativeJobs={latestCreativeJobs}
+      loadError={loadError}
+      draft={draft}
+      setDraft={setDraft}
+      importText={importText}
+      setImportText={setImportText}
+      importNotes={importNotes}
+      importQuality={importQuality}
+      onOrganizeProductPackage={onOrganizeProductPackage}
+      onSelectProduct={onSelectProduct}
+      onStartNewProduct={onStartNewProduct}
+      onGenerateVideo={onGenerateVideo}
+      onCancelVideoJob={onCancelVideoJob}
+      onDeleteLedgerVideo={onDeleteLedgerVideo}
+      onRetryVideoJob={onRetryVideoJob}
+      onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+      isGeneratingStoryboard={isGeneratingStoryboard}
+      onImportAssets={onImportAssets}
+      onUploadImages={onUploadImages}
+      onGenerateReferenceImages={onGenerateReferenceImages}
+      onSelectFinal={onSelectFinal}
+      provider={provider}
+      onProviderChange={onProviderChange}
+      duration={duration}
+      onDurationChange={onDurationChange}
+      versionCount={versionCount}
+      onVersionCountChange={onVersionCountChange}
+      confirmPaid={confirmPaid}
+      onConfirmPaidChange={onConfirmPaidChange}
+      template={template}
+      enabledTemplateOptions={enabledTemplateOptions}
+      onTemplateChange={onTemplateChange}
+      finalLanguage={finalLanguage}
+      onFinalLanguageChange={onFinalLanguageChange}
+      scriptDraft={scriptDraft}
+      onScriptDraftChange={onScriptDraftChange}
+      storyboardDraft={storyboardDraft}
+      onStoryboardDraftChange={onStoryboardDraftChange}
+      storyboardHistory={selectedProductStoryboardHistory}
+      onApplyStoryboardHistory={onApplyStoryboardHistory}
+    />
   );
-
 }
 
-type ProductStudioSection = "准备" | "创作";
-
-interface ProductStudioStep {
-  key: ProductStudioStepKey;
-  section: ProductStudioSection;
-  label: string;
-  description: string;
-  done: boolean;
-  icon: ReactNode;
-}
-
-interface ProductStudioProps {
-  products: ProductSummary[];
-  selectedProduct: ProductDetail;
-  selectedProductGroup?: ProductGroup;
-  videoJobs: VideoJob[];
-  onSelectProduct: (product: ProductSummary) => Promise<void>;
-  onAddProduct: () => void;
-  onEdit: (sku: string) => Promise<void>;
-  onGenerateVideo: (product: ProductSummary) => Promise<void>;
-  onCancelVideoJob: (jobId: string) => Promise<void>;
-  onDeleteLedgerVideo: (jobId: string) => Promise<void>;
-  onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: () => Promise<void>;
-  isGeneratingStoryboard: boolean;
-  onImportAssets: (sku: string) => Promise<void>;
-  onUploadImages: (sku: string, files: FileList | null) => Promise<void>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
-  provider: ProviderName;
-  onProviderChange: (provider: ProviderName) => void;
-  duration: number;
-  onDurationChange: (duration: number) => void;
-  versionCount: number;
-  onVersionCountChange: (versionCount: number) => void;
-  confirmPaid: boolean;
-  onConfirmPaidChange: (confirmPaid: boolean) => void;
-  template: TemplateName;
-  enabledTemplateOptions: TemplateName[];
-  onTemplateChange: (template: TemplateName) => void;
-  finalLanguage: FinalVideoLanguage;
-  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
-  scriptDraft: string;
-  onScriptDraftChange: (draft: string) => void;
-  storyboardDraft: string;
-  onStoryboardDraftChange: (draft: string) => void;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-}
-
-function ProductStudio({
+function ProductCreationComposer({
   products,
+  pendingProductSku,
   selectedProduct,
-  selectedProductGroup,
-  videoJobs,
+  actionProduct,
+  latestCreativeJobs,
+  loadError,
+  draft,
+  setDraft,
+  importText,
+  setImportText,
+  importNotes,
+  importQuality,
+  onOrganizeProductPackage,
   onSelectProduct,
-  onAddProduct,
-  onEdit,
+  onStartNewProduct,
   onGenerateVideo,
   onCancelVideoJob,
   onDeleteLedgerVideo,
@@ -2828,202 +2834,687 @@ function ProductStudio({
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory
-}: ProductStudioProps) {
-  const selectedSummary = products.find((product) => product.sku === selectedProduct.sku);
-  const studioProductOptions = selectedSummary ? products : [productActionSummary(selectedProduct), ...products];
-  const actionProduct = productActionSummary(selectedProduct, selectedSummary);
-  const selectedReadiness = actionProduct ? referenceReadiness(actionProduct) : undefined;
-  const steps = productStudioSteps(selectedProduct, selectedProductGroup);
-  const recommendedStep = recommendedProductStudioStep(productStudioFlowState(selectedProduct, selectedProductGroup));
-  const stepKeys = steps.map((step) => step.key).join("|");
-  const activeStepProductSkuRef = useRef<string | undefined>(selectedProduct.sku);
-
-  function persistProductStudioStep(step: ProductStudioStepKey) {
-    if (typeof window === "undefined") return;
-    const nextUrl = productStudioStepUrl(window.location.href, step);
-    if (nextUrl !== window.location.href) {
-      window.history.replaceState({}, "", nextUrl);
-    }
-    try {
-      window.localStorage.setItem(STUDIO_STEP_STORAGE_KEY, step);
-    } catch {
-      // Step persistence is a convenience; URL state still carries the main behavior.
-    }
-  }
-
-  function restoreProductStudioStep(availableSteps: ProductStudioStep[], fallback: ProductStudioStepKey) {
-    if (typeof window === "undefined") return fallback;
-    const urlStep = productStudioStepFromUrl(window.location.href);
-    if (urlStep && availableSteps.some((step) => step.key === urlStep)) return urlStep;
-    try {
-      const storedStep = window.localStorage.getItem(STUDIO_STEP_STORAGE_KEY);
-      if (storedStep && availableSteps.some((step) => step.key === storedStep)) {
-        return storedStep as ProductStudioStepKey;
-      }
-    } catch {
-      // Ignore unavailable local storage and fall back to the flow recommendation.
-    }
-    return fallback;
-  }
-
-  const [activeStep, setActiveStep] = useState<ProductStudioStepKey>(() => {
-    return restoreProductStudioStep(
-      steps,
-      recommendedProductStudioStep(productStudioFlowState(selectedProduct, selectedProductGroup))
-    );
-  });
-  const [studioPipelineCollapsed, setStudioPipelineCollapsed] = useState(false);
-  const activeStepIndex = Math.max(0, steps.findIndex((step) => step.key === activeStep));
-  const previousStep = steps[activeStepIndex - 1];
-  const nextStep = steps[activeStepIndex + 1];
-
-  function setActiveStepAndPersist(step: ProductStudioStepKey) {
-    persistProductStudioStep(step);
-    setActiveStep(step);
-  }
+}: {
+  products: ProductSummary[];
+  pendingProductSku?: string;
+  selectedProduct?: ProductDetail;
+  actionProduct?: ProductSummary;
+  latestCreativeJobs: CreativeVersionItem[];
+  loadError?: string;
+  draft: ProductDraft;
+  setDraft: (draft: ProductDraft) => void;
+  importText: string;
+  setImportText: (text: string) => void;
+  importNotes: string[];
+  importQuality?: ProductImportQuality;
+  onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
+  onSelectProduct: (product: ProductSummary) => Promise<void>;
+  onStartNewProduct: () => void;
+  onGenerateVideo: (product: ProductSummary) => Promise<void>;
+  onCancelVideoJob: (jobId: string) => Promise<void>;
+  onDeleteLedgerVideo: (jobId: string) => Promise<void>;
+  onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onGenerateStoryboardDraft: () => Promise<void>;
+  isGeneratingStoryboard: boolean;
+  onImportAssets: (sku: string) => Promise<void>;
+  onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
+  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
+  provider: ProviderName;
+  onProviderChange: (provider: ProviderName) => void;
+  duration: number;
+  onDurationChange: (duration: number) => void;
+  versionCount: number;
+  onVersionCountChange: (versionCount: number) => void;
+  confirmPaid: boolean;
+  onConfirmPaidChange: (confirmPaid: boolean) => void;
+  template: TemplateName;
+  enabledTemplateOptions: TemplateName[];
+  onTemplateChange: (template: TemplateName) => void;
+  finalLanguage: FinalVideoLanguage;
+  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
+  scriptDraft: string;
+  onScriptDraftChange: (draft: string) => void;
+  storyboardDraft: string;
+  onStoryboardDraftChange: (draft: string) => void;
+  storyboardHistory: StoryboardHistoryRecord[];
+  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+}) {
+  const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
+  const [isPacking, setIsPacking] = useState(false);
+  const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
+  const [submitHint, setSubmitHint] = useState("");
+  const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
+  const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
+  const referenceCount = selectedProduct ? productReferenceCount(selectedProduct) : pendingImageFiles.length;
+  const readiness = actionProduct ? referenceReadiness(actionProduct) : undefined;
+  const providerOptions: ProviderName[] = provider === "seedance"
+    ? ["mock", "seedance", "volcengine-seedance"]
+    : ["mock", "volcengine-seedance"];
+  const durationOptions = ["5", "8", "10", "12", "15"];
+  const versionCountOptions = ["1", "2", "3", "4", "5"];
+  const languageOptions: FinalVideoLanguage[] = ["ja", "zh"];
+  const templateOptions = enabledTemplateOptions.includes(template)
+    ? enabledTemplateOptions
+    : [template, ...enabledTemplateOptions];
+  const packingDisabled = isPacking || isSubmittingVideo;
 
   useEffect(() => {
-    const productChanged = activeStepProductSkuRef.current !== selectedProduct.sku;
-    activeStepProductSkuRef.current = selectedProduct.sku;
-    setActiveStep((current) => {
-      const currentStepStillAvailable = steps.some((step) => step.key === current);
-      if (productChanged || !currentStepStillAvailable) {
-        const persistedStep = restoreProductStudioStep(steps, recommendedStep);
-        return persistedStep && steps.some((step) => step.key === persistedStep) ? persistedStep : recommendedStep;
+    setPendingImageFiles([]);
+  }, [selectedProduct?.sku]);
+
+  async function uploadPendingImages(product: ProductDetail): Promise<ProductDetail> {
+    if (pendingImageFiles.length === 0) return product;
+    const uploadedProduct = await onUploadImages(product.sku, pendingImageFiles);
+    setPendingImageFiles([]);
+    return uploadedProduct ?? product;
+  }
+
+  async function handleOrganizeProductPackage() {
+    setIsPacking(true);
+    setSubmitHint("正在整理资料包...");
+    try {
+      const savedProduct = await onOrganizeProductPackage();
+      if (!savedProduct) {
+        setSubmitHint("请先填写商品资料。");
+        return undefined;
       }
-      return current;
-    });
-  }, [selectedProduct.sku, recommendedStep, stepKeys]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nextUrl = productStudioStepUrl(window.location.href, activeStep);
-    if (nextUrl !== window.location.href) {
-      window.history.replaceState({}, "", nextUrl);
+      const productWithImages = await uploadPendingImages(savedProduct);
+      setSubmitHint("资料包已保存。");
+      return productWithImages;
+    } catch (error) {
+      setSubmitHint(errorMessage(error));
+      return undefined;
+    } finally {
+      setIsPacking(false);
     }
-  }, [activeStep]);
+  }
 
-  const goPreviousStep = () => {
-    if (previousStep) {
-      setActiveStepAndPersist(previousStep.key);
+  async function handleGenerateVideo() {
+    setIsSubmittingVideo(true);
+    setSubmitHint("正在准备生成视频...");
+    try {
+      const savedProduct = await handleOrganizeProductPackage();
+      if (!savedProduct) return;
+      await onGenerateVideo(productActionSummary(savedProduct));
+      setSubmitHint("已加入历史记录，生成中可删除取消，完成后可预览和下载。");
+    } catch (error) {
+      setSubmitHint(errorMessage(error));
+    } finally {
+      setIsSubmittingVideo(false);
     }
-  };
+  }
 
-  const goNextStep = () => {
-    if (nextStep) {
-      setActiveStepAndPersist(nextStep.key);
+  function handleReferenceFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (selectedProduct) {
+      void onUploadImages(selectedProduct.sku, files);
+      return;
     }
-  };
+    setPendingImageFiles((current) => [...current, ...Array.from(files)]);
+  }
+
+  async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
+    if (job.source === "video-job") {
+      await onCancelVideoJob(job.id);
+    } else {
+      await onDeleteLedgerVideo(job.id);
+    }
+    setPreviewJob((current) => (current?.id === job.id ? undefined : current));
+    setDeleteTarget((current) => (current?.id === job.id ? undefined : current));
+  }
 
   return (
     <section
       id="视频创作"
-      className="product-studio-shell rounded-[18px] border border-[#dbe4f0] bg-[#f3f6fb] shadow-[0_20px_54px_rgba(30,42,68,.10)]"
+      className="video-creation-frame overflow-hidden rounded-[24px] border border-[#dbe4f0] bg-white shadow-[0_22px_64px_rgba(30,42,68,.10)]"
     >
-      <div className="product-studio-topbar border-b border-[#dbe4f0] bg-white/95 px-3.5 py-2.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div className="product-studio-title flex min-w-0 flex-1 basis-[460px] flex-nowrap items-center gap-3">
-            <ProductStudioProductPicker
-              className="product-studio-product-picker max-w-[460px] flex-1"
-              products={studioProductOptions}
-              selectedSku={selectedProduct.sku}
-              onSelectProduct={onSelectProduct}
-              onAddProduct={onAddProduct}
-            />
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-5">
+        <div className="min-w-0">
+          <div className="flex w-fit items-center gap-1 rounded-[999px] border border-[#e5ecf6] bg-[#f7f9fe] p-1">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-[999px] px-4 text-xs font-black text-[#8b9bb3]">
+              <ImageIcon size={14} />
+              AI 图片
+            </span>
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-[999px] bg-[var(--accent)] px-5 text-xs font-black text-white shadow-[0_10px_24px_rgba(10,163,148,.22)]">
+              <Clapperboard size={14} />
+              AI 视频
+            </span>
           </div>
-          <div className="product-studio-step-actions flex basis-full items-center justify-end gap-2 min-[760px]:ml-auto min-[760px]:basis-auto min-[760px]:justify-end">
-            <Button
-              size="sm"
-              aria-label={previousStep ? `上一步：${previousStep.label}` : "已经是第一步"}
-              title={previousStep ? `上一步：${previousStep.label}` : "已经是第一步"}
-              disabled={!previousStep}
-              onClick={goPreviousStep}
-            >
-              <ArrowLeft size={13} />
-              上一步
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              aria-label={nextStep ? `下一步：${nextStep.label}` : "已经是最后一步"}
-              title={nextStep ? `下一步：${nextStep.label}` : "已经是最后一步"}
-              disabled={!nextStep}
-              onClick={goNextStep}
-            >
-              下一步
-              <ChevronRight size={13} />
-            </Button>
-          </div>
+          <h2 className="m-0 mt-4 text-[28px] font-black leading-tight text-[#172033]">视频创作</h2>
+          <p className="m-0 mt-2 max-w-[760px] text-sm font-bold leading-6 text-[#6c7890]">
+            写商品、放参考图、选参数，然后生成视频；已有商品可以直接回填到这里。
+          </p>
         </div>
+        <Badge tone={referenceCount >= 3 ? "ok" : "warn"}>
+          {selectedProduct ? readiness?.label ?? `${referenceCount} 张参考图` : `待保存参考图 ${referenceCount} 张`}
+        </Badge>
       </div>
 
-      <div
-        className={cn(
-          "product-studio-body grid min-h-[680px] gap-0 transition-[grid-template-columns] duration-200",
-          studioPipelineCollapsed
-            ? "min-[1180px]:grid-cols-[56px_minmax(0,1fr)]"
-            : "min-[1180px]:grid-cols-[184px_minmax(0,1fr)]"
-        )}
-      >
-        <aside className="product-studio-sidebar grid min-h-0 border-b border-[#dbe4f0] bg-[#f8fbff] min-[1180px]:border-b-0 min-[1180px]:border-r">
-          <ProductStudioPipeline
-            activeStep={activeStep}
-            collapsed={studioPipelineCollapsed}
-            onCollapsedChange={setStudioPipelineCollapsed}
-            steps={steps}
-            onActiveStepChange={setActiveStepAndPersist}
+      <div className="grid gap-0 border-t border-[#e5ecf6] lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]">
+        <aside className="grid content-start gap-4 border-b border-[#e5ecf6] bg-[#fbfdff] p-5 lg:border-b-0 lg:border-r">
+          <PillChoiceGroup
+            label="商品来源"
+            value={selectedProduct ? "existing" : "new"}
+            options={["new", "existing"]}
+            formatOption={(option) => option === "new" ? "新商品" : "选择已有商品"}
+            onChange={(option) => {
+              if (option === "new") {
+                onStartNewProduct();
+                return;
+              }
+              const nextProduct = products.find((product) => product.sku === selectedSku) ?? products[0];
+              if (nextProduct) void onSelectProduct(nextProduct);
+            }}
+          />
+          <ProductCreationProductPicker
+            className="product-creation-picker grid-cols-1"
+            products={products}
+            selectedSku={selectedSku}
+            onSelectProduct={onSelectProduct}
+            onAddProduct={onStartNewProduct}
+          />
+          {loadError ? (
+            <div className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-[var(--danger)]">
+              {loadError}
+            </div>
+          ) : null}
+          <ProductComposerReferenceTray
+            product={selectedProduct}
+            pendingFiles={pendingImageFiles}
+            onImportAssets={onImportAssets}
+            onGenerateReferenceImages={onGenerateReferenceImages}
+            onFilesChange={handleReferenceFiles}
+            onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
           />
         </aside>
 
-        <main className="product-studio-main grid min-h-0 bg-white">
-          <>
-            <div className="min-h-0 overflow-auto bg-[#f7f9fe] p-4">
-              <ProductStudioStepPanel
-                activeStep={activeStep}
-                product={selectedProduct}
-                actionProduct={actionProduct}
-                group={selectedProductGroup}
-                videoJobs={videoJobs}
-                readiness={selectedReadiness}
-                onEdit={onEdit}
-                onImportAssets={onImportAssets}
-                onUploadImages={onUploadImages}
-                onGenerateReferenceImages={onGenerateReferenceImages}
-                onGenerateVideo={onGenerateVideo}
-                onCancelVideoJob={onCancelVideoJob}
-                onDeleteLedgerVideo={onDeleteLedgerVideo}
-                onRetryVideoJob={onRetryVideoJob}
-                onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-                isGeneratingStoryboard={isGeneratingStoryboard}
-                onSelectFinal={onSelectFinal}
-                onStepChange={setActiveStepAndPersist}
-                provider={provider}
-                onProviderChange={onProviderChange}
-                duration={duration}
-                onDurationChange={onDurationChange}
-                versionCount={versionCount}
-                onVersionCountChange={onVersionCountChange}
-                confirmPaid={confirmPaid}
-                onConfirmPaidChange={onConfirmPaidChange}
-                template={template}
-                enabledTemplateOptions={enabledTemplateOptions}
-                onTemplateChange={onTemplateChange}
-                finalLanguage={finalLanguage}
-                onFinalLanguageChange={onFinalLanguageChange}
-                scriptDraft={scriptDraft}
-                onScriptDraftChange={onScriptDraftChange}
-                storyboardDraft={storyboardDraft}
-                onStoryboardDraftChange={onStoryboardDraftChange}
-                storyboardHistory={storyboardHistory}
-                onApplyStoryboardHistory={onApplyStoryboardHistory}
-              />
+        <main className="grid min-w-0 content-start">
+          <section className="grid gap-4 p-5">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
+              <Field label="商品资料">
+                <Textarea
+                  className="min-h-[172px] resize-y text-sm leading-6"
+                  value={importText}
+                  onChange={(event) => setImportText(event.target.value)}
+                  placeholder="可以直接粘贴商品页、店小秘、1688 或补充描述；AI 会整理成资料包。"
+                />
+              </Field>
+              <InlineProductFactsFields draft={draft} setDraft={setDraft} />
             </div>
 
-          </>
+            {importQuality || importNotes.length > 0 ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[#6c7890]">
+                {importQuality ? <Badge tone={importQuality.ready ? "ok" : "warn"}>{importQuality.summary}</Badge> : null}
+                {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
+              </div>
+            ) : null}
+
+            <div className="creation-parameter-dock grid gap-3 rounded-[18px] border border-[#dbe4f0] bg-[#f8fbff] p-3">
+              <div className="grid gap-3 min-[980px]:grid-cols-[1fr_1fr_.8fr_.9fr_.8fr]">
+                <PillChoiceGroup
+                  label="视频风格"
+                  value={template}
+                  options={templateOptions}
+                  formatOption={templateLabel}
+                  onChange={onTemplateChange}
+                />
+                <PillChoiceGroup
+                  label="视频时长"
+                  value={String(duration)}
+                  options={durationOptions}
+                  formatOption={(option) => `${option}s`}
+                  onChange={(option) => onDurationChange(Number(option))}
+                />
+                <PillChoiceGroup
+                  label="成片语言"
+                  value={finalLanguage}
+                  options={languageOptions}
+                  formatOption={finalLanguageLabel}
+                  onChange={onFinalLanguageChange}
+                />
+                <PillChoiceGroup
+                  label="生成模型"
+                  value={provider}
+                  options={providerOptions}
+                  formatOption={providerLabel}
+                  onChange={onProviderChange}
+                />
+                <PillChoiceGroup
+                  label="生成视频"
+                  value={String(versionCount)}
+                  options={versionCountOptions}
+                  formatOption={(option) => `${option} 个`}
+                  onChange={(option) => onVersionCountChange(Number(option))}
+                />
+              </div>
+              {provider !== "mock" ? (
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-[#7a4a12]">
+                  <input
+                    className="h-4 w-4 accent-[var(--accent)]"
+                    type="checkbox"
+                    checked={confirmPaid}
+                    onChange={(event) => onConfirmPaidChange(event.target.checked)}
+                  />
+                  允许使用付费模型生成当前商品视频
+                </label>
+              ) : null}
+              <div className="grid gap-2 min-[820px]:grid-cols-[auto_minmax(0,1fr)_minmax(220px,.32fr)] min-[820px]:items-center">
+                <Button className="min-h-11 w-fit rounded-[12px] px-5" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
+                  <Package size={15} className={cn(isPacking && "animate-pulse")} />
+                  {isPacking ? "整理中" : "AI 整理资料包"}
+                </Button>
+                <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
+                <Button
+                  className="min-h-12 w-full justify-center rounded-[14px] text-sm"
+                  variant="primary"
+                  disabled={packingDisabled}
+                  onClick={() => void handleGenerateVideo()}
+                >
+                  <Play size={15} className={cn(isSubmittingVideo && "animate-pulse")} />
+                  {isSubmittingVideo ? "创建生成任务中" : "整理资料并生成视频"}
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <StoryboardComposerPanel
+            template={template}
+            duration={duration}
+            scriptDraft={scriptDraft}
+            storyboardDraft={storyboardDraft}
+            storyboardHistory={storyboardHistory}
+            onScriptDraftChange={onScriptDraftChange}
+            onStoryboardDraftChange={onStoryboardDraftChange}
+            onApplyStoryboardHistory={onApplyStoryboardHistory}
+            onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+            isGeneratingStoryboard={isGeneratingStoryboard}
+            productReady={Boolean(selectedProduct)}
+          />
+
+          <VideoHistoryPanel
+            actionProduct={actionProduct}
+            jobs={latestCreativeJobs}
+            onPreview={setPreviewJob}
+            onDelete={setDeleteTarget}
+            onRetryVideoJob={onRetryVideoJob}
+            onSelectFinal={onSelectFinal}
+          />
         </main>
       </div>
+
+      <VideoPreviewDialog
+        job={previewJob}
+        index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === previewJob?.id))}
+        actionProduct={actionProduct ?? productActionSummary(selectedProduct ?? productDraftToProductDetail(draft))}
+        onClose={() => setPreviewJob(undefined)}
+        onRequestDelete={setDeleteTarget}
+        onRetryVideoJob={onRetryVideoJob}
+        onSelectFinal={onSelectFinal}
+      />
+      <DeleteCreativeVersionDialog
+        job={deleteTarget}
+        index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === deleteTarget?.id))}
+        onClose={() => setDeleteTarget(undefined)}
+        onConfirm={handleDeleteCreativeVersion}
+      />
     </section>
   );
+}
+
+function PillChoiceGroup<T extends string>({
+  label,
+  value,
+  options,
+  formatOption,
+  onChange
+}: {
+  label: string;
+  value: T;
+  options: T[];
+  formatOption: (option: T) => string;
+  onChange: (option: T) => void;
+}) {
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      <div className="truncate text-xs font-black text-[#6c7890]">{label}</div>
+      <div className="flex min-w-0 gap-1 overflow-hidden rounded-[13px] border border-[#dbe4f0] bg-white p-1">
+        {options.map((option) => {
+          const active = option === value;
+          return (
+            <button
+              key={option}
+              type="button"
+              className={cn(
+                "min-h-9 min-w-0 flex-1 truncate rounded-[10px] px-3 text-xs font-black transition",
+                active
+                  ? "bg-[var(--accent)] text-white shadow-[0_8px_20px_rgba(10,163,148,.20)]"
+                  : "text-[#6c7890] hover:bg-[#f3f6fb] hover:text-[#172033]"
+              )}
+              onClick={() => onChange(option)}
+            >
+              {formatOption(option)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProductComposerReferenceTray({
+  product,
+  pendingFiles,
+  onImportAssets,
+  onGenerateReferenceImages,
+  onFilesChange,
+  onClearPendingFile
+}: {
+  product?: ProductDetail;
+  pendingFiles: File[];
+  onImportAssets: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onFilesChange: (files: FileList | null) => void;
+  onClearPendingFile: (index: number) => void;
+}) {
+  const images = product?.reference_image_statuses ?? [];
+  return (
+    <section className="grid gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-black text-[#172033]">参考图</div>
+          <div className="text-xs font-bold text-[#8b9bb3]">添加图片</div>
+        </div>
+        <Badge>{product ? `${productReferenceCount(product)} 张` : `${pendingFiles.length} 张`}</Badge>
+      </div>
+      <label className="grid min-h-[118px] cursor-pointer place-items-center rounded-[16px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-4 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
+        <span className="grid justify-items-center gap-2 text-sm font-black text-[var(--accent)]">
+          <Plus size={24} />
+          添加图片
+          <span className="text-xs font-bold text-[#8b9bb3]">可多选，未保存商品会先暂存</span>
+        </span>
+        <input
+          className="sr-only"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          onChange={(event) => {
+            onFilesChange(event.target.files);
+            event.currentTarget.value = "";
+          }}
+        />
+      </label>
+      {product ? (
+        <Button className="w-full justify-center" size="sm" variant="soft" onClick={() => void onGenerateReferenceImages(product.sku)}>
+          <Sparkles size={13} />
+          AI 生成参考图
+        </Button>
+      ) : null}
+      {images.length > 0 ? (
+        <div className="grid max-h-[320px] gap-2 overflow-auto pr-1">
+          {images.map((image, index) => (
+            <ReferenceImageFigure key={`${image.original}-${index}`} image={image} sku={product?.sku ?? ""} index={index} onImportAssets={onImportAssets} />
+          ))}
+        </div>
+      ) : pendingFiles.length > 0 ? (
+        <div className="grid max-h-[160px] gap-2 overflow-auto pr-1">
+          {pendingFiles.map((file, index) => (
+            <div key={`${file.name}-${index}`} className="flex min-w-0 items-center justify-between gap-2 rounded-[10px] border border-[#e5ecf6] bg-white px-3 py-2">
+              <span className="truncate text-xs font-bold text-[#6c7890]">{file.name}</span>
+              <button className="text-[#8b9bb3] hover:text-[var(--danger)]" type="button" onClick={() => onClearPendingFile(index)}>
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[12px] border border-[#eef3f8] bg-white px-3 py-3 text-xs font-bold leading-5 text-[#8b9bb3]">
+          参考图会影响商品外观、材质和镜头细节。
+        </div>
+      )}
+    </section>
+  );
+}
+
+function InlineProductFactsFields({ draft, setDraft }: { draft: ProductDraft; setDraft: (draft: ProductDraft) => void }) {
+  const patchDraft = (patch: Partial<ProductDraft>) => setDraft({ ...draft, ...patch });
+  return (
+    <div className="grid gap-3 rounded-[16px] border border-[#e5ecf6] bg-[#fbfdff] p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="标题">
+          <Input value={draft.title_ja} onChange={(event) => patchDraft({ title_ja: event.target.value })} placeholder="商品标题" />
+        </Field>
+        <Field label="分类">
+          <Input value={draft.category} onChange={(event) => patchDraft({ category: event.target.value })} placeholder="分类" />
+        </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="材质">
+          <Input value={draft.materials} onChange={(event) => patchDraft({ materials: event.target.value })} placeholder="聚酯纤维、PU..." />
+        </Field>
+        <Field label="尺寸/重量">
+          <Input value={draft.dimensions} onChange={(event) => patchDraft({ dimensions: event.target.value })} placeholder="15x10x5cm，0.1kg" />
+        </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="卖点">
+          <Textarea className="min-h-[104px] resize-y text-sm leading-6" value={draft.verified_selling_points} onChange={(event) => patchDraft({ verified_selling_points: event.target.value })} />
+        </Field>
+        <Field label="使用场景">
+          <Textarea className="min-h-[104px] resize-y text-sm leading-6" value={draft.usage_scenes} onChange={(event) => patchDraft({ usage_scenes: event.target.value })} />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function StoryboardComposerPanel({
+  template,
+  duration,
+  scriptDraft,
+  storyboardDraft,
+  storyboardHistory,
+  onScriptDraftChange,
+  onStoryboardDraftChange,
+  onApplyStoryboardHistory,
+  onGenerateStoryboardDraft,
+  isGeneratingStoryboard,
+  productReady
+}: {
+  template: TemplateName;
+  duration: number;
+  scriptDraft: string;
+  storyboardDraft: string;
+  storyboardHistory: StoryboardHistoryRecord[];
+  onScriptDraftChange: (draft: string) => void;
+  onStoryboardDraftChange: (draft: string) => void;
+  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onGenerateStoryboardDraft: () => Promise<void>;
+  isGeneratingStoryboard: boolean;
+  productReady: boolean;
+}) {
+  const [hint, setHint] = useState("");
+  return (
+    <details className="group border-t border-[#e5ecf6] bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+        <div className="min-w-0">
+          <div className="text-base font-black text-[#172033]">脚本分镜</div>
+          <div className="mt-1 text-xs font-bold text-[#8b9bb3]">可选；留空时会按商品资料自动生成视频提示。</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge>{templateLabel(template)}</Badge>
+          <Badge>{formatDuration(duration)}</Badge>
+          <ChevronDown size={16} className="text-[#8b9bb3] transition group-open:rotate-180" />
+        </div>
+      </summary>
+      <div className="grid gap-4 px-5 pb-5">
+        <div className="grid gap-3 min-[900px]:grid-cols-[minmax(0,1fr)_auto] min-[900px]:items-start">
+          <Field label="视频分镜">
+            <Textarea
+              className="min-h-[180px] resize-y border-[#dbe4f0] bg-white text-sm font-bold leading-7"
+              value={storyboardDraft}
+              onChange={(event) => onStoryboardDraftChange(event.target.value)}
+              placeholder="0-2s：展示商品和使用场景..."
+            />
+          </Field>
+          <div className="grid gap-2">
+            <Button
+              className="min-h-11 justify-center rounded-[12px] px-4"
+              variant="soft"
+              disabled={isGeneratingStoryboard || !productReady}
+              onClick={() => {
+                if (!productReady) {
+                  setHint("请先整理并保存资料包。");
+                  return;
+                }
+                setHint("正在请求文本模型，通常需要 10-30 秒。");
+                void onGenerateStoryboardDraft().finally(() => setHint(""));
+              }}
+            >
+              <Sparkles size={15} className={cn(isGeneratingStoryboard && "animate-spin")} />
+              {isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}
+            </Button>
+            <div className="max-w-[220px] text-xs font-bold leading-5 text-[#8b9bb3]">{hint}</div>
+          </div>
+        </div>
+        <details className="rounded-[12px] border border-[#e5ecf6] bg-[#fbfdff] px-3 py-2">
+          <summary className="cursor-pointer text-xs font-black text-[#6c7890]">补充要点</summary>
+          <Textarea
+            className="mt-2 min-h-[110px] resize-y bg-white text-sm leading-6"
+            value={scriptDraft}
+            onChange={(event) => onScriptDraftChange(event.target.value)}
+            placeholder="可补充镜头重点、禁用表达、旁白方向。"
+          />
+        </details>
+        <section className="grid gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-black text-[#172033]">分镜历史记录</div>
+            <Badge>{storyboardHistory.length} 条</Badge>
+          </div>
+          {storyboardHistory.length > 0 ? (
+            <div className="grid max-h-[190px] overflow-auto rounded-[12px] border border-[#e5ecf6] bg-white">
+              {storyboardHistory.map((record) => (
+                <article key={record.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[120px_minmax(0,1fr)_auto] sm:items-center">
+                  <div className="grid gap-1">
+                    <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
+                    <div className="flex gap-1">
+                      <Badge>{templateLabel(record.template)}</Badge>
+                      <Badge>{formatDuration(record.duration)}</Badge>
+                    </div>
+                  </div>
+                  <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
+                  <Button className="w-fit" size="sm" onClick={() => onApplyStoryboardHistory(record)}>回填</Button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-dashed border-[#dbe4f0] bg-[#fbfdff] px-3 py-4 text-center text-xs font-bold text-[#8b9bb3]">
+              还没有 AI 生成历史
+            </div>
+          )}
+        </section>
+      </div>
+    </details>
+  );
+}
+
+function VideoHistoryPanel({
+  actionProduct,
+  jobs,
+  onPreview,
+  onDelete,
+  onRetryVideoJob,
+  onSelectFinal
+}: {
+  actionProduct?: ProductSummary;
+  jobs: CreativeVersionItem[];
+  onPreview: (job: CreativeVersionItem) => void;
+  onDelete: (job: CreativeVersionItem) => void;
+  onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
+}) {
+  return (
+    <section className="grid gap-3 border-t border-[#e5ecf6] bg-[#fbfdff] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-base font-black text-[#172033]">历史记录</div>
+          <div className="mt-1 text-xs font-bold text-[#8b9bb3]">当前商品生成过的视频都会显示在这里。</div>
+        </div>
+        <Badge>{jobs.length} 个</Badge>
+      </div>
+      {jobs.length > 0 ? (
+        <div className="generation-history-scroll grid max-h-[360px] overflow-y-auto rounded-[14px] border border-[#e5ecf6] bg-white">
+          {jobs.map((job, index) => {
+            const activeVersion = isActiveCreativeVersion(job);
+            const playableVideo = hasPlayableVideo(job);
+            const retryJob = job.status === "failed" ? job.videoJob : undefined;
+            const canSelectFinal = actionProduct && playableVideo && !activeVersion;
+            return (
+              <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <strong className="truncate text-sm font-black text-[#172033]">{videoLabel(index)}</strong>
+                    <Badge tone={activeVersion ? "warn" : playableVideo ? "ok" : "neutral"}>
+                      {activeVersion ? <RefreshCcw className="mr-1 h-3 w-3 animate-spin" /> : null}
+                      {creativeVersionDisplayStatus(job)}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
+                    {providerLabel(job.provider)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
+                  </div>
+                </div>
+                <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
+                  {playableVideo ? (
+                    <Button className="w-fit" size="sm" onClick={() => onPreview(job)}>
+                      <Play size={13} />
+                      预览视频
+                    </Button>
+                  ) : null}
+                  {job.finalVideoUrl ? (
+                    <Button asChild className="w-fit" size="sm">
+                      <a href={job.finalVideoUrl} download>
+                        <Download size={13} />
+                        下载视频
+                      </a>
+                    </Button>
+                  ) : null}
+                  {retryJob ? (
+                    <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
+                      <RefreshCcw size={13} />
+                      重试
+                    </Button>
+                  ) : null}
+                  {canSelectFinal ? (
+                    <Button className="w-fit" size="sm" disabled={job.selectedFinal} onClick={() => void onSelectFinal(actionProduct.sku, job.id)}>
+                      {job.selectedFinal ? "已设最终" : "设为最终"}
+                    </Button>
+                  ) : null}
+                  <Button className="w-fit" size="sm" variant="danger" onClick={() => onDelete(job)}>
+                    <X size={13} />
+                    删除
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState icon={<FileVideo size={28} />} text="还没有视频" />
+      )}
+    </section>
+  );
+}
+
+function productDraftToProductDetail(draft: ProductDraft): ProductDetail {
+  const facts = productDraftToFacts(draft);
+  return {
+    ...facts,
+    path: "",
+    referenceImageCount: facts.reference_images.length,
+    importQuality: undefined,
+    reference_image_statuses: []
+  };
 }
 
 function ProductLibraryHome({
@@ -3270,841 +3761,6 @@ function ProductLibraryDialog({
   );
 }
 
-function ProductStudioPipeline({
-  steps,
-  activeStep,
-  collapsed,
-  onCollapsedChange,
-  onActiveStepChange
-}: {
-  steps: ProductStudioStep[];
-  activeStep: ProductStudioStepKey;
-  collapsed: boolean;
-  onCollapsedChange: (collapsed: boolean) => void;
-  onActiveStepChange: (step: ProductStudioStepKey) => void;
-}) {
-  const grouped = productStudioSections(steps);
-  return (
-    <div className="relative grid min-h-0 overflow-visible">
-      <nav
-        className={cn(
-          "min-h-0 py-4",
-          collapsed ? "overflow-visible" : "overflow-auto",
-          collapsed ? "px-2" : "px-3"
-        )}
-        aria-label="商品创作流程"
-      >
-        <div className={cn("grid", collapsed ? "gap-3" : "gap-4")}>
-          {grouped.map((group) => (
-            <section key={group.label} className="grid gap-2">
-              <div className={cn("px-1 text-[11px] font-black uppercase tracking-[.16em] text-[#8b9bb3]", collapsed && "sr-only")}>{group.label}</div>
-              <div className={cn("grid", collapsed ? "gap-2" : "gap-1")}>
-                {group.steps.map((step) => {
-                  const active = step.key === activeStep;
-                  return (
-                    <button
-                      key={step.key}
-                      type="button"
-                      title={collapsed ? step.label : undefined}
-                      className={cn(
-                        "group/pipeline-step relative grid items-center rounded-[15px] border text-left text-xs transition",
-                        collapsed
-                          ? "min-h-11 grid-cols-1 justify-items-center px-0"
-                          : "min-h-11 grid-cols-[32px_minmax(0,1fr)] gap-1.5 px-2",
-                        active
-                          ? "border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,white)] text-[var(--text)]"
-                          : "border-transparent bg-transparent text-[#6c7890] hover:border-[#dbe4f0] hover:bg-white"
-                      )}
-                      onClick={() => onActiveStepChange(step.key)}
-                    >
-                      <span className={cn("grid h-8 w-8 place-items-center rounded-[11px]", active ? "bg-transparent text-[var(--text)]" : "bg-[#edf2f8]")}>
-                        {step.icon}
-                      </span>
-                      <span className={cn("min-w-0 truncate font-black", collapsed && "sr-only")}>{step.label}</span>
-                      {collapsed ? (
-                        <span
-                          className={cn(
-                            floatingTooltipClass,
-                            "product-studio-step-tooltip left-[calc(100%+10px)] top-1/2 z-20 -translate-y-1/2 group-hover/pipeline-step:opacity-100 group-focus-visible/pipeline-step:opacity-100",
-                          )}
-                        >
-                          {step.label}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-      </nav>
-      <button
-        type="button"
-        className="product-studio-collapse-handle group absolute inset-y-0 right-[-8px] z-10 hidden w-4 cursor-pointer bg-transparent text-[#8b9bb3] transition-colors hover:text-[var(--accent)] focus-visible:outline-none min-[1180px]:flex min-[1180px]:items-center min-[1180px]:justify-center"
-        aria-label={collapsed ? "展开流程轨" : "折叠流程轨"}
-        title={collapsed ? "展开流程轨" : "折叠流程轨"}
-        onClick={() => onCollapsedChange(!collapsed)}
-      >
-        <span className="product-studio-collapse-edge pointer-events-none grid h-12 w-4 place-items-center">
-          <span className="product-studio-collapse-thumb grid h-10 w-4 place-items-center rounded-full border border-[#d5dfec] bg-white/95 shadow-[0_8px_20px_rgba(30,42,68,.10)] group-focus-visible:border-[color-mix(in_srgb,var(--accent)_35%,var(--border))]">
-            <span className="product-studio-collapse-chevron grid place-items-center" aria-hidden="true">
-              {collapsed ? <ChevronRight size={13} strokeWidth={2.4} /> : <ChevronLeft size={13} strokeWidth={2.4} />}
-            </span>
-          </span>
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function ProductStudioStepPanel({
-  activeStep,
-  product,
-  actionProduct,
-  group,
-  videoJobs,
-  readiness,
-  onEdit,
-  onImportAssets,
-  onUploadImages,
-  onGenerateReferenceImages,
-  onGenerateVideo,
-  onCancelVideoJob,
-  onDeleteLedgerVideo,
-  onRetryVideoJob,
-  onGenerateStoryboardDraft,
-  isGeneratingStoryboard,
-  onSelectFinal,
-  onStepChange,
-  provider,
-  onProviderChange,
-  duration,
-  onDurationChange,
-  versionCount,
-  onVersionCountChange,
-  confirmPaid,
-  onConfirmPaidChange,
-  template,
-  enabledTemplateOptions,
-  onTemplateChange,
-  finalLanguage,
-  onFinalLanguageChange,
-  scriptDraft,
-  onScriptDraftChange,
-  storyboardDraft,
-  onStoryboardDraftChange,
-  storyboardHistory,
-  onApplyStoryboardHistory
-}: {
-  activeStep: ProductStudioStepKey;
-  product: ProductDetail;
-  actionProduct: ProductSummary;
-  group?: ProductGroup;
-  videoJobs: VideoJob[];
-  readiness?: { ready: boolean; label: string };
-  onEdit: (sku: string) => Promise<void>;
-  onImportAssets: (sku: string) => Promise<void>;
-  onUploadImages: (sku: string, files: FileList | null) => Promise<void>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
-  onGenerateVideo: (product: ProductSummary) => Promise<void>;
-  onCancelVideoJob: (jobId: string) => Promise<void>;
-  onDeleteLedgerVideo: (jobId: string) => Promise<void>;
-  onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: () => Promise<void>;
-  isGeneratingStoryboard: boolean;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
-  onStepChange: (step: ProductStudioStepKey) => void;
-  provider: ProviderName;
-  onProviderChange: (provider: ProviderName) => void;
-  duration: number;
-  onDurationChange: (duration: number) => void;
-  versionCount: number;
-  onVersionCountChange: (versionCount: number) => void;
-  confirmPaid: boolean;
-  onConfirmPaidChange: (confirmPaid: boolean) => void;
-  template: TemplateName;
-  enabledTemplateOptions: TemplateName[];
-  onTemplateChange: (template: TemplateName) => void;
-  finalLanguage: FinalVideoLanguage;
-  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
-  scriptDraft: string;
-  onScriptDraftChange: (draft: string) => void;
-  storyboardDraft: string;
-  onStoryboardDraftChange: (draft: string) => void;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-}) {
-  const referenceCount = productReferenceCount(product);
-  const latestCreativeJobs = buildLatestCreativeJobs({
-    actionProduct,
-    ledgerJobs: group?.jobs ?? [],
-    videoJobs
-  });
-
-  if (activeStep === "raw") {
-    return (
-      <ProductStudioPanel>
-        <div className="grid gap-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-lg font-black text-[#172033]">商品信息</div>
-              <div className="mt-1 max-w-[780px] text-sm font-semibold text-[#6c7890]">
-                确认当前创作可使用的事实资料；后续脚本、分镜和生成都只引用这里的内容。
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone={product.importQuality?.ready ? "ok" : "warn"}>
-                {product.importQuality?.ready ? "资料完整" : "资料待补"}
-              </Badge>
-              <Badge tone={readiness?.ready ? "ok" : "warn"}>{readiness?.label ?? "参考图待检查"}</Badge>
-            </div>
-          </div>
-
-          <div className="grid gap-4 border-b border-[#e5ecf6] pb-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <h4 className="m-0 min-w-0 flex-1 text-[28px] font-black leading-tight text-[#172033]">{product.title_ja}</h4>
-              <Button className="w-fit" size="sm" onClick={() => void onEdit(product.sku)}>
-                <Settings size={13} />
-                编辑资料
-              </Button>
-            </div>
-            <ProductFactSummaryStrip
-              facts={[
-                { label: "分类", value: product.category || "-" },
-                { label: "材质", value: product.materials.join("、") || "-" },
-                { label: "尺寸/重量", value: product.dimensions || "-" },
-                { label: "参考图", value: `${referenceCount} 张` }
-              ]}
-            />
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,.85fr)]">
-            <ProductNarrativeList title="已验证卖点" items={product.verified_selling_points} />
-            <div className="grid content-start gap-5">
-              <ProductSceneTags items={product.usage_scenes} />
-              <ProductRiskList items={product.forbidden_claims} />
-            </div>
-          </div>
-
-          <ProductReferenceStrip
-            product={product}
-            referenceCount={referenceCount}
-            onGenerateReferenceImages={onGenerateReferenceImages}
-            onImportAssets={onImportAssets}
-            onUploadImages={onUploadImages}
-          />
-        </div>
-      </ProductStudioPanel>
-    );
-  }
-
-  if (activeStep === "storyboard") {
-    const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
-    return (
-      <StoryboardDesk
-        selectedDuration={selectedDuration}
-        template={template}
-        enabledTemplateOptions={enabledTemplateOptions}
-        storyboardDraft={storyboardDraft}
-        scriptDraft={scriptDraft}
-        storyboardHistory={storyboardHistory}
-        onTemplateChange={onTemplateChange}
-        onDurationChange={onDurationChange}
-        onScriptDraftChange={onScriptDraftChange}
-        onStoryboardDraftChange={onStoryboardDraftChange}
-        onApplyStoryboardHistory={onApplyStoryboardHistory}
-        onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-        isGenerating={isGeneratingStoryboard}
-      />
-    );
-  }
-
-  if (activeStep === "generate") {
-    const needsProductFacts = !actionProduct.importQuality?.ready;
-    const needsReferenceImages = !readiness?.ready;
-    const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
-    const selectedVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
-    const paidGeneration = provider !== "mock";
-    const generateBlockReason = needsProductFacts
-      ? "商品资料还没整理完整。"
-      : needsReferenceImages
-        ? readiness?.label ?? "参考图不足。"
-        : paidGeneration && !confirmPaid
-          ? "使用付费通道前需要先勾选确认。"
-          : "";
-    const generateDisabled = Boolean(generateBlockReason);
-    return (
-      <GenerationConsole
-        provider={provider}
-        selectedDuration={selectedDuration}
-        selectedVersionCount={selectedVersionCount}
-        template={template}
-        finalLanguage={finalLanguage}
-        readiness={readiness}
-        paidGeneration={paidGeneration}
-        confirmPaid={confirmPaid}
-        generateDisabled={generateDisabled}
-        generateBlockReason={generateBlockReason}
-        needsProductFacts={needsProductFacts}
-        needsReferenceImages={needsReferenceImages}
-        latestCreativeJobs={latestCreativeJobs}
-        actionProduct={actionProduct}
-        onProviderChange={onProviderChange}
-        onVersionCountChange={onVersionCountChange}
-        onFinalLanguageChange={onFinalLanguageChange}
-        onConfirmPaidChange={onConfirmPaidChange}
-        onEdit={onEdit}
-        onStepChange={onStepChange}
-        onGenerateVideo={onGenerateVideo}
-        onCancelVideoJob={onCancelVideoJob}
-        onDeleteLedgerVideo={onDeleteLedgerVideo}
-        onRetryVideoJob={onRetryVideoJob}
-        onSelectFinal={onSelectFinal}
-      />
-    );
-  }
-
-  return null;
-}
-
-function StoryboardDesk({
-  selectedDuration,
-  template,
-  enabledTemplateOptions,
-  storyboardDraft,
-  scriptDraft,
-  storyboardHistory,
-  onTemplateChange,
-  onDurationChange,
-  onScriptDraftChange,
-  onStoryboardDraftChange,
-  onApplyStoryboardHistory,
-  onGenerateStoryboardDraft,
-  isGenerating
-}: {
-  selectedDuration: number;
-  template: TemplateName;
-  enabledTemplateOptions: TemplateName[];
-  storyboardDraft: string;
-  scriptDraft: string;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onTemplateChange: (template: TemplateName) => void;
-  onDurationChange: (duration: number) => void;
-  onScriptDraftChange: (draft: string) => void;
-  onStoryboardDraftChange: (draft: string) => void;
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onGenerateStoryboardDraft: () => Promise<void>;
-  isGenerating: boolean;
-}) {
-  const scriptLines = splitLines(scriptDraft);
-  const templateOptions = enabledTemplateOptions.includes(template)
-    ? enabledTemplateOptions
-    : [template, ...enabledTemplateOptions];
-  const durationOptions = ["5", "8", "10", "12", "15"];
-
-  return (
-    <ProductStudioPanel>
-      <div className="storyboard-desk grid gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-lg font-black text-[#172033]">脚本分镜</div>
-            <div className="mt-1 max-w-[760px] text-sm font-semibold leading-6 text-[#6c7890]">
-              先选视频风格和时长，再生成或编辑当前商品的视频分镜。
-            </div>
-          </div>
-        </div>
-
-        <section className="storyboard-workbench storyboard-editor divide-y divide-[#e5ecf6] overflow-hidden rounded-[14px] border border-[#dbe4f0] bg-white">
-          <div className="storyboard-control-row grid gap-3 bg-[#fbfdff] p-4 lg:grid-cols-[minmax(180px,1fr)_minmax(160px,.7fr)_280px] lg:items-end">
-            <StudioOptionSelect
-              label="视频风格"
-              value={template}
-              options={templateOptions}
-              formatOption={templateLabel}
-              onChange={onTemplateChange}
-            />
-            <StudioOptionSelect
-              label="视频时长"
-              value={String(selectedDuration)}
-              options={durationOptions}
-              formatOption={(option) => `${option}s`}
-              onChange={(option) => onDurationChange(Number(option))}
-            />
-            <div className="grid gap-1.5">
-              <span className="text-xs font-black text-[#6c7890]">生成</span>
-              <div className="flex min-w-0 items-center gap-2">
-                <Button
-                  className="min-h-11 w-full justify-center rounded-[12px] px-4 text-sm"
-                  variant="primary"
-                  disabled={isGenerating}
-                  onClick={() => void onGenerateStoryboardDraft()}
-                >
-                  <Sparkles size={15} className={cn(isGenerating && "animate-spin")} />
-                  {isGenerating ? "生成中..." : "AI 生成分镜"}
-                </Button>
-                {isGenerating ? (
-                  <div className="generation-hint min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold leading-4 text-[var(--accent)]">
-                    正在请求文本模型，通常需要 10-30 秒。
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2 p-4">
-            <div className="flex min-h-[40px] flex-wrap items-start justify-between gap-2">
-              <div>
-                <div className="text-sm font-black text-[#172033]">视频分镜</div>
-                <div className="mt-1 text-xs font-semibold text-[#8b9bb3]">用中文编辑；生成视频时会按成片语言执行。</div>
-              </div>
-            </div>
-            <Textarea
-              aria-label="视频分镜"
-              className="min-h-[220px] resize-y border-0 bg-transparent px-0 py-1 text-[15px] font-black leading-8 shadow-none focus-visible:ring-0"
-              value={storyboardDraft}
-              onChange={(event) => onStoryboardDraftChange(event.target.value)}
-            />
-          </div>
-
-          <section className="storyboard-history grid min-w-0 gap-3 bg-[#fbfdff] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-sm font-black text-[#172033]">历史记录</div>
-                <div className="mt-1 text-xs font-semibold text-[#8b9bb3]">选择一个历史分镜回填。</div>
-              </div>
-              <Badge>{storyboardHistory.length} 条</Badge>
-            </div>
-            {storyboardHistory.length > 0 ? (
-              <div className="grid max-h-[220px] overflow-auto rounded-[12px] border border-[#e5ecf6] bg-white">
-                {storyboardHistory.map((record) => (
-                  <article
-                    key={record.id}
-                    className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 text-xs last:border-b-0 md:grid-cols-[120px_minmax(0,1fr)_64px] md:items-center"
-                  >
-                    <div className="grid gap-1">
-                      <div className="font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge>{templateLabel(record.template)}</Badge>
-                        <Badge>{formatDuration(record.duration)}</Badge>
-                      </div>
-                    </div>
-                    <div className="line-clamp-2 whitespace-pre-line font-semibold leading-5 text-[#6c7890]">
-                      {historyPreview(record.storyboardDraft)}
-                    </div>
-                    <Button className="min-h-7 w-fit px-2 text-[12px]" size="sm" type="button" onClick={() => onApplyStoryboardHistory(record)}>
-                      回填
-                    </Button>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[12px] border border-dashed border-[#dbe4f0] bg-white px-3 py-4 text-center text-xs font-bold leading-5 text-[#8b9bb3]">
-                还没有 AI 生成历史
-              </div>
-            )}
-          </section>
-
-          <details className="border-t border-[#e5ecf6] bg-[#fbfdff] px-4 py-3">
-            <summary className="cursor-pointer text-xs font-black text-[#6c7890]">
-              补充要点 {scriptLines.length > 0 ? `(${scriptLines.length} 条)` : ""}
-            </summary>
-            <Field className="mt-3 text-[#6c7890]" label="给 AI 参考的补充信息">
-              <Textarea
-                className="min-h-[160px] resize-y bg-white"
-                value={scriptDraft}
-                onChange={(event) => onScriptDraftChange(event.target.value)}
-              />
-            </Field>
-          </details>
-        </section>
-      </div>
-    </ProductStudioPanel>
-  );
-}
-
-function StudioOptionSelect<T extends string>({
-  label,
-  value,
-  options,
-  formatOption,
-  onChange
-}: {
-  label: string;
-  value: T;
-  options: T[];
-  formatOption: (option: T) => string;
-  onChange: (option: T) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const selectedLabel = formatOption(value);
-
-  return (
-    <div
-      className="relative grid gap-1.5"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setOpen(false);
-        }
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          setOpen(false);
-        }
-      }}
-    >
-      <span className="text-xs font-black text-[#6c7890]">{label}</span>
-      <button
-        type="button"
-        className={cn(
-          "flex min-h-11 w-full items-center justify-between gap-3 rounded-[12px] border bg-white px-4 text-left text-sm font-black text-[#172033] shadow-[0_1px_0_rgba(30,42,68,.03)] transition",
-          open
-            ? "border-[var(--accent)] ring-2 ring-[color-mix(in_srgb,var(--accent)_18%,transparent)]"
-            : "border-[#dbe4f0] hover:border-[#b8c8dc]"
-        )}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="truncate">{selectedLabel}</span>
-        <ChevronDown
-          size={16}
-          className={cn("shrink-0 text-[#6c7890] transition-transform", open ? "rotate-180" : "")}
-          aria-hidden="true"
-        />
-      </button>
-      {open ? (
-        <div
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-[12px] border border-[#dbe4f0] bg-white p-1 shadow-[0_18px_44px_rgba(30,42,68,.14)]"
-          role="listbox"
-        >
-          {options.map((option) => {
-            const optionLabel = formatOption(option);
-            const selected = option === value;
-            return (
-              <button
-                key={option}
-                type="button"
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-[10px] px-3 py-2 text-left text-sm font-black transition",
-                  selected
-                    ? "bg-[#e8f8f5] text-[var(--accent)]"
-                    : "text-[#40506a] hover:bg-[#f4f8fc] hover:text-[#172033]"
-                )}
-                role="option"
-                aria-selected={selected}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option);
-                  setOpen(false);
-                }}
-              >
-                <span className="truncate">{optionLabel}</span>
-                {selected ? <CheckCircle2 size={15} className="shrink-0" aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function GenerationConsole({
-  provider,
-  selectedDuration,
-  selectedVersionCount,
-  template,
-  finalLanguage,
-  readiness,
-  paidGeneration,
-  confirmPaid,
-  generateDisabled,
-  generateBlockReason,
-  needsProductFacts,
-  needsReferenceImages,
-  latestCreativeJobs,
-  actionProduct,
-  onProviderChange,
-  onVersionCountChange,
-  onFinalLanguageChange,
-  onConfirmPaidChange,
-  onEdit,
-  onStepChange,
-  onGenerateVideo,
-  onCancelVideoJob,
-  onDeleteLedgerVideo,
-  onRetryVideoJob,
-  onSelectFinal
-}: {
-  provider: ProviderName;
-  selectedDuration: number;
-  selectedVersionCount: number;
-  template: TemplateName;
-  finalLanguage: FinalVideoLanguage;
-  readiness?: { ready: boolean; label: string };
-  paidGeneration: boolean;
-  confirmPaid: boolean;
-  generateDisabled: boolean;
-  generateBlockReason: string;
-  needsProductFacts: boolean;
-  needsReferenceImages: boolean;
-  latestCreativeJobs: CreativeVersionItem[];
-  actionProduct: ProductSummary;
-  onProviderChange: (provider: ProviderName) => void;
-  onVersionCountChange: (versionCount: number) => void;
-  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
-  onConfirmPaidChange: (confirmPaid: boolean) => void;
-  onEdit: (sku: string) => Promise<void>;
-  onStepChange: (step: ProductStudioStepKey) => void;
-  onGenerateVideo: (product: ProductSummary) => Promise<void>;
-  onCancelVideoJob: (jobId: string) => Promise<void>;
-  onDeleteLedgerVideo: (jobId: string) => Promise<void>;
-  onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
-}) {
-  const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
-  const [submitHint, setSubmitHint] = useState("");
-  const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
-  const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
-  const providerOptions: ProviderName[] = provider === "seedance"
-    ? ["seedance", "volcengine-seedance", "mock"]
-    : ["volcengine-seedance", "mock"];
-  const videoCountOptions = ["1", "2", "3", "4", "5"];
-  const languageOptions: FinalVideoLanguage[] = ["ja", "zh"];
-  const primaryDisabled = generateDisabled || isSubmittingVideo;
-
-  async function handleGenerateVideo() {
-    if (generateDisabled) {
-      setSubmitHint(generateBlockReason);
-      return;
-    }
-    setIsSubmittingVideo(true);
-    setSubmitHint("创建生成任务中...");
-    try {
-      await onGenerateVideo(actionProduct);
-      setSubmitHint("已加入历史记录，最新结果显示在视频 1。");
-    } catch (error) {
-      setSubmitHint(errorMessage(error));
-    } finally {
-      setIsSubmittingVideo(false);
-    }
-  }
-
-  function requestDeleteCreativeVersion(job: CreativeVersionItem) {
-    setDeleteTarget(job);
-  }
-
-  async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
-    if (job.source === "video-job") {
-      await onCancelVideoJob(job.id);
-    } else {
-      await onDeleteLedgerVideo(job.id);
-    }
-    setPreviewJob((current) => (current?.id === job.id ? undefined : current));
-    setDeleteTarget((current) => (current?.id === job.id ? undefined : current));
-  }
-
-  async function handleCancelPreviewJob(jobId: string) {
-    const job = latestCreativeJobs.find((item) => item.id === jobId);
-    if (job) {
-      requestDeleteCreativeVersion(job);
-    }
-  }
-
-  return (
-    <ProductStudioPanel>
-      <div className="generation-console grid gap-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-lg font-black text-[#172033]">生成控制台</div>
-            <div className="mt-1 max-w-[760px] text-sm font-semibold leading-6 text-[#6c7890]">
-              视频类型和时长来自脚本分镜步骤，这里只决定通道、视频数量和是否开始制作。
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={readiness?.ready ? "ok" : "warn"}>{readiness?.label ?? "参考图待检查"}</Badge>
-          </div>
-        </div>
-
-        <section className="generation-workbench overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_12px_30px_rgba(30,42,68,.06)]">
-          <div className="generation-command-bar grid gap-3 border-b border-[#e5ecf6] px-4 py-4">
-            <div className="generation-control-row grid gap-3 lg:grid-cols-[minmax(180px,1fr)_minmax(150px,.7fr)_minmax(150px,.7fr)_280px] lg:items-end">
-              <StudioOptionSelect
-                label="生成通道"
-                value={provider}
-                options={providerOptions}
-                formatOption={providerLabel}
-                onChange={onProviderChange}
-              />
-              <StudioOptionSelect
-                label="成片语言"
-                value={finalLanguage}
-                options={languageOptions}
-                formatOption={finalLanguageLabel}
-                onChange={onFinalLanguageChange}
-              />
-              <StudioOptionSelect
-                label="生成视频"
-                value={String(selectedVersionCount)}
-                options={videoCountOptions}
-                formatOption={(option) => `${option} 个`}
-                onChange={(option) => onVersionCountChange(Number(option))}
-              />
-              <Button
-                className="min-h-11 w-full justify-center rounded-[12px] text-sm"
-                variant="primary"
-                disabled={primaryDisabled}
-                onClick={() => void handleGenerateVideo()}
-              >
-                <Play size={15} className={cn(isSubmittingVideo && "animate-pulse")} />
-                {isSubmittingVideo ? "创建生成任务中" : `生成 ${selectedVersionCount} 个视频`}
-              </Button>
-            </div>
-            <div className={cn("min-h-5 truncate text-xs font-bold", generateBlockReason ? "text-amber-700" : "text-[#6c7890]")}>
-              {submitHint || generateBlockReason}
-            </div>
-          </div>
-
-          {paidGeneration || needsProductFacts || needsReferenceImages ? (
-            <div className="grid gap-2 border-t border-[#eef3f8] px-4 py-3">
-            {paidGeneration ? (
-              <label className="grid cursor-pointer grid-cols-[18px_minmax(0,1fr)] gap-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-[#7a4a12]">
-                <input
-                  className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
-                  type="checkbox"
-                  checked={confirmPaid}
-                  onChange={(event) => onConfirmPaidChange(event.target.checked)}
-                />
-                <span>允许使用付费模型生成当前商品视频</span>
-              </label>
-            ) : null}
-
-            {needsProductFacts ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-[#7a4a12]">
-                <span>资料还没整理完整</span>
-                <Button className="w-fit bg-white" size="sm" onClick={() => void onEdit(actionProduct.sku)}>
-                  <Settings size={13} />
-                  编辑资料
-                </Button>
-              </div>
-            ) : null}
-
-            {needsReferenceImages ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold leading-5 text-[#315a78]">
-                <span>参考图不足时先回到商品信息补图</span>
-                <Button className="w-fit bg-white" size="sm" onClick={() => onStepChange("raw")}>
-                  <ImageIcon size={13} />
-                  商品信息
-                </Button>
-              </div>
-            ) : null}
-            </div>
-          ) : null}
-
-          <section className="grid min-w-0 content-start gap-3 border-t border-[#e5ecf6] px-4 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="font-black text-[#172033]">历史记录</div>
-                <div className="mt-1 text-xs font-semibold text-[#8b9bb3]">当前商品生成过的视频都会显示在这里。</div>
-              </div>
-              <Badge>{latestCreativeJobs.length} 个</Badge>
-            </div>
-            {latestCreativeJobs.length > 0 ? (
-              <div className="generation-history-scroll grid max-h-[360px] gap-2 overflow-y-auto pr-1">
-	                {latestCreativeJobs.map((job, index) => {
-	                  const activeVersion = isActiveCreativeVersion(job);
-                  const playableVideo = hasPlayableVideo(job);
-                  const canSelectFinal = playableVideo && !activeVersion;
-                  const retryJob = job.status === "failed" ? job.videoJob : undefined;
-                  return (
-                    <article
-                      key={job.id}
-                      className="grid gap-2 border-b border-[#e8eef7] pb-3 last:border-b-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <strong className="truncate text-sm font-black text-[#172033]">{videoLabel(index)}</strong>
-                          <Badge tone={activeVersion ? "warn" : playableVideo ? "ok" : "neutral"}>
-                            {activeVersion ? <RefreshCcw className="mr-1 h-3 w-3 animate-spin" /> : null}
-                            {creativeVersionDisplayStatus(job)}
-                          </Badge>
-                        </div>
-                        <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                          {providerLabel(job.provider)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
-                        </div>
-                      </div>
-	                      <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
-	                        {playableVideo ? (
-	                          <Button className="w-fit" size="sm" onClick={() => setPreviewJob(job)}>
-                            <Play size={13} />
-                            预览视频
-                          </Button>
-	                        ) : null}
-	                        {job.finalVideoUrl ? (
-	                          <Button asChild className="w-fit" size="sm">
-	                            <a href={job.finalVideoUrl} download>
-	                              <Download size={13} />
-	                              下载视频
-	                            </a>
-	                          </Button>
-	                        ) : null}
-	                        {retryJob ? (
-	                          <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
-	                            <RefreshCcw size={13} />
-	                            重试
-	                          </Button>
-	                        ) : null}
-	                        {canSelectFinal ? (
-	                          <Button
-	                            className="w-fit"
-	                            size="sm"
-	                            disabled={job.selectedFinal}
-	                            onClick={() => void onSelectFinal(actionProduct.sku, job.id)}
-	                          >
-	                            {job.selectedFinal ? "已设最终" : "设为最终"}
-	                          </Button>
-	                        ) : null}
-                        <Button
-                          className="w-fit"
-                          size="sm"
-                          variant="danger"
-                          title={activeVersion ? "删除并取消生成" : "删除这条视频记录"}
-                          onClick={() => requestDeleteCreativeVersion(job)}
-                        >
-                          <X size={13} />
-                          删除
-                        </Button>
-	                      </div>
-	                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState icon={<FileVideo size={28} />} text="还没有视频" />
-            )}
-          </section>
-        </section>
-      </div>
-      <VideoPreviewDialog
-        job={previewJob}
-        index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === previewJob?.id))}
-        actionProduct={actionProduct}
-        onClose={() => setPreviewJob(undefined)}
-        onCancelVideoJob={handleCancelPreviewJob}
-        onRetryVideoJob={onRetryVideoJob}
-        onSelectFinal={onSelectFinal}
-      />
-      <DeleteCreativeVersionDialog
-        job={deleteTarget}
-        index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === deleteTarget?.id))}
-        onClose={() => setDeleteTarget(undefined)}
-        onConfirm={handleDeleteCreativeVersion}
-      />
-    </ProductStudioPanel>
-  );
-}
-
 function DeleteCreativeVersionDialog({
   job,
   index,
@@ -4196,7 +3852,7 @@ function VideoPreviewDialog({
   index,
   actionProduct,
   onClose,
-  onCancelVideoJob,
+  onRequestDelete,
   onRetryVideoJob,
   onSelectFinal
 }: {
@@ -4204,7 +3860,7 @@ function VideoPreviewDialog({
   index: number;
   actionProduct: ProductSummary;
   onClose: () => void;
-  onCancelVideoJob: (jobId: string) => Promise<void>;
+  onRequestDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
 }) {
@@ -4322,7 +3978,7 @@ function VideoPreviewDialog({
               size="sm"
               variant="danger"
               title={activeVersion ? "删除并取消生成" : "删除这条视频记录"}
-              onClick={() => void onCancelVideoJob(job.id)}
+              onClick={() => onRequestDelete(job)}
             >
               <X size={13} />
               删除
@@ -4334,15 +3990,7 @@ function VideoPreviewDialog({
   );
 }
 
-function ProductStudioPanel({ children }: { children: ReactNode }) {
-  return (
-    <section className="grid content-start gap-4 rounded-[22px] border border-[#dbe4f0] bg-white p-5 shadow-[0_14px_36px_rgba(30,42,68,.08)]">
-      {children}
-    </section>
-  );
-}
-
-function ProductStudioProductPicker({
+function ProductCreationProductPicker({
   className,
   products,
   selectedSku,
@@ -4405,7 +4053,7 @@ function ProductStudioProductPicker({
       </button>
       {productPickerOpen ? (
         <div
-          className="product-studio-product-menu absolute left-[98px] right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+          className="product-creation-product-menu absolute left-[98px] right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
           role="listbox"
         >
           {products.length > 0 ? (
@@ -4449,278 +4097,6 @@ function ProductStudioProductPicker({
   );
 }
 
-function VideoCreationEmptyShell({
-  products,
-  selectedSku,
-  loadError,
-  onSelectProduct,
-  onAddProduct
-}: {
-  products: ProductSummary[];
-  selectedSku?: string;
-  loadError?: string;
-  onSelectProduct: (product: ProductSummary) => Promise<void>;
-  onAddProduct: () => void;
-}) {
-  const [productPickerSku, setProductPickerSku] = useState(selectedSku ?? products[0]?.sku ?? "");
-  const selectedPickerProduct = products.find((product) => product.sku === productPickerSku);
-  const retryLoadProduct = () => {
-    if (!selectedPickerProduct) return;
-    void onSelectProduct(selectedPickerProduct);
-  };
-
-  useEffect(() => {
-    setProductPickerSku((currentSku) => {
-      if (selectedSku && products.some((product) => product.sku === selectedSku)) return selectedSku;
-      if (products.some((product) => product.sku === currentSku)) return currentSku;
-      return products[0]?.sku ?? "";
-    });
-  }, [products, selectedSku]);
-
-  return (
-    <section
-      id="视频创作"
-      className="product-studio-shell rounded-[18px] border border-[#dbe4f0] bg-[#f3f6fb] shadow-[0_20px_54px_rgba(30,42,68,.10)]"
-    >
-      <div className="product-studio-topbar border-b border-[#dbe4f0] bg-white/95 px-3.5 py-2.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div className="product-studio-title flex min-w-0 flex-1 basis-[460px] flex-nowrap items-center gap-3">
-            <ProductStudioProductPicker
-              className="product-studio-product-picker max-w-[460px] flex-1"
-              products={products}
-              selectedSku={productPickerSku}
-              onSelectProduct={async (product) => {
-                setProductPickerSku(product.sku);
-                await onSelectProduct(product);
-              }}
-              onAddProduct={onAddProduct}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="product-studio-body grid min-h-[620px] place-items-center p-4">
-        <div className="grid w-full max-w-[420px] justify-items-center gap-3">
-          <EmptyState
-            icon={loadError ? <AlertTriangle size={28} /> : <Package size={28} />}
-            text={loadError ? "加载商品创作工作台失败" : products.length > 0 ? "正在载入商品创作工作台" : "还没有商品，请从上方下拉新建商品"}
-          />
-          {loadError ? (
-            <>
-              <div className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-xs font-bold leading-5 text-[var(--danger)]">
-                {loadError}
-              </div>
-              {selectedPickerProduct ? (
-                <Button variant="soft" onClick={retryLoadProduct}>
-                  <RefreshCcw size={14} />
-                  重试加载
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProductStudioMetric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="min-w-0 rounded-[14px] border border-[#dbe4f0] bg-[#f8fbff] p-3">
-      <span className="block truncate text-[11px] font-black text-[#8b9bb3]">{label}</span>
-      <strong className="mt-1 block truncate text-sm font-black text-[#172033]">{value}</strong>
-    </div>
-  );
-}
-
-function ProductFactSummaryStrip({ facts }: { facts: Array<{ label: string; value: ReactNode }> }) {
-  return (
-    <dl className="grid gap-x-4 gap-y-2 rounded-[14px] bg-[#f8fbff] px-4 py-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-      {facts.map((fact) => (
-        <div key={fact.label} className="min-w-0">
-          <dt className="text-[11px] font-black text-[#8b9bb3]">{fact.label}</dt>
-          <dd className="m-0 mt-1 truncate text-[14px] font-black text-[#172033]" title={typeof fact.value === "string" ? fact.value : undefined}>
-            {fact.value}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function ProductNarrativeList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="grid content-start gap-3">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[var(--accent)]">
-          <CheckCircle2 size={15} />
-        </span>
-        <h5 className="m-0 text-sm font-black text-[#172033]">{title}</h5>
-      </div>
-      {items.length > 0 ? (
-        <ul className="m-0 grid gap-2 pl-0 text-[15px] font-semibold leading-7 text-[#40506a]">
-          {items.map((item, index) => (
-            <li key={`${title}-${item}-${index}`} className="grid grid-cols-[18px_minmax(0,1fr)] gap-2">
-              <span className="mt-[9px] h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-              <span>{formatProductInfoText(item)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="text-sm font-semibold text-[#8b9bb3]">未填写</div>
-      )}
-    </section>
-  );
-}
-
-function ProductSceneTags({ items }: { items: string[] }) {
-  return (
-    <section className="grid content-start gap-3">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef4ff] text-[#3265d8]">
-          <Sparkles size={15} />
-        </span>
-        <h5 className="m-0 text-sm font-black text-[#172033]">使用场景</h5>
-      </div>
-      {items.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {items.map((item, index) => (
-            <span
-              key={`${item}-${index}`}
-              className="rounded-full border border-[#dbe4f0] bg-white px-3 py-1.5 text-sm font-black text-[#40506a]"
-            >
-              {formatProductInfoText(item)}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="text-sm font-semibold text-[#8b9bb3]">未填写</div>
-      )}
-    </section>
-  );
-}
-
-function ProductRiskList({ items }: { items: string[] }) {
-  return (
-    <section className="grid content-start gap-3 rounded-[14px] bg-[#fff7ed] p-3">
-      <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#d97706]">
-          <AlertTriangle size={15} />
-        </span>
-        <h5 className="m-0 text-sm font-black text-[#172033]">不可用/未确认卖点</h5>
-      </div>
-      {items.length > 0 ? (
-        <ul className="m-0 grid max-h-[190px] gap-1.5 overflow-auto pl-0 text-sm font-semibold leading-6 text-[#7a4a12]">
-          {items.map((item, index) => (
-            <li key={`${item}-${index}`} className="grid grid-cols-[16px_minmax(0,1fr)] gap-2">
-              <span className="mt-[9px] h-1.5 w-1.5 rounded-full bg-[#f59e0b]" />
-              <span>{formatProductInfoText(item)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="text-sm font-semibold text-[#9a6a28]">暂无限制</div>
-      )}
-    </section>
-  );
-}
-
-function ProductReferenceStrip({
-  product,
-  referenceCount,
-  onGenerateReferenceImages,
-  onImportAssets,
-  onUploadImages
-}: {
-  product: ProductDetail;
-  referenceCount: number;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
-  onImportAssets: (sku: string) => Promise<void>;
-  onUploadImages: (sku: string, files: FileList | null) => Promise<void>;
-}) {
-  const images = product.reference_image_statuses ?? [];
-  return (
-    <section className="product-reference-strip grid gap-3 border-t border-[#e5ecf6] pt-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="font-black text-[#172033]">参考图</div>
-          <div className="mt-1 text-xs font-semibold text-[#6c7890]">作为外观、质感和镜头构图参考。</div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={referenceCount >= 3 ? "ok" : "warn"}>{referenceCount >= 3 ? `${referenceCount} 张` : `还差 ${3 - referenceCount} 张`}</Badge>
-          <Button size="sm" variant="soft" onClick={() => void onGenerateReferenceImages(product.sku)}>
-            <Sparkles size={13} />
-            AI 生成参考图
-          </Button>
-          <label className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#dbe4f0] bg-white px-2.5 text-xs font-black text-[#172033] transition hover:border-[var(--accent)] hover:text-[var(--accent)]">
-            <ImageIcon size={13} />
-            上传
-            <input
-              className="sr-only"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={(event) => {
-                void onUploadImages(product.sku, event.target.files);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
-        </div>
-      </div>
-      {images.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {images.map((image, index) => (
-            <ReferenceImageFigure key={`${image.original}-${index}`} image={image} sku={product.sku} index={index} onImportAssets={onImportAssets} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState icon={<ImageIcon size={28} />} text="还没有参考图" />
-      )}
-    </section>
-  );
-}
-
-function formatProductInfoText(value: string): string {
-  return value.replace(/\bSKU\b/gi, "款式");
-}
-
-function productStudioSteps(product?: ProductDetail, group?: ProductGroup): ProductStudioStep[] {
-  const referenceCount = productReferenceCount(product);
-  return [
-    {
-      key: "raw",
-      section: "准备",
-      label: "商品信息",
-      description: "查看标题、分类、材质、尺寸、卖点、场景和参考图，只围绕真实商品继续创作。",
-      done: Boolean(product?.importQuality?.ready && referenceCount >= 3),
-      icon: <Package size={14} />
-    },
-    {
-      key: "storyboard",
-      section: "创作",
-      label: "脚本分镜",
-      description: "把商品资料转成中文脚本和分镜要点，生成视频时再按成片语言执行。",
-      done: Boolean(product?.importQuality?.ready && referenceCount > 0),
-      icon: <Sparkles size={14} />
-    },
-    {
-      key: "generate",
-      section: "创作",
-      label: "生成视频",
-      description: "选择通道、成片语言和视频数量，生成当前商品视频。",
-      done: (group?.jobCount ?? 0) > 0,
-      icon: <Play size={14} />
-    }
-  ];
-}
-
-function productStudioSections(steps: ProductStudioStep[]) {
-  return (["准备", "创作"] as ProductStudioSection[]).map((label) => ({
-    label,
-    steps: steps.filter((step) => step.section === label)
-  }));
-}
-
 function productReferenceCount(product?: ProductSummary | ProductDetail): number {
   if (!product) return 0;
   if ("reference_image_statuses" in product && product.reference_image_statuses) {
@@ -4730,17 +4106,6 @@ function productReferenceCount(product?: ProductSummary | ProductDetail): number
     return product.reference_images.length;
   }
   return product.referenceImageCount ?? 0;
-}
-
-function productStudioFlowState(product?: ProductDetail, group?: ProductGroup) {
-  const selectedFinalJob = group?.jobs.find((job) => job.id === group.selectedFinalJobId);
-  return {
-    productLoaded: Boolean(product),
-    productFactsReady: Boolean(product?.importQuality?.ready),
-    referenceImageCount: productReferenceCount(product),
-    generatedVersionCount: group?.jobCount ?? 0,
-    selectedFinalReady: Boolean(selectedFinalJob)
-  };
 }
 
 function productActionSummary(product: ProductDetail, summary?: ProductSummary): ProductSummary {
@@ -6618,6 +5983,18 @@ function removeLedgerJob(ledger: Ledger, jobId: string): Ledger {
   };
 }
 
+function mergeLedgerJobs(...jobGroups: LedgerJob[][]): LedgerJob[] {
+  const byId = new Map<string, LedgerJob>();
+  for (const jobs of jobGroups) {
+    for (const job of jobs) {
+      if (!byId.has(job.id)) {
+        byId.set(job.id, job);
+      }
+    }
+  }
+  return Array.from(byId.values());
+}
+
 function mergeVideoJobs(nextJobs: VideoJob[], currentJobs: VideoJob[]): VideoJob[] {
   const byId = new Map<string, VideoJob>();
   for (const job of [...nextJobs, ...currentJobs]) {
@@ -6638,7 +6015,7 @@ function buildLatestCreativeJobs(input: {
   const productVideoJobs = matchingVideoJobs
     .filter((job) => job.status !== "canceled")
     .map(videoJobToCreativeVersion);
-  const videoJobIds = new Set(matchingVideoJobs.map((job) => job.id));
+  const videoJobIds = new Set(productVideoJobs.map((job) => job.id));
   const ledgerVersions = input.ledgerJobs
     .filter((job) => !videoJobIds.has(job.id))
     .map(ledgerJobToCreativeVersion);
