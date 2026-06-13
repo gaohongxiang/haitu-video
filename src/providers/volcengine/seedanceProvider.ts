@@ -1,0 +1,316 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { extname, isAbsolute, join, resolve } from "node:path";
+
+import { defaultFinalVideoLanguage, providerScriptLanguageLabel } from "../../core/videoLanguage.js";
+import type { VideoProvider, VideoProviderRequest, VideoProviderResult } from "../types.js";
+
+interface VolcengineSeedanceProviderOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  pollIntervalMs?: number;
+  maxPolls?: number;
+  resolution?: "480p" | "720p" | "1080p";
+  watermark?: boolean;
+  estimatedCostAmount?: number;
+  estimatedCostPerSecond?: number;
+  estimatedCostCurrency?: "USD" | "JPY" | "CNY";
+  fetchImpl?: typeof fetch;
+}
+
+interface VolcengineSeedanceTaskResponse {
+  id?: string;
+  task_id?: string;
+  status?: string;
+  content?: VolcengineSeedanceContent;
+  output?: {
+    video_url?: string;
+    url?: string;
+  };
+  data?: {
+    id?: string;
+    task_id?: string;
+    status?: string;
+    content?: VolcengineSeedanceContent;
+    output?: VolcengineSeedanceTaskResponse["output"];
+  };
+  usage?: Record<string, unknown>;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+type VolcengineSeedanceContent =
+  | Array<{
+      type?: string;
+      url?: string;
+      video_url?: string;
+    }>
+  | {
+      type?: string;
+      url?: string;
+      video_url?: string;
+    };
+
+export class VolcengineSeedanceProvider implements VideoProvider {
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+  private readonly model: string;
+  private readonly pollIntervalMs: number;
+  private readonly maxPolls: number;
+  private readonly resolution: "480p" | "720p" | "1080p";
+  private readonly watermark: boolean;
+  private readonly estimatedCostAmount?: number;
+  private readonly estimatedCostPerSecond: number;
+  private readonly estimatedCostCurrency: "USD" | "JPY" | "CNY";
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(options: VolcengineSeedanceProviderOptions = {}) {
+    this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
+    this.baseUrl =
+      options.baseUrl ?? process.env.SEEDANCE_BASE_URL ?? "https://ark.cn-beijing.volces.com";
+    this.model =
+      options.model ?? process.env.SEEDANCE_MODEL ?? "doubao-seedance-2-0-260128";
+    this.pollIntervalMs = options.pollIntervalMs ?? Number(process.env.SEEDANCE_POLL_MS ?? 5000);
+    this.maxPolls = options.maxPolls ?? Number(process.env.SEEDANCE_MAX_POLLS ?? 120);
+    this.resolution =
+      options.resolution ??
+      ((process.env.SEEDANCE_RESOLUTION as "480p" | "720p" | "1080p" | undefined) ?? "480p");
+    this.watermark = options.watermark ?? parseBoolean(process.env.SEEDANCE_WATERMARK ?? "false");
+    this.estimatedCostAmount = options.estimatedCostAmount ?? parseOptionalNumber(
+      process.env.SEEDANCE_ESTIMATED_COST_CNY
+    );
+    this.estimatedCostPerSecond =
+      options.estimatedCostPerSecond ??
+      Number(process.env.SEEDANCE_ESTIMATED_COST_CNY_PER_SECOND ?? 0.8);
+    this.estimatedCostCurrency =
+      options.estimatedCostCurrency ??
+      ((process.env.SEEDANCE_ESTIMATED_COST_CURRENCY as "USD" | "JPY" | "CNY" | undefined) ??
+        "CNY");
+    this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
+    if (!this.apiKey) {
+      throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Refusing to make a paid request.");
+    }
+
+    await mkdir(request.outputDir, { recursive: true });
+    const createResponse = await this.postJson<VolcengineSeedanceTaskResponse>(
+      "/api/v3/contents/generations/tasks",
+      {
+        model: this.model,
+        content: await this.buildContent(request),
+        resolution: this.resolution,
+        ratio: request.aspectRatio,
+        duration: request.durationSeconds,
+        watermark: this.watermark
+      }
+    );
+    const taskId = getTaskId(createResponse);
+    if (!taskId) {
+      throw new Error("Volcengine Seedance create task response did not include a task id.");
+    }
+
+    const completedTask = await this.waitForTask(taskId);
+    const videoUrl = getVideoUrl(completedTask);
+    if (!videoUrl) {
+      throw new Error(`Volcengine Seedance task ${taskId} completed without a video URL.`);
+    }
+
+    const outputPath = join(request.outputDir, `${request.jobId}.seedance.mp4`);
+    await this.download(videoUrl, outputPath);
+
+    return {
+      provider: "volcengine-seedance",
+      model: this.model,
+      providerTaskId: taskId,
+      output: {
+        path: outputPath,
+        width: 1080,
+        height: 1920,
+        durationSeconds: request.durationSeconds,
+        mimeType: "video/mp4"
+      },
+      usage: getUsage(completedTask),
+      cost: {
+        amount: this.estimatedCostAmount ?? roundMoney(this.estimatedCostPerSecond * request.durationSeconds),
+        currency: this.estimatedCostCurrency
+      },
+      rawResponse: {
+        createResponse,
+        completedTask
+      }
+    };
+  }
+
+  private async buildContent(request: VideoProviderRequest): Promise<Array<Record<string, unknown>>> {
+    const finalLanguage = request.finalLanguage ?? defaultFinalVideoLanguage;
+    const content: Array<Record<string, unknown>> = [
+      {
+        type: "text",
+        text: [request.prompt, "", `${providerScriptLanguageLabel(finalLanguage)}:`, request.script].join("\n")
+      }
+    ];
+
+    for (const referenceImage of request.referenceImages ?? []) {
+      content.push({
+        type: "image_url",
+        role: "reference_image",
+        image_url: {
+          url: await normalizeImageReference(referenceImage)
+        }
+      });
+    }
+
+    return content;
+  }
+
+  private async waitForTask(taskId: string): Promise<VolcengineSeedanceTaskResponse> {
+    for (let attempt = 1; attempt <= this.maxPolls; attempt += 1) {
+      const task = await this.getJson<VolcengineSeedanceTaskResponse>(
+        `/api/v3/contents/generations/tasks/${taskId}`
+      );
+      const status = getStatus(task);
+      if (["succeeded", "success", "completed"].includes(status)) {
+        return task;
+      }
+      if (["failed", "error", "cancelled", "canceled", "expired"].includes(status)) {
+        const message = task.error?.message ?? task.data?.status ?? status;
+        throw new Error(`Volcengine Seedance task ${taskId} failed: ${message}`);
+      }
+      await sleep(this.pollIntervalMs);
+    }
+
+    throw new Error(`Volcengine Seedance task did not finish after ${this.maxPolls} poll(s).`);
+  }
+
+  private async postJson<T>(path: string, body: unknown): Promise<T> {
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.apiKey}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    return parseJsonResponse<T>(response);
+  }
+
+  private async getJson<T>(path: string): Promise<T> {
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${this.apiKey}`
+      }
+    });
+    return parseJsonResponse<T>(response);
+  }
+
+  private async download(url: string, outputPath: string): Promise<void> {
+    const response = await this.fetchImpl(url);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download Volcengine Seedance video: ${response.status} ${response.statusText}`
+      );
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    await writeFile(outputPath, bytes);
+  }
+}
+
+export { VolcengineSeedanceProvider as SeedanceProvider };
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Volcengine Seedance API error ${response.status}: ${text}`);
+  }
+  return JSON.parse(text) as T;
+}
+
+function getTaskId(response: VolcengineSeedanceTaskResponse): string | undefined {
+  return response.id ?? response.task_id ?? response.data?.id ?? response.data?.task_id;
+}
+
+function getStatus(response: VolcengineSeedanceTaskResponse): string {
+  return (response.status ?? response.data?.status ?? "").toLowerCase();
+}
+
+function getVideoUrl(response: VolcengineSeedanceTaskResponse): string | undefined {
+  return (
+    response.output?.video_url ??
+    response.output?.url ??
+    response.data?.output?.video_url ??
+    response.data?.output?.url ??
+    getContentVideoUrl(response.content) ??
+    getContentVideoUrl(response.data?.content)
+  );
+}
+
+function getUsage(
+  response: VolcengineSeedanceTaskResponse
+): { completionTokens?: number; totalTokens?: number } | undefined {
+  const completionTokens = getNumberField(response.usage, "completion_tokens");
+  const totalTokens = getNumberField(response.usage, "total_tokens");
+  if (completionTokens === undefined && totalTokens === undefined) {
+    return undefined;
+  }
+  return {
+    completionTokens,
+    totalTokens
+  };
+}
+
+function getNumberField(value: Record<string, unknown> | undefined, key: string): number | undefined {
+  const field = value?.[key];
+  return typeof field === "number" ? field : undefined;
+}
+
+function getContentVideoUrl(content: VolcengineSeedanceContent | undefined): string | undefined {
+  if (!content) {
+    return undefined;
+  }
+  if (Array.isArray(content)) {
+    return (
+      content.find((item) => item.type === "video_url")?.url ??
+      content.find((item) => item.video_url)?.video_url
+    );
+  }
+  return content.video_url ?? (content.type === "video_url" ? content.url : undefined) ?? content.url;
+}
+
+async function normalizeImageReference(reference: string): Promise<string> {
+  if (reference.startsWith("http://") || reference.startsWith("https://")) {
+    return reference;
+  }
+  if (reference.startsWith("data:image/") || reference.startsWith("asset://")) {
+    return reference;
+  }
+
+  const path = isAbsolute(reference) ? reference : resolve(reference);
+  const extension = extname(path).slice(1).toLowerCase();
+  const mime = extension === "jpg" ? "jpeg" : extension || "png";
+  const bytes = await readFile(path);
+  return `data:image/${mime};base64,${bytes.toString("base64")}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseBoolean(value: string): boolean {
+  return ["1", "true", "yes"].includes(value.toLowerCase());
+}
+
+function parseOptionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+  return Number(value);
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}

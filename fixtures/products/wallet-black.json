@@ -1,0 +1,31 @@
+{
+  "sku": "WALLET-BLACK-001",
+  "title_ja": "ラウンドファスナー ミニ財布 ブラック",
+  "category": "財布",
+  "materials": [
+    "レザー調素材"
+  ],
+  "dimensions": "ミニサイズ",
+  "verified_selling_points": [
+    "ラウンドファスナー仕様",
+    "カードをまとめて収納しやすい",
+    "小銭入れ付き",
+    "お札とカードを分けて入れられる",
+    "ブラックのシンプルなデザイン"
+  ],
+  "usage_scenes": [
+    "通勤",
+    "買い物",
+    "旅行"
+  ],
+  "forbidden_claims": [
+    "本革未確認",
+    "防水未確認",
+    "スキミング防止未確認",
+    "大容量は未確認",
+    "日本で大人気は未確認"
+  ],
+  "reference_images": [
+    "../../assets/products/WALLET-BLACK-001/reference-01.jpg"
+  ]
+}

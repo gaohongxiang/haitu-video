@@ -1,0 +1,30 @@
+{
+  "sku": "DXM-172397240576223361",
+  "title_ja": "接触冷感アームカバー",
+  "category": "スポーツ用スリーブ・サポーター",
+  "materials": ["ポリエステル"],
+  "dimensions": "梱包サイズ目安 15x10x5cm、重量 0.1kg",
+  "verified_selling_points": [
+    "指先までカバーしやすい一体型デザイン",
+    "ロング丈のアームカバー",
+    "リブとメロウのくすみカラーデザイン",
+    "通気性のある生地",
+    "ホワイト、カーキ、ブルー、グレー、ブラックの5色展開"
+  ],
+  "usage_scenes": ["通勤", "屋外での移動", "スポーツ"],
+  "forbidden_claims": [
+    "UVカット96%以上は証明未確認",
+    "日焼け防止効果の数値保証は未確認",
+    "接触冷感の検査値は未確認",
+    "医療用サポーター効果は未確認",
+    "40cmと52cmの両サイズ展開はSKU別確認未完了",
+    "日本で大人気は未確認"
+  ],
+  "reference_images": [
+    "../../assets/products/arm-cover-cool/reference-01.jpeg",
+    "../../assets/products/arm-cover-cool/reference-02.jpeg",
+    "../../assets/products/arm-cover-cool/reference-03.jpeg",
+    "../../assets/products/arm-cover-cool/reference-04.jpeg",
+    "../../assets/products/arm-cover-cool/reference-05.jpeg"
+  ]
+}

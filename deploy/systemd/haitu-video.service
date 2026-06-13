@@ -1,0 +1,19 @@
+[Unit]
+Description=Haitu Video Console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=haitu
+Group=haitu
+WorkingDirectory=/opt/haitu-video
+EnvironmentFile=/etc/haitu-video.env
+ExecStart=/usr/bin/npm run start:console
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

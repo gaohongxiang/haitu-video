@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.haitu.video.console</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/gaohongxiang/projects/haitu-video</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/npm</string>
+    <string>run</string>
+    <string>start:console</string>
+    <string>--</string>
+    <string>--port</string>
+    <string>4173</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/gaohongxiang/projects/haitu-video/outputs/console-launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/gaohongxiang/projects/haitu-video/outputs/console-launchd.err.log</string>
+</dict>
+</plist>
