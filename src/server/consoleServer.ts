@@ -419,6 +419,17 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           })
         );
       }
+      const deleteProductAssetMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/reference-images\/(\d+)$/);
+      if (request.method === "DELETE" && deleteProductAssetMatch) {
+        return jsonResponse(
+          await deleteProductReferenceImage({
+            fixturesDir,
+            rootDir,
+            sku: decodeURIComponent(deleteProductAssetMatch[1] ?? ""),
+            index: Number(deleteProductAssetMatch[2])
+          })
+        );
+      }
       const generateProductAssetsMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/reference-images\/generate$/);
       if (request.method === "POST" && generateProductAssetsMatch) {
         return jsonResponse(
@@ -887,6 +898,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse({ error: message }, 422);
       }
       if (message.includes("付费生成前请先补齐商品资料")) {
+        return jsonResponse({ error: message }, 422);
+      }
+      if (message.includes("Reference image index")) {
         return jsonResponse({ error: message }, 422);
       }
       if (message.includes("exceeds budget cap")) {
@@ -2623,6 +2637,51 @@ async function generateProductReferenceImages(input: {
   );
   return {
     generated,
+    product: await getProductBySku({
+      fixturesDir: input.fixturesDir,
+      rootDir: input.rootDir,
+      sku: input.sku
+    })
+  };
+}
+
+async function deleteProductReferenceImage(input: {
+  fixturesDir: string;
+  rootDir: string;
+  sku: string;
+  index: number;
+}): Promise<{
+  deleted: {
+    index: number;
+    reference: string;
+  };
+  product: Awaited<ReturnType<typeof getProductBySku>>;
+}> {
+  const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
+  const rawProduct = JSON.parse(await readFile(productFilePath, "utf8")) as Record<string, unknown>;
+  const product = parseProductFacts(rawProduct);
+  if (!Number.isInteger(input.index) || input.index < 0 || input.index >= product.reference_images.length) {
+    throw new Error(`Reference image index is out of range: ${input.index}`);
+  }
+  const nextReferenceImages = product.reference_images.filter((_, index) => index !== input.index);
+  const deletedReference = product.reference_images[input.index] ?? "";
+  await writeFile(
+    productFilePath,
+    JSON.stringify(
+      {
+        ...rawProduct,
+        reference_images: nextReferenceImages
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  return {
+    deleted: {
+      index: input.index,
+      reference: deletedReference
+    },
     product: await getProductBySku({
       fixturesDir: input.fixturesDir,
       rootDir: input.rootDir,

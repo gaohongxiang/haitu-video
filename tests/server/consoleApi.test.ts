@@ -308,8 +308,8 @@ describe("console API", () => {
     expect(appSource).toContain("添加商品");
     expect(appSource).toContain("粘贴导入");
     expect(appSource).toContain("创作视频");
-    expect(appSource).toContain("选择创作商品");
-    expect(appSource).toContain("+ 新建商品");
+    expect(appSource).toContain("创作商品");
+    expect(appSource).toContain("新商品");
     expect(appSource).not.toContain("开始创作");
     expect(appSource).not.toContain("用此商品创作视频");
     expect(appSource).toContain("粘贴商品信息");
@@ -361,7 +361,8 @@ describe("console API", () => {
     expect(appSource).toContain("video-creation-frame");
     expect(appSource).toContain("product-creation-picker");
     expect(appSource).toContain("product-creation-product-menu");
-    expect(appSource).toContain("creation-parameter-dock");
+    expect(appSource).toContain("product-control-bar");
+    expect(appSource).not.toContain("creation-parameter-dock");
     expect(appSource).not.toContain("product-studio-shell");
     expect(appSource).not.toContain("product-studio-topbar");
     expect(appSource).not.toContain("product-studio-step-actions");
@@ -496,12 +497,29 @@ describe("console API", () => {
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
     expect(creationComposerSource).toContain("product-creation-canvas");
+    expect(creationComposerSource).toContain("product-control-bar");
+    expect(creationComposerSource).not.toContain("creation-parameter-dock");
+    expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
+    expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
+    expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(creationComposerSource).toContain("product-reference-inline");
     expect(creationComposerSource).toContain("storyboard-side-panel");
-    expect(creationComposerSource).toContain("新商品");
-    expect(creationComposerSource).toContain("选择已有商品");
+    expect(creationComposerSource).toContain("product-facts-editor");
+    expect(creationComposerSource).toContain("product-facts-actions");
+    expect(creationComposerSource).toContain("product-facts-body");
+    expect(creationComposerSource).not.toContain("min-h-[350px] resize-y border-0");
+    expect(creationComposerSource).not.toContain("max-h-[340px]");
+    expect(creationComposerSource).not.toContain("grid min-h-[430px]");
+    expect(creationComposerSource).toContain("grid items-start gap-0");
+    expect(creationComposerSource).not.toContain("选择已有商品");
+    expect(creationComposerSource).not.toContain('label="商品来源"');
+    expect(creationComposerSource).not.toContain("商品资料完整，可进入视频预检");
+    expect(creationComposerSource).not.toContain("referenceReadiness(actionProduct)");
+    expect(creationComposerSource).not.toContain("参考图 5 张 · 可生成视频");
     expect(creationComposerSource).toContain("商品资料");
     expect(creationComposerSource).toContain("添加图片");
+    expect(creationComposerSource).toContain("onPreviewReferenceImage");
+    expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("AI 整理资料包");
     expect(creationComposerSource).toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain("视频风格");
@@ -514,6 +532,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct))");
     expect(creationComposerSource).toContain("已加入历史记录");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
+    expect(creationComposerSource).toContain("previewReferenceIndex");
+    expect(creationComposerSource).toContain("previewReferenceImages");
     expect(creationComposerSource).not.toContain("InlineProductFactsFields");
     expect(creationComposerSource).not.toContain('Field label="标题"');
     expect(creationComposerSource).not.toContain("<Select");
@@ -522,16 +542,27 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]");
     expect(creationComposerSource).not.toContain("上一步");
     expect(creationComposerSource).not.toContain("下一步");
-    expect(productPickerSource).toContain("选择创作商品");
+    expect(productPickerSource).toContain("创作商品");
     expect(productPickerSource).toContain("product-creation-product-menu");
     expect(productPickerSource).toContain('aria-haspopup="listbox"');
     expect(productPickerSource).toContain('role="listbox"');
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
-    expect(productPickerSource).toContain("+ 新建商品");
+    expect(productPickerSource).toContain("新商品");
+    expect(productPickerSource).not.toContain("+ 新建商品");
+    const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
+    const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
+    expect(referenceFigureSource).toContain("reference-image-actions");
+    expect(referenceFigureSource).toContain("group-hover:opacity-100");
+    expect(referencePreviewSource).toContain("onPrevious");
+    expect(referencePreviewSource).toContain("onNext");
+    expect(referencePreviewSource).toContain("touchStartXRef");
+    expect(referencePreviewSource).toContain("ArrowLeft");
+    expect(referencePreviewSource).toContain("ArrowRight");
     expect(storyboardPanelSource).toContain("脚本分镜");
     expect(storyboardPanelSource).toContain("视频分镜");
     expect(storyboardPanelSource).toContain("AI 生成分镜");
     expect(storyboardPanelSource).toContain("分镜历史记录");
+    expect(storyboardPanelSource).toContain("storyboard-history-dropdown");
     expect(storyboardPanelSource).toContain("补充要点");
     expect(storyboardPanelSource).toContain("正在请求文本模型");
     expect(storyboardPanelSource).not.toContain("时间线");
@@ -1284,10 +1315,11 @@ describe("console API", () => {
     const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
     expect(appSource).not.toContain("product-studio-topbar");
     expect(appSource).not.toContain("ProductStudioProductPicker");
-    expect(productPickerSource).toContain("选择创作商品");
+    expect(productPickerSource).toContain("创作商品");
     expect(productPickerSource).toContain("product-creation-product-menu");
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
-    expect(productPickerSource).toContain("+ 新建商品");
+    expect(productPickerSource).toContain("新商品");
+    expect(productPickerSource).not.toContain("+ 新建商品");
     expect(productPickerSource).not.toContain("<Select");
     expect(productPickerSource).not.toContain("切换商品");
     expect(productPickerSource).not.toContain("返回视频创作");
@@ -1314,12 +1346,29 @@ describe("console API", () => {
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     expect(composerSource).toContain("video-creation-frame");
     expect(composerSource).toContain("product-creation-canvas");
+    expect(composerSource).toContain("product-control-bar");
+    expect(composerSource).not.toContain("creation-parameter-dock");
+    expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
+    expect(composerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
+    expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(composerSource).toContain("product-reference-inline");
     expect(composerSource).toContain("storyboard-side-panel");
-    expect(composerSource).toContain("新商品");
-    expect(composerSource).toContain("选择已有商品");
+    expect(composerSource).toContain("product-facts-editor");
+    expect(composerSource).toContain("product-facts-actions");
+    expect(composerSource).toContain("product-facts-body");
+    expect(composerSource).not.toContain("min-h-[350px] resize-y border-0");
+    expect(composerSource).not.toContain("max-h-[340px]");
+    expect(composerSource).not.toContain("grid min-h-[430px]");
+    expect(composerSource).toContain("grid items-start gap-0");
+    expect(composerSource).not.toContain("选择已有商品");
+    expect(composerSource).not.toContain('label="商品来源"');
+    expect(composerSource).not.toContain("商品资料完整，可进入视频预检");
+    expect(composerSource).not.toContain("referenceReadiness(actionProduct)");
+    expect(composerSource).not.toContain("参考图 5 张 · 可生成视频");
     expect(composerSource).toContain("商品资料");
     expect(composerSource).toContain("添加图片");
+    expect(composerSource).toContain("onPreviewReferenceImage");
+    expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("AI 整理资料包");
     expect(composerSource).toContain("整理资料并生成视频");
     expect(composerSource).toContain("视频风格");
@@ -1336,6 +1385,8 @@ describe("console API", () => {
     expect(composerSource).toContain("预览视频");
     expect(composerSource).toContain("下载视频");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
+    expect(composerSource).toContain("previewReferenceIndex");
+    expect(composerSource).toContain("previewReferenceImages");
     expect(composerSource).not.toContain("InlineProductFactsFields");
     expect(composerSource).not.toContain('Field label="标题"');
     expect(composerSource).not.toContain("<Select");
@@ -2228,6 +2279,35 @@ describe("console API", () => {
       previewUrl: `/media?path=${encodeURIComponent(uploadedPath)}`,
       status: "previewable"
     });
+  });
+
+  it("deletes a product reference image from the product file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-delete-reference-image-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const productPath = join(fixturesDir, "wallet.json");
+    const assetPath = join(root, "assets", "products", "TK-001", "reference-02.jpg");
+    const assetReference = "../../assets/products/TK-001/reference-02.jpg";
+    await mkdir(join(root, "assets", "products", "TK-001"), { recursive: true });
+    await writeFile(assetPath, Buffer.from("uploaded-wallet-image"));
+    await writeProduct(productPath, {
+      reference_images: ["main.jpg", assetReference, "detail.jpg"]
+    });
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products/TK-001/reference-images/1", {
+      method: "DELETE"
+    });
+
+    expect(response.deleted).toEqual({
+      index: 1,
+      reference: assetReference
+    });
+    expect(response.product.reference_images).toEqual(["main.jpg", "detail.jpg"]);
+    await expect(readFile(productPath, "utf8")).resolves.not.toContain(assetReference);
+    await expect(stat(assetPath)).resolves.toEqual(expect.objectContaining({
+      size: "uploaded-wallet-image".length
+    }));
   });
 
   it("uses the highest priority enabled image model config to generate product reference images", async () => {

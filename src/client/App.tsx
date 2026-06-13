@@ -1910,6 +1910,25 @@ export function App() {
     }
   }
 
+  async function deleteProductReferenceImage(sku: string, index: number) {
+    if (!sku) return;
+    setIsBusy(true);
+    try {
+      const response = await deleteJson<{
+        deleted: { index: number; reference: string };
+        product: ProductDetail;
+      }>(`/api/products/${encodeURIComponent(sku)}/reference-images/${index}`);
+      applyProductToCreationComposer(response.product);
+      setStatusText(`已删除参考图: ${response.deleted.reference}`);
+      await refreshConsole();
+    } catch (error) {
+      showError(error);
+      throw error;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function generateProductReferenceImages(sku: string) {
     if (!sku) {
       return;
@@ -2187,11 +2206,9 @@ export function App() {
               ledgerJobs={ledger?.jobs ?? []}
               videoJobs={videoJobs}
               draft={productDraft}
-              setDraft={setProductDraft}
               importText={productImportText}
               setImportText={setProductImportText}
               importNotes={importNotes}
-              importQuality={importQuality}
               onOrganizeProductPackage={organizeProductPackage}
               onSelectProduct={openProductStudio}
               onStartNewProduct={startNewVideoProduct}
@@ -2204,6 +2221,7 @@ export function App() {
               onImportAssets={importProductAssets}
               onUploadImages={uploadProductReferenceImages}
               onGenerateReferenceImages={generateProductReferenceImages}
+              onDeleteReferenceImage={deleteProductReferenceImage}
               onSelectFinal={selectFinalVersion}
               provider={provider}
               onProviderChange={(nextProvider) => {
@@ -2651,11 +2669,9 @@ function ProductCreationWorkspace({
   ledgerJobs,
   videoJobs,
   draft,
-  setDraft,
   importText,
   setImportText,
   importNotes,
-  importQuality,
   onOrganizeProductPackage,
   onSelectProduct,
   onStartNewProduct,
@@ -2668,6 +2684,7 @@ function ProductCreationWorkspace({
   onImportAssets,
   onUploadImages,
   onGenerateReferenceImages,
+  onDeleteReferenceImage,
   onSelectFinal,
   provider,
   onProviderChange,
@@ -2697,11 +2714,9 @@ function ProductCreationWorkspace({
   ledgerJobs: LedgerJob[];
   videoJobs: VideoJob[];
   draft: ProductDraft;
-  setDraft: (draft: ProductDraft) => void;
   importText: string;
   setImportText: (text: string) => void;
   importNotes: string[];
-  importQuality?: ProductImportQuality;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
@@ -2714,6 +2729,7 @@ function ProductCreationWorkspace({
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
   provider: ProviderName;
   onProviderChange: (provider: ProviderName) => void;
@@ -2766,11 +2782,9 @@ function ProductCreationWorkspace({
       latestCreativeJobs={latestCreativeJobs}
       loadError={loadError}
       draft={draft}
-      setDraft={setDraft}
       importText={importText}
       setImportText={setImportText}
       importNotes={importNotes}
-      importQuality={importQuality}
       onOrganizeProductPackage={onOrganizeProductPackage}
       onSelectProduct={onSelectProduct}
       onStartNewProduct={onStartNewProduct}
@@ -2783,6 +2797,7 @@ function ProductCreationWorkspace({
       onImportAssets={onImportAssets}
       onUploadImages={onUploadImages}
       onGenerateReferenceImages={onGenerateReferenceImages}
+      onDeleteReferenceImage={onDeleteReferenceImage}
       onSelectFinal={onSelectFinal}
       provider={provider}
       onProviderChange={onProviderChange}
@@ -2815,11 +2830,9 @@ function ProductCreationComposer({
   latestCreativeJobs,
   loadError,
   draft,
-  setDraft,
   importText,
   setImportText,
   importNotes,
-  importQuality,
   onOrganizeProductPackage,
   onSelectProduct,
   onStartNewProduct,
@@ -2832,6 +2845,7 @@ function ProductCreationComposer({
   onImportAssets,
   onUploadImages,
   onGenerateReferenceImages,
+  onDeleteReferenceImage,
   onSelectFinal,
   provider,
   onProviderChange,
@@ -2860,11 +2874,9 @@ function ProductCreationComposer({
   latestCreativeJobs: CreativeVersionItem[];
   loadError?: string;
   draft: ProductDraft;
-  setDraft: (draft: ProductDraft) => void;
   importText: string;
   setImportText: (text: string) => void;
   importNotes: string[];
-  importQuality?: ProductImportQuality;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
@@ -2877,6 +2889,7 @@ function ProductCreationComposer({
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
   provider: ProviderName;
   onProviderChange: (provider: ProviderName) => void;
@@ -2904,9 +2917,9 @@ function ProductCreationComposer({
   const [submitHint, setSubmitHint] = useState("");
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
+  const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
-  const referenceCount = selectedProduct ? productReferenceCount(selectedProduct) : pendingImageFiles.length;
-  const readiness = actionProduct ? referenceReadiness(actionProduct) : undefined;
+  const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
   const providerOptions: ProviderName[] = provider === "seedance"
     ? ["mock", "seedance", "volcengine-seedance"]
     : ["mock", "volcengine-seedance"];
@@ -2917,10 +2930,23 @@ function ProductCreationComposer({
     ? enabledTemplateOptions
     : [template, ...enabledTemplateOptions];
   const packingDisabled = isPacking || isSubmittingVideo;
+  const productFactsRows = Math.max(5, Math.min(8, importText.split(/\r?\n/).length + 1));
 
   useEffect(() => {
     setPendingImageFiles([]);
+    setPreviewReferenceIndex(undefined);
   }, [selectedProduct?.sku]);
+
+  useEffect(() => {
+    if (previewReferenceIndex === undefined) return;
+    if (previewReferenceImages.length === 0) {
+      setPreviewReferenceIndex(undefined);
+      return;
+    }
+    if (previewReferenceIndex >= previewReferenceImages.length) {
+      setPreviewReferenceIndex(previewReferenceImages.length - 1);
+    }
+  }, [previewReferenceImages.length, previewReferenceIndex]);
 
   async function uploadPendingImages(product: ProductDetail): Promise<ProductDetail> {
     if (pendingImageFiles.length === 0) return product;
@@ -2983,96 +3009,27 @@ function ProductCreationComposer({
     setDeleteTarget((current) => (current?.id === job.id ? undefined : current));
   }
 
+  async function handleDeleteReferenceImage(index: number) {
+    if (!selectedProduct) return;
+    await onDeleteReferenceImage(selectedProduct.sku, index);
+    setPreviewReferenceIndex(undefined);
+  }
+
   return (
     <section
       id="视频创作"
-      className="video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-white p-4 shadow-[0_22px_64px_rgba(30,42,68,.10)]"
+      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] shadow-[0_22px_64px_rgba(30,42,68,.10)]"
     >
-      <div className="product-creation-canvas overflow-visible rounded-[22px] border border-[#dbe4f0] bg-[#fbfdff]">
-        <div className="grid gap-3 border-b border-[#e5ecf6] p-4 min-[920px]:grid-cols-[160px_minmax(280px,420px)_minmax(0,1fr)_auto] min-[920px]:items-end">
-          <CompactChoiceDropdown
-            label="商品来源"
-            value={selectedProduct ? "existing" : "new"}
-            options={["new", "existing"]}
-            formatOption={(option) => option === "new" ? "新商品" : "选择已有商品"}
-            onChange={(option) => {
-              if (option === "new") {
-                onStartNewProduct();
-                return;
-              }
-              const nextProduct = products.find((product) => product.sku === selectedSku) ?? products[0];
-              if (nextProduct) void onSelectProduct(nextProduct);
-            }}
-          />
-          <ProductCreationProductPicker
-            className="product-creation-picker min-w-0"
-            products={products}
-            selectedSku={selectedSku}
-            onSelectProduct={onSelectProduct}
-            onAddProduct={onStartNewProduct}
-          />
-          <div className="hidden min-[920px]:block" />
-          <Badge tone={referenceCount >= 3 ? "ok" : "warn"}>
-            {selectedProduct ? readiness?.label ?? `${referenceCount} 张参考图` : `待保存参考图 ${referenceCount} 张`}
-          </Badge>
-        </div>
-
-        {loadError ? (
-          <div className="mx-4 mt-4 rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-[var(--danger)]">
-            {loadError}
-          </div>
-        ) : null}
-
-        <div className="grid min-h-[430px] gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
-          <div className="border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <ProductComposerReferenceTray
-              className="h-full"
-              product={selectedProduct}
-              pendingFiles={pendingImageFiles}
-              onImportAssets={onImportAssets}
-              onGenerateReferenceImages={onGenerateReferenceImages}
-              onFilesChange={handleReferenceFiles}
-              onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+      <div className="product-creation-canvas overflow-visible">
+        <div className="product-control-bar grid gap-3 border-b border-[#e5ecf6] bg-white p-4">
+          <div className="grid gap-3 min-[1280px]:grid-cols-[minmax(260px,1.45fr)_minmax(118px,.62fr)_minmax(108px,.55fr)_minmax(108px,.55fr)_minmax(130px,.7fr)_minmax(108px,.55fr)_minmax(220px,1fr)] min-[1280px]:items-end">
+            <ProductCreationProductPicker
+              className="product-creation-picker min-w-0"
+              products={products}
+              selectedSku={selectedSku}
+              onSelectProduct={onSelectProduct}
+              onAddProduct={onStartNewProduct}
             />
-          </div>
-
-          <div className="grid min-w-0 content-start gap-3 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <Field label="商品资料">
-              <Textarea
-                className="min-h-[350px] resize-y border-0 bg-white/70 text-sm leading-7 shadow-none focus-visible:ring-0"
-                value={importText}
-                onChange={(event) => setImportText(event.target.value)}
-                placeholder="可以直接粘贴商品页、店小秘、1688 或补充描述；也可以按标题、分类、材质、尺寸/重量、卖点、使用场景来写。"
-              />
-            </Field>
-
-            {importQuality || importNotes.length > 0 ? (
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[#6c7890]">
-                {importQuality ? <Badge tone={importQuality.ready ? "ok" : "warn"}>{importQuality.summary}</Badge> : null}
-                {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="min-w-0 p-4">
-            <StoryboardComposerPanel
-              template={template}
-              duration={duration}
-              scriptDraft={scriptDraft}
-              storyboardDraft={storyboardDraft}
-              storyboardHistory={storyboardHistory}
-              onScriptDraftChange={onScriptDraftChange}
-              onStoryboardDraftChange={onStoryboardDraftChange}
-              onApplyStoryboardHistory={onApplyStoryboardHistory}
-              onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-              isGeneratingStoryboard={isGeneratingStoryboard}
-              productReady={Boolean(selectedProduct)}
-            />
-          </div>
-        </div>
-
-        <div className="creation-parameter-dock grid gap-3 border-t border-[#e5ecf6] bg-white p-4">
-          <div className="grid gap-3 min-[1180px]:grid-cols-[1fr_1fr_.9fr_1fr_.9fr_minmax(240px,1.05fr)] min-[1180px]:items-end">
             <CompactChoiceDropdown
               label="视频风格"
               value={template}
@@ -3118,13 +3075,7 @@ function ProductCreationComposer({
               {isSubmittingVideo ? "创建生成任务中" : "整理资料并生成视频"}
             </Button>
           </div>
-          <div className="grid gap-2 min-[760px]:grid-cols-[auto_minmax(0,1fr)] min-[760px]:items-center">
-            <Button className="min-h-10 w-fit rounded-[12px] px-4" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
-              <Package size={14} className={cn(isPacking && "animate-pulse")} />
-              {isPacking ? "整理中" : "AI 整理资料包"}
-            </Button>
-            <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
-          </div>
+          <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
           {provider !== "mock" ? (
             <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-[#7a4a12]">
               <input
@@ -3137,6 +3088,69 @@ function ProductCreationComposer({
             </label>
           ) : null}
         </div>
+
+        {loadError ? (
+          <div className="mx-4 mt-4 rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-[var(--danger)]">
+            {loadError}
+          </div>
+        ) : null}
+
+        <div className="grid items-start gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
+          <div className="border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
+            <ProductComposerReferenceTray
+              product={selectedProduct}
+              pendingFiles={pendingImageFiles}
+              onImportAssets={onImportAssets}
+              onGenerateReferenceImages={onGenerateReferenceImages}
+              onPreviewReferenceImage={setPreviewReferenceIndex}
+              onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
+              onFilesChange={handleReferenceFiles}
+              onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+            />
+          </div>
+
+          <div className="grid min-w-0 content-start gap-3 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
+            <div className="product-facts-editor grid content-start gap-2">
+              <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-black text-[#172033]">商品资料</div>
+                <Button className="min-h-9 w-fit rounded-[11px] px-3" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
+                  <Package size={13} className={cn(isPacking && "animate-pulse")} />
+                  {isPacking ? "整理中" : "AI 整理资料包"}
+                </Button>
+              </div>
+              <Textarea
+                className="product-facts-body min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-7 shadow-none focus-visible:ring-0"
+                rows={productFactsRows}
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                placeholder="可以直接粘贴商品页、店小秘、1688 或补充描述；也可以按标题、分类、材质、尺寸/重量、卖点、使用场景来写。"
+              />
+            </div>
+
+            {importNotes.length > 0 ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[#6c7890]">
+                {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="min-w-0 p-4">
+            <StoryboardComposerPanel
+              template={template}
+              duration={duration}
+              scriptDraft={scriptDraft}
+              storyboardDraft={storyboardDraft}
+              storyboardHistory={storyboardHistory}
+              onScriptDraftChange={onScriptDraftChange}
+              onStoryboardDraftChange={onStoryboardDraftChange}
+              onApplyStoryboardHistory={onApplyStoryboardHistory}
+              onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+              isGeneratingStoryboard={isGeneratingStoryboard}
+              productReady={Boolean(selectedProduct)}
+            />
+          </div>
+        </div>
+
       </div>
 
       <VideoHistoryPanel
@@ -3162,6 +3176,12 @@ function ProductCreationComposer({
         index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === deleteTarget?.id))}
         onClose={() => setDeleteTarget(undefined)}
         onConfirm={handleDeleteCreativeVersion}
+      />
+      <ReferenceImagePreviewDialog
+        images={previewReferenceImages}
+        index={previewReferenceIndex}
+        onIndexChange={setPreviewReferenceIndex}
+        onClose={() => setPreviewReferenceIndex(undefined)}
       />
     </section>
   );
@@ -3256,6 +3276,8 @@ function ProductComposerReferenceTray({
   pendingFiles,
   onImportAssets,
   onGenerateReferenceImages,
+  onPreviewReferenceImage,
+  onDeleteReferenceImage,
   onFilesChange,
   onClearPendingFile
 }: {
@@ -3264,6 +3286,8 @@ function ProductComposerReferenceTray({
   pendingFiles: File[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onPreviewReferenceImage: (index: number) => void;
+  onDeleteReferenceImage: (index: number) => void;
   onFilesChange: (files: FileList | null) => void;
   onClearPendingFile: (index: number) => void;
 }) {
@@ -3277,11 +3301,11 @@ function ProductComposerReferenceTray({
         </div>
         <Badge>{product ? `${productReferenceCount(product)} 张` : `${pendingFiles.length} 张`}</Badge>
       </div>
-      <label className="grid min-h-[118px] cursor-pointer place-items-center rounded-[16px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-4 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
-        <span className="grid justify-items-center gap-2 text-sm font-black text-[var(--accent)]">
-          <Plus size={24} />
+      <label className="grid min-h-[74px] cursor-pointer place-items-center rounded-[14px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-3 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
+        <span className="grid justify-items-center gap-1 text-sm font-black text-[var(--accent)]">
+          <Plus size={18} />
           添加图片
-          <span className="text-xs font-bold text-[#8b9bb3]">可多选，未保存商品会先暂存</span>
+          <span className="text-[11px] font-bold text-[#8b9bb3]">可多选</span>
         </span>
         <input
           className="sr-only"
@@ -3301,9 +3325,17 @@ function ProductComposerReferenceTray({
         </Button>
       ) : null}
       {images.length > 0 ? (
-        <div className="grid max-h-[250px] gap-2 overflow-auto pr-1">
+        <div className="reference-image-list grid max-h-[312px] gap-2 overflow-auto pr-1">
           {images.map((image, index) => (
-            <ReferenceImageFigure key={`${image.original}-${index}`} image={image} sku={product?.sku ?? ""} index={index} onImportAssets={onImportAssets} />
+            <ReferenceImageFigure
+              key={`${image.original}-${index}`}
+              image={image}
+              sku={product?.sku ?? ""}
+              index={index}
+              onImportAssets={onImportAssets}
+              onPreview={() => onPreviewReferenceImage(index)}
+              onDelete={onDeleteReferenceImage}
+            />
           ))}
         </div>
       ) : pendingFiles.length > 0 ? (
@@ -3352,6 +3384,7 @@ function StoryboardComposerPanel({
   productReady: boolean;
 }) {
   const [hint, setHint] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <section className="storyboard-side-panel grid h-full min-h-[398px] content-start gap-3">
       <div className="flex items-start justify-between gap-3">
@@ -3407,36 +3440,73 @@ function StoryboardComposerPanel({
         />
       </details>
 
-      <details className="group rounded-[12px] border border-[#e5ecf6] bg-white px-3 py-2">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-black text-[#6c7890]">
-          分镜历史记录
+      <div
+        className="storyboard-history-dropdown relative"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setHistoryOpen(false);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setHistoryOpen(false);
+          }
+        }}
+      >
+        <button
+          type="button"
+          className={cn(
+            "flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2 text-left text-xs font-black text-[#6c7890] transition",
+            historyOpen
+              ? "border-[color-mix(in_srgb,var(--accent)_55%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
+              : "border-[#e5ecf6] hover:border-[color-mix(in_srgb,var(--accent)_35%,#dbe4f0)]"
+          )}
+          aria-haspopup="listbox"
+          aria-expanded={historyOpen}
+          onClick={() => setHistoryOpen((open) => !open)}
+        >
+          <span>分镜历史记录</span>
           <span className="flex items-center gap-2">
             <Badge>{storyboardHistory.length} 条</Badge>
-            <ChevronDown size={14} className="text-[#8b9bb3] transition group-open:rotate-180" />
+            <ChevronDown size={14} className={cn("text-[#8b9bb3] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
           </span>
-        </summary>
-        {storyboardHistory.length > 0 ? (
-          <div className="mt-2 grid max-h-[190px] overflow-auto rounded-[10px] border border-[#eef3f8] bg-[#fbfdff]">
-            {storyboardHistory.map((record) => (
-              <article key={record.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
-                  <div className="flex gap-1">
-                    <Badge>{templateLabel(record.template)}</Badge>
-                    <Badge>{formatDuration(record.duration)}</Badge>
+        </button>
+        {historyOpen ? (
+          <div
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[#dbe4f0] bg-white p-2 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+            role="listbox"
+          >
+            {storyboardHistory.length > 0 ? (
+              storyboardHistory.map((record) => (
+                <article key={record.id} className="grid gap-2 rounded-[10px] px-2.5 py-2.5 transition hover:bg-[#f7fbff]">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
+                    <div className="flex gap-1">
+                      <Badge>{templateLabel(record.template)}</Badge>
+                      <Badge>{formatDuration(record.duration)}</Badge>
+                    </div>
                   </div>
-                </div>
-                <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
-                <Button className="w-fit" size="sm" onClick={() => onApplyStoryboardHistory(record)}>回填</Button>
-              </article>
-            ))}
+                  <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
+                  <Button
+                    className="w-fit"
+                    size="sm"
+                    onClick={() => {
+                      onApplyStoryboardHistory(record);
+                      setHistoryOpen(false);
+                    }}
+                  >
+                    回填
+                  </Button>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-[10px] border border-dashed border-[#dbe4f0] bg-[#fbfdff] px-3 py-4 text-center text-xs font-bold text-[#8b9bb3]">
+                还没有 AI 生成历史
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="mt-2 rounded-[10px] border border-dashed border-[#dbe4f0] bg-[#fbfdff] px-3 py-4 text-center text-xs font-bold text-[#8b9bb3]">
-            还没有 AI 生成历史
-          </div>
-        )}
-      </details>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -4027,7 +4097,7 @@ function ProductCreationProductPicker({
 }) {
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const selectedProductOption = products.find((product) => product.sku === selectedSku);
-  const selectedProductLabel = selectedProductOption ? selectedProductOption.title_ja : "暂无商品";
+  const selectedProductLabel = selectedProductOption ? selectedProductOption.title_ja : "新商品";
 
   const handleProductPickerSelect = (sku: string) => {
     if (sku === NEW_PRODUCT_SELECT_VALUE) {
@@ -4045,7 +4115,7 @@ function ProductCreationProductPicker({
 
   return (
     <div
-      className={cn("label-inline relative grid min-w-[280px] grid-cols-[auto_minmax(0,1fr)] items-center gap-2", className)}
+      className={cn("product-picker-single relative grid min-w-[280px] gap-1.5", className)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setProductPickerOpen(false);
@@ -4057,11 +4127,11 @@ function ProductCreationProductPicker({
         }
       }}
     >
-      <span className="shrink-0 text-[12px] font-black text-[#6c7890]">选择创作商品</span>
+      <span className="shrink-0 text-[12px] font-black text-[#6c7890]">创作商品</span>
       <button
         type="button"
         className={cn(
-          "flex min-h-9 min-w-0 items-center justify-between gap-2 rounded-lg border bg-white px-3 text-left text-[13px] font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
+          "flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-[13px] border bg-white px-3.5 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
           productPickerOpen
             ? "border-[color-mix(in_srgb,var(--accent)_65%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(30,42,68,.05)]"
             : "border-[#dbe4f0] hover:border-[color-mix(in_srgb,var(--accent)_45%,#dbe4f0)]"
@@ -4070,14 +4140,30 @@ function ProductCreationProductPicker({
         aria-expanded={productPickerOpen}
         onClick={() => setProductPickerOpen((open) => !open)}
       >
-        <span className="min-w-0 truncate">{selectedProductLabel}</span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className="min-w-0 truncate">{selectedProductLabel}</span>
+          <span className="truncate text-[11px] font-bold text-[#8b9bb3]">{selectedProductOption ? "已保存商品" : "直接填写新商品资料"}</span>
+        </span>
         <ChevronDown className={cn("shrink-0 text-[#8b9bb3] transition", productPickerOpen && "rotate-180 text-[var(--accent)]")} size={15} />
       </button>
       {productPickerOpen ? (
         <div
-          className="product-creation-product-menu absolute left-[98px] right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
           role="listbox"
         >
+          <button
+            type="button"
+            role="option"
+            aria-selected={!selectedProductOption}
+            className={cn(
+              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_6%,white)] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,white)]",
+              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,white)]"
+            )}
+            onClick={() => handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)}
+          >
+            <Plus size={13} />
+            <span>新商品</span>
+          </button>
           {products.length > 0 ? (
             products.map((option) => {
               const active = option.sku === selectedSku;
@@ -4103,16 +4189,6 @@ function ProductCreationProductPicker({
           ) : (
             <div className="px-3 py-2 text-xs font-bold text-[#8b9bb3]">暂无商品</div>
           )}
-          <button
-            type="button"
-            role="option"
-            aria-selected={false}
-            className="mt-1 grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_6%,white)] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,white)]"
-            onClick={() => handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)}
-          >
-            <Plus size={13} />
-            <span>+ 新建商品</span>
-          </button>
         </div>
       ) : null}
     </div>
@@ -4160,32 +4236,169 @@ function ReferenceImageFigure({
   image,
   sku,
   index,
-  onImportAssets
+  onImportAssets,
+  onPreview,
+  onDelete
 }: {
   image: ReferenceImageStatus;
   sku: string;
   index: number;
   onImportAssets: (sku: string) => Promise<void>;
+  onPreview: () => void;
+  onDelete: (index: number) => void;
 }) {
+  const canPreview = Boolean(image.previewUrl);
   return (
-    <figure className="m-0 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
-      {image.previewUrl ? (
-        <img className="aspect-square w-full object-cover" src={image.previewUrl} alt={`${sku} reference ${index + 1}`} />
-      ) : (
-        <div className="grid aspect-square place-items-center bg-[var(--panel2)] p-2 text-center text-xs text-[var(--muted)]">
-          {referenceStatusLabel(image.status)}
-        </div>
-      )}
-      <figcaption className="grid gap-1 border-t border-[var(--border)] p-2">
-        <span className="truncate text-[11px] text-[var(--muted)]">{image.original}</span>
+    <figure className="group m-0 grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-white p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
+      <button
+        type="button"
+        className="overflow-hidden rounded-[9px] border border-[#eef3f8] bg-[var(--panel2)]"
+        disabled={!canPreview}
+        title={canPreview ? "查看参考图" : referenceStatusLabel(image.status)}
+        onClick={onPreview}
+      >
+        {image.previewUrl ? (
+          <img className="h-12 w-[72px] object-cover transition group-hover:scale-[1.03]" src={image.previewUrl} alt={`${sku} reference ${index + 1}`} />
+        ) : (
+          <span className="grid h-12 w-[72px] place-items-center px-1 text-center text-[10px] font-bold leading-4 text-[var(--muted)]">
+            {referenceStatusLabel(image.status)}
+          </span>
+        )}
+      </button>
+      <figcaption className="min-w-0">
+        <div className="truncate text-xs font-black text-[#172033]">参考图 {index + 1}</div>
+        <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</div>
+      </figcaption>
+      <div className="reference-image-actions flex items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
         {image.status === "outside-project-root" ? (
-          <Button className="min-h-7 px-2 text-[11px]" size="sm" onClick={() => void onImportAssets(sku)}>
+          <Button className="h-8 w-8 p-0" size="icon" title="导入资产" onClick={() => void onImportAssets(sku)}>
             <Download size={12} />
-            导入资产
           </Button>
         ) : null}
-      </figcaption>
+        {canPreview ? (
+          <Button className="h-8 w-8 p-0" size="icon" title="查看参考图" onClick={onPreview}>
+            <ImageIcon size={12} />
+          </Button>
+        ) : null}
+        <Button className="h-8 w-8 p-0" size="icon" variant="danger" title="删除参考图" onClick={() => onDelete(index)}>
+          <X size={12} />
+        </Button>
+      </div>
     </figure>
+  );
+}
+
+function ReferenceImagePreviewDialog({
+  images,
+  index,
+  onIndexChange,
+  onClose
+}: {
+  images: ReferenceImageStatus[];
+  index?: number;
+  onIndexChange: (index: number | undefined) => void;
+  onClose: () => void;
+}) {
+  const touchStartXRef = useRef<number | undefined>(undefined);
+  const previewableImages = images;
+  const activeIndex = index ?? -1;
+  const image = activeIndex >= 0 ? previewableImages[activeIndex] : undefined;
+  const canNavigate = previewableImages.length > 1;
+  const onPrevious = () => {
+    if (!canNavigate) return;
+    onIndexChange((activeIndex - 1 + previewableImages.length) % previewableImages.length);
+  };
+  const onNext = () => {
+    if (!canNavigate) return;
+    onIndexChange((activeIndex + 1) % previewableImages.length);
+  };
+
+  useEffect(() => {
+    if (!image?.previewUrl) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+      if (event.key === "ArrowLeft") {
+        onPrevious();
+      }
+      if (event.key === "ArrowRight") {
+        onNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [image?.previewUrl, activeIndex, canNavigate, onClose]);
+
+  if (!image?.previewUrl) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-[rgba(23,32,51,.42)] p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="参考图预览"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="grid max-h-[min(760px,calc(100vh-32px))] w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.26)]">
+        <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[#e5ecf6] px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-black text-[#172033]">参考图预览</div>
+            <div className="truncate text-xs font-semibold text-[#6c7890]">
+              {image.original}
+              {canNavigate ? ` · ${activeIndex + 1}/${previewableImages.length}` : ""}
+            </div>
+          </div>
+          <Button className="w-fit" size="sm" variant="ghost" onClick={onClose}>
+            <X size={15} />
+          </Button>
+        </div>
+        <div
+          className="relative grid place-items-center bg-[#0f172a] p-3"
+          onTouchStart={(event) => {
+            touchStartXRef.current = event.touches[0]?.clientX;
+          }}
+          onTouchEnd={(event) => {
+            const startX = touchStartXRef.current;
+            touchStartXRef.current = undefined;
+            if (startX === undefined) return;
+            const endX = event.changedTouches[0]?.clientX ?? startX;
+            const deltaX = endX - startX;
+            if (Math.abs(deltaX) < 42) return;
+            if (deltaX > 0) {
+              onPrevious();
+            } else {
+              onNext();
+            }
+          }}
+        >
+          {canNavigate ? (
+            <>
+              <Button
+                className="absolute left-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-white/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
+                size="icon"
+                title="上一张"
+                onClick={onPrevious}
+              >
+                <ChevronLeft size={18} />
+              </Button>
+              <Button
+                className="absolute right-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-white/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
+                size="icon"
+                title="下一张"
+                onClick={onNext}
+              >
+                <ChevronRight size={18} />
+              </Button>
+            </>
+          ) : null}
+          <img className="max-h-[640px] max-w-full object-contain" src={image.previewUrl} alt={image.original} />
+        </div>
+      </section>
+    </div>
   );
 }
 
