@@ -495,8 +495,9 @@ describe("console API", () => {
     expect(creationWorkspaceSource).toContain("mergeLedgerJobs");
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
-    expect(creationComposerSource).toContain("AI 视频");
-    expect(creationComposerSource).toContain("AI 图片");
+    expect(creationComposerSource).toContain("product-creation-canvas");
+    expect(creationComposerSource).toContain("product-reference-inline");
+    expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(creationComposerSource).toContain("新商品");
     expect(creationComposerSource).toContain("选择已有商品");
     expect(creationComposerSource).toContain("商品资料");
@@ -507,12 +508,18 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("视频时长");
     expect(creationComposerSource).toContain("成片语言");
     expect(creationComposerSource).toContain("生成模型");
-    expect(creationComposerSource).toContain("PillChoiceGroup");
+    expect(creationComposerSource).toContain("CompactChoiceDropdown");
+    expect(appSource).toContain("function productDraftToComposerText");
     expect(creationComposerSource).toContain("handleGenerateVideo");
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct))");
     expect(creationComposerSource).toContain("已加入历史记录");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
+    expect(creationComposerSource).not.toContain("InlineProductFactsFields");
+    expect(creationComposerSource).not.toContain('Field label="标题"');
     expect(creationComposerSource).not.toContain("<Select");
+    expect(creationComposerSource).not.toContain("AI 视频");
+    expect(creationComposerSource).not.toContain("AI 图片");
+    expect(creationComposerSource).not.toContain("lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]");
     expect(creationComposerSource).not.toContain("上一步");
     expect(creationComposerSource).not.toContain("下一步");
     expect(productPickerSource).toContain("选择创作商品");
@@ -716,7 +723,7 @@ describe("console API", () => {
     expect(appSource).toContain("setModelConfigTestStatus");
     expect(appSource).toContain("productStudioLoadError");
     expect(appSource).toContain("loadError={productStudioLoadError}");
-    expect(appSource).toContain("InlineProductFactsFields");
+    expect(appSource).not.toContain("InlineProductFactsFields");
     expect(appSource).toContain("ProductComposerReferenceTray");
     expect(appSource).toContain("ProductCreationProductPicker");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
@@ -1265,7 +1272,7 @@ describe("console API", () => {
 
     const loadProductIntoDraftSource = appSource.slice(appSource.indexOf("async function loadProductIntoDraft"), appSource.indexOf("async function openProductStudio"));
     expect(loadProductIntoDraftSource).toContain('if (activeSection === "video")');
-    expect(loadProductIntoDraftSource).toContain("setSelectedProduct(response.product)");
+    expect(loadProductIntoDraftSource).toContain("applyProductToCreationComposer(response.product)");
     expect(loadProductIntoDraftSource).toContain("persistProductStudioSku(response.product.sku)");
 
     expect(appSource).not.toContain("function ProductCreationStartPanel");
@@ -1306,8 +1313,9 @@ describe("console API", () => {
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     expect(composerSource).toContain("video-creation-frame");
-    expect(composerSource).toContain("AI 视频");
-    expect(composerSource).toContain("AI 图片");
+    expect(composerSource).toContain("product-creation-canvas");
+    expect(composerSource).toContain("product-reference-inline");
+    expect(composerSource).toContain("storyboard-side-panel");
     expect(composerSource).toContain("新商品");
     expect(composerSource).toContain("选择已有商品");
     expect(composerSource).toContain("商品资料");
@@ -1319,7 +1327,8 @@ describe("console API", () => {
     expect(composerSource).toContain("成片语言");
     expect(composerSource).toContain("生成模型");
     expect(composerSource).toContain("生成视频");
-    expect(composerSource).toContain("PillChoiceGroup");
+    expect(composerSource).toContain("CompactChoiceDropdown");
+    expect(appSource).toContain("function productDraftToComposerText");
     expect(composerSource).toContain("details");
     expect(composerSource).toContain("脚本分镜");
     expect(composerSource).toContain("AI 生成分镜");
@@ -1327,7 +1336,12 @@ describe("console API", () => {
     expect(composerSource).toContain("预览视频");
     expect(composerSource).toContain("下载视频");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
+    expect(composerSource).not.toContain("InlineProductFactsFields");
+    expect(composerSource).not.toContain('Field label="标题"');
     expect(composerSource).not.toContain("<Select");
+    expect(composerSource).not.toContain("AI 视频");
+    expect(composerSource).not.toContain("AI 图片");
+    expect(composerSource).not.toContain("lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]");
     expect(composerSource).not.toContain("上一步");
     expect(composerSource).not.toContain("下一步");
     expect(composerSource).not.toContain("审核发布");
