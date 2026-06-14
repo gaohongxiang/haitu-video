@@ -2872,6 +2872,16 @@ function ProductCreationComposer({
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
   const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
+  const pendingReferenceImageStatuses = useMemo<ReferenceImageStatus[]>(
+    () => pendingImageFiles.map((file, index) => ({
+      original: file.name || `待上传图片 ${index + 1}`,
+      resolvedPath: file.name,
+      previewUrl: URL.createObjectURL(file),
+      status: "previewable"
+    })),
+    [pendingImageFiles]
+  );
+  const previewableReferenceImages = selectedProduct ? previewReferenceImages : pendingReferenceImageStatuses;
   const videoModelConfig = videoModelConfigs[videoModelChoice];
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
@@ -2906,14 +2916,24 @@ function ProductCreationComposer({
 
   useEffect(() => {
     if (previewReferenceIndex === undefined) return;
-    if (previewReferenceImages.length === 0) {
+    if (previewableReferenceImages.length === 0) {
       setPreviewReferenceIndex(undefined);
       return;
     }
-    if (previewReferenceIndex >= previewReferenceImages.length) {
-      setPreviewReferenceIndex(previewReferenceImages.length - 1);
+    if (previewReferenceIndex >= previewableReferenceImages.length) {
+      setPreviewReferenceIndex(previewableReferenceImages.length - 1);
     }
-  }, [previewReferenceImages.length, previewReferenceIndex]);
+  }, [previewableReferenceImages.length, previewReferenceIndex]);
+
+  useEffect(() => {
+    return () => {
+      for (const image of pendingReferenceImageStatuses) {
+        if (image.previewUrl) {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      }
+    };
+  }, [pendingReferenceImageStatuses]);
 
   async function uploadPendingImages(product: ProductDetail): Promise<ProductDetail> {
     if (pendingImageFiles.length === 0) return product;
@@ -3088,9 +3108,11 @@ function ProductCreationComposer({
               className="h-full"
               product={selectedProduct}
               pendingFiles={pendingImageFiles}
+              pendingImages={pendingReferenceImageStatuses}
               onImportAssets={onImportAssets}
               onGenerateReferenceImages={onGenerateReferenceImages}
               onPreviewReferenceImage={setPreviewReferenceIndex}
+              onPendingPreview={(index) => setPreviewReferenceIndex(index)}
               onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
               onFilesChange={handleReferenceFiles}
               onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
@@ -3181,7 +3203,7 @@ function ProductCreationComposer({
         onConfirm={handleDeleteCreativeVersion}
       />
       <ReferenceImagePreviewDialog
-        images={previewReferenceImages}
+        images={previewableReferenceImages}
         index={previewReferenceIndex}
         onIndexChange={setPreviewReferenceIndex}
         onClose={() => setPreviewReferenceIndex(undefined)}
@@ -3277,9 +3299,11 @@ function ProductComposerReferenceTray({
   className,
   product,
   pendingFiles,
+  pendingImages,
   onImportAssets,
   onGenerateReferenceImages,
   onPreviewReferenceImage,
+  onPendingPreview,
   onDeleteReferenceImage,
   onFilesChange,
   onClearPendingFile
@@ -3287,30 +3311,17 @@ function ProductComposerReferenceTray({
   className?: string;
   product?: ProductDetail;
   pendingFiles: File[];
+  pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onPreviewReferenceImage: (index: number) => void;
+  onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
   onFilesChange: (files: FileList | File[] | null) => void;
   onClearPendingFile: (index: number) => void;
 }) {
   const images = product?.reference_image_statuses ?? [];
   const [dragOver, setDragOver] = useState(false);
-  const pendingImagePreviews = useMemo(
-    () => pendingFiles.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file)
-    })),
-    [pendingFiles]
-  );
-
-  useEffect(() => {
-    return () => {
-      for (const preview of pendingImagePreviews) {
-        URL.revokeObjectURL(preview.previewUrl);
-      }
-    };
-  }, [pendingImagePreviews]);
 
   function acceptReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
@@ -3395,23 +3406,34 @@ function ProductComposerReferenceTray({
         </div>
       ) : pendingFiles.length > 0 ? (
         <div className="reference-image-list grid max-h-[250px] gap-1.5 overflow-auto pr-1">
-          {pendingImagePreviews.map(({ file, previewUrl }, index) => (
-            <div key={`${file.name}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[#e5ecf6] bg-white pr-11 shadow-[0_8px_18px_rgba(30,42,68,.04)]">
-              <img className="h-16 w-[72px] bg-[#f3f6fb] object-cover" src={previewUrl} alt={`${file.name} preview`} />
-              <div className="min-w-0">
-                <div className="truncate text-xs font-black text-[#172033]">待上传 {index + 1}</div>
-                <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{file.name}</div>
+          {pendingImages.map((image, index) => {
+            const file = pendingFiles[index];
+            const fileName = file?.name ?? image.original;
+            return (
+              <div key={`${fileName}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[#e5ecf6] bg-white pr-11 shadow-[0_8px_18px_rgba(30,42,68,.04)]">
+                <button
+                  className="h-16 w-[72px] overflow-hidden bg-[#f3f6fb]"
+                  type="button"
+                  title="查看待上传图片"
+                  onClick={() => onPendingPreview(index)}
+                >
+                  <img className="h-16 w-[72px] object-cover transition hover:scale-[1.03]" src={image.previewUrl ?? ""} alt={`${fileName} preview`} />
+                </button>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-black text-[#172033]">待上传 {index + 1}</div>
+                  <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{fileName}</div>
+                </div>
+                <button
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[#8b9bb3] transition hover:bg-red-50 hover:text-[var(--danger)]"
+                  type="button"
+                  title="移除待上传图片"
+                  onClick={() => onClearPendingFile(index)}
+                >
+                  <X size={13} />
+                </button>
               </div>
-              <button
-                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[#8b9bb3] transition hover:bg-red-50 hover:text-[var(--danger)]"
-                type="button"
-                title="移除待上传图片"
-                onClick={() => onClearPendingFile(index)}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="rounded-[12px] border border-[#eef3f8] bg-white px-3 py-3 text-xs font-bold leading-5 text-[#8b9bb3]">

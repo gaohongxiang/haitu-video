@@ -706,11 +706,15 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("event.dataTransfer.files");
     expect(creationComposerSource).toContain("dragOver");
     expect(creationComposerSource).toContain("拖拽或粘贴图片");
-    expect(creationComposerSource).toContain("pendingImagePreviews");
+    expect(creationComposerSource).toContain("pendingReferenceImageStatuses");
     expect(creationComposerSource).toContain("URL.createObjectURL");
     expect(creationComposerSource).toContain("URL.revokeObjectURL");
-    expect(creationComposerSource).toContain('alt={`${file.name} preview`}');
+    expect(creationComposerSource).toContain('alt={`${fileName} preview`}');
     expect(creationComposerSource).toContain("待上传");
+    expect(creationComposerSource).toContain("previewableReferenceImages");
+    expect(creationComposerSource).toContain("onPendingPreview");
+    expect(creationComposerSource).toContain("onPendingPreview(index)");
+    expect(creationComposerSource).toContain('title="查看待上传图片"');
     expect(creationComposerSource).toContain("clipboardReferenceFiles");
     expect(creationComposerSource).toContain("handleProductFactsPaste");
     expect(creationComposerSource).toContain("event.stopPropagation()");
