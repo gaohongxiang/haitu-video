@@ -11,7 +11,7 @@ export const productFactsSchema = z.object({
     .min(1, "verified_selling_points must not be empty"),
   usage_scenes: z.array(z.string().min(1)).min(1, "usage_scenes must not be empty"),
   forbidden_claims: z.array(z.string().min(1)).min(1, "forbidden_claims must not be empty"),
-  reference_images: z.array(z.string().min(1)).min(1, "reference_images must not be empty")
+  reference_images: z.array(z.string().min(1))
 });
 
 export type ProductFacts = z.infer<typeof productFactsSchema>;

@@ -711,7 +711,7 @@ function renderProductFactsPreview(product) {
                   <small>${escapeHtml(image.status)}</small>
                   ${
                     image.status === "outside-project-root"
-                      ? `<button class="ghost compact inline-action" type="button" data-import-product-assets="${escapeAttribute(product.sku)}">导入资产</button>`
+                      ? `<button class="ghost compact inline-action" type="button" data-import-product-refs="${escapeAttribute(product.sku)}">导入资产</button>`
                       : ""
                   }
                 </figcaption>
@@ -722,9 +722,9 @@ function renderProductFactsPreview(product) {
       }
     </div>
   `;
-  els.productFactsPreview.querySelectorAll("[data-import-product-assets]").forEach((button) => {
+  els.productFactsPreview.querySelectorAll("[data-import-product-refs]").forEach((button) => {
     button.addEventListener("click", async () => {
-      await importProductAssets(button.dataset.importProductAssets || "");
+      await importProductAssets(button.dataset.importProductRefs || "");
     });
   });
 }

@@ -40,4 +40,11 @@ describe("parseProductFacts", () => {
       })
     ).toThrow(/forbidden_claims/);
   });
+
+  it("accepts a saved product before reference images are uploaded", () => {
+    expect(parseProductFacts({
+      ...validProduct,
+      reference_images: []
+    }).reference_images).toEqual([]);
+  });
 });

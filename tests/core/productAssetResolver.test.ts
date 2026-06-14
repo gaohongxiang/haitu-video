@@ -5,12 +5,12 @@ import { resolveReferenceImages } from "../../src/core/productAssetResolver.js";
 describe("resolveReferenceImages", () => {
   it("resolves relative product image paths against the product file directory", () => {
     const references = resolveReferenceImages(["main.jpg", "detail/detail1.png"], {
-      productFilePath: "/fixtures/products/TK-001/product.json"
+      productFilePath: "/data/workspaces/default/products/TK-001/product.json"
     });
 
     expect(references).toEqual([
-      "/fixtures/products/TK-001/main.jpg",
-      "/fixtures/products/TK-001/detail/detail1.png"
+      "/data/workspaces/default/products/TK-001/main.jpg",
+      "/data/workspaces/default/products/TK-001/detail/detail1.png"
     ]);
   });
 
@@ -22,7 +22,7 @@ describe("resolveReferenceImages", () => {
         "asset://seedance-material-id"
       ],
       {
-        productFilePath: "/fixtures/products/TK-001/product.json"
+        productFilePath: "/data/workspaces/default/products/TK-001/product.json"
       }
     );
 

@@ -8,8 +8,9 @@ coverage/
 .env
 .env.*
 !.env.example
-outputs/*
-!outputs/.gitkeep
+/outputs/
+/data/
+!/data/.gitkeep
 .DS_Store
 *.log
 *.pid

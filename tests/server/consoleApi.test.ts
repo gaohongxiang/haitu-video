@@ -10,11 +10,180 @@ import { createConsoleServer } from "../../src/server/consoleServer.js";
 let tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(tempDirs.map((dir) => rm(dir, { force: true, recursive: true })));
   tempDirs = [];
 });
 
 describe("console API", () => {
+  it("stores products and reference images under HAITU_DATA_DIR workspaces/default without reading legacy runtime folders", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-data-dir-"));
+    const dataDir = join(root, "runtime-data");
+    tempDirs.push(root);
+    await mkdir(join(root, "fixtures", "products"), { recursive: true });
+    await writeFile(join(root, "fixtures", "products", "legacy.json"), JSON.stringify({
+      sku: "LEGACY-001",
+      title_ja: "旧ディレクトリ商品",
+      category: "旧",
+      materials: ["紙"],
+      dimensions: "1cm",
+      verified_selling_points: ["旧データ"],
+      usage_scenes: ["旧"],
+      forbidden_claims: [],
+      reference_images: []
+    }), "utf8");
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
+
+    await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
+    const saved = await server.fetchJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: "TK-001",
+        title_ja: "冷感アームカバー",
+        category: "アームカバー",
+        materials: ["ナイロン"],
+        dimensions: "約40cm",
+        verified_selling_points: ["接触冷感"],
+        usage_scenes: ["通勤"],
+        forbidden_claims: ["UV数値未確認"],
+        reference_images: []
+      })
+    });
+    const uploaded = await server.fetchJson("/api/products/TK-001/reference-images", {
+      method: "POST",
+      body: JSON.stringify({
+        files: [{
+          fileName: "cover.jpg",
+          mimeType: "image/jpeg",
+          base64: Buffer.from("image-bytes").toString("base64")
+        }]
+      })
+    });
+    const listed = await server.fetchJson("/api/products");
+    const productFile = join(dataDir, "workspaces", "default", "products", "TK-001", "product.json");
+    const refFile = join(dataDir, "workspaces", "default", "products", "TK-001", "refs", "reference-01.jpg");
+    const stored = JSON.parse(await readFile(productFile, "utf8"));
+
+    expect(saved.product.path).toBe(productFile);
+    expect(uploaded.uploaded[0]).toEqual(expect.objectContaining({
+      path: refFile,
+      reference: "refs/reference-01.jpg"
+    }));
+    expect(uploaded.product.reference_images).toEqual(["refs/reference-01.jpg"]);
+    expect(uploaded.product.reference_image_statuses[0]).toEqual(expect.objectContaining({
+      previewUrl: `/media?path=${encodeURIComponent(refFile)}`,
+      status: "previewable"
+    }));
+    expect(listed.products.map((product: { sku: string }) => product.sku)).toEqual(["TK-001"]);
+    expect(stored).toEqual(expect.objectContaining({
+      workspaceId: "default",
+      sku: "TK-001",
+      reference_images: ["refs/reference-01.jpg"]
+    }));
+    await expect(readFile(refFile, "utf8")).resolves.toBe("image-bytes");
+  });
+
+  it("persists storyboard history in the selected product directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-storyboards-"));
+    const dataDir = join(root, "data");
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: "TK-001",
+        title_ja: "冷感アームカバー",
+        category: "アームカバー",
+        materials: ["ナイロン"],
+        dimensions: "約40cm",
+        verified_selling_points: ["接触冷感"],
+        usage_scenes: ["通勤"],
+        forbidden_claims: ["UV数値未確認"],
+        reference_images: []
+      })
+    });
+
+    const created = await server.fetchJson("/api/products/TK-001/storyboards", {
+      method: "POST",
+      body: JSON.stringify({
+        style: "scene",
+        duration: 10,
+        script: "0-2s: 商品全体を見せる。\n2-10s: 使用シーンを見せる。"
+      })
+    });
+    const listed = await server.fetchJson("/api/products/TK-001/storyboards");
+    const storyboardsFile = join(dataDir, "workspaces", "default", "products", "TK-001", "storyboards.json");
+    const stored = JSON.parse(await readFile(storyboardsFile, "utf8"));
+    const deleted = await server.fetchJson(`/api/products/TK-001/storyboards/${created.storyboard.id}`, {
+      method: "DELETE"
+    });
+    const afterDelete = await server.fetchJson("/api/products/TK-001/storyboards");
+
+    expect(created.storyboard).toEqual({
+      id: expect.any(String),
+      createdAt: expect.any(String),
+      style: "scene",
+      duration: 10,
+      script: "0-2s: 商品全体を見せる。\n2-10s: 使用シーンを見せる。"
+    });
+    expect(listed).toEqual({
+      storyboards: [created.storyboard]
+    });
+    expect(stored).toEqual({
+      workspaceId: "default",
+      productSku: "TK-001",
+      storyboards: [created.storyboard]
+    });
+    expect(deleted).toEqual({
+      deleted: true,
+      id: created.storyboard.id
+    });
+    expect(afterDelete).toEqual({ storyboards: [] });
+  });
+
+  it("stores system settings, sessions, provider keys, and audit logs under HAITU_DATA_DIR and rejects outside media", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-system-data-"));
+    const dataDir = join(root, "data");
+    tempDirs.push(root);
+    vi.stubEnv("HAITU_AUTH_PASSWORD", "admin-pass");
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
+
+    const loginResponse = await server.fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: "admin-pass" })
+    });
+    const cookie = loginResponse.headers.get("set-cookie") ?? "";
+    await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      method: "PUT",
+      headers: { cookie },
+      body: JSON.stringify({ apiKey: "text-secret-123456" })
+    });
+    await server.fetchJson("/api/settings", {
+      method: "PUT",
+      headers: { cookie },
+      body: JSON.stringify({ defaultCta: "詳しく見る" })
+    });
+    const dataMediaPath = join(dataDir, "workspaces", "default", "products", "TK-001", "refs", "reference-01.jpg");
+    await mkdir(join(dataMediaPath, ".."), { recursive: true });
+    await writeFile(dataMediaPath, Buffer.from("image"));
+    const mediaResponse = await server.fetch(`/media?path=${encodeURIComponent(dataMediaPath)}`, {
+      headers: { cookie }
+    });
+    const outsideMedia = await server.fetch(`/media?path=${encodeURIComponent(join(root, "outside.jpg"))}`, {
+      headers: { cookie }
+    });
+
+    await expect(readFile(join(dataDir, "system", "console-sessions.json"), "utf8")).resolves.toContain("token");
+    await expect(readFile(join(dataDir, "system", "console-settings.json"), "utf8")).resolves.toContain("詳しく見る");
+    await expect(readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8")).resolves.toContain("provider_key.saved");
+    await expect(readFile(join(dataDir, "workspaces", "default", "settings", "provider-keys.json"), "utf8")).resolves.toContain("text-secret-123456");
+    await expect(readFile(join(root, "outputs", "provider-keys.json"), "utf8")).rejects.toThrow();
+    expect(mediaResponse.status).toBe(200);
+    expect(outsideMedia.status).toBe(403);
+    vi.unstubAllEnvs();
+  });
+
   it("protects console APIs with a local admin session when auth password is configured", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-auth-"));
     tempDirs.push(root);
@@ -89,12 +258,13 @@ describe("console API", () => {
   it("records sensitive and cost-related console operations in an audit log without storing secrets", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-audit-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const dataDir = join(root, "data");
+    const outputsDir = join(dataDir, "workspaces", "default", "jobs");
     const videoPath = join(outputsDir, "wallet-final", "final", "wallet.final.mp4");
     await mkdir(join(videoPath, ".."), { recursive: true });
     await writeFile(videoPath, Buffer.from("final-video"));
     vi.stubEnv("HAITU_AUTH_PASSWORD", "admin-pass");
-    const server = createConsoleServer({ rootDir: root, outputsDir, autoStartSavedJobs: false });
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
     await server.fetch("/api/auth/login", {
       method: "POST",
@@ -126,7 +296,7 @@ describe("console API", () => {
       headers: { cookie }
     });
     const events = audit.events.map((event: { action: string }) => event.action);
-    const auditFile = await readFile(join(outputsDir, "audit-log.jsonl"), "utf8");
+    const auditFile = await readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8");
 
     expect(events).toEqual(expect.arrayContaining([
       "auth.login_failed",
@@ -663,6 +833,7 @@ describe("console API", () => {
     expect(appSource).toContain("当前商品创作已刷新");
     expect(appSource).toContain("selectedProductGroup");
     expect(appSource).toContain("/video-jobs");
+    expect(appSource).toContain("/storyboards");
     expect(appSource).toContain("queueProductVideoJobs");
     expect(queueProductVideoJobsSource).toContain("mergeVideoJobs(response.jobs, current)");
     expect(queueProductVideoJobsSource).not.toContain("scriptLines: splitDraftLines(studioScriptDraft)");
@@ -672,12 +843,16 @@ describe("console API", () => {
     expect(queueProductVideoJobsSource).not.toContain("个验证版本");
     expect(appSource).toContain("StoryboardHistoryRecord");
     expect(appSource).toContain("pushStoryboardHistory");
-    expect(appSource).toContain("STORYBOARD_HISTORY_STORAGE_KEY");
-    expect(appSource).toContain("loadStoryboardHistory");
-    expect(appSource).toContain("saveStoryboardHistory");
+    expect(appSource).toContain("loadProductStoryboards");
+    expect(appSource).not.toContain("STORYBOARD_HISTORY_STORAGE_KEY");
+    expect(appSource).not.toContain("haitu.storyboardHistory.v1");
+    expect(appSource).not.toContain("loadStoryboardHistory");
+    expect(appSource).not.toContain("saveStoryboardHistory");
+    expect(appSource).not.toContain("window.localStorage");
+    expect(appSource).not.toContain("haitu.productStudio.productSku.v1");
     expect(appSource).toContain("const selectedProductStoryboardHistory = selectedProduct");
-    expect(appSource).toContain("record.productSku === selectedProduct.sku");
-    expect(appSource).toContain("setTemplate(record.template)");
+    expect(appSource).not.toContain("record.productSku === selectedProduct.sku");
+    expect(appSource).toContain("setTemplate(record.style)");
     expect(appSource).toContain("setDuration(record.duration)");
     expect(appSource).toContain('setStudioScriptDraft("");');
     expect(appSource).toContain("setStudioStoryboardDraft(defaultStoryboardDraft(template, duration))");
@@ -977,7 +1152,7 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-store-"));
       tempDirs.push(root);
-      const outputsDir = join(root, "outputs");
+      const outputsDir = testJobsDir(root);
       const server = createConsoleServer({ rootDir: root, outputsDir });
 
       const saved = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
@@ -995,7 +1170,7 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "byok...9999"
       }));
-      await expect(readFile(join(outputsDir, "provider-keys.json"), "utf8")).resolves.toContain(
+      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).resolves.toContain(
         "byok-secret-seedance-provider-key-9999"
       );
 
@@ -1032,7 +1207,7 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-model-key-store-"));
       tempDirs.push(root);
-      const outputsDir = join(root, "outputs");
+      const outputsDir = testJobsDir(root);
       const server = createConsoleServer({ rootDir: root, outputsDir });
 
       const savedText = await server.fetchJson("/api/provider-keys/openai-compatible-text", {
@@ -1068,7 +1243,7 @@ describe("console API", () => {
         keyPreview: "imag...cdef"
       }));
 
-      const keyFile = await readFile(join(outputsDir, "provider-keys.json"), "utf8");
+      const keyFile = await readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8");
       expect(keyFile).toContain("text-model-secret-key-123456");
       expect(keyFile).toContain("image-model-secret-key-abcdef");
       expect(keyFile).toContain("https://api.chatfire.site");
@@ -1102,7 +1277,7 @@ describe("console API", () => {
   it("tests provider model configs against the real provider endpoint without saving secrets", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-provider-test-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const path = String(url);
       if (path === "https://api.openai.com/v1/chat/completions") {
@@ -1168,7 +1343,7 @@ describe("console API", () => {
     expect(JSON.stringify(text)).not.toContain("text-test-secret");
     expect(JSON.stringify(image)).not.toContain("image-test-secret");
     expect(JSON.stringify(video)).not.toContain("video-test-secret");
-    await expect(readFile(join(outputsDir, "provider-keys.json"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
     expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
       authorization: "Bearer text-test-secret"
     }));
@@ -1366,7 +1541,7 @@ describe("console API", () => {
 
     const loadProductIntoDraftSource = appSource.slice(appSource.indexOf("async function loadProductIntoDraft"), appSource.indexOf("async function openProductStudio"));
     expect(loadProductIntoDraftSource).toContain('if (activeSection === "video")');
-    expect(loadProductIntoDraftSource).toContain("applyProductToCreationComposer(response.product)");
+    expect(loadProductIntoDraftSource).toContain("applyProductToCreationComposerWithStoryboards(response.product)");
     expect(loadProductIntoDraftSource).toContain("persistProductStudioSku(response.product.sku)");
 
     expect(appSource).not.toContain("function ProductCreationStartPanel");
@@ -1531,7 +1706,7 @@ describe("console API", () => {
   it("cleans imported product text into a product fact draft without saving it", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-product-import-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
+    const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products/import-preview", {
@@ -1574,7 +1749,7 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-product-import-ai-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
+      const fixturesDir = testProductsDir(root);
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
           choices: [
@@ -1649,9 +1824,8 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-storyboard-ai-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
-      await mkdir(fixturesDir, { recursive: true });
-      await writeFile(join(fixturesDir, "storyboard.json"), JSON.stringify({
+      const fixturesDir = testProductsDir(root);
+      await writeProduct(testProductPath(fixturesDir, "storyboard"), {
         sku: "STORY-001",
         title_ja: "接触冷感アームカバー",
         category: "スポーツ用スリーブ",
@@ -1661,7 +1835,7 @@ describe("console API", () => {
         usage_scenes: ["通勤", "スポーツ"],
         forbidden_claims: ["UVカット率は未確認"],
         reference_images: ["arm-01.jpg", "arm-02.jpg", "arm-03.jpg"]
-      }), "utf8");
+      });
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
           choices: [
@@ -1723,9 +1897,8 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-storyboard-lang-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
-      await mkdir(fixturesDir, { recursive: true });
-      await writeFile(join(fixturesDir, "storyboard.json"), JSON.stringify({
+      const fixturesDir = testProductsDir(root);
+      await writeProduct(testProductPath(fixturesDir, "storyboard"), {
         sku: "STORY-LANG",
         title_ja: "接触冷感アームカバー",
         category: "スポーツ用スリーブ",
@@ -1735,7 +1908,7 @@ describe("console API", () => {
         usage_scenes: ["通勤", "スポーツ"],
         forbidden_claims: ["UVカット率は未確認"],
         reference_images: ["arm-01.jpg", "arm-02.jpg", "arm-03.jpg"]
-      }), "utf8");
+      });
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
           choices: [
@@ -1787,7 +1960,7 @@ describe("console API", () => {
   it("imports pasted product text into the product library after cleaning it", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-product-import-save-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
+    const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products/import", {
@@ -1808,7 +1981,7 @@ describe("console API", () => {
       })
     });
 
-    const productPath = join(fixturesDir, "DXM-172397240576223361.json");
+    const productPath = testProductPath(fixturesDir, "DXM-172397240576223361");
     expect(response.product).toEqual(expect.objectContaining({
       path: productPath,
       sku: "DXM-172397240576223361",
@@ -1835,7 +2008,7 @@ describe("console API", () => {
   it("imports multiple pasted product blocks and reports per-item errors", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-product-import-batch-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
+    const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products/import-batch", {
@@ -1899,14 +2072,14 @@ describe("console API", () => {
       "DXM-172397240576223361",
       "WALLET-BLACK-001"
     ]);
-    await expect(readFile(join(fixturesDir, "DXM-172397240576223361.json"), "utf8")).resolves.toContain("接触冷感アームカバー");
-    await expect(readFile(join(fixturesDir, "WALLET-BLACK-001.json"), "utf8")).resolves.toContain("ラウンドファスナー");
+    await expect(readFile(testProductPath(fixturesDir, "DXM-172397240576223361"), "utf8")).resolves.toContain("接触冷感アームカバー");
+    await expect(readFile(testProductPath(fixturesDir, "WALLET-BLACK-001"), "utf8")).resolves.toContain("ラウンドファスナー");
   });
 
   it("returns cleaning notes for messy ecommerce imports", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-product-import-notes-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
+    const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products/import-preview", {
@@ -1955,7 +2128,7 @@ describe("console API", () => {
   it("persists API management defaults for console video jobs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-settings-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const server = createConsoleServer({ rootDir: root, outputsDir });
 
     await expect(server.fetchJson("/api/settings")).resolves.toEqual({
@@ -2002,10 +2175,10 @@ describe("console API", () => {
       forbiddenWords: ["絶対痩せる", "医療用"],
       exaggerationRules: ["未确认功效不写入视频。"]
     });
-    await expect(readFile(join(outputsDir, "console-settings.json"), "utf8")).resolves.toContain(
+    await expect(readFile(join(testSystemDir(root), "console-settings.json"), "utf8")).resolves.toContain(
       "\"maxEstimatedCostCnyPerVideo\": 12.5"
     );
-    await expect(readFile(join(outputsDir, "console-settings.json"), "utf8")).resolves.toContain(
+    await expect(readFile(join(testSystemDir(root), "console-settings.json"), "utf8")).resolves.toContain(
       "\"testCreditBalanceCny\": 20"
     );
     await expect(server.fetchJson("/api/settings")).resolves.toEqual({
@@ -2016,8 +2189,8 @@ describe("console API", () => {
   it("manages built-in video templates and rejects disabled templates for preflight", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-templates-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    await writeProduct(join(fixturesDir, "box.json"));
+    const fixturesDir = testProductsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "box"));
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const initial = await server.fetchJson("/api/templates");
@@ -2059,7 +2232,7 @@ describe("console API", () => {
     const blocked = await server.fetch("/api/preflight", {
       method: "POST",
       body: JSON.stringify({
-        productPath: join(fixturesDir, "box.json"),
+        productPath: testProductPath(fixturesDir, "box"),
         provider: "mock",
         duration: 8,
         template: "benefit",
@@ -2075,9 +2248,9 @@ describe("console API", () => {
   it("lists product fixtures and existing make-video reports", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    await writeProduct(join(fixturesDir, "box.json"));
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "box"));
     await mkdir(join(outputsDir, "box"), { recursive: true });
     await writeFile(
       join(outputsDir, "box", "make-video-report.json"),
@@ -2097,7 +2270,7 @@ describe("console API", () => {
     expect(products).toEqual({
       products: [
         expect.objectContaining({
-          path: join(fixturesDir, "box.json"),
+          path: testProductPath(fixturesDir, "box"),
           sku: "TK-001",
           title_ja: "折りたたみ収納ボックス",
           referenceImageCount: 2
@@ -2128,18 +2301,18 @@ describe("console API", () => {
   it("deduplicates product list entries that point to the same saved product", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-dedupe-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    await writeProduct(join(fixturesDir, "box.json"), {
+    const fixturesDir = testProductsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "box"), {
       sku: "TK-001",
       title_ja: "折りたたみ収納ボックス",
       reference_images: ["main.jpg"]
     });
-    await writeProduct(join(fixturesDir, "box-copy.json"), {
+    await writeProduct(testProductPath(fixturesDir, "box-copy"), {
       sku: "TK-001",
       title_ja: "折りたたみ収納ボックス",
       reference_images: ["main.jpg", "detail1.jpg"]
     });
-    await writeProduct(join(fixturesDir, "wallet.json"), {
+    await writeProduct(testProductPath(fixturesDir, "wallet"), {
       sku: "WALLET-001",
       title_ja: "ミニ財布"
     });
@@ -2158,10 +2331,10 @@ describe("console API", () => {
   it("returns one product fact package by sku", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-detail-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
-    await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
+    await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products/TK-001");
@@ -2193,19 +2366,19 @@ describe("console API", () => {
           warnings: ["1 张参考图缺失。"]
         },
         reference_image_urls: [
-          `/media?path=${encodeURIComponent(join(fixturesDir, "main.jpg"))}`,
+          `/media?path=${encodeURIComponent(productAssetPath(productPath, "main.jpg"))}`,
           null
         ],
         reference_image_statuses: [
           {
             original: "main.jpg",
-            resolvedPath: join(fixturesDir, "main.jpg"),
-            previewUrl: `/media?path=${encodeURIComponent(join(fixturesDir, "main.jpg"))}`,
+            resolvedPath: productAssetPath(productPath, "main.jpg"),
+            previewUrl: `/media?path=${encodeURIComponent(productAssetPath(productPath, "main.jpg"))}`,
             status: "previewable"
           },
           {
             original: "detail1.jpg",
-            resolvedPath: join(fixturesDir, "detail1.jpg"),
+            resolvedPath: productAssetPath(productPath, "detail1.jpg"),
             previewUrl: null,
             status: "missing"
           }
@@ -2217,8 +2390,8 @@ describe("console API", () => {
   it("summarizes product fact quality and paid readiness in the product list", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    await writeProduct(join(fixturesDir, "ready-wallet.json"), {
+    const fixturesDir = testProductsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "ready-wallet"), {
       sku: "READY-WALLET",
       title_ja: "ラウンドファスナー ミニ財布",
       category: "財布",
@@ -2228,8 +2401,8 @@ describe("console API", () => {
       usage_scenes: ["買い物"],
       reference_images: ["ready-main.jpg"]
     });
-    await writeFile(join(fixturesDir, "ready-main.jpg"), Buffer.from("ready-image"));
-    await writeProduct(join(fixturesDir, "draft-wallet.json"), {
+    await writeFile(productAssetPath(testProductPath(fixturesDir, "ready-wallet"), "ready-main.jpg"), Buffer.from("ready-image"));
+    await writeProduct(testProductPath(fixturesDir, "draft-wallet"), {
       sku: "DRAFT-WALLET",
       title_ja: "ミニ財布",
       category: "財布",
@@ -2276,7 +2449,7 @@ describe("console API", () => {
   it("creates a local product fact package from the console", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-create-product-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
+    const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetchJson("/api/products", {
@@ -2290,11 +2463,11 @@ describe("console API", () => {
         verified_selling_points: ["カードを整理しやすい", "小銭入れ付き"],
         usage_scenes: ["買い物", "通勤"],
         forbidden_claims: ["本革未確認", "防水未確認"],
-        reference_images: ["../../assets/products/NEW-WALLET-BLACK/reference-01.jpg"]
+        reference_images: ["refs/reference-01.jpg"]
       })
     });
 
-    const productPath = join(fixturesDir, "NEW-WALLET-BLACK.json");
+    const productPath = testProductPath(fixturesDir, "NEW-WALLET-BLACK");
     expect(response.product).toEqual(expect.objectContaining({
       path: productPath,
       sku: "NEW-WALLET/BLACK",
@@ -2318,7 +2491,7 @@ describe("console API", () => {
         title_ja: "ラウンドファスナー財布",
         reference_image_statuses: [
           expect.objectContaining({
-            original: "../../assets/products/NEW-WALLET-BLACK/reference-01.jpg",
+            original: "refs/reference-01.jpg",
             status: "missing"
           })
         ]
@@ -2329,8 +2502,8 @@ describe("console API", () => {
   it("does not create preview URLs for product images outside the project root", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-safe-image-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    await writeProduct(join(fixturesDir, "external.json"), {
+    const fixturesDir = testProductsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "external"), {
       reference_images: [join(tmpdir(), "outside-wallet.jpg")]
     });
     const server = createConsoleServer({ rootDir: root, fixturesDir });
@@ -2355,8 +2528,8 @@ describe("console API", () => {
     tempDirs.push(outsideDir);
     const outsideImagePath = join(outsideDir, "wallet.jpg");
     await writeFile(outsideImagePath, Buffer.from("wallet-image"));
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "wallet.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
     await writeProduct(productPath, {
       reference_images: [outsideImagePath]
     });
@@ -2366,8 +2539,8 @@ describe("console API", () => {
       method: "POST"
     });
 
-    const importedPath = join(root, "assets", "products", "TK-001", "reference-01.jpg");
-    const importedReference = "../../assets/products/TK-001/reference-01.jpg";
+    const importedPath = join(productPath, "..", "refs", "reference-01.jpg");
+    const importedReference = "refs/reference-01.jpg";
     expect(response.imported).toEqual([
       {
         original: outsideImagePath,
@@ -2391,8 +2564,8 @@ describe("console API", () => {
   it("uploads product reference images into project assets and appends them to the product", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-upload-assets-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "wallet.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
     await writeProduct(productPath, {
       reference_images: ["main.jpg"]
     });
@@ -2411,8 +2584,8 @@ describe("console API", () => {
       })
     });
 
-    const uploadedPath = join(root, "assets", "products", "TK-001", "reference-02.jpg");
-    const uploadedReference = "../../assets/products/TK-001/reference-02.jpg";
+    const uploadedPath = join(productPath, "..", "refs", "reference-02.jpg");
+    const uploadedReference = "refs/reference-02.jpg";
     expect(response.uploaded).toEqual([
       {
         originalName: "钱包 黑色.JPG",
@@ -2436,11 +2609,11 @@ describe("console API", () => {
   it("deletes a product reference image from the product file", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-delete-reference-image-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "wallet.json");
-    const assetPath = join(root, "assets", "products", "TK-001", "reference-02.jpg");
-    const assetReference = "../../assets/products/TK-001/reference-02.jpg";
-    await mkdir(join(root, "assets", "products", "TK-001"), { recursive: true });
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    const assetPath = productAssetPath(productPath, "refs/reference-02.jpg");
+    const assetReference = "refs/reference-02.jpg";
+    await mkdir(join(productPath, "..", "refs"), { recursive: true });
     await writeFile(assetPath, Buffer.from("uploaded-wallet-image"));
     await writeProduct(productPath, {
       reference_images: ["main.jpg", assetReference, "detail.jpg"]
@@ -2470,14 +2643,14 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-console-generate-reference-images-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
-      const productPath = join(fixturesDir, "wallet.json");
+      const fixturesDir = testProductsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet");
       await writeProduct(productPath, {
         sku: "IMG-001",
         title_ja: "接触冷感アームカバー",
         reference_images: ["main.jpg"]
       });
-      await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-reference"));
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-reference"));
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
           data: [
@@ -2518,8 +2691,8 @@ describe("console API", () => {
         })
       });
 
-      const generatedPath = join(root, "assets", "products", "IMG-001", "reference-02.png");
-      const generatedReference = "../../assets/products/IMG-001/reference-02.png";
+      const generatedPath = join(productPath, "..", "refs", "reference-02.png");
+      const generatedReference = "refs/reference-02.png";
       expect(response.generated).toEqual([
         {
           path: generatedPath,
@@ -2545,8 +2718,8 @@ describe("console API", () => {
   it("returns 404 when product sku does not exist", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-missing-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    await writeProduct(join(fixturesDir, "box.json"));
+    const fixturesDir = testProductsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "box"));
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
     const response = await server.fetch("/api/products/NOPE");
@@ -2560,8 +2733,8 @@ describe("console API", () => {
   it("deletes a product fact package from product management", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-delete-product-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
@@ -2583,10 +2756,10 @@ describe("console API", () => {
   it("preflights a paid video generation without calling the provider", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-preflight-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
-    await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
+    await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
     const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
 
@@ -2647,8 +2820,8 @@ describe("console API", () => {
   it("includes paid generation readiness blockers in preflight", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-preflight-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath, {
       materials: ["材质未确认"],
       dimensions: "尺寸未确认",
@@ -2686,9 +2859,9 @@ describe("console API", () => {
   it("shows remaining test credit in paid preflight estimates", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-credit-preflight-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     await writeFileReport(join(outputsDir, "paid-run", "make-video-report.json"), {
       type: "haitu_make_video_report",
@@ -2736,7 +2909,7 @@ describe("console API", () => {
   it("lists report preview fields and serves local video media inside the project root", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-media-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-video");
     const rawManifestPath = join(runDir, "raw", "TK-001", "v1", "manifest.json");
     const rawOutputPath = join(runDir, "raw", "TK-001", "v1", "wallet.seedance.mp4");
@@ -2817,7 +2990,7 @@ describe("console API", () => {
   it("filters reports by provider, status, product, and final video availability", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-report-filter-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "mock-run", "make-video-report.json"), {
       type: "haitu_make_video_report",
       productSku: "TK-001",
@@ -3012,7 +3185,7 @@ describe("console API", () => {
   it("serves local job ledger totals for dashboard and billing views", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-ledger-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "paid-run", "make-video-report.json"), {
       type: "haitu_make_video_report",
       status: "completed",
@@ -3063,7 +3236,7 @@ describe("console API", () => {
   it("deletes a legacy ledger video history entry by removing its output directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-ledger-delete-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const legacyDir = join(outputsDir, "legacy-run");
     await writeFileReport(join(legacyDir, "make-video-report.json"), {
       type: "haitu_make_video_report",
@@ -3101,7 +3274,7 @@ describe("console API", () => {
   it("persists selected final version and returns it in the job ledger", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-review-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "wallet-final", "make-video-report.json"), {
       type: "haitu_make_video_report",
       status: "completed",
@@ -3154,7 +3327,7 @@ describe("console API", () => {
   it("persists manual review ratings and returns them in the job ledger", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-manual-review-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "wallet-v1", "make-video-report.json"), {
       type: "haitu_make_video_report",
       status: "completed",
@@ -3212,7 +3385,7 @@ describe("console API", () => {
   it("summarizes manual review progress toward the internal validation target", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-review-progress-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     for (const jobId of ["wallet-v1", "wallet-v2", "wallet-v3", "wallet-v4"]) {
       await writeFileReport(join(outputsDir, jobId, "make-video-report.json"), {
         type: "haitu_make_video_report",
@@ -3304,14 +3477,14 @@ describe("console API", () => {
   it("exposes product readiness for internal validation batches", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    await writeProduct(join(fixturesDir, "wallet.json"), {
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "wallet"), {
       sku: "WALLET-BLACK-001",
       title_ja: "カード収納ミニ財布",
       reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
     });
-    await writeProduct(join(fixturesDir, "box.json"), {
+    await writeProduct(testProductPath(fixturesDir, "box"), {
       sku: "BOX-001",
       title_ja: "折りたたみ収納ボックス",
       reference_images: ["main.jpg"]
@@ -3381,14 +3554,14 @@ describe("console API", () => {
   it("exports internal validation progress as CSV", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-validation-export-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    await writeProduct(join(fixturesDir, "wallet.csv.json"), {
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "wallet.csv"), {
       sku: "WALLET-BLACK-001",
       title_ja: "カード収納ミニ財布",
       reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
     });
-    await writeProduct(join(fixturesDir, "box.csv.json"), {
+    await writeProduct(testProductPath(fixturesDir, "box.csv"), {
       sku: "BOX-001",
       title_ja: "折りたたみ収納ボックス",
       reference_images: ["main.jpg"]
@@ -3446,7 +3619,7 @@ describe("console API", () => {
   it("refuses invalid manual review ratings", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-manual-review-invalid-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "wallet-v1", "make-video-report.json"), {
       type: "haitu_make_video_report",
       status: "completed",
@@ -3490,7 +3663,7 @@ describe("console API", () => {
   it("summarizes local QC results for review decisions", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-qc-summary-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-final");
     const rawManifestPath = join(runDir, "raw", "manifest.json");
     await writeFileReport(rawManifestPath, {
@@ -3589,7 +3762,7 @@ describe("console API", () => {
   it("creates a local publish package from the selected final version", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-final");
     const rawManifestPath = join(runDir, "raw", "manifest.json");
     const finalManifestPath = join(runDir, "final", "final-manifest.json");
@@ -3686,7 +3859,7 @@ describe("console API", () => {
   it("creates publish packages in batch for selected final versions and skips existing packages", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-batch-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     for (const [productSku, jobId] of [
       ["WALLET-BLACK-001", "wallet-final"],
       ["BOX-001", "box-final"]
@@ -3791,7 +3964,7 @@ describe("console API", () => {
   it("skips batch publish packages for final versions that are not manually marked publishable", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-batch-review-gate-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-final");
     const finalOutputPath = join(runDir, "final", "wallet.final.mp4");
     await mkdir(join(finalOutputPath, ".."), { recursive: true });
@@ -3853,7 +4026,7 @@ describe("console API", () => {
   it("lists local publish packages for the console", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-list-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const packageDir = join(outputsDir, "publish-packages", "WALLET-BLACK-001", "wallet-final");
     await mkdir(packageDir, { recursive: true });
     await writeFile(join(packageDir, "wallet.final.mp4"), Buffer.from("final-video"));
@@ -3915,7 +4088,7 @@ describe("console API", () => {
   it("marks publish package files that no longer exist on disk", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-missing-files-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const packageDir = join(outputsDir, "publish-packages", "WALLET-BLACK-001", "wallet-final");
     await mkdir(packageDir, { recursive: true });
     await writeFile(join(packageDir, "wallet.ass"), "[Script Info]\n", "utf8");
@@ -3951,7 +4124,7 @@ describe("console API", () => {
   it("exports publish packages as a customer-service CSV with media URLs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-publish-csv-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const packageDir = join(outputsDir, "publish-packages", "WALLET-BLACK-001", "wallet-final");
     await mkdir(packageDir, { recursive: true });
     await writeFile(join(packageDir, "wallet.final.mp4"), Buffer.from("final-video"));
@@ -3999,7 +4172,7 @@ describe("console API", () => {
   it("lists locally stored video assets for long-term storage support", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-assets-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-final");
     const rawVideoPath = join(runDir, "raw", "wallet.seedance.mp4");
     const finalVideoPath = join(runDir, "final", "wallet.final.mp4");
@@ -4098,76 +4271,87 @@ describe("console API", () => {
   it("summarizes local storage scopes that must be backed up for long-term video retention", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-storage-backup-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
-    const fixturesDir = join(root, "fixtures", "products");
-    const assetsDir = join(root, "assets", "products");
+    const outputsDir = testJobsDir(root);
+    const fixturesDir = testProductsDir(root);
     await mkdir(join(outputsDir, "wallet-final", "final"), { recursive: true });
     await mkdir(join(fixturesDir), { recursive: true });
-    await mkdir(join(assetsDir, "WALLET-BLACK-001"), { recursive: true });
     await writeFile(join(outputsDir, "wallet-final", "make-video-report.json"), JSON.stringify({ productSku: "WALLET-BLACK-001" }), "utf8");
     await writeFile(join(outputsDir, "wallet-final", "final", "manifest.json"), JSON.stringify({ ok: true }), "utf8");
     await writeFile(join(outputsDir, "wallet-final", "final", "wallet.final.mp4"), Buffer.from("final-video"));
     await writeFile(join(outputsDir, "review-state.json"), JSON.stringify({ selectedFinal: {} }), "utf8");
-    await writeFile(join(fixturesDir, "wallet.json"), JSON.stringify({ sku: "WALLET-BLACK-001" }), "utf8");
-    await writeFile(join(assetsDir, "WALLET-BLACK-001", "reference-01.jpg"), Buffer.from("image-bytes"));
+    const walletProductPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(walletProductPath, {
+      sku: "WALLET-BLACK-001",
+      reference_images: ["refs/reference-01.jpg"]
+    });
+    await mkdir(join(walletProductPath, "..", "refs"), { recursive: true });
+    await writeFile(join(walletProductPath, "..", "refs", "reference-01.jpg"), Buffer.from("image-bytes"));
     const server = createConsoleServer({ rootDir: root, outputsDir, fixturesDir });
 
     const response = await server.fetchJson("/api/storage-backup");
 
     expect(response.summary.totalBytes).toBeGreaterThan(0);
-    expect(response.summary.totalFiles).toBe(6);
-    expect(response.summary.videoFiles).toBe(1);
-    expect(response.summary.manifestFiles).toBe(1);
+    expect(response.summary.totalFiles).toBe(4);
+    expect(response.summary.videoFiles).toBe(0);
+    expect(response.summary.manifestFiles).toBe(0);
     expect(response.summary.productFiles).toBe(1);
     expect(response.summary.referenceImages).toBe(1);
     expect(response.scopes).toEqual([
       expect.objectContaining({
-        id: "outputs",
-        label: "生成结果与任务记录",
-        path: outputsDir,
-        mustBackup: true,
-        videoFiles: 1,
-        manifestFiles: 1,
-        jsonFiles: 3
-      }),
-      expect.objectContaining({
-        id: "product-fixtures",
-        label: "商品资料",
+        id: "products",
+        label: "商品资料与参考图",
         path: fixturesDir,
         mustBackup: true,
-        productFiles: 1
+        productFiles: 1,
+        referenceImages: 1
       }),
       expect.objectContaining({
-        id: "product-assets",
-        label: "商品参考图",
-        path: assetsDir,
+        id: "settings",
+        label: "默认工作区设置",
+        path: testSettingsDir(root),
+        mustBackup: true
+      }),
+      expect.objectContaining({
+        id: "system",
+        label: "系统设置、会话和审计日志",
+        path: testSystemDir(root),
+        mustBackup: true
+      }),
+      expect.objectContaining({
+        id: "job-metadata",
+        label: "任务元数据",
+        path: outputsDir,
         mustBackup: true,
-        referenceImages: 1
+        videoFiles: 0,
+        manifestFiles: 0,
+        jsonFiles: 2
       })
     ]);
     expect(response.backupCommands).toHaveLength(1);
-    expect(response.backupCommands[0]).toContain("tar -czf haitu-backup-$(date +%Y%m%d).tar.gz");
-    expect(response.backupCommands[0]).toContain("outputs");
-    expect(response.backupCommands[0]).toContain("fixtures/products");
-    expect(response.backupCommands[0]).toContain("assets/products");
-    expect(response.notes).toContain("不要删除 outputs/，这里保存视频、manifest、脚本、prompt、成本和审核记录。");
+    expect(response.backupCommands[0]).toContain(testDataDir(root));
+    expect(response.backupCommands[0]).toContain("--exclude='workspaces/*/jobs/*/raw'");
+    expect(response.backupCommands[0]).toContain("--exclude='workspaces/*/jobs/*/final'");
+    expect(response.notes).toContain("备份只处理 HAITU_DATA_DIR，不包含代码目录。");
   });
 
   it("creates a downloadable local backup archive without nesting previous backups", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-backup-archive-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
-    const fixturesDir = join(root, "fixtures", "products");
-    const productAssetsDir = join(root, "assets", "products", "WALLET-BLACK-001");
-    await mkdir(join(outputsDir, "wallet-final"), { recursive: true });
-    await mkdir(join(outputsDir, "backups"), { recursive: true });
+    const outputsDir = testJobsDir(root);
+    const fixturesDir = testProductsDir(root);
+    await mkdir(join(outputsDir, "wallet-final", "final"), { recursive: true });
+    await mkdir(join(testDataDir(root), "backups"), { recursive: true });
     await mkdir(fixturesDir, { recursive: true });
-    await mkdir(productAssetsDir, { recursive: true });
     await writeFile(join(outputsDir, "wallet-final", "make-video-report.json"), JSON.stringify({ productSku: "WALLET-BLACK-001" }), "utf8");
-    await writeFile(join(outputsDir, "wallet-final", "wallet.final.mp4"), Buffer.from("final-video"));
-    await writeFile(join(outputsDir, "backups", "old-backup.tar.gz"), Buffer.from("old-backup"));
-    await writeFile(join(fixturesDir, "wallet.json"), JSON.stringify({ sku: "WALLET-BLACK-001" }), "utf8");
-    await writeFile(join(productAssetsDir, "reference-01.jpg"), Buffer.from("image-bytes"));
+    await writeFile(join(outputsDir, "wallet-final", "final", "wallet.final.mp4"), Buffer.from("final-video"));
+    await writeFile(join(testDataDir(root), "backups", "old-backup.tar.gz"), Buffer.from("old-backup"));
+    const walletProductPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(walletProductPath, {
+      sku: "WALLET-BLACK-001",
+      reference_images: ["refs/reference-01.jpg"]
+    });
+    await mkdir(join(walletProductPath, "..", "refs"), { recursive: true });
+    await writeFile(join(walletProductPath, "..", "refs", "reference-01.jpg"), Buffer.from("image-bytes"));
     const server = createConsoleServer({ rootDir: root, outputsDir, fixturesDir });
 
     const created = await server.fetchJson("/api/backups", {
@@ -4182,7 +4366,7 @@ describe("console API", () => {
 
     expect(created.backup).toEqual(expect.objectContaining({
       fileName: expect.stringMatching(/^haitu-backup-\d{8}-\d{6}\.tar\.gz$/),
-      path: expect.stringContaining(join("outputs", "backups")),
+      path: expect.stringContaining(join("data", "backups")),
       sizeBytes: expect.any(Number),
       url: `/media?path=${encodeURIComponent(created.backup.path)}`
     }));
@@ -4197,21 +4381,68 @@ describe("console API", () => {
     expect(archiveResponse.status).toBe(200);
     expect(archiveResponse.headers.get("content-type")).toBe("application/gzip");
     expect(archiveList.status).toBe(0);
-    expect(archiveList.stdout).toContain("outputs/wallet-final/make-video-report.json");
-    expect(archiveList.stdout).toContain("outputs/wallet-final/wallet.final.mp4");
-    expect(archiveList.stdout).toContain("fixtures/products/wallet.json");
-    expect(archiveList.stdout).toContain("assets/products/WALLET-BLACK-001/reference-01.jpg");
-    expect(archiveList.stdout).not.toContain("outputs/backups/old-backup.tar.gz");
+    expect(archiveList.stdout).toContain("workspaces/default/jobs/wallet-final/make-video-report.json");
+    expect(archiveList.stdout).not.toContain("workspaces/default/jobs/wallet-final/final/wallet.final.mp4");
+    expect(archiveList.stdout).toContain("workspaces/default/products/wallet/product.json");
+    expect(archiveList.stdout).toContain("workspaces/default/products/wallet/refs/reference-01.jpg");
+    expect(archiveList.stdout).not.toContain("backups/old-backup.tar.gz");
     expect(audit.events[0]).toEqual(expect.objectContaining({
       action: "backup.created",
       target: created.backup.path
     }));
   });
 
+  it("backs up HAITU_DATA_DIR long-lived data and job metadata without video files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-data-backup-"));
+    const dataDir = join(root, "data");
+    tempDirs.push(root);
+    const productDir = join(dataDir, "workspaces", "default", "products", "TK-001");
+    const settingsDir = join(dataDir, "workspaces", "default", "settings");
+    const systemDir = join(dataDir, "system");
+    const jobDir = join(dataDir, "workspaces", "default", "jobs", "job-1");
+    await mkdir(join(productDir, "refs"), { recursive: true });
+    await mkdir(settingsDir, { recursive: true });
+    await mkdir(systemDir, { recursive: true });
+    await mkdir(join(jobDir, "raw"), { recursive: true });
+    await mkdir(join(jobDir, "final"), { recursive: true });
+    await mkdir(join(dataDir, "backups"), { recursive: true });
+    await writeFile(join(productDir, "product.json"), JSON.stringify({ sku: "TK-001", workspaceId: "default" }), "utf8");
+    await writeFile(join(productDir, "refs", "reference-01.jpg"), Buffer.from("image"));
+    await writeFile(join(settingsDir, "provider-keys.json"), JSON.stringify({ providers: {} }), "utf8");
+    await writeFile(join(systemDir, "console-settings.json"), JSON.stringify({ defaultCta: "check" }), "utf8");
+    await writeFile(join(jobDir, "job.json"), JSON.stringify({ id: "job-1", workspaceId: "default" }), "utf8");
+    await writeFile(join(jobDir, "make-video-report.json"), JSON.stringify({ productSku: "TK-001" }), "utf8");
+    await writeFile(join(jobDir, "raw", "source.mp4"), Buffer.from("raw-video"));
+    await writeFile(join(jobDir, "final", "final.mp4"), Buffer.from("final-video"));
+    await writeFile(join(dataDir, "backups", "old-backup.tar.gz"), Buffer.from("old"));
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
+
+    const report = await server.fetchJson("/api/storage-backup");
+    const created = await server.fetchJson("/api/backups", { method: "POST" });
+    const archiveList = spawnSync("tar", ["-tzf", created.backup.path], { encoding: "utf8" });
+
+    expect(report.backupCommands[0]).toContain("-C");
+    expect(report.backupCommands[0]).toContain(dataDir);
+    expect(report.backupCommands[0]).toContain("--exclude='backups'");
+    expect(report.backupCommands[0]).toContain("--exclude='workspaces/*/jobs/*/raw'");
+    expect(report.backupCommands[0]).toContain("--exclude='workspaces/*/jobs/*/final'");
+    expect(created.backup.path).toContain(join(dataDir, "backups"));
+    expect(archiveList.status).toBe(0);
+    expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/product.json");
+    expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/refs/reference-01.jpg");
+    expect(archiveList.stdout).toContain("workspaces/default/settings/provider-keys.json");
+    expect(archiveList.stdout).toContain("system/console-settings.json");
+    expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/job.json");
+    expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/make-video-report.json");
+    expect(archiveList.stdout).not.toContain("workspaces/default/jobs/job-1/raw/source.mp4");
+    expect(archiveList.stdout).not.toContain("workspaces/default/jobs/job-1/final/final.mp4");
+    expect(archiveList.stdout).not.toContain("backups/old-backup.tar.gz");
+  });
+
   it("requires explicit confirmation before deleting a local video asset", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-asset-confirm-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const finalVideoPath = join(outputsDir, "wallet-final", "final", "wallet.final.mp4");
     await mkdir(join(finalVideoPath, ".."), { recursive: true });
     await writeFile(finalVideoPath, Buffer.from("final-video"));
@@ -4234,7 +4465,7 @@ describe("console API", () => {
   it("deletes only the confirmed video file while keeping job metadata and billing history", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-asset-delete-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const runDir = join(outputsDir, "wallet-final");
     const finalVideoPath = join(runDir, "final", "wallet.final.mp4");
     const reportPath = join(runDir, "make-video-report.json");
@@ -4307,7 +4538,7 @@ describe("console API", () => {
   it("refuses to select a final version that has no final video", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-review-invalid-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     await writeFileReport(join(outputsDir, "wallet-raw", "make-video-report.json"), {
       type: "haitu_make_video_report",
       status: "completed",
@@ -4394,9 +4625,9 @@ describe("console API", () => {
   it("runs a mock make-video request through the API", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-run-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const server = createConsoleServer({ rootDir: root, fixturesDir, outputsDir });
 
@@ -4422,9 +4653,9 @@ describe("console API", () => {
   it("queues a mock video job and exposes async job status", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const server = createConsoleServer({ rootDir: root, fixturesDir, outputsDir });
 
@@ -4462,7 +4693,7 @@ describe("console API", () => {
       productSku: "TK-001",
       reportPath: join(outputsDir, queued.job.id, "make-video-report.json")
     }));
-    await expect(readFile(join(outputsDir, "video-jobs", `${queued.job.id}.json`), "utf8")).resolves.toContain(
+    await expect(readFile(jobFilePath(outputsDir, queued.job.id), "utf8")).resolves.toContain(
       "\"status\": \"completed\""
     );
   });
@@ -4475,12 +4706,12 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-console-video-config-job-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
-      const outputsDir = join(root, "outputs");
-      const productPath = join(fixturesDir, "box.json");
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
       await writeProduct(productPath);
-      await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
-      await writeFile(join(fixturesDir, "detail1.jpg"), Buffer.from("detail-image"));
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      await writeFile(productAssetPath(productPath, "detail1.jpg"), Buffer.from("detail-image"));
       const capturedInputs: unknown[] = [];
       const server = createConsoleServer({
         rootDir: root,
@@ -4573,16 +4804,17 @@ describe("console API", () => {
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-console-video-model-override-"));
       tempDirs.push(root);
-      const fixturesDir = join(root, "fixtures", "products");
-      const outputsDir = join(root, "outputs");
-      await writeProduct(join(fixturesDir, "wallet.json"), {
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const walletProductPath = testProductPath(fixturesDir, "wallet");
+      await writeProduct(walletProductPath, {
         sku: "WALLET-BLACK-001",
         title_ja: "カード収納ミニ財布",
         reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
       });
-      await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
-      await writeFile(join(fixturesDir, "detail.jpg"), Buffer.from("detail-image"));
-      await writeFile(join(fixturesDir, "use.jpg"), Buffer.from("use-image"));
+      await writeFile(productAssetPath(walletProductPath, "main.jpg"), Buffer.from("main-image"));
+      await writeFile(productAssetPath(walletProductPath, "detail.jpg"), Buffer.from("detail-image"));
+      await writeFile(productAssetPath(walletProductPath, "use.jpg"), Buffer.from("use-image"));
       const capturedInputs: unknown[] = [];
       const server = createConsoleServer({
         rootDir: root,
@@ -4653,7 +4885,7 @@ describe("console API", () => {
         providerModel: "doubao-seedance-2-0-260128",
         confirmPaid: true
       }));
-      await expect(readFile(join(outputsDir, "video-jobs", `${response.jobs[0].id}.json`), "utf8")).resolves.toContain(
+      await expect(readFile(jobFilePath(outputsDir, response.jobs[0].id), "utf8")).resolves.toContain(
         "\"providerModel\": \"doubao-seedance-2-0-260128\""
       );
     } finally {
@@ -4665,9 +4897,9 @@ describe("console API", () => {
   it("queues multiple video job versions for the same product in one request", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-batch-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const server = createConsoleServer({ rootDir: root, fixturesDir, outputsDir });
 
@@ -4704,9 +4936,9 @@ describe("console API", () => {
   it("queues product video jobs by sku so product workflows do not pass local fixture paths", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-product-video-job-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    await writeProduct(join(fixturesDir, "wallet.json"), {
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "wallet"), {
       sku: "WALLET-BLACK-001",
       title_ja: "カード収納ミニ財布",
       reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
@@ -4730,7 +4962,7 @@ describe("console API", () => {
         expect.objectContaining({
           id: expect.stringMatching(/^job-/),
           status: "queued",
-          productPath: join(fixturesDir, "wallet.json"),
+          productPath: testProductPath(fixturesDir, "wallet"),
           provider: "mock",
           durationSeconds: 8,
           outDir: expect.stringContaining(join(outputsDir, "job-"))
@@ -4738,7 +4970,7 @@ describe("console API", () => {
         expect.objectContaining({
           id: expect.stringMatching(/^job-/),
           status: "queued",
-          productPath: join(fixturesDir, "wallet.json"),
+          productPath: testProductPath(fixturesDir, "wallet"),
           provider: "mock",
           durationSeconds: 8,
           outDir: expect.stringContaining(join(outputsDir, "job-"))
@@ -4760,14 +4992,14 @@ describe("console API", () => {
   it("tops up internal validation batches only for products with enough reference images", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-validation-topup-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    await writeProduct(join(fixturesDir, "wallet.json"), {
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    await writeProduct(testProductPath(fixturesDir, "wallet"), {
       sku: "WALLET-BLACK-001",
       title_ja: "カード収納ミニ財布",
       reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
     });
-    await writeProduct(join(fixturesDir, "box.json"), {
+    await writeProduct(testProductPath(fixturesDir, "box"), {
       sku: "BOX-001",
       title_ja: "折りたたみ収納ボックス",
       reference_images: ["main.jpg"]
@@ -4830,7 +5062,7 @@ describe("console API", () => {
   it("keeps the legacy video job groups endpoint stable when no queued job files exist", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-groups-empty-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const server = createConsoleServer({ rootDir: root, outputsDir, autoStartSavedJobs: false });
 
     const response = await server.fetch("/api/video-jobs/groups");
@@ -4846,9 +5078,9 @@ describe("console API", () => {
   it("rejects paid video jobs when estimated cost exceeds the configured budget cap", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-budget-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const calls: string[] = [];
     const server = createConsoleServer({
@@ -4891,9 +5123,9 @@ describe("console API", () => {
   it("rejects paid video jobs when remaining test credit is insufficient", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-credit-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     await writeFileReport(join(outputsDir, "paid-existing", "make-video-report.json"), {
       type: "haitu_make_video_report",
@@ -4953,11 +5185,11 @@ describe("console API", () => {
   it("rejects paid batch video jobs when the combined version cost exceeds remaining test credit", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-batch-credit-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
-    await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
+    await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
     const calls: string[] = [];
     const server = createConsoleServer({
       rootDir: root,
@@ -5003,9 +5235,9 @@ describe("console API", () => {
   it("rejects paid video jobs before enqueue when product reference images are not usable", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath, {
       reference_images: ["missing-main.jpg"]
     });
@@ -5044,15 +5276,15 @@ describe("console API", () => {
   it("rejects paid video jobs before enqueue when required product facts are unconfirmed", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-fact-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath, {
       materials: ["材质未确认"],
       dimensions: "尺寸未确认",
       reference_images: ["main.jpg"]
     });
-    await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
+    await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
     const calls: string[] = [];
     const server = createConsoleServer({
       rootDir: root,
@@ -5088,9 +5320,9 @@ describe("console API", () => {
   it("rejects paid batch video jobs before enqueue when product reference images are not usable", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-batch-readiness-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath, {
       reference_images: ["missing-main.jpg"]
     });
@@ -5130,9 +5362,9 @@ describe("console API", () => {
   it("cancels a queued local video job from the console API", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-cancel-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     let releaseFirstJob!: () => void;
     const firstJobGate = new Promise<void>((resolve) => {
@@ -5202,7 +5434,7 @@ describe("console API", () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    const jobPath = join(outputsDir, "video-jobs", `${second.job.id}.json`);
+    const jobPath = jobFilePath(outputsDir, second.job.id);
 
     expect(cancelled.job).toEqual(expect.objectContaining({
       id: second.job.id,
@@ -5215,9 +5447,9 @@ describe("console API", () => {
   it("keeps a running local video job canceled after the worker returns", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-running-cancel-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     let releaseJob!: () => void;
     const jobGate = new Promise<void>((resolve) => {
@@ -5308,9 +5540,9 @@ describe("console API", () => {
   it("retries a failed local video job from the console API", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-retry-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     const calls: string[] = [];
     const server = createConsoleServer({
@@ -5405,16 +5637,16 @@ describe("console API", () => {
   it("requires a fresh paid confirmation before retrying paid failed video jobs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-retry-paid-"));
     tempDirs.push(root);
-    const outputsDir = join(root, "outputs");
+    const outputsDir = testJobsDir(root);
     const failedJobId = "job-paid-failed";
-    await mkdir(join(outputsDir, "video-jobs"), { recursive: true });
+    await mkdir(join(outputsDir, failedJobId), { recursive: true });
     await writeFile(
-      join(outputsDir, "video-jobs", `${failedJobId}.json`),
+      jobFilePath(outputsDir, failedJobId),
       JSON.stringify(
         {
           id: failedJobId,
           status: "failed",
-          productPath: join(root, "fixtures", "products", "box.json"),
+          productPath: testProductPath(testProductsDir(root), "box"),
           provider: "volcengine-seedance",
           durationSeconds: 8,
           template: "scene",
@@ -5454,31 +5686,46 @@ describe("console API", () => {
   it("auto-resumes saved queued video jobs when the console server starts", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-resume-"));
     tempDirs.push(root);
-    const fixturesDir = join(root, "fixtures", "products");
-    const outputsDir = join(root, "outputs");
-    const productPath = join(fixturesDir, "box.json");
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
-    const originalServer = createConsoleServer({
-      rootDir: root,
-      fixturesDir,
-      outputsDir,
-      autoStartSavedJobs: false
-    });
-    const queued = await originalServer.fetchJson("/api/video-jobs", {
-      method: "POST",
-      body: JSON.stringify({
-        productPath,
-        provider: "mock",
-        duration: 8,
-        template: "scene",
-        cta: "今すぐチェック"
-      })
-    });
-    const jobPath = join(outputsDir, "video-jobs", `${queued.job.id}.json`);
-    const jobRecord = JSON.parse(await readFile(jobPath, "utf8")) as Record<string, unknown>;
-    jobRecord.status = "queued";
-    delete jobRecord.startedAt;
-    await writeFile(jobPath, JSON.stringify(jobRecord, null, 2), "utf8");
+    const queuedJobId = "job-resume-queued";
+    const queuedOutDir = join(outputsDir, queuedJobId);
+    await mkdir(queuedOutDir, { recursive: true });
+    await writeFile(
+      jobFilePath(outputsDir, queuedJobId),
+      JSON.stringify(
+        {
+          id: queuedJobId,
+          workspaceId: "default",
+          status: "queued",
+          productPath,
+          outDir: queuedOutDir,
+          createdAt: "2026-06-14T09:00:00.000Z",
+          updatedAt: "2026-06-14T09:00:00.000Z",
+          expiresAt: "2026-06-15T09:00:00.000Z",
+          confirmPaid: false,
+          finalLanguage: "ja",
+          cta: "今すぐチェック",
+          provider: "mock",
+          durationSeconds: 8,
+          template: "scene"
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    await expect(readFile(jobFilePath(outputsDir, queuedJobId), "utf8")).resolves.toContain(
+      "\"status\": \"queued\""
+    );
+    await expect(readFile(jobFilePath(outputsDir, queuedJobId), "utf8")).resolves.toContain(
+      "\"workspaceId\": \"default\""
+    );
+    await expect(readFile(jobFilePath(outputsDir, queuedJobId), "utf8")).resolves.toContain(
+      "\"expiresAt\": \"2026-06-15T09:00:00.000Z\""
+    );
     const calls: string[] = [];
     const resumedServer = createConsoleServer({
       rootDir: root,
@@ -5510,7 +5757,7 @@ describe("console API", () => {
 
     let latest;
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      latest = await resumedServer.fetchJson(`/api/video-jobs/${queued.job.id}`);
+      latest = await resumedServer.fetchJson(`/api/video-jobs/${queuedJobId}`);
       if (latest.job.status === "completed") {
         break;
       }
@@ -5518,11 +5765,11 @@ describe("console API", () => {
     }
 
     expect(latest.job).toEqual(expect.objectContaining({
-      id: queued.job.id,
+      id: queuedJobId,
       status: "completed",
       productSku: "TK-001"
     }));
-    expect(calls).toEqual([queued.job.outDir]);
+    expect(calls).toEqual([queuedOutDir]);
   });
 });
 
@@ -5548,6 +5795,38 @@ async function writeProduct(path: string, overrides: Record<string, unknown> = {
     ),
     "utf8"
   );
+}
+
+function testDataDir(root: string): string {
+  return join(root, "data");
+}
+
+function testProductsDir(root: string): string {
+  return join(testDataDir(root), "workspaces", "default", "products");
+}
+
+function testJobsDir(root: string): string {
+  return join(testDataDir(root), "workspaces", "default", "jobs");
+}
+
+function testSettingsDir(root: string): string {
+  return join(testDataDir(root), "workspaces", "default", "settings");
+}
+
+function testSystemDir(root: string): string {
+  return join(testDataDir(root), "system");
+}
+
+function testProductPath(productsDir: string, id: string): string {
+  return join(productsDir, id, "product.json");
+}
+
+function productAssetPath(productFilePath: string, fileName: string): string {
+  return join(productFilePath, "..", fileName);
+}
+
+function jobFilePath(jobsDir: string, jobId: string): string {
+  return join(jobsDir, jobId, "job.json");
 }
 
 async function writeFileReport(path: string, report: unknown): Promise<void> {

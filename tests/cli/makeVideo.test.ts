@@ -49,6 +49,35 @@ describe("runMakeVideoCli", () => {
     );
   });
 
+  it("defaults output to HAITU_DATA_DIR default workspace jobs when --outDir is omitted", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-default-data-"));
+    tempDirs.push(tempDir);
+    process.env.HAITU_DATA_DIR = join(tempDir, "runtime-data");
+    const productPath = join(tempDir, "product.json");
+    await writeProduct(productPath);
+
+    const report = await runMakeVideoCli([
+      "--product",
+      productPath,
+      "--provider",
+      "mock",
+      "--duration",
+      "8"
+    ], {
+      cwd: tempDir
+    });
+
+    expect(report.reportPath).toBe(join(
+      tempDir,
+      "runtime-data",
+      "workspaces",
+      "default",
+      "jobs",
+      "make-video",
+      "make-video-report.json"
+    ));
+  });
+
   it("estimates billing cost from recorded usage tokens", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-billing-"));
     tempDirs.push(tempDir);

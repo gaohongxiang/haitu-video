@@ -58,6 +58,47 @@ describe("runGenerateCli", () => {
     );
   });
 
+  it("defaults output to the project data default workspace jobs when --outDir is omitted", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-default-data-"));
+    tempDirs.push(tempDir);
+    delete process.env.HAITU_DATA_DIR;
+    const productPath = join(tempDir, "product.json");
+    await writeFile(
+      productPath,
+      JSON.stringify({
+        sku: "TK-001",
+        title_ja: "折りたたみ収納ボックス",
+        category: "収納用品",
+        materials: ["PP"],
+        dimensions: "36x25x19cm",
+        verified_selling_points: ["折りたたみ可能"],
+        usage_scenes: ["キッチン"],
+        forbidden_claims: ["防水未確認"],
+        reference_images: ["main.jpg"]
+      }),
+      "utf8"
+    );
+
+    const summary = await runGenerateCli([
+      "--product",
+      productPath,
+      "--versions",
+      "1"
+    ], {
+      cwd: tempDir
+    });
+
+    expect(summary.summaryPath).toBe(join(
+      tempDir,
+      "data",
+      "workspaces",
+      "default",
+      "jobs",
+      "generate",
+      "summary.json"
+    ));
+  });
+
   it("passes an explicit duration to generated jobs", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-duration-"));
     tempDirs.push(tempDir);

@@ -21,14 +21,16 @@
   <dict>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HAITU_DATA_DIR</key>
+    <string>/Users/gaohongxiang/projects/haitu-video/data</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/gaohongxiang/projects/haitu-video/outputs/console-launchd.log</string>
+  <string>/Users/gaohongxiang/projects/haitu-video/data/system/console-launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/gaohongxiang/projects/haitu-video/outputs/console-launchd.err.log</string>
+  <string>/Users/gaohongxiang/projects/haitu-video/data/system/console-launchd.err.log</string>
 </dict>
 </plist>

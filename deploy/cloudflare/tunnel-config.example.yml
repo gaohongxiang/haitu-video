@@ -1,0 +1,7 @@
+tunnel: <你的隧道编号>
+credentials-file: /etc/cloudflared/<你的隧道编号>.json
+
+ingress:
+  - hostname: haitu.online
+    service: http://127.0.0.1:4173
+  - service: http_status:404

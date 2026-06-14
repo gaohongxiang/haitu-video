@@ -8,9 +8,9 @@ vi.mock("../../src/server/consoleServer.js", () => ({
 }));
 
 describe("console CLI", () => {
-  it("uses PORT and HOST environment defaults for VPS service startup", async () => {
-    vi.stubEnv("PORT", "4188");
-    vi.stubEnv("HOST", "0.0.0.0");
+  it("uses HAITU_PORT and HAITU_HOST environment defaults for VPS service startup", async () => {
+    vi.stubEnv("HAITU_PORT", "4188");
+    vi.stubEnv("HAITU_HOST", "0.0.0.0");
     const listen = vi.fn(async (port: number, host: string) => ({
       url: `http://${host}:${port}`,
       close: async () => undefined
@@ -28,8 +28,8 @@ describe("console CLI", () => {
   });
 
   it("lets explicit --port and --host override environment defaults", async () => {
-    vi.stubEnv("PORT", "4188");
-    vi.stubEnv("HOST", "0.0.0.0");
+    vi.stubEnv("HAITU_PORT", "4188");
+    vi.stubEnv("HAITU_HOST", "0.0.0.0");
     const listen = vi.fn(async (port: number, host: string) => ({
       url: `http://${host}:${port}`,
       close: async () => undefined

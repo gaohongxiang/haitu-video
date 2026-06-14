@@ -6,6 +6,7 @@ import { config as loadDotenv } from "dotenv";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import { DEFAULT_WORKSPACE_ID, getWorkspacePaths, resolveDataDir } from "../server/storagePaths.js";
 
 export interface MakeVideoCliOptions {
   cwd?: string;
@@ -35,7 +36,8 @@ export async function runMakeVideoCli(
     override: false,
     quiet: true
   });
-  const args = parseArgs(argv);
+  const cwd = options.cwd ?? process.cwd();
+  const args = parseArgs(argv, cwd);
   return runMakeVideoPipeline({
     productPath: args.productPath,
     outDir: args.outDir,
@@ -47,13 +49,13 @@ export async function runMakeVideoCli(
     tokenPriceCnyPerMillion: args.tokenPriceCnyPerMillion,
     forceRegenerate: args.forceRegenerate,
     reuseManifestPath: args.reuseManifestPath,
-    cwd: options.cwd,
+    cwd,
     fetchImpl: options.fetchImpl,
     postprocessVideo: options.postprocessVideo
   });
 }
 
-function parseArgs(argv: string[]): MakeVideoArgs {
+function parseArgs(argv: string[], cwd: string): MakeVideoArgs {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
@@ -71,7 +73,7 @@ function parseArgs(argv: string[]): MakeVideoArgs {
 
   return {
     productPath,
-    outDir: values.get("outDir") ?? "outputs/make-video",
+    outDir: values.get("outDir") ?? join(defaultJobsDir(cwd), "make-video"),
     providerName: parseProvider(values.get("provider") ?? "mock"),
     durationSeconds: parseDuration(values.get("duration") ?? "8"),
     cta: values.get("cta") ?? "今すぐチェック",
@@ -86,6 +88,14 @@ function parseArgs(argv: string[]): MakeVideoArgs {
     forceRegenerate: parseBoolean(values.get("forceRegenerate") ?? "false"),
     reuseManifestPath: values.get("reuseManifest")
   };
+}
+
+function defaultJobsDir(cwd: string): string {
+  const dataDir = resolveDataDir({
+    rootDir: cwd,
+    env: process.env
+  });
+  return getWorkspacePaths(dataDir, DEFAULT_WORKSPACE_ID).jobsDir;
 }
 
 function parseProvider(value: string): VideoProviderName {

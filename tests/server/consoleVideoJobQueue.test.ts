@@ -15,6 +15,66 @@ afterEach(async () => {
 });
 
 describe("LocalVideoJobQueue", () => {
+  it("stores job metadata and outputs in workspace job directories with default workspace and 24h expiry", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-workspace-"));
+    tempDirs.push(root);
+    const dataDir = join(root, "data");
+    const productsDir = join(dataDir, "workspaces", "default", "products");
+    const jobsDir = join(dataDir, "workspaces", "default", "jobs");
+    const productPath = join(productsDir, "TK-001", "product.json");
+    await writeProduct(productPath);
+    const queue = new LocalVideoJobQueue({
+      rootDir: dataDir,
+      outputsDir: jobsDir,
+      workspaceId: "default",
+      settingsStore: new FileConsoleSettingsStore(join(dataDir, "system", "console-settings.json")),
+      now: () => new Date("2026-06-07T09:00:00.000Z"),
+      runMakeVideoPipeline: async (input) => {
+        const report = makeReport(input);
+        await mkdir(join(report.reportPath, ".."), { recursive: true });
+        await writeFile(report.reportPath, JSON.stringify(report, null, 2), "utf8");
+        return report;
+      }
+    });
+
+    const enqueued = await queue.enqueue({
+      productPath,
+      provider: "mock",
+      duration: 8,
+      template: "scene",
+      cta: "今すぐチェック",
+      confirmPaid: false
+    });
+    const jobFile = join(jobsDir, enqueued.id, "job.json");
+    const queuedRecord = JSON.parse(await readFile(jobFile, "utf8"));
+    const completed = await queue.waitForIdle(enqueued.id);
+    const completedRecord = JSON.parse(await readFile(jobFile, "utf8"));
+
+    expect(enqueued).toEqual(expect.objectContaining({
+      workspaceId: "default",
+      outDir: join(jobsDir, enqueued.id),
+      expiresAt: "2026-06-08T09:00:00.000Z"
+    }));
+    expect(queuedRecord).toEqual(expect.objectContaining({
+      workspaceId: "default",
+      status: "queued",
+      outDir: join(jobsDir, enqueued.id),
+      expiresAt: "2026-06-08T09:00:00.000Z"
+    }));
+    expect(completed).toEqual(expect.objectContaining({
+      workspaceId: "default",
+      status: "completed",
+      reportPath: join(jobsDir, enqueued.id, "make-video-report.json"),
+      finalOutputPath: join(jobsDir, enqueued.id, "final", "final.mp4"),
+      expiresAt: "2026-06-08T09:00:00.000Z"
+    }));
+    expect(completedRecord).toEqual(expect.objectContaining({
+      workspaceId: "default",
+      status: "completed",
+      expiresAt: "2026-06-08T09:00:00.000Z"
+    }));
+  });
+
   it("enqueues a make-video job, runs it asynchronously, and persists status", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-queue-"));
     tempDirs.push(root);
@@ -46,7 +106,7 @@ describe("LocalVideoJobQueue", () => {
 
     expect(enqueued.status).toBe("queued");
     expect(enqueued.id).toBe("job-20260607090000000-001");
-    await expect(readFile(join(outputsDir, "video-jobs", `${enqueued.id}.json`), "utf8")).resolves.toContain(
+    await expect(readFile(join(outputsDir, enqueued.id, "job.json"), "utf8")).resolves.toContain(
       "\"status\": \"queued\""
     );
 
@@ -67,7 +127,7 @@ describe("LocalVideoJobQueue", () => {
     await expect(readFile(completed.reportPath ?? "", "utf8")).resolves.toContain(
       "\"type\": \"haitu_make_video_report\""
     );
-    await expect(readFile(join(outputsDir, "video-jobs", `${enqueued.id}.json`), "utf8")).resolves.toContain(
+    await expect(readFile(join(outputsDir, enqueued.id, "job.json"), "utf8")).resolves.toContain(
       "\"status\": \"completed\""
     );
   });
@@ -134,7 +194,7 @@ describe("LocalVideoJobQueue", () => {
     }));
     expect(latestSecond.status).toBe("canceled");
     expect(calls).toEqual([first.outDir]);
-    await expect(readFile(join(outputsDir, "video-jobs", `${second.id}.json`), "utf8")).resolves.toContain(
+    await expect(readFile(join(outputsDir, second.id, "job.json"), "utf8")).resolves.toContain(
       "\"status\": \"canceled\""
     );
   });
@@ -164,7 +224,7 @@ describe("LocalVideoJobQueue", () => {
       status: "canceled",
       completedAt: "2026-06-07T09:00:00.000Z"
     }));
-    await expect(readFile(join(outputsDir, "video-jobs", `${completed.id}.json`), "utf8")).resolves.toContain(
+    await expect(readFile(join(outputsDir, completed.id, "job.json"), "utf8")).resolves.toContain(
       "\"status\": \"canceled\""
     );
   });
@@ -325,11 +385,11 @@ describe("LocalVideoJobQueue", () => {
       template: "scene",
       confirmPaid: false
     });
-    await mkdir(join(outputsDir, "video-jobs"), { recursive: true });
+    await mkdir(join(outputsDir, jobId), { recursive: true });
     await mkdir(join(report.reportPath, ".."), { recursive: true });
     await writeFile(report.reportPath, JSON.stringify(report, null, 2), "utf8");
     await writeFile(
-      join(outputsDir, "video-jobs", `${jobId}.json`),
+      join(outputsDir, jobId, "job.json"),
       JSON.stringify(
         {
           id: jobId,
@@ -377,9 +437,9 @@ describe("LocalVideoJobQueue", () => {
     tempDirs.push(root);
     const outputsDir = join(root, "outputs");
     const interruptedId = "job-20260607090000000-001";
-    await mkdir(join(outputsDir, "video-jobs"), { recursive: true });
+    await mkdir(join(outputsDir, interruptedId), { recursive: true });
     await writeFile(
-      join(outputsDir, "video-jobs", `${interruptedId}.json`),
+      join(outputsDir, interruptedId, "job.json"),
       JSON.stringify(
         {
           id: interruptedId,

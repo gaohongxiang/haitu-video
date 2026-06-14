@@ -283,6 +283,57 @@ describe("buildJobLedger", () => {
       }
     }));
   });
+
+  it("keeps expired job history while hiding previewable video URLs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-ledger-expired-"));
+    tempDirs.push(root);
+    const outputsDir = join(root, "outputs");
+    const jobDir = join(outputsDir, "expired-run");
+    const finalOutputPath = join(jobDir, "final", "final.mp4");
+    await writeReport(join(jobDir, "job.json"), {
+      id: "expired-run",
+      workspaceId: "default",
+      status: "completed",
+      createdAt: "2026-06-07T09:00:00.000Z",
+      updatedAt: "2026-06-08T09:01:00.000Z",
+      expiresAt: "2026-06-08T09:00:00.000Z",
+      expired: true,
+      mediaDeletedAt: "2026-06-08T09:01:00.000Z"
+    });
+    await writeReport(join(jobDir, "make-video-report.json"), {
+      type: "haitu_make_video_report",
+      status: "completed",
+      productSku: "TK-001",
+      provider: "mock",
+      durationSeconds: 8,
+      raw: {
+        manifestPath: join(jobDir, "raw", "manifest.json"),
+        outputPath: join(jobDir, "raw", "video.mp4")
+      },
+      final: {
+        manifestPath: join(jobDir, "final", "final-manifest.json"),
+        outputPath: finalOutputPath,
+        subtitlePath: join(jobDir, "final", "final.ass")
+      },
+      totalCost: {
+        amount: 0,
+        currency: "USD"
+      },
+      reusedRawManifest: false,
+      recoveredRawOutput: false
+    });
+
+    const ledger = await buildJobLedger(outputsDir);
+
+    expect(ledger.jobs[0]).toEqual(expect.objectContaining({
+      id: "expired-run",
+      expired: true,
+      expiresAt: "2026-06-08T09:00:00.000Z",
+      hasFinalVideo: false,
+      finalOutputPath,
+      finalVideoUrl: undefined
+    }));
+  });
 });
 
 async function writeReport(path: string, report: unknown, encoding: BufferEncoding = "utf8"): Promise<void> {

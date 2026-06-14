@@ -11,6 +11,7 @@ import { runProductJob } from "../pipeline/runProductJob.js";
 import { createVideoProvider } from "../providers/providerFactory.js";
 import type { MoneyAmount } from "../providers/types.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import { DEFAULT_WORKSPACE_ID, getWorkspacePaths, resolveDataDir } from "../server/storagePaths.js";
 
 export interface GenerateSummary {
   productSku: string;
@@ -45,7 +46,8 @@ export async function runGenerateCli(
     override: false,
     quiet: true
   });
-  const args = parseArgs(argv);
+  const cwd = options.cwd ?? process.cwd();
+  const args = parseArgs(argv, cwd);
   const rawProduct = JSON.parse(await readFile(args.productPath, "utf8")) as unknown;
   const product = parseProductFacts(rawProduct);
   const productWithResolvedAssets = {
@@ -97,7 +99,7 @@ export async function runGenerateCli(
   return summary;
 }
 
-function parseArgs(argv: string[]): GenerateArgs {
+function parseArgs(argv: string[], cwd: string): GenerateArgs {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
@@ -121,13 +123,21 @@ function parseArgs(argv: string[]): GenerateArgs {
   return {
     productPath,
     versions,
-    outDir: values.get("outDir") ?? "outputs",
+    outDir: values.get("outDir") ?? join(defaultJobsDir(cwd), "generate"),
     cta: values.get("cta") ?? "今すぐチェック",
     template: parseTemplate(values.get("template") ?? "pain-point"),
     providerName: parseProvider(values.get("provider") ?? "mock"),
     durationSeconds: parseDuration(values.get("duration") ?? "8"),
     confirmPaid: parseBoolean(values.get("confirmPaid") ?? "false")
   };
+}
+
+function defaultJobsDir(cwd: string): string {
+  const dataDir = resolveDataDir({
+    rootDir: cwd,
+    env: process.env
+  });
+  return getWorkspacePaths(dataDir, DEFAULT_WORKSPACE_ID).jobsDir;
 }
 
 function parseTemplate(value: string): ScriptTemplate {

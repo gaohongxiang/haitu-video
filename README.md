@@ -31,12 +31,11 @@ npm run typecheck
 
 ```bash
 npm run generate -- \
-  --product fixtures/products/sample-storage-box.json \
-  --versions 3 \
-  --outDir outputs
+  --product examples/products/sample-storage-box.json \
+  --versions 3
 ```
 
-Generated files are written under `outputs/` and ignored by git.
+Generated files are written under `data/workspaces/default/jobs/generate/` by default and ignored by git. Set `HAITU_DATA_DIR` to move runtime data outside the repository.
 
 ## Generate With Seedance
 
@@ -66,10 +65,9 @@ Run one paid smoke test only after checking the estimated cost:
 
 ```bash
 npm run generate -- \
-  --product fixtures/products/sample-storage-box.json \
+  --product examples/products/sample-storage-box.json \
   --versions 1 \
   --duration 8 \
-  --outDir outputs \
   --provider volcengine-seedance \
   --confirmPaid true
 ```

@@ -113,13 +113,10 @@ interface StoryboardDraftResponse {
 
 interface StoryboardHistoryRecord {
   id: string;
-  productSku: string;
   createdAt: string;
-  template: TemplateName;
+  style: TemplateName;
   duration: number;
-  scriptDraft: string;
-  storyboardDraft: string;
-  notes: string[];
+  script: string;
 }
 
 interface ProductImportQuality {
@@ -227,6 +224,8 @@ interface LedgerJob {
   estimatedCostCny: number;
   hasFinalVideo: boolean;
   finalVideoUrl?: string;
+  expiresAt?: string;
+  expired?: boolean;
   rawManifestPath?: string;
   selectedFinal: boolean;
   qc?: QcSummaryItem;
@@ -317,6 +316,8 @@ interface VideoJob {
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
+  expiresAt?: string;
+  expired?: boolean;
 }
 
 interface ProductVideoGenerationOptions {
@@ -335,6 +336,8 @@ interface CreativeVersionItem {
   hasFinalVideo: boolean;
   finalVideoUrl?: string;
   createdAt?: string;
+  expiresAt?: string;
+  expired?: boolean;
   source: "video-job" | "ledger";
   videoJob?: VideoJob;
 }
@@ -528,7 +531,7 @@ interface VideoAssetLedger {
 }
 
 interface StorageBackupScope {
-  id: "outputs" | "product-fixtures" | "product-assets";
+  id: "products" | "settings" | "system" | "job-metadata";
   label: string;
   path: string;
   mustBackup: boolean;
@@ -802,78 +805,16 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
 };
 
 const NEW_PRODUCT_SELECT_VALUE = "__new_product__";
-const STORYBOARD_HISTORY_STORAGE_KEY = "haitu.storyboardHistory.v1";
-const STUDIO_PRODUCT_SKU_STORAGE_KEY = "haitu.productStudio.productSku.v1";
 const storyboardTemplateNames: TemplateName[] = ["scene", "pain-point", "benefit", "ugc", "unboxing"];
 
 function isTemplateName(value: unknown): value is TemplateName {
   return typeof value === "string" && storyboardTemplateNames.includes(value as TemplateName);
 }
 
-function normalizeStoryboardHistoryRecord(value: unknown): StoryboardHistoryRecord | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const record = value as Partial<StoryboardHistoryRecord>;
-  const duration = typeof record.duration === "number" ? record.duration : Number(record.duration);
-  if (
-    typeof record.id !== "string" ||
-    typeof record.productSku !== "string" ||
-    typeof record.createdAt !== "string" ||
-    !isTemplateName(record.template) ||
-    !Number.isFinite(duration) ||
-    typeof record.scriptDraft !== "string" ||
-    typeof record.storyboardDraft !== "string"
-  ) {
-    return undefined;
-  }
-  return {
-    id: record.id,
-    productSku: record.productSku,
-    createdAt: record.createdAt,
-    template: record.template,
-    duration,
-    scriptDraft: record.scriptDraft,
-    storyboardDraft: record.storyboardDraft,
-    notes: Array.isArray(record.notes) ? record.notes.filter((note): note is string => typeof note === "string") : []
-  };
-}
-
-function loadStoryboardHistory(): StoryboardHistoryRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORYBOARD_HISTORY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeStoryboardHistoryRecord)
-      .filter((record): record is StoryboardHistoryRecord => Boolean(record))
-      .slice(0, 40);
-  } catch {
-    return [];
-  }
-}
-
-function saveStoryboardHistory(records: StoryboardHistoryRecord[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORYBOARD_HISTORY_STORAGE_KEY, JSON.stringify(records.slice(0, 40)));
-  } catch {
-    // Local storage can be unavailable in restricted browser modes; history is optional.
-  }
-}
-
 function restoreProductStudioSku(availableProducts: ProductSummary[]): string {
   if (availableProducts.length === 0 || typeof window === "undefined") return "";
   const urlSku = productStudioProductSkuFromUrl(window.location.href);
   if (urlSku && availableProducts.some((product) => product.sku === urlSku)) return urlSku;
-  try {
-    const storedSku = window.localStorage.getItem(STUDIO_PRODUCT_SKU_STORAGE_KEY)?.trim() ?? "";
-    if (storedSku && availableProducts.some((product) => product.sku === storedSku)) {
-      return storedSku;
-    }
-  } catch {
-    // Ignore unavailable local storage and fall back to the first product.
-  }
   return availableProducts[0]?.sku ?? "";
 }
 
@@ -898,7 +839,7 @@ export function App() {
   const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => defaultStoryboardDraft("scene", defaultVideoDurationSeconds));
   const [storyboardDraftTouched, setStoryboardDraftTouched] = useState(false);
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
-  const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>(() => loadStoryboardHistory());
+  const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>([]);
   const [reuseManifest, setReuseManifest] = useState("");
   const [confirmPaid, setConfirmPaid] = useState(false);
   const [preflight, setPreflight] = useState<Preflight | undefined>();
@@ -1002,15 +943,6 @@ export function App() {
     const nextUrl = productStudioProductUrl(window.location.href, sku);
     if (nextUrl !== window.location.href) {
       window.history.replaceState({}, "", nextUrl);
-    }
-    try {
-      if (sku) {
-        window.localStorage.setItem(STUDIO_PRODUCT_SKU_STORAGE_KEY, sku);
-      } else {
-        window.localStorage.removeItem(STUDIO_PRODUCT_SKU_STORAGE_KEY);
-      }
-    } catch {
-      // Product persistence is a convenience; URL state is enough for normal refreshes.
     }
   }
 
@@ -1216,34 +1148,39 @@ export function App() {
     setStatusText("表单已变更，请重新生成预检后再运行。");
   }
 
-  function pushStoryboardHistory(record: StoryboardHistoryRecord) {
-    setStoryboardHistory((current) => {
-      const next = [record, ...current.filter((item) => item.id !== record.id)];
-      const byProduct = next.filter((item) => item.productSku === record.productSku).slice(0, 8);
-      const otherProducts = next.filter((item) => item.productSku !== record.productSku);
-      const persistedHistory = [...byProduct, ...otherProducts].slice(0, 40);
-      saveStoryboardHistory(persistedHistory);
-      return persistedHistory;
-    });
+  async function loadProductStoryboards(sku: string) {
+    try {
+      const response = await getJson<{ storyboards: StoryboardHistoryRecord[] }>(`/api/products/${encodeURIComponent(sku)}/storyboards`);
+      setStoryboardHistory(response.storyboards);
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  async function pushStoryboardHistory(input: { style: TemplateName; duration: number; script: string }) {
+    if (!selectedProduct) return;
+    const response = await postJson<{ storyboard: StoryboardHistoryRecord }>(
+      `/api/products/${encodeURIComponent(selectedProduct.sku)}/storyboards`,
+      input
+    );
+    setStoryboardHistory((current) => [response.storyboard, ...current.filter((item) => item.id !== response.storyboard.id)]);
   }
 
   function applyStoryboardHistory(record: StoryboardHistoryRecord) {
-    setTemplate(record.template);
+    setTemplate(record.style);
     setDuration(record.duration);
-    setStudioScriptDraft(record.scriptDraft);
-    setStudioStoryboardDraft(record.storyboardDraft);
+    setStudioScriptDraft("");
+    setStudioStoryboardDraft(record.script);
     setStoryboardDraftTouched(true);
     setStudioStoryboardCnDraft("");
     markPreflightStale();
-    setStatusText(`已回填历史分镜: ${templateLabel(record.template)} / ${formatDuration(record.duration)}`);
+    setStatusText(`已回填历史分镜: ${templateLabel(record.style)} / ${formatDuration(record.duration)}`);
   }
 
-  function deleteStoryboardHistory(recordId: string) {
-    setStoryboardHistory((current) => {
-      const next = current.filter((record) => record.id !== recordId);
-      saveStoryboardHistory(next);
-      return next;
-    });
+  async function deleteStoryboardHistory(recordId: string) {
+    if (!selectedProduct) return;
+    await deleteJson(`/api/products/${encodeURIComponent(selectedProduct.sku)}/storyboards/${encodeURIComponent(recordId)}`);
+    setStoryboardHistory((current) => current.filter((record) => record.id !== recordId));
     showConsoleToast("分镜记录已删除。", "ok");
   }
 
@@ -1517,6 +1454,11 @@ export function App() {
     setImportQuality(product.importQuality);
   }
 
+  async function applyProductToCreationComposerWithStoryboards(product: ProductDetail) {
+    applyProductToCreationComposer(product);
+    await loadProductStoryboards(product.sku);
+  }
+
   function updateProductComposerText(text: string) {
     setProductImportText(text);
     if (isStructuredProductComposerText(text)) {
@@ -1530,7 +1472,7 @@ export function App() {
   async function refreshSelectedProductForStudio(sku = selectedProductSkuRef.current) {
     if (!sku) return;
     const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(sku)}`);
-    applyProductToCreationComposer(response.product);
+    await applyProductToCreationComposerWithStoryboards(response.product);
     persistProductStudioSku(response.product.sku);
   }
 
@@ -1539,7 +1481,7 @@ export function App() {
     try {
       const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(sku)}`);
       if (activeSection === "video") {
-        applyProductToCreationComposer(response.product);
+        await applyProductToCreationComposerWithStoryboards(response.product);
         persistProductStudioSku(response.product.sku);
         setImportNotes([]);
         setProductLibraryDialogMode(undefined);
@@ -1566,7 +1508,7 @@ export function App() {
     setIsBusy(true);
     try {
       const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(product.sku)}`);
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setImportNotes([]);
       persistProductStudioSku(response.product.sku);
       setProductStudioLoadError("");
@@ -1599,6 +1541,7 @@ export function App() {
     setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
     setStoryboardDraftTouched(false);
     setStudioStoryboardCnDraft("");
+    setStoryboardHistory([]);
     setActiveSection("video");
     setStatusText("已切换为新商品创作，可以直接填写资料并添加图片。");
   }
@@ -1622,7 +1565,7 @@ export function App() {
           text: importText
         });
         const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
-        applyProductToCreationComposer(response.product);
+        await applyProductToCreationComposerWithStoryboards(response.product);
         setImportNotes(preview.notes);
         setImportQuality(preview.quality);
         persistProductStudioSku(response.product.sku);
@@ -1639,7 +1582,7 @@ export function App() {
 
       const draftToSave = importText ? structuredDraft : productDraft;
       const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts(draftToSave));
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setImportNotes([]);
       setImportQuality(response.product.importQuality);
       persistProductStudioSku(response.product.sku);
@@ -1766,7 +1709,7 @@ export function App() {
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       if (activeSection === "video") {
-        applyProductToCreationComposer(response.product);
+        await applyProductToCreationComposerWithStoryboards(response.product);
         persistProductStudioSku(response.product.sku);
       } else {
         setSelectedProduct(undefined);
@@ -1861,15 +1804,10 @@ export function App() {
       setStudioStoryboardDraft(nextStoryboardDraft);
       setStoryboardDraftTouched(true);
       setStudioStoryboardCnDraft("");
-      pushStoryboardHistory({
-        id: `${selectedProduct.sku}-${Date.now()}`,
-        productSku: selectedProduct.sku,
-        createdAt: new Date().toISOString(),
-        template,
+      await pushStoryboardHistory({
+        style: template,
         duration,
-        scriptDraft: nextScriptDraft,
-        storyboardDraft: nextStoryboardDraft,
-        notes: response.notes
+        script: nextStoryboardDraft
       });
       setPreflight(undefined);
       setPreflightSignature("");
@@ -1898,7 +1836,7 @@ export function App() {
       const continueCreation = activeSection === "video";
       if (editingCurrentProduct || continueCreation) {
         if (continueCreation) {
-          applyProductToCreationComposer(response.product);
+          await applyProductToCreationComposerWithStoryboards(response.product);
         } else {
           setSelectedProduct(response.product);
           setProductPath(response.product.path);
@@ -1930,7 +1868,7 @@ export function App() {
         `/api/products/${encodeURIComponent(sku)}/import-assets`,
         {}
       );
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
         `已导入参考图: ${response.imported.length}`,
         ...response.imported.map((item) => `- ${item.original} -> ${item.reference}`)
@@ -1962,7 +1900,7 @@ export function App() {
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images`, {
         files: payloadFiles
       });
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
         `已上传参考图: ${response.uploaded.length}`,
         ...response.uploaded.map((item) => `- ${item.originalName} -> ${item.reference}`)
@@ -1985,7 +1923,7 @@ export function App() {
         deleted: { index: number; reference: string };
         product: ProductDetail;
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/${index}`);
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText(`已删除参考图: ${response.deleted.reference}`);
       await refreshConsole();
     } catch (error) {
@@ -2009,7 +1947,7 @@ export function App() {
         generated: Array<{ reference: string }>;
         product: ProductDetail;
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {});
-      applyProductToCreationComposer(response.product);
+      await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
         `AI 已生成参考图: ${response.generated.length}`,
         ...response.generated.map((item) => `- ${item.reference}`)
@@ -2761,7 +2699,7 @@ function ProductCreationWorkspace({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => void;
+  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
   const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
@@ -2785,7 +2723,7 @@ function ProductCreationWorkspace({
     })
     : [];
   const selectedProductStoryboardHistory = selectedProduct
-    ? storyboardHistory.filter((record) => record.productSku === selectedProduct.sku)
+    ? storyboardHistory
     : [];
 
   return (
@@ -2923,7 +2861,7 @@ function ProductCreationComposer({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => void;
+  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
@@ -3406,7 +3344,7 @@ function StoryboardComposerPanel({
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => void;
+  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onGenerateStoryboardDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
   productReady: boolean;
@@ -3509,11 +3447,11 @@ function StoryboardComposerPanel({
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
                       <div className="flex gap-1">
-                        <Badge>{templateLabel(record.template)}</Badge>
+                        <Badge>{templateLabel(record.style)}</Badge>
                         <Badge>{formatDuration(record.duration)}</Badge>
                       </div>
                     </div>
-                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
+                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.script)}</div>
                   </button>
                   <button
                     type="button"
@@ -3522,7 +3460,7 @@ function StoryboardComposerPanel({
                     aria-label={`删除分镜记录 ${formatHistoryTime(record.createdAt)}`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onDeleteStoryboardHistory(record.id);
+                      void onDeleteStoryboardHistory(record.id);
                       setHistoryOpen(false);
                     }}
                   >
@@ -3584,7 +3522,7 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
+                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {videoExpiryLabel(job)}
                   </div>
                 </div>
                 <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
@@ -3594,7 +3532,7 @@ function VideoHistoryPanel({
                       预览视频
                     </Button>
                   ) : null}
-                  {job.finalVideoUrl ? (
+                  {playableVideo && job.finalVideoUrl ? (
                     <Button asChild className="w-fit" size="sm">
                       <a href={job.finalVideoUrl} download>
                         <Download size={13} />
@@ -4778,7 +4716,7 @@ function ProductDraftReferencePaths({ value, onChange }: { value: string; onChan
           rows={5}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="../../assets/products/WALLET-BLACK-001/reference-01.jpg"
+          placeholder="refs/reference-01.jpg"
         />
       </div>
     </ProductDraftSection>
@@ -5405,7 +5343,7 @@ function StorageBackupPanel({
                   {backups ? `${formatNumber(backups.summary.totalBackups)} 个备份 / ${formatBytes(backups.summary.totalBytes)}` : "正在读取备份包"}
                 </div>
               </div>
-              <Badge tone="neutral">outputs/backups</Badge>
+              <Badge tone="neutral">data/backups</Badge>
             </div>
             {backups && backups.backups.length > 0 ? (
               <div className="grid gap-2">
@@ -6279,14 +6217,31 @@ function creativeVersionStatusLabel(value?: string): string {
   return value || "-";
 }
 
-function hasPlayableVideo(job: { finalVideoUrl?: string; finalOutputPath?: string }): boolean {
-  return Boolean(job.finalVideoUrl || job.finalOutputPath);
+function hasPlayableVideo(job: { finalVideoUrl?: string; finalOutputPath?: string; expiresAt?: string; expired?: boolean }): boolean {
+  return !isExpiredVideo(job) && Boolean(job.finalVideoUrl || job.finalOutputPath);
 }
 
 function creativeVersionDisplayStatus(job: CreativeVersionItem): string {
+  if (isExpiredVideo(job)) return "已过期";
   if (hasPlayableVideo(job)) return "可预览";
   if (job.status === "completed" || job.status === "succeeded") return "已完成";
   return creativeVersionStatusLabel(job.status);
+}
+
+function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {
+  if (job.expired) return true;
+  if (!job.expiresAt) return false;
+  const expiresAt = Date.parse(job.expiresAt);
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+}
+
+function videoExpiryLabel(job: { expiresAt?: string; expired?: boolean }): string {
+  if (isExpiredVideo(job)) return "已过期";
+  if (!job.expiresAt) return "24 小时内可下载";
+  const expiresAt = Date.parse(job.expiresAt);
+  if (!Number.isFinite(expiresAt)) return "24 小时内可下载";
+  const remainingHours = Math.max(1, Math.ceil((expiresAt - Date.now()) / 3_600_000));
+  return `剩余 ${remainingHours} 小时`;
 }
 
 function removeLedgerJob(ledger: Ledger, jobId: string): Ledger {
@@ -6355,6 +6310,8 @@ function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
     hasFinalVideo: hasPlayableVideo(job),
     finalVideoUrl: job.finalVideoUrl,
     createdAt: job.createdAt,
+    expiresAt: job.expiresAt,
+    expired: job.expired,
     source: "video-job",
     videoJob: job
   };
@@ -6370,6 +6327,8 @@ function ledgerJobToCreativeVersion(job: LedgerJob): CreativeVersionItem {
     hasFinalVideo: hasPlayableVideo(job),
     finalVideoUrl: job.finalVideoUrl,
     createdAt: createdAtFromReportPath(job.reportPath),
+    expiresAt: job.expiresAt,
+    expired: job.expired,
     source: "ledger"
   };
 }

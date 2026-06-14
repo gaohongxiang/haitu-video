@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
-import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { access, copyFile, mkdir, readFile, readdir, rm, stat, unlink, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -36,6 +37,13 @@ import { FileAuditLog } from "./auditLog.js";
 import { buildJobLedger, deleteJobLedgerEntry } from "./jobLedger.js";
 import { FileConsoleAuthStore, isPublicConsoleRoute } from "./consoleAuth.js";
 import {
+  DEFAULT_WORKSPACE_ID,
+  getProductPaths,
+  getStorageRoots,
+  getWorkspacePaths,
+  resolveDataDir
+} from "./storagePaths.js";
+import {
   createPublishPackage,
   listPublishPackages,
   type PublishPackageLedger,
@@ -60,9 +68,11 @@ import {
   type ProviderKeySource,
   type ProviderStoredConfig
 } from "./providerKeyStore.js";
+import { cleanupExpiredVideos } from "./videoRetention.js";
 
 export interface ConsoleServerOptions {
   rootDir?: string;
+  dataDir?: string;
   fixturesDir?: string;
   outputsDir?: string;
   consoleDistDir?: string;
@@ -152,6 +162,20 @@ interface StoryboardDraftRequest {
   template?: ScriptTemplate;
 }
 
+interface StoryboardHistoryRequest {
+  style?: unknown;
+  duration?: unknown;
+  script?: unknown;
+}
+
+interface StoryboardRecord {
+  id: string;
+  createdAt: string;
+  style: ScriptTemplate;
+  duration: number;
+  script: string;
+}
+
 interface ImportProductsBatchRequest {
   text?: string;
 }
@@ -237,16 +261,24 @@ interface ProductListQuality {
 
 export function createConsoleServer(options: ConsoleServerOptions = {}): ConsoleServerHandle {
   const rootDir = options.rootDir ?? process.cwd();
-  const fixturesDir = options.fixturesDir ?? join(rootDir, "fixtures", "products");
-  const outputsDir = options.outputsDir ?? join(rootDir, "outputs");
+  const dataDir = resolveDataDir({
+    rootDir,
+    dataDir: options.dataDir,
+    env: process.env
+  });
+  const storageRoots = getStorageRoots(dataDir);
+  const workspacePaths = getWorkspacePaths(dataDir, DEFAULT_WORKSPACE_ID);
+  const productsDir = workspacePaths.productsDir;
+  const fixturesDir = productsDir;
+  const outputsDir = workspacePaths.jobsDir;
   const consoleDistDir = options.consoleDistDir ?? join(rootDir, "dist", "console");
-  const reviewStore = new FileReviewStore(join(outputsDir, "review-state.json"));
-  const settingsStore = new FileConsoleSettingsStore(join(outputsDir, "console-settings.json"));
-  const providerKeyStore = new FileProviderKeyStore(join(outputsDir, "provider-keys.json"));
-  const auditLog = new FileAuditLog(join(outputsDir, "audit-log.jsonl"));
+  const reviewStore = new FileReviewStore(join(workspacePaths.settingsDir, "review-state.json"));
+  const settingsStore = new FileConsoleSettingsStore(join(storageRoots.systemDir, "console-settings.json"));
+  const providerKeyStore = new FileProviderKeyStore(workspacePaths.providerKeysFile);
+  const auditLog = new FileAuditLog(join(storageRoots.systemDir, "audit-log.jsonl"));
   const authStore = new FileConsoleAuthStore({
     password: process.env.HAITU_AUTH_PASSWORD,
-    sessionFilePath: join(outputsDir, "console-sessions.json")
+    sessionFilePath: join(storageRoots.systemDir, "console-sessions.json")
   });
   const runConfiguredMakeVideoPipeline: LocalVideoJobQueueOptions["runMakeVideoPipeline"] = async (input) => {
     const config = await selectedVideoProviderConfig(providerKeyStore, input.providerName);
@@ -261,10 +293,45 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
   const videoJobQueue = new LocalVideoJobQueue({
     rootDir,
     outputsDir,
+    workspaceId: DEFAULT_WORKSPACE_ID,
     settingsStore,
     fetchImpl: options.fetchImpl,
     runMakeVideoPipeline: runConfiguredMakeVideoPipeline
   });
+  const runVideoRetentionCleanup = async () => {
+    await cleanupExpiredVideos({
+      dataDir,
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      onDeleteError: async (error, filePath) => {
+        await auditLog.append({
+          action: "video_retention.delete_failed",
+          target: filePath,
+          metadata: {
+            error: error instanceof Error ? error.message : String(error)
+          }
+        });
+      }
+    });
+  };
+  void runVideoRetentionCleanup().catch((error: unknown) => {
+    void auditLog.append({
+      action: "video_retention.cleanup_failed",
+      metadata: {
+        error: error instanceof Error ? error.message : String(error)
+      }
+    });
+  });
+  const videoRetentionTimer = setInterval(() => {
+    void runVideoRetentionCleanup().catch((error: unknown) => {
+      void auditLog.append({
+        action: "video_retention.cleanup_failed",
+        metadata: {
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+    });
+  }, 30 * 60 * 1000);
+  videoRetentionTimer.unref?.();
   if (options.autoStartSavedJobs !== false) {
     void videoJobQueue.startSavedJobs();
   }
@@ -308,13 +375,13 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         }
       }
       if (request.method === "GET" && url.pathname === "/api/products") {
-        return jsonResponse({ products: await listProducts(fixturesDir, rootDir) });
+        return jsonResponse({ products: await listProducts(fixturesDir, dataDir) });
       }
       if (request.method === "POST" && url.pathname === "/api/products") {
         return jsonResponse({
           product: await saveProductFactPackage({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             input: await request.json()
           })
         });
@@ -333,7 +400,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await importProductFromText({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             input: (await request.json()) as ImportProductPreviewRequest
           })
         );
@@ -342,7 +409,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await importProductsBatchFromText({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             input: (await request.json()) as ImportProductsBatchRequest
           })
         );
@@ -354,7 +421,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           productSku: sku,
           jobs: await enqueueProductVideoJobsBySku((await request.json()) as ProductVideoJobRequest, {
             sku,
-            rootDir,
+            rootDir: dataDir,
             outputsDir,
             fixturesDir,
             settingsStore,
@@ -368,10 +435,36 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(await buildAiStoryboardDraft({
           sku,
           fixturesDir,
-          rootDir,
+          rootDir: dataDir,
           providerKeyStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as StoryboardDraftRequest
+        }));
+      }
+      const productStoryboardsMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/storyboards$/);
+      if (request.method === "GET" && productStoryboardsMatch) {
+        return jsonResponse({
+          storyboards: await listProductStoryboards({
+            fixturesDir,
+            sku: decodeURIComponent(productStoryboardsMatch[1] ?? "")
+          })
+        });
+      }
+      if (request.method === "POST" && productStoryboardsMatch) {
+        return jsonResponse({
+          storyboard: await createProductStoryboard({
+            fixturesDir,
+            sku: decodeURIComponent(productStoryboardsMatch[1] ?? ""),
+            input: (await request.json()) as StoryboardHistoryRequest
+          })
+        });
+      }
+      const deleteProductStoryboardMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/storyboards\/([^/]+)$/);
+      if (request.method === "DELETE" && deleteProductStoryboardMatch) {
+        return jsonResponse(await deleteProductStoryboard({
+          fixturesDir,
+          sku: decodeURIComponent(deleteProductStoryboardMatch[1] ?? ""),
+          id: decodeURIComponent(deleteProductStoryboardMatch[2] ?? "")
         }));
       }
       const productMatch = url.pathname.match(/^\/api\/products\/([^/]+)$/);
@@ -379,7 +472,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse({
           product: await getProductBySku({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             sku: decodeURIComponent(productMatch[1] ?? "")
           })
         });
@@ -404,7 +497,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await importProductReferenceAssets({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             sku: decodeURIComponent(importProductAssetsMatch[1] ?? "")
           })
         );
@@ -414,7 +507,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await uploadProductReferenceImages({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             sku: decodeURIComponent(uploadProductAssetsMatch[1] ?? ""),
             input: (await request.json()) as UploadProductReferenceImagesRequest
           })
@@ -425,7 +518,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await deleteProductReferenceImage({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             sku: decodeURIComponent(deleteProductAssetMatch[1] ?? ""),
             index: Number(deleteProductAssetMatch[2])
           })
@@ -436,7 +529,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await generateProductReferenceImages({
             fixturesDir,
-            rootDir,
+            rootDir: dataDir,
             providerKeyStore,
             fetchImpl: options.fetchImpl,
             sku: decodeURIComponent(generateProductAssetsMatch[1] ?? ""),
@@ -474,7 +567,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && url.pathname === "/api/internal-validation/export.csv") {
         return csvResponse(
           await buildInternalValidationCsv({
-            rootDir,
+            rootDir: dataDir,
             fixturesDir,
             outputsDir,
             reviewStore
@@ -485,7 +578,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && url.pathname === "/api/internal-validation/top-up") {
         return jsonResponse(
           await topUpInternalValidationJobs({
-            rootDir,
+            rootDir: dataDir,
             fixturesDir,
             outputsDir,
             videoJobQueue
@@ -506,29 +599,23 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "GET" && url.pathname === "/api/video-assets") {
         return jsonResponse(await listVideoAssets({
-          rootDir,
+          rootDir: dataDir,
           outputsDir
         }));
       }
       if (request.method === "GET" && url.pathname === "/api/storage-backup") {
         return jsonResponse(await buildStorageBackupReport({
-          rootDir,
-          outputsDir,
-          fixturesDir,
-          productAssetsDir: join(rootDir, "assets", "products")
+          dataDir
         }));
       }
       if (request.method === "GET" && url.pathname === "/api/backups") {
         return jsonResponse(await listLocalBackups({
-          outputsDir
+          dataDir
         }));
       }
       if (request.method === "POST" && url.pathname === "/api/backups") {
         const backup = await createLocalBackup({
-          rootDir,
-          outputsDir,
-          fixturesDir,
-          productAssetsDir: join(rootDir, "assets", "products")
+          dataDir
         });
         await auditLog.append({
           action: "backup.created",
@@ -549,7 +636,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "DELETE" && url.pathname === "/api/video-assets") {
         const result = await deleteVideoAsset({
-          rootDir,
+          rootDir: dataDir,
           input: (await request.json()) as DeleteVideoAssetRequest
         });
         await auditLog.append({
@@ -703,7 +790,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const body = (await request.json()) as PreflightRequest;
         return jsonResponse({
           preflight: await runConsolePreflight(body, {
-            rootDir,
+            rootDir: dataDir,
             outputsDir,
             settingsStore
           })
@@ -712,7 +799,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && url.pathname === "/api/make-video") {
         const body = (await request.json()) as MakeVideoRequest;
         const report = await runConsoleMakeVideo(body, {
-          rootDir,
+          rootDir: dataDir,
           outputsDir,
           settingsStore,
           providerKeyStore,
@@ -724,7 +811,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const body = (await request.json()) as BatchVideoJobRequest;
         return jsonResponse({
           jobs: await enqueueBatchVideoJobs(body, {
-            rootDir,
+            rootDir: dataDir,
             outputsDir,
             fixturesDir,
             settingsStore,
@@ -734,7 +821,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "POST" && url.pathname === "/api/video-jobs") {
         const body = (await request.json()) as MakeVideoRequest;
-        const productPath = resolveWithin(rootDir, body.productPath);
+        const productPath = resolveWithin(dataDir, body.productPath);
         await assertTemplateEnabled(body, settingsStore);
         await assertWithinVideoBudget(body, settingsStore);
         await assertWithinTestCredit(body, {
@@ -746,7 +833,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         await assertPaidProductReady({
           provider: providerName,
           productPath,
-          rootDir
+          rootDir: dataDir
         });
         return jsonResponse({
           job: await videoJobQueue.enqueue({
@@ -761,7 +848,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             scriptLines: sanitizeLines(body.scriptLines),
             storyboardLines: sanitizeLines(body.storyboardLines),
             confirmPaid: body.confirmPaid ?? providerName !== "mock",
-            reuseManifest: body.reuseManifest ? resolveWithin(rootDir, body.reuseManifest) : undefined
+            reuseManifest: body.reuseManifest ? resolveWithin(dataDir, body.reuseManifest) : undefined
           })
         });
       }
@@ -875,14 +962,14 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/media") {
         return await mediaResponse(url.searchParams.get("path"), {
-          rootDir,
+          rootDir: dataDir,
           head: request.method === "HEAD"
         });
       }
       return jsonResponse({ error: "Not found" }, 404);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("outside project root")) {
+      if (message.includes("outside project root") || message.includes("outside data root")) {
         return jsonResponse({ error: message }, 403);
       }
       if (message.includes("Can cancel only queued tasks")) {
@@ -2042,7 +2129,7 @@ async function listProducts(fixturesDir: string, rootDir: string): Promise<
     paidReadiness: ReturnType<typeof buildPaidGenerationReadiness>;
   }>
 > {
-  const files = await listFiles(fixturesDir, ".json");
+  const files = await listProductFiles(fixturesDir);
   const products = new Map<string, {
     path: string;
     sku: string;
@@ -2100,7 +2187,7 @@ async function getProductBySku(input: {
     reference_image_statuses: ProductImagePreview[];
   } & ReturnType<typeof parseProductFacts>
 > {
-  const files = await listFiles(input.fixturesDir, ".json");
+  const files = await listProductFiles(input.fixturesDir);
   for (const file of files) {
     const product = parseProductFacts(JSON.parse(await readFile(file, "utf8")));
     if (product.sku === input.sku) {
@@ -2129,9 +2216,12 @@ async function saveProductFactPackage(input: {
   input: unknown;
 }): Promise<Awaited<ReturnType<typeof getProductBySku>>> {
   const product = parseProductFacts(input.input);
-  const productPath = join(input.fixturesDir, `${sanitizePathSegment(product.sku)}.json`);
+  const productPath = join(input.fixturesDir, sanitizePathSegment(product.sku), "product.json");
   await mkdir(dirname(productPath), { recursive: true });
-  await writeFile(productPath, JSON.stringify(product, null, 2), "utf8");
+  await writeFile(productPath, JSON.stringify({
+    ...product,
+    workspaceId: DEFAULT_WORKSPACE_ID
+  }, null, 2), "utf8");
   return getProductBySku({
     fixturesDir: input.fixturesDir,
     rootDir: input.rootDir,
@@ -2144,7 +2234,7 @@ async function deleteProductBySku(input: {
   sku: string;
 }): Promise<{ deleted: true; sku: string; path: string }> {
   const productPath = await findProductFileBySku(input.fixturesDir, input.sku);
-  await unlink(productPath);
+  await rm(dirname(productPath), { recursive: true, force: true });
   return {
     deleted: true,
     sku: input.sku,
@@ -2289,6 +2379,111 @@ async function buildAiStoryboardDraft(input: {
     storyboardCnLines,
     notes: normalizeStringArray(draft.notes)
   };
+}
+
+async function listProductStoryboards(input: {
+  fixturesDir: string;
+  sku: string;
+}): Promise<StoryboardRecord[]> {
+  const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
+  return readProductStoryboards(productFilePath);
+}
+
+async function createProductStoryboard(input: {
+  fixturesDir: string;
+  sku: string;
+  input: StoryboardHistoryRequest;
+}): Promise<StoryboardRecord> {
+  const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
+  const storyboards = await readProductStoryboards(productFilePath);
+  const record: StoryboardRecord = {
+    id: randomUUID(),
+    createdAt: new Date().toISOString(),
+    style: normalizeStoryboardStyle(input.input.style),
+    duration: clampInteger(Number(input.input.duration ?? 10), 4, 60),
+    script: normalizeStoryboardScript(input.input.script)
+  };
+  await writeProductStoryboards(productFilePath, [record, ...storyboards]);
+  return record;
+}
+
+async function deleteProductStoryboard(input: {
+  fixturesDir: string;
+  sku: string;
+  id: string;
+}): Promise<{ deleted: true; id: string }> {
+  const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
+  const storyboards = await readProductStoryboards(productFilePath);
+  await writeProductStoryboards(
+    productFilePath,
+    storyboards.filter((record) => record.id !== input.id)
+  );
+  return {
+    deleted: true,
+    id: input.id
+  };
+}
+
+async function readProductStoryboards(productFilePath: string): Promise<StoryboardRecord[]> {
+  try {
+    const parsed = JSON.parse(await readFile(join(dirname(productFilePath), "storyboards.json"), "utf8")) as {
+      storyboards?: unknown;
+    };
+    if (!Array.isArray(parsed.storyboards)) {
+      return [];
+    }
+    return parsed.storyboards.flatMap((record) => normalizeStoryboardRecord(record));
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function writeProductStoryboards(productFilePath: string, storyboards: StoryboardRecord[]): Promise<void> {
+  const product = parseProductFacts(JSON.parse(await readFile(productFilePath, "utf8")));
+  const storyboardsFile = join(dirname(productFilePath), "storyboards.json");
+  await mkdir(dirname(storyboardsFile), { recursive: true });
+  await writeFile(storyboardsFile, JSON.stringify({
+    workspaceId: DEFAULT_WORKSPACE_ID,
+    productSku: product.sku,
+    storyboards
+  }, null, 2), "utf8");
+}
+
+function normalizeStoryboardRecord(value: unknown): StoryboardRecord[] {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  const raw = value as Partial<StoryboardRecord>;
+  if (
+    typeof raw.id !== "string" ||
+    typeof raw.createdAt !== "string" ||
+    typeof raw.script !== "string" ||
+    !isScriptTemplate(raw.style)
+  ) {
+    return [];
+  }
+  return [{
+    id: raw.id,
+    createdAt: raw.createdAt,
+    style: raw.style,
+    duration: clampInteger(Number(raw.duration ?? 10), 4, 60),
+    script: raw.script
+  }];
+}
+
+function normalizeStoryboardStyle(value: unknown): ScriptTemplate {
+  return isScriptTemplate(value) ? value : "scene";
+}
+
+function normalizeStoryboardScript(value: unknown): string {
+  const script = typeof value === "string" ? value.trim() : "";
+  if (!script) {
+    throw new Error("Storyboard history requires a script.");
+  }
+  return script;
 }
 
 async function createTextModelProvider(providerKeyStore: FileProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleTextProvider> {
@@ -2498,16 +2693,10 @@ async function importProductReferenceAssets(input: {
       continue;
     }
     const extension = normalizedImageExtension(image.resolvedPath);
-    const targetPath = join(
-      input.rootDir,
-      "assets",
-      "products",
-      product.sku,
-      `reference-${String(index + 1).padStart(2, "0")}${extension}`
-    );
+    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index + 1).padStart(2, "0")}${extension}`);
     await mkdir(dirname(targetPath), { recursive: true });
     await copyFile(image.resolvedPath, targetPath);
-    const reference = relative(dirname(productFilePath), targetPath);
+    const reference = `refs/${basename(targetPath)}`;
     nextReferenceImages[index] = reference;
     imported.push({
       original: image.original,
@@ -2568,16 +2757,10 @@ async function uploadProductReferenceImages(input: {
       throw new Error(`Reference image ${fileName} is missing base64 content.`);
     }
     const index = nextReferenceImages.length + 1;
-    const targetPath = join(
-      input.rootDir,
-      "assets",
-      "products",
-      product.sku,
-      `reference-${String(index).padStart(2, "0")}${extension}`
-    );
+    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index).padStart(2, "0")}${extension}`);
     await mkdir(dirname(targetPath), { recursive: true });
     await writeFile(targetPath, Buffer.from(file.base64, "base64"));
-    const reference = relative(dirname(productFilePath), targetPath);
+    const reference = `refs/${basename(targetPath)}`;
     nextReferenceImages.push(reference);
     uploaded.push({
       originalName: fileName,
@@ -2635,16 +2818,10 @@ async function generateProductReferenceImages(input: {
   const generated: GeneratedProductReferenceImage[] = [];
   for (const image of images) {
     const index = nextReferenceImages.length + 1;
-    const targetPath = join(
-      input.rootDir,
-      "assets",
-      "products",
-      product.sku,
-      `reference-${String(index).padStart(2, "0")}${extensionFromMimeType(image.mimeType)}`
-    );
+    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index).padStart(2, "0")}${extensionFromMimeType(image.mimeType)}`);
     await mkdir(dirname(targetPath), { recursive: true });
     await writeFile(targetPath, image.bytes);
-    const reference = relative(dirname(productFilePath), targetPath);
+    const reference = `refs/${basename(targetPath)}`;
     nextReferenceImages.push(reference);
     generated.push({
       path: targetPath,
@@ -2719,7 +2896,7 @@ async function deleteProductReferenceImage(input: {
 }
 
 async function findProductFileBySku(fixturesDir: string, sku: string): Promise<string> {
-  const files = await listFiles(fixturesDir, ".json");
+  const files = await listProductFiles(fixturesDir);
   for (const file of files) {
     const product = parseProductFacts(JSON.parse(await readFile(file, "utf8")));
     if (product.sku === sku) {
@@ -2727,6 +2904,18 @@ async function findProductFileBySku(fixturesDir: string, sku: string): Promise<s
     }
   }
   throw new Error(`Product not found: ${sku}`);
+}
+
+async function listProductFiles(productsDir: string): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(productsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(productsDir, entry.name, "product.json"));
 }
 
 async function describeReferenceImages(
@@ -2910,7 +3099,7 @@ interface VideoAssetLedger {
 }
 
 interface StorageBackupScope {
-  id: "outputs" | "product-fixtures" | "product-assets";
+  id: "products" | "settings" | "system" | "job-metadata";
   label: string;
   path: string;
   mustBackup: true;
@@ -3144,26 +3333,30 @@ async function listVideoAssets(input: {
 }
 
 async function buildStorageBackupReport(input: {
-  rootDir: string;
-  outputsDir: string;
-  fixturesDir: string;
-  productAssetsDir: string;
+  dataDir: string;
 }): Promise<StorageBackupReport> {
+  const workspace = getWorkspacePaths(input.dataDir, DEFAULT_WORKSPACE_ID);
+  const roots = getStorageRoots(input.dataDir);
   const scopes: StorageBackupScope[] = [
     await summarizeStorageScope({
-      id: "outputs",
-      label: "生成结果与任务记录",
-      path: input.outputsDir
+      id: "products",
+      label: "商品资料与参考图",
+      path: workspace.productsDir
     }),
     await summarizeStorageScope({
-      id: "product-fixtures",
-      label: "商品资料",
-      path: input.fixturesDir
+      id: "settings",
+      label: "默认工作区设置",
+      path: workspace.settingsDir
     }),
     await summarizeStorageScope({
-      id: "product-assets",
-      label: "商品参考图",
-      path: input.productAssetsDir
+      id: "system",
+      label: "系统设置、会话和审计日志",
+      path: roots.systemDir
+    }),
+    await summarizeStorageScope({
+      id: "job-metadata",
+      label: "任务元数据",
+      path: workspace.jobsDir
     })
   ];
   return {
@@ -3172,54 +3365,56 @@ async function buildStorageBackupReport(input: {
       totalBytes: scopes.reduce((sum, scope) => sum + scope.totalBytes, 0),
       videoFiles: scopes.reduce((sum, scope) => sum + scope.videoFiles, 0),
       manifestFiles: scopes.reduce((sum, scope) => sum + scope.manifestFiles, 0),
-      productFiles: scopes.find((scope) => scope.id === "product-fixtures")?.productFiles ?? 0,
-      referenceImages: scopes.find((scope) => scope.id === "product-assets")?.referenceImages ?? 0
+      productFiles: scopes.find((scope) => scope.id === "products")?.productFiles ?? 0,
+      referenceImages: scopes.find((scope) => scope.id === "products")?.referenceImages ?? 0
     },
     scopes,
     backupCommands: [
-      `cd ${input.rootDir} && tar -czf haitu-backup-$(date +%Y%m%d).tar.gz outputs fixtures/products assets/products`
+      [
+        `tar -czf ${join(input.dataDir, "backups", "haitu-backup-$(date +%Y%m%d).tar.gz")}`,
+        "--exclude='backups'",
+        "--exclude='workspaces/*/jobs/*/raw'",
+        "--exclude='workspaces/*/jobs/*/final'",
+        "-C",
+        input.dataDir,
+        "."
+      ].join(" ")
     ],
     notes: [
-      "不要删除 outputs/，这里保存视频、manifest、脚本、prompt、成本和审核记录。",
-      "fixtures/products/ 保存商品资料，assets/products/ 保存商品参考图。",
-      "迁移服务器或接入对象存储前，先完整备份这些目录。"
+      "备份只处理 HAITU_DATA_DIR，不包含代码目录。",
+      "默认排除 jobs/*/raw 和 jobs/*/final，视频只保留 24 小时，用户应尽快下载。",
+      "如需排查，可以保留 job.json 和 make-video-report.json 等任务元数据。"
     ]
   };
 }
 
 async function createLocalBackup(input: {
-  rootDir: string;
-  outputsDir: string;
-  fixturesDir: string;
-  productAssetsDir: string;
+  dataDir: string;
 }): Promise<LocalBackupItem> {
-  const backupsDir = join(input.outputsDir, "backups");
-  await Promise.all([
-    mkdir(input.outputsDir, { recursive: true }),
-    mkdir(input.fixturesDir, { recursive: true }),
-    mkdir(input.productAssetsDir, { recursive: true }),
-    mkdir(backupsDir, { recursive: true })
-  ]);
+  const backupsDir = join(input.dataDir, "backups");
+  await mkdir(backupsDir, { recursive: true });
   const fileName = backupFileName();
   const backupPath = join(backupsDir, fileName);
   await runCommand("tar", [
     "-czf",
     backupPath,
     "--exclude",
-    "outputs/backups",
+    "backups",
+    "--exclude",
+    "workspaces/*/jobs/*/raw",
+    "--exclude",
+    "workspaces/*/jobs/*/final",
     "-C",
-    input.rootDir,
-    "outputs",
-    "fixtures/products",
-    "assets/products"
+    input.dataDir,
+    "."
   ]);
   return toLocalBackupItem(backupPath, await stat(backupPath));
 }
 
 async function listLocalBackups(input: {
-  outputsDir: string;
+  dataDir: string;
 }): Promise<LocalBackupLedger> {
-  const backupsDir = join(input.outputsDir, "backups");
+  const backupsDir = join(input.dataDir, "backups");
   const backups: LocalBackupItem[] = [];
   let entries: Dirent[];
   try {
@@ -3294,7 +3489,9 @@ async function summarizeStorageScope(input: {
   label: string;
   path: string;
 }): Promise<StorageBackupScope> {
-  const files = await listStorageFiles(input.path);
+  const files = await listStorageFiles(input.path, {
+    excludeJobMediaDirs: input.id === "job-metadata"
+  });
   return {
     id: input.id,
     label: input.label,
@@ -3305,12 +3502,15 @@ async function summarizeStorageScope(input: {
     videoFiles: files.filter((file) => file.extension === ".mp4").length,
     manifestFiles: files.filter((file) => basename(file.path) === "manifest.json" || basename(file.path) === "final-manifest.json").length,
     jsonFiles: files.filter((file) => file.extension === ".json").length,
-    productFiles: input.id === "product-fixtures" ? files.filter((file) => file.extension === ".json").length : 0,
-    referenceImages: input.id === "product-assets" ? files.filter((file) => [".jpg", ".jpeg", ".png", ".webp"].includes(file.extension)).length : 0
+    productFiles: input.id === "products" ? files.filter((file) => basename(file.path) === "product.json").length : 0,
+    referenceImages: input.id === "products" ? files.filter((file) => [".jpg", ".jpeg", ".png", ".webp"].includes(file.extension)).length : 0
   };
 }
 
-async function listStorageFiles(root: string): Promise<Array<{ path: string; sizeBytes: number; extension: string }>> {
+async function listStorageFiles(
+  root: string,
+  options: { excludeJobMediaDirs?: boolean } = {}
+): Promise<Array<{ path: string; sizeBytes: number; extension: string }>> {
   const files: Array<{ path: string; sizeBytes: number; extension: string }> = [];
   async function walk(dir: string): Promise<void> {
     let entries;
@@ -3322,6 +3522,9 @@ async function listStorageFiles(root: string): Promise<Array<{ path: string; siz
     for (const entry of entries) {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (options.excludeJobMediaDirs && (entry.name === "raw" || entry.name === "final")) {
+          continue;
+        }
         await walk(path);
       } else if (entry.isFile()) {
         try {

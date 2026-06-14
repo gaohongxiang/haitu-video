@@ -33,8 +33,8 @@ function parseArgs(argv: string[]): ConsoleArgs {
   }
 
   return {
-    port: parsePort(values.get("port") ?? process.env.PORT ?? "4173"),
-    host: values.get("host") ?? process.env.HOST ?? "127.0.0.1"
+    port: parsePort(values.get("port") ?? process.env.HAITU_PORT ?? process.env.PORT ?? "4173"),
+    host: values.get("host") ?? process.env.HAITU_HOST ?? process.env.HOST ?? "127.0.0.1"
   };
 }
 

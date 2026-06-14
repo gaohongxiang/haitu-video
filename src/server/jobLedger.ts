@@ -18,6 +18,8 @@ export interface JobLedgerRow {
   hasFinalVideo: boolean;
   finalOutputPath?: string;
   finalVideoUrl?: string;
+  expiresAt?: string;
+  expired?: boolean;
   finalSubtitlePath?: string;
   finalManifestPath?: string;
   rawManifestPath?: string;
@@ -170,6 +172,10 @@ async function toLedgerRow(
   const rawManifestPath = report.raw?.manifestPath;
   const finalManifestPath = report.final?.manifestPath;
   const finalSubtitlePath = report.final?.subtitlePath;
+  const jobMetadata = await readJobMetadata(reportPath);
+  const expired = jobMetadata.expired === true;
+  const expiresAt = typeof jobMetadata.expiresAt === "string" ? jobMetadata.expiresAt : undefined;
+  const finalOutputPath = report.final?.outputPath;
   return {
     id,
     reportPath,
@@ -181,9 +187,11 @@ async function toLedgerRow(
     totalTokens: report.billing?.totalTokens ?? 0,
     estimatedCostCny: report.billing?.estimatedCostCny ?? 0,
     totalCost: report.totalCost,
-    hasFinalVideo: report.final?.outputPath !== undefined,
-    finalOutputPath: report.final?.outputPath,
-    finalVideoUrl: report.final?.outputPath ? mediaUrl(report.final.outputPath) : undefined,
+    hasFinalVideo: finalOutputPath !== undefined && !expired,
+    finalOutputPath,
+    finalVideoUrl: finalOutputPath && !expired ? mediaUrl(finalOutputPath) : undefined,
+    expiresAt,
+    expired,
     finalSubtitlePath,
     finalManifestPath,
     rawManifestPath,
@@ -197,6 +205,17 @@ async function toLedgerRow(
       finalSubtitlePath
     })
   };
+}
+
+async function readJobMetadata(reportPath: string): Promise<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(await readFile(join(dirname(reportPath), "job.json"), "utf8")) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 async function buildContentReviewSnapshot(input: {

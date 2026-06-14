@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
@@ -24,6 +24,7 @@ export interface VideoJobRequest {
 
 export interface VideoJobRecord {
   id: string;
+  workspaceId?: string;
   status: "queued" | "running" | "completed" | "failed" | "canceled";
   productPath: string;
   productSku?: string;
@@ -53,6 +54,7 @@ export interface VideoJobRecord {
   error?: string;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string;
   startedAt?: string;
   completedAt?: string;
 }
@@ -60,6 +62,7 @@ export interface VideoJobRecord {
 export interface LocalVideoJobQueueOptions {
   rootDir: string;
   outputsDir: string;
+  workspaceId?: string;
   settingsStore: FileConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   now?: () => Date;
@@ -84,6 +87,7 @@ export class LocalVideoJobQueue {
     const outDir = join(this.options.outputsDir, sanitizePathSegment(request.outDirName ?? id));
     const record: VideoJobRecord = {
       id,
+      workspaceId: this.options.workspaceId ?? "default",
       status: "queued",
       productPath: request.productPath,
       provider,
@@ -98,7 +102,8 @@ export class LocalVideoJobQueue {
       reuseManifest: request.reuseManifest,
       outDir,
       createdAt,
-      updatedAt: createdAt
+      updatedAt: createdAt,
+      expiresAt: this.expiresAtIso(createdAt)
     };
     await this.write(record);
     this.chain = this.chain.then(() => this.run(record.id)).catch(() => undefined);
@@ -156,8 +161,12 @@ export class LocalVideoJobQueue {
     }
     const records: VideoJobRecord[] = [];
     for (const entry of entries) {
-      if (entry.isFile() && extname(entry.name) === ".json") {
-        records.push(await this.read(basename(entry.name, ".json")));
+      if (entry.isDirectory()) {
+        try {
+          records.push(await this.read(entry.name));
+        } catch {
+          // Ignore non-job directories such as publish packages.
+        }
       }
     }
     return records.sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
@@ -214,7 +223,7 @@ export class LocalVideoJobQueue {
         fetchImpl: this.options.fetchImpl
       });
       if ((await this.read(id)).status === "canceled") {
-        await rm(record.outDir, { recursive: true, force: true });
+        await this.removeGeneratedOutputs(record.outDir);
         return;
       }
       await this.update(record, {
@@ -236,7 +245,7 @@ export class LocalVideoJobQueue {
       });
     } catch (error) {
       if ((await this.read(id)).status === "canceled") {
-        await rm(record.outDir, { recursive: true, force: true });
+        await this.removeGeneratedOutputs(record.outDir);
         return;
       }
       await this.update(record, {
@@ -266,7 +275,7 @@ export class LocalVideoJobQueue {
   }
 
   private async write(record: VideoJobRecord): Promise<void> {
-    await mkdir(this.jobsDir(), { recursive: true });
+    await mkdir(dirname(this.pathFor(record.id)), { recursive: true });
     const path = this.pathFor(record.id);
     const tempPath = `${path}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
     await writeFile(tempPath, JSON.stringify(record, null, 2), "utf8");
@@ -283,11 +292,23 @@ export class LocalVideoJobQueue {
   }
 
   private jobsDir(): string {
-    return join(this.options.outputsDir, "video-jobs");
+    return this.options.outputsDir;
   }
 
   private pathFor(id: string): string {
-    return join(this.jobsDir(), `${sanitizePathSegment(id)}.json`);
+    return join(this.jobsDir(), sanitizePathSegment(id), "job.json");
+  }
+
+  private async removeGeneratedOutputs(outDir: string): Promise<void> {
+    await Promise.all([
+      rm(join(outDir, "raw"), { recursive: true, force: true }),
+      rm(join(outDir, "final"), { recursive: true, force: true }),
+      rm(join(outDir, "make-video-report.json"), { force: true })
+    ]);
+  }
+
+  private expiresAtIso(createdAt: string): string {
+    return new Date(Date.parse(createdAt) + 24 * 60 * 60 * 1000).toISOString();
   }
 
   private async hydrateResultFields(record: VideoJobRecord): Promise<VideoJobRecord> {
