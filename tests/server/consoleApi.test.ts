@@ -706,6 +706,11 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("event.dataTransfer.files");
     expect(creationComposerSource).toContain("dragOver");
     expect(creationComposerSource).toContain("拖拽或粘贴图片");
+    expect(creationComposerSource).toContain("pendingImagePreviews");
+    expect(creationComposerSource).toContain("URL.createObjectURL");
+    expect(creationComposerSource).toContain("URL.revokeObjectURL");
+    expect(creationComposerSource).toContain('alt={`${file.name} preview`}');
+    expect(creationComposerSource).toContain("待上传");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("text-[#9aa7ba]");

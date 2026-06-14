@@ -3283,6 +3283,21 @@ function ProductComposerReferenceTray({
 }) {
   const images = product?.reference_image_statuses ?? [];
   const [dragOver, setDragOver] = useState(false);
+  const pendingImagePreviews = useMemo(
+    () => pendingFiles.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file)
+    })),
+    [pendingFiles]
+  );
+
+  useEffect(() => {
+    return () => {
+      for (const preview of pendingImagePreviews) {
+        URL.revokeObjectURL(preview.previewUrl);
+      }
+    };
+  }, [pendingImagePreviews]);
 
   function acceptReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
@@ -3366,11 +3381,20 @@ function ProductComposerReferenceTray({
           ))}
         </div>
       ) : pendingFiles.length > 0 ? (
-        <div className="grid max-h-[160px] gap-2 overflow-auto pr-1">
-          {pendingFiles.map((file, index) => (
-            <div key={`${file.name}-${index}`} className="flex min-w-0 items-center justify-between gap-2 rounded-[10px] border border-[#e5ecf6] bg-white px-3 py-2">
-              <span className="truncate text-xs font-bold text-[#6c7890]">{file.name}</span>
-              <button className="text-[#8b9bb3] hover:text-[var(--danger)]" type="button" onClick={() => onClearPendingFile(index)}>
+        <div className="reference-image-list grid max-h-[250px] gap-1.5 overflow-auto pr-1">
+          {pendingImagePreviews.map(({ file, previewUrl }, index) => (
+            <div key={`${file.name}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[#e5ecf6] bg-white pr-11 shadow-[0_8px_18px_rgba(30,42,68,.04)]">
+              <img className="h-16 w-[72px] bg-[#f3f6fb] object-cover" src={previewUrl} alt={`${file.name} preview`} />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-black text-[#172033]">待上传 {index + 1}</div>
+                <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{file.name}</div>
+              </div>
+              <button
+                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[#8b9bb3] transition hover:bg-red-50 hover:text-[var(--danger)]"
+                type="button"
+                title="移除待上传图片"
+                onClick={() => onClearPendingFile(index)}
+              >
                 <X size={13} />
               </button>
             </div>
