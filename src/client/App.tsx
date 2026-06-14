@@ -3046,7 +3046,7 @@ function ProductCreationComposer({
     >
       <div className="product-creation-canvas overflow-visible">
         <div className="product-control-bar grid gap-2 border-b border-[#e5ecf6] bg-white p-3 min-[1280px]:px-4">
-          <div className="grid gap-3 min-[1280px]:grid-cols-[minmax(260px,1.45fr)_minmax(118px,.62fr)_minmax(108px,.55fr)_minmax(108px,.55fr)_minmax(130px,.7fr)_minmax(108px,.55fr)_minmax(220px,1fr)] min-[1280px]:items-end">
+          <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)] min-[1280px]:items-end">
             <ProductCreationProductPicker
               className="product-creation-picker min-w-0"
               products={products}
@@ -4140,7 +4140,7 @@ function ProductCreationProductPicker({
 
   return (
     <div
-      className={cn("product-picker-single relative grid min-w-[280px] gap-1.5", className)}
+      className={cn("product-picker-single relative grid min-w-0 gap-1.5", className)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setProductPickerOpen(false);
@@ -4156,7 +4156,7 @@ function ProductCreationProductPicker({
       <button
         type="button"
         className={cn(
-          "flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-[13px] border bg-white px-3.5 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
+          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
           productPickerOpen
             ? "border-[color-mix(in_srgb,var(--accent)_65%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(30,42,68,.05)]"
             : "border-[#dbe4f0] hover:border-[color-mix(in_srgb,var(--accent)_45%,#dbe4f0)]"
@@ -4165,10 +4165,7 @@ function ProductCreationProductPicker({
         aria-expanded={productPickerOpen}
         onClick={() => setProductPickerOpen((open) => !open)}
       >
-        <span className="grid min-w-0 gap-0.5">
-          <span className="min-w-0 truncate">{selectedProductLabel}</span>
-          <span className="truncate text-[11px] font-bold text-[#8b9bb3]">{selectedProductOption ? "已保存商品" : "直接填写新商品资料"}</span>
-        </span>
+        <span className="min-w-0 truncate">{selectedProductLabel}</span>
         <ChevronDown className={cn("shrink-0 text-[#8b9bb3] transition", productPickerOpen && "rotate-180 text-[var(--accent)]")} size={15} />
       </button>
       {productPickerOpen ? (

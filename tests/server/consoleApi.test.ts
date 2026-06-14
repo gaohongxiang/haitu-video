@@ -498,6 +498,8 @@ describe("console API", () => {
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
     expect(creationComposerSource).toContain("product-creation-canvas");
     expect(creationComposerSource).toContain("product-control-bar");
+    expect(creationComposerSource).toContain("video-parameter-row grid");
+    expect(creationComposerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)]");
     expect(creationComposerSource).not.toContain("creation-parameter-dock");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
     expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
@@ -560,6 +562,9 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("下一步");
     expect(productPickerSource).toContain("创作商品");
     expect(productPickerSource).toContain("product-creation-product-menu");
+    expect(productPickerSource).toContain("min-h-11");
+    expect(productPickerSource).not.toContain("已保存商品");
+    expect(productPickerSource).not.toContain("直接填写新商品资料");
     expect(productPickerSource).toContain('aria-haspopup="listbox"');
     expect(productPickerSource).toContain('role="listbox"');
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
@@ -1368,6 +1373,8 @@ describe("console API", () => {
     expect(composerSource).toContain("video-creation-frame");
     expect(composerSource).toContain("product-creation-canvas");
     expect(composerSource).toContain("product-control-bar");
+    expect(composerSource).toContain("video-parameter-row grid");
+    expect(composerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)]");
     expect(composerSource).not.toContain("creation-parameter-dock");
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
     expect(composerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
