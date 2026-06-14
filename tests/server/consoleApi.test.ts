@@ -590,6 +590,12 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("AI 生成分镜");
     expect(storyboardPanelSource).toContain("分镜历史记录");
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown");
+    expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory");
+    expect(storyboardPanelSource).toContain("onApplyStoryboardHistory(record)");
+    expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory(record.id)");
+    expect(storyboardPanelSource).toContain("删除分镜记录");
+    expect(storyboardPanelSource).toContain("event.stopPropagation()");
+    expect(storyboardPanelSource).not.toContain("回填");
     expect(storyboardPanelSource).not.toContain("补充要点");
     expect(storyboardPanelSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
     expect(storyboardPanelSource).not.toContain("scriptDraft");
@@ -1339,8 +1345,10 @@ describe("console API", () => {
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
     expect(productPickerSource).toContain("新商品");
     expect(productPickerSource).toContain("onDeleteProduct");
-    expect(productPickerSource).toContain("删除当前商品");
-    expect(productPickerSource).toContain("selectedProductOption.sku");
+    expect(productPickerSource).toContain("删除商品");
+    expect(productPickerSource).toContain("onDeleteProduct(option.sku)");
+    expect(productPickerSource).toContain("event.stopPropagation()");
+    expect(productPickerSource).not.toContain("删除当前商品");
     expect(productPickerSource).toContain("setProductPickerOpen(false)");
     expect(productPickerSource).not.toContain("+ 新建商品");
     expect(productPickerSource).not.toContain("<Select");

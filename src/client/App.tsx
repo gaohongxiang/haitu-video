@@ -1183,6 +1183,15 @@ export function App() {
     setStatusText(`已回填历史分镜: ${templateLabel(record.template)} / ${formatDuration(record.duration)}`);
   }
 
+  function deleteStoryboardHistory(recordId: string) {
+    setStoryboardHistory((current) => {
+      const next = current.filter((record) => record.id !== recordId);
+      saveStoryboardHistory(next);
+      return next;
+    });
+    showConsoleToast("分镜记录已删除。", "ok");
+  }
+
   function productTitleForSku(sku: string): string {
     return products.find((product) => product.sku === sku)?.title_ja || "当前商品";
   }
@@ -2226,6 +2235,7 @@ export function App() {
               }}
               storyboardHistory={storyboardHistory}
               onApplyStoryboardHistory={applyStoryboardHistory}
+              onDeleteStoryboardHistory={deleteStoryboardHistory}
               onToast={showConsoleToast}
             />
           </section>
@@ -2680,6 +2690,7 @@ function ProductCreationWorkspace({
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
+  onDeleteStoryboardHistory,
   onToast
 }: {
   products: ProductSummary[];
@@ -2725,6 +2736,7 @@ function ProductCreationWorkspace({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onDeleteStoryboardHistory: (recordId: string) => void;
   onToast: ConsoleToastFn;
 }) {
   const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
@@ -2793,6 +2805,7 @@ function ProductCreationWorkspace({
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
+      onDeleteStoryboardHistory={onDeleteStoryboardHistory}
       onToast={onToast}
     />
   );
@@ -2841,6 +2854,7 @@ function ProductCreationComposer({
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
+  onDeleteStoryboardHistory,
   onToast
 }: {
   products: ProductSummary[];
@@ -2885,6 +2899,7 @@ function ProductCreationComposer({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onDeleteStoryboardHistory: (recordId: string) => void;
   onToast: ConsoleToastFn;
 }) {
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
@@ -3127,6 +3142,7 @@ function ProductCreationComposer({
               storyboardHistory={storyboardHistory}
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
+              onDeleteStoryboardHistory={onDeleteStoryboardHistory}
               onGenerateStoryboardDraft={onGenerateStoryboardDraft}
               isGeneratingStoryboard={isGeneratingStoryboard}
               productReady={Boolean(selectedProduct)}
@@ -3348,6 +3364,7 @@ function StoryboardComposerPanel({
   storyboardHistory,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
+  onDeleteStoryboardHistory,
   onGenerateStoryboardDraft,
   isGeneratingStoryboard,
   productReady
@@ -3358,6 +3375,7 @@ function StoryboardComposerPanel({
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onDeleteStoryboardHistory: (recordId: string) => void;
   onGenerateStoryboardDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
   productReady: boolean;
@@ -3444,25 +3462,38 @@ function StoryboardComposerPanel({
           >
             {storyboardHistory.length > 0 ? (
               storyboardHistory.map((record) => (
-                <article key={record.id} className="grid gap-2 rounded-[10px] px-2.5 py-2.5 transition hover:bg-[#f7fbff]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
-                    <div className="flex gap-1">
-                      <Badge>{templateLabel(record.template)}</Badge>
-                      <Badge>{formatDuration(record.duration)}</Badge>
-                    </div>
-                  </div>
-                  <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
-                  <Button
-                    className="w-fit"
-                    size="sm"
+                <article key={record.id} className="group/storyboard-record grid grid-cols-[minmax(0,1fr)_32px] items-start gap-1 rounded-[10px] transition hover:bg-[#f7fbff]">
+                  <button
+                    type="button"
+                    role="option"
+                    className="grid min-w-0 gap-2 rounded-[10px] px-2.5 py-2.5 text-left"
                     onClick={() => {
                       onApplyStoryboardHistory(record);
                       setHistoryOpen(false);
                     }}
                   >
-                    回填
-                  </Button>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
+                      <div className="flex gap-1">
+                        <Badge>{templateLabel(record.template)}</Badge>
+                        <Badge>{formatDuration(record.duration)}</Badge>
+                      </div>
+                    </div>
+                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.storyboardDraft)}</div>
+                  </button>
+                  <button
+                    type="button"
+                    className="mr-1 mt-2 grid h-8 w-8 place-items-center rounded-lg text-red-400 opacity-80 transition hover:bg-red-50 hover:text-red-600 min-[900px]:opacity-0 min-[900px]:group-hover/storyboard-record:opacity-100"
+                    title="删除分镜记录"
+                    aria-label={`删除分镜记录 ${formatHistoryTime(record.createdAt)}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeleteStoryboardHistory(record.id);
+                      setHistoryOpen(false);
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
                 </article>
               ))
             ) : (
@@ -4133,43 +4164,44 @@ function ProductCreationProductPicker({
             products.map((option) => {
               const active = option.sku === selectedSku;
               return (
-                <button
+                <div
                   key={option.sku}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
                   className={cn(
-                    "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black transition",
+                    "group/product-option grid min-h-10 grid-cols-[minmax(0,1fr)_32px] items-center gap-1 rounded-lg transition",
                     active ? "bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[#172033]" : "text-[#4f5f76] hover:bg-[#f3f6fb] hover:text-[#172033]"
                   )}
-                  onClick={() => handleProductPickerSelect(option.sku)}
                 >
-                  <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
-                    <CheckCircle2 size={14} />
-                  </span>
-                  <span className="min-w-0 truncate">{option.title_ja}</span>
-                </button>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className="grid min-h-10 min-w-0 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black"
+                    onClick={() => handleProductPickerSelect(option.sku)}
+                  >
+                    <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
+                      <CheckCircle2 size={14} />
+                    </span>
+                    <span className="min-w-0 truncate">{option.title_ja}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-red-400 opacity-80 transition hover:bg-red-50 hover:text-red-600 min-[900px]:opacity-0 min-[900px]:group-hover/product-option:opacity-100"
+                    title="删除商品"
+                    aria-label={`删除商品 ${option.title_ja}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setProductPickerOpen(false);
+                      void onDeleteProduct(option.sku);
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               );
             })
           ) : (
             <div className="px-3 py-2 text-xs font-bold text-[#8b9bb3]">暂无商品</div>
           )}
-          {selectedProductOption ? (
-            <>
-              <div className="my-1 h-px bg-[#edf2f8]" />
-              <button
-                type="button"
-                className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-red-500 transition hover:bg-red-50 hover:text-red-600"
-                onClick={() => {
-                  setProductPickerOpen(false);
-                  void onDeleteProduct(selectedProductOption.sku);
-                }}
-              >
-                <X size={13} />
-                <span>删除当前商品</span>
-              </button>
-            </>
-          ) : null}
         </div>
       ) : null}
     </div>
