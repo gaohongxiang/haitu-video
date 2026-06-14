@@ -2765,9 +2765,11 @@ function ProductCreationWorkspace({
   onToast: ConsoleToastFn;
 }) {
   const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
-  const studioProductOptions = selectedProduct && !products.some((product) => product.sku === selectedProduct.sku)
-    ? [productActionSummary(selectedProduct), ...products]
-    : products;
+  const studioProductOptions = dedupeProductSummaries(
+    selectedProduct && !products.some((product) => product.sku === selectedProduct.sku)
+      ? [productActionSummary(selectedProduct), ...products]
+      : products
+  );
   const actionProduct = selectedProduct ? productActionSummary(selectedProduct, selectedSummary) : undefined;
   const selectedProductLedgerJobs = selectedProduct
     ? mergeLedgerJobs(
@@ -4127,7 +4129,8 @@ function ProductCreationProductPicker({
   onDeleteProduct: (sku: string) => Promise<void>;
 }) {
   const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const selectedProductOption = products.find((product) => product.sku === selectedSku);
+  const productOptions = dedupeProductSummaries(products);
+  const selectedProductOption = productOptions.find((product) => product.sku === selectedSku);
   const selectedProductLabel = selectedProductOption ? selectedProductOption.title_ja : "新商品";
 
   const handleProductPickerSelect = (sku: string) => {
@@ -4136,7 +4139,7 @@ function ProductCreationProductPicker({
       onAddProduct();
       return;
     }
-    const nextProduct = products.find((product) => product.sku === sku);
+    const nextProduct = productOptions.find((product) => product.sku === sku);
     if (!nextProduct) return;
     setProductPickerOpen(false);
     if (nextProduct.sku !== selectedSku) {
@@ -4192,8 +4195,8 @@ function ProductCreationProductPicker({
             <Plus size={13} />
             <span>新商品</span>
           </button>
-          {products.length > 0 ? (
-            products.map((option) => {
+          {productOptions.length > 0 ? (
+            productOptions.map((option) => {
               const active = option.sku === selectedSku;
               return (
                 <div
@@ -4249,6 +4252,32 @@ function productReferenceCount(product?: ProductSummary | ProductDetail): number
     return product.reference_images.length;
   }
   return product.referenceImageCount ?? 0;
+}
+
+function dedupeProductSummaries(products: ProductSummary[]): ProductSummary[] {
+  const byIdentity = new Map<string, ProductSummary>();
+  for (const product of products) {
+    const identity = productIdentityKey(product);
+    const existing = byIdentity.get(identity);
+    if (!existing || productSummaryCompleteness(product) > productSummaryCompleteness(existing)) {
+      byIdentity.set(identity, product);
+    }
+  }
+  return Array.from(byIdentity.values());
+}
+
+function productIdentityKey(product: ProductSummary): string {
+  const sku = product.sku.trim().toLowerCase();
+  if (sku) return `sku:${sku}`;
+  const path = product.path.trim().toLowerCase();
+  if (path) return `path:${path}`;
+  return `title:${product.title_ja.trim().toLowerCase()}`;
+}
+
+function productSummaryCompleteness(product: ProductSummary): number {
+  return productReferenceCount(product) * 100 +
+    (product.importQuality?.score ?? 0) +
+    (product.paidReadiness?.readyForPaidGeneration ? 10 : 0);
 }
 
 function productActionSummary(product: ProductDetail, summary?: ProductSummary): ProductSummary {

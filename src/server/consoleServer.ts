@@ -2043,7 +2043,14 @@ async function listProducts(fixturesDir: string, rootDir: string): Promise<
   }>
 > {
   const files = await listFiles(fixturesDir, ".json");
-  const products = [];
+  const products = new Map<string, {
+    path: string;
+    sku: string;
+    title_ja: string;
+    referenceImageCount: number;
+    importQuality: ProductListQuality;
+    paidReadiness: ReturnType<typeof buildPaidGenerationReadiness>;
+  }>();
   for (const file of files) {
     const product = parseProductFacts(JSON.parse(await readFile(file, "utf8")));
     const referenceImageStatuses = await describeReferenceImages(product.reference_images, {
@@ -2051,16 +2058,32 @@ async function listProducts(fixturesDir: string, rootDir: string): Promise<
       rootDir
     });
     const assetSummary = summarizeReferenceImages(referenceImageStatuses);
-    products.push({
+    const summary = {
       path: file,
       sku: product.sku,
       title_ja: product.title_ja,
       referenceImageCount: product.reference_images.length,
       importQuality: summarizeProductListQuality(product),
       paidReadiness: buildPaidGenerationReadiness(product, assetSummary)
-    });
+    };
+    const existing = products.get(product.sku);
+    if (!existing || productSummaryRank(summary) > productSummaryRank(existing)) {
+      products.set(product.sku, summary);
+    }
   }
-  return products.sort((left, right) => left.sku.localeCompare(right.sku));
+  return Array.from(products.values()).sort((left, right) => left.sku.localeCompare(right.sku));
+}
+
+function productSummaryRank(product: {
+  referenceImageCount: number;
+  importQuality?: ProductListQuality;
+  paidReadiness?: ReturnType<typeof buildPaidGenerationReadiness>;
+}): number {
+  return (
+    product.referenceImageCount * 100 +
+    (product.importQuality?.score ?? 0) +
+    (product.paidReadiness?.readyForPaidGeneration ? 10 : 0)
+  );
 }
 
 async function getProductBySku(input: {

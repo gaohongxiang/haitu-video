@@ -599,6 +599,7 @@ describe("console API", () => {
     expect(productPickerSource).toContain('role="listbox"');
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
     expect(productPickerSource).toContain("新商品");
+    expect(productPickerSource).toContain("dedupeProductSummaries(products)");
     expect(productPickerSource).not.toContain("+ 新建商品");
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
@@ -1381,6 +1382,7 @@ describe("console API", () => {
     expect(productPickerSource).toContain("product-creation-product-menu");
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
     expect(productPickerSource).toContain("新商品");
+    expect(productPickerSource).toContain("dedupeProductSummaries(products)");
     expect(productPickerSource).toContain("onDeleteProduct");
     expect(productPickerSource).toContain("删除商品");
     expect(productPickerSource).toContain("onDeleteProduct(option.sku)");
@@ -2121,6 +2123,36 @@ describe("console API", () => {
         }
       ]
     });
+  });
+
+  it("deduplicates product list entries that point to the same saved product", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-product-dedupe-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    await writeProduct(join(fixturesDir, "box.json"), {
+      sku: "TK-001",
+      title_ja: "折りたたみ収納ボックス",
+      reference_images: ["main.jpg"]
+    });
+    await writeProduct(join(fixturesDir, "box-copy.json"), {
+      sku: "TK-001",
+      title_ja: "折りたたみ収納ボックス",
+      reference_images: ["main.jpg", "detail1.jpg"]
+    });
+    await writeProduct(join(fixturesDir, "wallet.json"), {
+      sku: "WALLET-001",
+      title_ja: "ミニ財布"
+    });
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const products = await server.fetchJson("/api/products");
+
+    expect(products.products.map((product: { sku: string }) => product.sku)).toEqual(["TK-001", "WALLET-001"]);
+    expect(products.products.filter((product: { sku: string }) => product.sku === "TK-001")).toHaveLength(1);
+    expect(products.products.find((product: { sku: string }) => product.sku === "TK-001")).toEqual(expect.objectContaining({
+      title_ja: "折りたたみ収納ボックス",
+      referenceImageCount: 2
+    }));
   });
 
   it("returns one product fact package by sku", async () => {
