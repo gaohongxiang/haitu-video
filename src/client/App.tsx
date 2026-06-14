@@ -2288,6 +2288,7 @@ export function App() {
                 markPreflightStale();
               }}
               storyboardDraft={studioStoryboardDraft}
+              storyboardDraftIsGuidance={!storyboardDraftTouched}
               onStoryboardDraftChange={(nextDraft) => {
                 setStoryboardDraftTouched(true);
                 setStudioStoryboardDraft(nextDraft);
@@ -2745,6 +2746,7 @@ function ProductCreationWorkspace({
   finalLanguage,
   onFinalLanguageChange,
   storyboardDraft,
+  storyboardDraftIsGuidance,
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
@@ -2789,6 +2791,7 @@ function ProductCreationWorkspace({
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
+  storyboardDraftIsGuidance: boolean;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -2856,6 +2859,7 @@ function ProductCreationWorkspace({
       finalLanguage={finalLanguage}
       onFinalLanguageChange={onFinalLanguageChange}
       storyboardDraft={storyboardDraft}
+      storyboardDraftIsGuidance={storyboardDraftIsGuidance}
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -2903,6 +2907,7 @@ function ProductCreationComposer({
   finalLanguage,
   onFinalLanguageChange,
   storyboardDraft,
+  storyboardDraftIsGuidance,
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
@@ -2946,6 +2951,7 @@ function ProductCreationComposer({
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
+  storyboardDraftIsGuidance: boolean;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -3180,6 +3186,7 @@ function ProductCreationComposer({
               template={template}
               duration={duration}
               storyboardDraft={storyboardDraft}
+              storyboardDraftIsGuidance={storyboardDraftIsGuidance}
               storyboardHistory={storyboardHistory}
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -3415,6 +3422,7 @@ function StoryboardComposerPanel({
   template,
   duration,
   storyboardDraft,
+  storyboardDraftIsGuidance,
   storyboardHistory,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
@@ -3426,6 +3434,7 @@ function StoryboardComposerPanel({
   template: TemplateName;
   duration: number;
   storyboardDraft: string;
+  storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -3451,7 +3460,10 @@ function StoryboardComposerPanel({
 
       <Field label="视频分镜">
         <Textarea
-          className="min-h-[230px] resize-y border-[#dbe4f0] bg-white text-sm font-bold leading-7"
+          className={cn(
+            "min-h-[230px] resize-y border-[#dbe4f0] bg-white text-sm leading-7 transition-colors",
+            storyboardDraftIsGuidance ? "font-semibold text-[#9aa7ba]" : "font-bold text-[#172033]"
+          )}
           value={storyboardDraft}
           onChange={(event) => onStoryboardDraftChange(event.target.value)}
           placeholder=""

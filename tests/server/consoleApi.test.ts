@@ -503,6 +503,7 @@ describe("console API", () => {
     expect(appSource).toContain("defaultStoryboardDraftForTemplate");
     expect(appSource).toContain("defaultStoryboardDraft(template, duration)");
     expect(appSource).toContain("用户已手动编辑分镜时不覆盖");
+    expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
     expect(creationComposerSource).toContain("product-creation-canvas");
     expect(creationComposerSource).toContain("product-control-bar");
     expect(creationComposerSource).toContain("video-parameter-row grid");
@@ -528,6 +529,9 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(creationComposerSource).toContain("product-reference-inline");
     expect(creationComposerSource).toContain("storyboard-side-panel");
+    expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
+    expect(storyboardPanelSource).toContain("text-[#9aa7ba]");
+    expect(storyboardPanelSource).toContain("text-[#172033]");
     expect(creationComposerSource).toContain("product-facts-editor");
     expect(creationComposerSource).toContain("product-facts-actions");
     expect(creationComposerSource).toContain("product-facts-body");
@@ -1411,6 +1415,7 @@ describe("console API", () => {
     expect(defaultStoryboardSource).toContain("unboxing");
     expect(defaultStoryboardSource).toContain("storyboardTimeRanges(durationSeconds)");
     expect(defaultStoryboardSource).toContain("`0-${firstEnd}s`");
+    expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     expect(composerSource).toContain("video-creation-frame");
@@ -1439,6 +1444,9 @@ describe("console API", () => {
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(composerSource).toContain("product-reference-inline");
     expect(composerSource).toContain("storyboard-side-panel");
+    expect(composerSource).toContain("storyboardDraftIsGuidance");
+    expect(composerSource).toContain("text-[#9aa7ba]");
+    expect(composerSource).toContain("text-[#172033]");
     expect(composerSource).toContain("product-facts-editor");
     expect(composerSource).toContain("product-facts-actions");
     expect(composerSource).toContain("product-facts-body");
