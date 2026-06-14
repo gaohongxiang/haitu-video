@@ -17,10 +17,11 @@ describe("console navigation", () => {
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=templates")).toBe("settings");
   });
 
-  it("falls back to products for missing or unknown sections", () => {
-    expect(consoleSectionFromUrl("http://127.0.0.1:4173/")).toBe("products");
-    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=all")).toBe("products");
-    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=review")).toBe("products");
+  it("falls back to video creation for missing, unknown, or removed sections", () => {
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/")).toBe("video");
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=all")).toBe("video");
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=review")).toBe("video");
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=products")).toBe("video");
   });
 
   it("builds a shareable URL for the selected section without dropping existing query state", () => {
@@ -49,7 +50,7 @@ describe("console navigation", () => {
     expect(productStudioProductUrl("http://127.0.0.1:4173/?section=video&step=generate&productSku=TK-001", "")).toBe("http://127.0.0.1:4173/?section=video&step=generate");
   });
 
-  it.each<ConsoleSection>(["dashboard", "products", "video", "ledger", "settings"])(
+  it.each<ConsoleSection>(["dashboard", "video", "ledger", "settings"])(
     "accepts %s as a known console section",
     (section) => {
       expect(consoleSectionFromUrl(`http://127.0.0.1:4173/?section=${section}`)).toBe(section);

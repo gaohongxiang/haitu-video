@@ -1,10 +1,10 @@
 import type { ProductStudioStepKey } from "./productStudioFlow.js";
 
-export const consoleSections = ["dashboard", "products", "video", "ledger", "settings"] as const;
+export const consoleSections = ["dashboard", "video", "ledger", "settings"] as const;
 
 export type ConsoleSection = (typeof consoleSections)[number];
 
-export const defaultConsoleSection: ConsoleSection = "products";
+export const defaultConsoleSection: ConsoleSection = "video";
 export const productStudioStepKeys = ["raw", "storyboard", "generate"] as const;
 
 export function isConsoleSection(value: string | null | undefined): value is ConsoleSection {
@@ -15,6 +15,7 @@ export function consoleSectionFromUrl(currentUrl: string): ConsoleSection {
   const url = new URL(currentUrl);
   const section = url.searchParams.get("section");
   if (section === "templates") return "settings";
+  if (section === "products") return "video";
   return isConsoleSection(section) ? section : defaultConsoleSection;
 }
 

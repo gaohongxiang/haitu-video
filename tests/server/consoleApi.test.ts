@@ -219,8 +219,8 @@ describe("console API", () => {
     expect(appSource).toContain("管理");
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
     const managementNavSource = appSource.slice(appSource.indexOf("const managementNavItems"), appSource.indexOf("const navItems"));
-    expect(primaryNavSource).toContain("商品管理");
     expect(primaryNavSource).toContain("视频创作");
+    expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
     expect(primaryNavSource).not.toContain("生成记录");
@@ -375,8 +375,8 @@ describe("console API", () => {
     expect(appSource).toContain("商品库");
     expect(appSource).toContain("添加商品");
     expect(appSource).toContain("创作视频");
-    const productsCase = appSource.slice(appSource.indexOf('case "products"'), appSource.indexOf('case "video"'));
-    expect(productsCase).not.toContain("StatusPanel");
+    expect(appSource).not.toContain('case "products"');
+    expect(appSource).not.toContain('aria-label="商品管理"');
     const productLibraryHome = appSource.slice(appSource.indexOf("function ProductLibraryHome"), appSource.indexOf("function ProductLibraryDialog"));
     expect(productLibraryHome).toContain("product-library-toolbar");
     expect(productLibraryHome).toContain("商品资料");
@@ -461,8 +461,8 @@ describe("console API", () => {
     expect(appSource).not.toContain("useProductForVideo");
     expect(appSource).not.toContain("onUseForVideo");
     expect(appSource).not.toContain("用此商品做视频");
-    expect(appSource).toContain("商品管理");
     expect(appSource).toContain("视频创作");
+    expect(appSource).not.toContain('aria-label="商品管理"');
     expect(appSource).toContain("历史记录");
     expect(appSource).not.toContain("高级新建任务");
     const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
@@ -489,6 +489,7 @@ describe("console API", () => {
     );
     expect(videoCase).toContain("onOrganizeProductPackage={organizeProductPackage}");
     expect(videoCase).toContain("onStartNewProduct={startNewVideoProduct}");
+    expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
     expect(videoCase).toContain("ledgerJobs={ledger?.jobs ?? []}");
     expect(creationWorkspaceSource).toContain("<ProductCreationComposer");
     expect(creationWorkspaceSource).toContain("selectedProductStoryboardHistory");
@@ -1286,29 +1287,23 @@ describe("console API", () => {
     }
   });
 
-  it("separates product management and video creation as the primary modules", async () => {
+  it("consolidates product management into video creation", async () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
 
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
-    expect(primaryNavSource).toContain("商品管理");
     expect(primaryNavSource).toContain("视频创作");
+    expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
     expect(primaryNavSource).not.toContain("后台记录");
 
     expect(appSource).not.toContain("hiddenNavItems");
-
-    const productsCase = appSource.slice(appSource.indexOf('case "products"'), appSource.indexOf('case "video"'));
-    expect(productsCase).toContain("<ProductLibraryHome");
-    expect(productsCase).toContain("onCreateVideo");
-    expect(productsCase).toContain("onDeleteProduct");
-    expect(productsCase).toContain("onEdit={loadProductIntoDraft}");
-    expect(productsCase).toContain("<ProductLibraryDialogMount");
-    expect(productsCase).not.toContain("<ProductStudio");
-    expect(productsCase).not.toContain("ProductStudioStepPanel");
+    expect(appSource).not.toContain('case "products"');
+    expect(appSource).not.toContain('aria-label="商品管理"');
 
     const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
+    expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
     expect(videoCase).not.toContain("<VideoJobsPanel");
     expect(videoCase).not.toContain("<ReportsPanel");
     expect(videoCase).not.toContain("手动生成参数");
@@ -1322,15 +1317,8 @@ describe("console API", () => {
     expect(productCreationWorkspace).not.toContain("选择商品开始创作");
     expect(productCreationWorkspace).toContain("selectedProductStoryboardHistory");
     expect(productCreationWorkspace).toContain("onOrganizeProductPackage");
+    expect(productCreationWorkspace).toContain("onDeleteProduct");
     expect(productCreationWorkspace).not.toContain("ensureVideoProductSelection");
-
-    const productLibraryHome = appSource.slice(appSource.indexOf("function ProductLibraryHome"), appSource.indexOf("function ProductLibraryDialog"));
-    expect(productLibraryHome).toContain("创作视频");
-    expect(productLibraryHome).toContain("编辑");
-    expect(productLibraryHome).toContain("删除");
-    expect(productLibraryHome).toContain("onCreateVideo(product)");
-    expect(productLibraryHome).toContain("onEdit(product.sku)");
-    expect(productLibraryHome).toContain("onDeleteProduct(product.sku)");
 
     const loadProductIntoDraftSource = appSource.slice(appSource.indexOf("async function loadProductIntoDraft"), appSource.indexOf("async function openProductStudio"));
     expect(loadProductIntoDraftSource).toContain('if (activeSection === "video")');
@@ -1350,6 +1338,10 @@ describe("console API", () => {
     expect(productPickerSource).toContain("product-creation-product-menu");
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
     expect(productPickerSource).toContain("新商品");
+    expect(productPickerSource).toContain("onDeleteProduct");
+    expect(productPickerSource).toContain("删除当前商品");
+    expect(productPickerSource).toContain("selectedProductOption.sku");
+    expect(productPickerSource).toContain("setProductPickerOpen(false)");
     expect(productPickerSource).not.toContain("+ 新建商品");
     expect(productPickerSource).not.toContain("<Select");
     expect(productPickerSource).not.toContain("切换商品");

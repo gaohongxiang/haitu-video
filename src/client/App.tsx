@@ -648,7 +648,6 @@ type ProductEditorMode = "import" | "manual";
 type ProductLibraryDialogMode = ProductEditorMode | "edit" | undefined;
 
 const primaryNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
-  { id: "products", label: "商品管理", icon: Package },
   { id: "video", label: "视频创作", icon: Clapperboard }
 ];
 
@@ -665,7 +664,6 @@ const navGroups = [
 ];
 
 const sectionSubtitles: Record<ConsoleSection, string> = {
-  products: "管理商品资料、参考图和商品状态。",
   video: "选择商品、设置参数、编辑脚本分镜并生成视频。",
   dashboard: "隐藏运营概览和最近结果。",
   ledger: "生成任务、报告、用量、备份和审计。",
@@ -936,7 +934,7 @@ export function App() {
     return true;
   });
   const activeSection = activeSectionState;
-  const activeSectionLabel = navItems.find((item) => item.id === activeSection)?.label ?? "商品管理";
+  const activeSectionLabel = navItems.find((item) => item.id === activeSection)?.label ?? "视频创作";
   const activeSectionSubtitle = sectionSubtitles[activeSection];
   const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
   const textModelConfigured = providerConfig.textModels.some((model) => model.configured);
@@ -1599,11 +1597,9 @@ export function App() {
     try {
       const response = await deleteJson<{ deleted: true; sku: string; path: string }>(`/api/products/${encodeURIComponent(sku)}`);
       if (selectedProduct?.sku === sku) {
-        setSelectedProduct(undefined);
-        persistProductStudioSku("");
-        setProductPath("");
+        startNewVideoProduct();
       }
-      setStatusText(`商品已删除: ${productTitleForSku(response.sku) || productTitle}`);
+      setStatusText(`商品已删除: ${productTitle || response.sku}`);
       await refreshConsole();
     } catch (error) {
       showError(error);
@@ -2168,33 +2164,6 @@ export function App() {
             />
           </section>
         );
-      case "products":
-        return (
-          <section className="grid gap-4" aria-label="商品管理">
-            <ProductLibraryHome
-              products={products}
-              setEditorMode={setProductEditorMode}
-              setDialogMode={setProductLibraryDialogMode}
-              onCreateVideo={openProductStudio}
-              onEdit={loadProductIntoDraft}
-              onDeleteProduct={deleteProduct}
-            />
-            <ProductLibraryDialogMount
-              dialogMode={productLibraryDialogMode}
-              draft={productDraft}
-              setDraft={setProductDraft}
-              editorMode={productEditorMode}
-              setEditorMode={setProductEditorMode}
-              importText={productImportText}
-              setImportText={updateProductComposerText}
-              importNotes={importNotes}
-              importQuality={importQuality}
-              setDialogMode={setProductLibraryDialogMode}
-              onImportSave={importProductAndSave}
-              onSaveDraft={saveProductDraft}
-            />
-          </section>
-        );
       case "video":
         return (
           <section className="grid gap-4" aria-label="视频创作">
@@ -2213,6 +2182,7 @@ export function App() {
               onOrganizeProductPackage={organizeProductPackage}
               onSelectProduct={openProductStudio}
               onStartNewProduct={startNewVideoProduct}
+              onDeleteProduct={deleteProduct}
               onGenerateVideo={queueProductVideoJobs}
               onCancelVideoJob={cancelVideoJob}
               onDeleteLedgerVideo={deleteLedgerVideo}
@@ -2681,6 +2651,7 @@ function ProductCreationWorkspace({
   onOrganizeProductPackage,
   onSelectProduct,
   onStartNewProduct,
+  onDeleteProduct,
   onGenerateVideo,
   onCancelVideoJob,
   onDeleteLedgerVideo,
@@ -2725,6 +2696,7 @@ function ProductCreationWorkspace({
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
+  onDeleteProduct: (sku: string) => Promise<void>;
   onGenerateVideo: (product: ProductSummary) => Promise<void>;
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
@@ -2792,6 +2764,7 @@ function ProductCreationWorkspace({
       onOrganizeProductPackage={onOrganizeProductPackage}
       onSelectProduct={onSelectProduct}
       onStartNewProduct={onStartNewProduct}
+      onDeleteProduct={onDeleteProduct}
       onGenerateVideo={onGenerateVideo}
       onCancelVideoJob={onCancelVideoJob}
       onDeleteLedgerVideo={onDeleteLedgerVideo}
@@ -2839,6 +2812,7 @@ function ProductCreationComposer({
   onOrganizeProductPackage,
   onSelectProduct,
   onStartNewProduct,
+  onDeleteProduct,
   onGenerateVideo,
   onCancelVideoJob,
   onDeleteLedgerVideo,
@@ -2882,6 +2856,7 @@ function ProductCreationComposer({
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
+  onDeleteProduct: (sku: string) => Promise<void>;
   onGenerateVideo: (product: ProductSummary) => Promise<void>;
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
@@ -3037,6 +3012,7 @@ function ProductCreationComposer({
               selectedSku={selectedSku}
               onSelectProduct={onSelectProduct}
               onAddProduct={onStartNewProduct}
+              onDeleteProduct={onDeleteProduct}
             />
             <CompactChoiceDropdown
               label="视频风格"
@@ -4077,13 +4053,15 @@ function ProductCreationProductPicker({
   products,
   selectedSku,
   onSelectProduct,
-  onAddProduct
+  onAddProduct,
+  onDeleteProduct
 }: {
   className?: string;
   products: ProductSummary[];
   selectedSku: string;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onAddProduct: () => void;
+  onDeleteProduct: (sku: string) => Promise<void>;
 }) {
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const selectedProductOption = products.find((product) => product.sku === selectedSku);
@@ -4176,6 +4154,22 @@ function ProductCreationProductPicker({
           ) : (
             <div className="px-3 py-2 text-xs font-bold text-[#8b9bb3]">暂无商品</div>
           )}
+          {selectedProductOption ? (
+            <>
+              <div className="my-1 h-px bg-[#edf2f8]" />
+              <button
+                type="button"
+                className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                onClick={() => {
+                  setProductPickerOpen(false);
+                  void onDeleteProduct(selectedProductOption.sku);
+                }}
+              >
+                <X size={13} />
+                <span>删除当前商品</span>
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
