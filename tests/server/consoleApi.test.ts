@@ -698,6 +698,14 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(creationComposerSource).toContain("product-reference-inline");
+    expect(creationComposerSource).toContain("acceptReferenceFiles");
+    expect(creationComposerSource).toContain("isReferenceImageFile");
+    expect(creationComposerSource).toContain("onDrop=");
+    expect(creationComposerSource).toContain("onPaste=");
+    expect(creationComposerSource).toContain("event.clipboardData.files");
+    expect(creationComposerSource).toContain("event.dataTransfer.files");
+    expect(creationComposerSource).toContain("dragOver");
+    expect(creationComposerSource).toContain("拖拽或粘贴图片");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("text-[#9aa7ba]");

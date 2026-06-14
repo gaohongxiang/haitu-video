@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import * as EChartsForReact from "echarts-for-react";
 import type { EChartsOption, EChartsReactProps } from "echarts-for-react";
-import { FormEvent, ReactNode, type ComponentType, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, type ClipboardEvent, type ComponentType, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
@@ -2961,13 +2961,36 @@ function ProductCreationComposer({
     }
   }
 
-  function handleReferenceFiles(files: FileList | null) {
+  function handleReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
-    if (selectedProduct) {
-      void onUploadImages(selectedProduct.sku, files);
+    const incomingFiles = Array.from(files);
+    const acceptedFiles = incomingFiles.filter(isReferenceImageFile);
+    if (acceptedFiles.length === 0) {
+      onToast("只支持 JPG、PNG、WebP 图片。");
       return;
     }
-    setPendingImageFiles((current) => [...current, ...Array.from(files)]);
+    if (acceptedFiles.length < incomingFiles.length) {
+      onToast("已忽略非图片文件。");
+    }
+    if (selectedProduct) {
+      void onUploadImages(selectedProduct.sku, acceptedFiles);
+      return;
+    }
+    setPendingImageFiles((current) => [...current, ...acceptedFiles]);
+  }
+
+  function handleReferencePaste(event: ClipboardEvent<HTMLElement>) {
+    const clipboardFiles = Array.from(event.clipboardData.files);
+    const itemFiles = clipboardFiles.length > 0
+      ? []
+      : Array.from(event.clipboardData.items)
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+    const files = clipboardFiles.length > 0 ? clipboardFiles : itemFiles;
+    if (!files.some(isReferenceImageFile)) return;
+    event.preventDefault();
+    handleReferenceFiles(files);
   }
 
   async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
@@ -2990,6 +3013,7 @@ function ProductCreationComposer({
     <section
       id="视频创作"
       className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] shadow-[0_22px_64px_rgba(30,42,68,.10)]"
+      onPaste={handleReferencePaste}
     >
       <div className="product-creation-canvas overflow-visible">
         <div className="product-control-bar grid gap-2 border-b border-[#e5ecf6] bg-white p-3 min-[1280px]:px-4">
@@ -3254,12 +3278,42 @@ function ProductComposerReferenceTray({
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onPreviewReferenceImage: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
-  onFilesChange: (files: FileList | null) => void;
+  onFilesChange: (files: FileList | File[] | null) => void;
   onClearPendingFile: (index: number) => void;
 }) {
   const images = product?.reference_image_statuses ?? [];
+  const [dragOver, setDragOver] = useState(false);
+
+  function acceptReferenceFiles(files: FileList | File[] | null) {
+    if (!files || files.length === 0) return;
+    onFilesChange(files);
+  }
+
+  function handleReferenceDrag(event: DragEvent<HTMLElement>) {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDragOver(true);
+  }
+
+  function handleReferenceDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    setDragOver(false);
+    acceptReferenceFiles(event.dataTransfer.files);
+  }
+
   return (
-    <section className={cn("product-reference-inline grid content-start gap-3", className)}>
+    <section
+      className={cn("product-reference-inline grid content-start gap-3", className)}
+      onDragEnter={handleReferenceDrag}
+      onDragOver={handleReferenceDrag}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDragOver(false);
+        }
+      }}
+      onDrop={handleReferenceDrop}
+    >
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-sm font-black text-[#172033]">参考图</div>
@@ -3267,11 +3321,18 @@ function ProductComposerReferenceTray({
         </div>
         <Badge>{product ? `${productReferenceCount(product)} 张` : `${pendingFiles.length} 张`}</Badge>
       </div>
-      <label className="grid min-h-[58px] cursor-pointer place-items-center rounded-[12px] border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-2 text-center transition hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
+      <label
+        className={cn(
+          "grid min-h-[66px] cursor-pointer place-items-center rounded-[12px] border border-dashed p-2 text-center transition",
+          dragOver
+            ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,white)] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
+            : "border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]"
+        )}
+      >
         <span className="grid justify-items-center gap-0.5 text-sm font-black text-[var(--accent)]">
           <Plus size={16} />
           添加图片
-          <span className="text-[11px] font-bold text-[#8b9bb3]">可多选</span>
+          <span className="text-[11px] font-bold text-[#8b9bb3]">可多选 · 拖拽或粘贴图片</span>
         </span>
         <input
           className="sr-only"
@@ -3279,7 +3340,7 @@ function ProductComposerReferenceTray({
           accept="image/jpeg,image/png,image/webp"
           multiple
           onChange={(event) => {
-            onFilesChange(event.target.files);
+            acceptReferenceFiles(event.target.files);
             event.currentTarget.value = "";
           }}
         />
@@ -3317,11 +3378,19 @@ function ProductComposerReferenceTray({
         </div>
       ) : (
         <div className="rounded-[12px] border border-[#eef3f8] bg-white px-3 py-3 text-xs font-bold leading-5 text-[#8b9bb3]">
-          参考图会影响商品外观、材质和镜头细节。
+          参考图会影响商品外观、材质和镜头细节。支持拖拽或粘贴图片。
         </div>
       )}
     </section>
   );
+}
+
+function isReferenceImageFile(file: File): boolean {
+  const mimeType = file.type.toLowerCase();
+  if (mimeType === "image/jpeg" || mimeType === "image/png" || mimeType === "image/webp") {
+    return true;
+  }
+  return /\.(jpe?g|png|webp)$/i.test(file.name);
 }
 
 function StoryboardComposerPanel({
