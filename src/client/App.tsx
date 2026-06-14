@@ -1641,7 +1641,6 @@ export function App() {
         template,
         finalLanguage,
         cta,
-        scriptLines: splitDraftLines(studioScriptDraft),
         storyboardLines: splitDraftLines(studioStoryboardDraft),
         confirmPaid: provider !== "mock" && confirmPaid,
         versions: selectedVersionCount
@@ -2250,11 +2249,6 @@ export function App() {
                 setFinalLanguage(nextLanguage);
                 markPreflightStale();
               }}
-              scriptDraft={studioScriptDraft}
-              onScriptDraftChange={(nextDraft) => {
-                setStudioScriptDraft(nextDraft);
-                markPreflightStale();
-              }}
               storyboardDraft={studioStoryboardDraft}
               onStoryboardDraftChange={(nextDraft) => {
                 setStudioStoryboardDraft(nextDraft);
@@ -2711,8 +2705,6 @@ function ProductCreationWorkspace({
   onTemplateChange,
   finalLanguage,
   onFinalLanguageChange,
-  scriptDraft,
-  onScriptDraftChange,
   storyboardDraft,
   onStoryboardDraftChange,
   storyboardHistory,
@@ -2757,8 +2749,6 @@ function ProductCreationWorkspace({
   onTemplateChange: (template: TemplateName) => void;
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
-  scriptDraft: string;
-  onScriptDraftChange: (draft: string) => void;
   storyboardDraft: string;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -2826,8 +2816,6 @@ function ProductCreationWorkspace({
       onTemplateChange={onTemplateChange}
       finalLanguage={finalLanguage}
       onFinalLanguageChange={onFinalLanguageChange}
-      scriptDraft={scriptDraft}
-      onScriptDraftChange={onScriptDraftChange}
       storyboardDraft={storyboardDraft}
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
@@ -2875,8 +2863,6 @@ function ProductCreationComposer({
   onTemplateChange,
   finalLanguage,
   onFinalLanguageChange,
-  scriptDraft,
-  onScriptDraftChange,
   storyboardDraft,
   onStoryboardDraftChange,
   storyboardHistory,
@@ -2920,8 +2906,6 @@ function ProductCreationComposer({
   onTemplateChange: (template: TemplateName) => void;
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
-  scriptDraft: string;
-  onScriptDraftChange: (draft: string) => void;
   storyboardDraft: string;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -3163,10 +3147,8 @@ function ProductCreationComposer({
             <StoryboardComposerPanel
               template={template}
               duration={duration}
-              scriptDraft={scriptDraft}
               storyboardDraft={storyboardDraft}
               storyboardHistory={storyboardHistory}
-              onScriptDraftChange={onScriptDraftChange}
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
               onGenerateStoryboardDraft={onGenerateStoryboardDraft}
@@ -3386,10 +3368,8 @@ function ProductComposerReferenceTray({
 function StoryboardComposerPanel({
   template,
   duration,
-  scriptDraft,
   storyboardDraft,
   storyboardHistory,
-  onScriptDraftChange,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
   onGenerateStoryboardDraft,
@@ -3398,10 +3378,8 @@ function StoryboardComposerPanel({
 }: {
   template: TemplateName;
   duration: number;
-  scriptDraft: string;
   storyboardDraft: string;
   storyboardHistory: StoryboardHistoryRecord[];
-  onScriptDraftChange: (draft: string) => void;
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onGenerateStoryboardDraft: () => Promise<void>;
@@ -3451,19 +3429,6 @@ function StoryboardComposerPanel({
         </Button>
         <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{hint}</div>
       </div>
-
-      <details className="group rounded-[12px] border border-[#e5ecf6] bg-white px-3 py-2">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-black text-[#6c7890]">
-          补充要点
-          <ChevronDown size={14} className="text-[#8b9bb3] transition group-open:rotate-180" />
-        </summary>
-        <Textarea
-          className="mt-2 min-h-[90px] resize-y bg-white text-sm leading-6"
-          value={scriptDraft}
-          onChange={(event) => onScriptDraftChange(event.target.value)}
-          placeholder="可补充镜头重点、禁用表达、旁白方向。"
-        />
-      </details>
 
       <div
         className="storyboard-history-dropdown relative"

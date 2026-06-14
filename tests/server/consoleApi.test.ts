@@ -589,7 +589,10 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("AI 生成分镜");
     expect(storyboardPanelSource).toContain("分镜历史记录");
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown");
-    expect(storyboardPanelSource).toContain("补充要点");
+    expect(storyboardPanelSource).not.toContain("补充要点");
+    expect(storyboardPanelSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
+    expect(storyboardPanelSource).not.toContain("scriptDraft");
+    expect(storyboardPanelSource).not.toContain("onScriptDraftChange");
     expect(storyboardPanelSource).toContain("正在请求文本模型");
     expect(storyboardPanelSource).not.toContain("时间线");
     expect(storyboardPanelSource).not.toContain("镜头脚本");
@@ -625,6 +628,8 @@ describe("console API", () => {
     expect(appSource).toContain("/video-jobs");
     expect(appSource).toContain("queueProductVideoJobs");
     expect(queueProductVideoJobsSource).toContain("mergeVideoJobs(response.jobs, current)");
+    expect(queueProductVideoJobsSource).not.toContain("scriptLines: splitDraftLines(studioScriptDraft)");
+    expect(queueProductVideoJobsSource).toContain("storyboardLines: splitDraftLines(studioStoryboardDraft)");
     expect(queueProductVideoJobsSource).toContain("throw new Error");
     expect(queueProductVideoJobsSource).not.toContain('setActiveSection("video")');
     expect(queueProductVideoJobsSource).not.toContain("个验证版本");
@@ -1423,7 +1428,9 @@ describe("console API", () => {
     expect(composerSource).toContain("生成视频");
     expect(composerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain("function productDraftToComposerText");
-    expect(composerSource).toContain("details");
+    expect(composerSource).toContain("storyboard-history-dropdown");
+    expect(composerSource).not.toContain("补充要点");
+    expect(composerSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
     expect(composerSource).toContain("脚本分镜");
     expect(composerSource).toContain("AI 生成分镜");
     expect(composerSource).toContain("历史记录");
