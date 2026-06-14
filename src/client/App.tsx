@@ -661,11 +661,12 @@ const primaryNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof L
 ];
 
 const managementNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
+  { id: "dashboard", label: "仪表盘", icon: LayoutDashboard },
   { id: "ledger", label: "任务记录", icon: WalletCards },
   { id: "settings", label: "API 管理", icon: Settings }
 ];
 
-const navItems = [...primaryNavItems, ...managementNavItems, { id: "dashboard", label: "运营概览", icon: LayoutDashboard }] as const;
+const navItems = [...primaryNavItems, ...managementNavItems] as const;
 
 const navGroups = [
   { label: "主流程", items: primaryNavItems },
@@ -674,8 +675,8 @@ const navGroups = [
 
 const sectionSubtitles: Record<ConsoleSection, string> = {
   video: "选择商品、设置参数、编辑脚本分镜并生成视频。",
-  dashboard: "隐藏运营概览和最近结果。",
-  ledger: "生成任务、报告、用量、备份和审计。",
+  dashboard: "查看生成数量、成本趋势、模型分布和最近使用。",
+  ledger: "查看正在生成和已生成的视频任务。",
   settings: "配置文本、图片和视频模型服务。"
 };
 
@@ -2210,7 +2211,7 @@ export function App() {
     switch (activeSection) {
       case "dashboard":
         return (
-          <section className="grid gap-4" aria-label="运营概览">
+          <section className="grid gap-4" aria-label="仪表盘">
             <KpiGrid
               items={[
                 { label: "商品", value: formatNumber(products.length), hint: "可创作商品", icon: Package, tone: "blue" },
@@ -2304,42 +2305,7 @@ export function App() {
       case "ledger":
         return (
           <section className="grid gap-4" aria-label="任务记录">
-            <ProviderUsagePanel
-              usage={providerUsage}
-              status={providerUsageStatus}
-              model={providerUsageModel}
-              setStatus={setProviderUsageStatus}
-              setModel={setProviderUsageModel}
-              onRefresh={refreshProviderUsage}
-              isBusy={isBusy}
-            />
-
-            <FeeSummaryPanel ledger={ledger} reports={reports} />
             <VideoJobsPanel jobs={videoJobs} onCancel={cancelVideoJob} onRetry={retryVideoJob} />
-            <ReportsPanel
-              reports={filteredReports}
-              allReports={reports}
-              filters={filters}
-              productOptions={productOptions}
-              providerOptions={providerOptions}
-              statusOptions={statusOptions}
-              setFilters={setFilters}
-              onReuse={(manifest) => {
-                setReuseManifest(manifest);
-                setProvider("volcengine-seedance");
-                setActiveSection("video");
-                setStatusText("已填入 raw manifest，可在视频创作里使用当前商品继续生成。");
-              }}
-              onUsage={showProviderUsage}
-              onCancel={cancelProviderTask}
-            />
-            <StorageBackupPanel
-              report={storageBackup}
-              backups={localBackups}
-              onCreateBackup={createBackupArchive}
-              isBusy={isBusy}
-            />
-            <AuditLogPanel auditLog={auditLog} />
             <VideoAssetsPanel assets={videoAssets} onDelete={deleteVideoAsset} isBusy={isBusy} />
           </section>
         );
