@@ -702,7 +702,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("isReferenceImageFile");
     expect(creationComposerSource).toContain("onDrop=");
     expect(creationComposerSource).toContain("onPaste=");
-    expect(creationComposerSource).toContain("event.clipboardData.files");
+    expect(creationComposerSource).toContain("clipboardData.files");
     expect(creationComposerSource).toContain("event.dataTransfer.files");
     expect(creationComposerSource).toContain("dragOver");
     expect(creationComposerSource).toContain("拖拽或粘贴图片");
@@ -711,6 +711,11 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("URL.revokeObjectURL");
     expect(creationComposerSource).toContain('alt={`${file.name} preview`}');
     expect(creationComposerSource).toContain("待上传");
+    expect(creationComposerSource).toContain("clipboardReferenceFiles");
+    expect(creationComposerSource).toContain("handleProductFactsPaste");
+    expect(creationComposerSource).toContain("event.stopPropagation()");
+    expect(creationComposerSource).toContain('event.clipboardData.getData("text/plain")');
+    expect(creationComposerSource).toContain("onPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("text-[#9aa7ba]");

@@ -2979,18 +2979,30 @@ function ProductCreationComposer({
     setPendingImageFiles((current) => [...current, ...acceptedFiles]);
   }
 
+  function clipboardReferenceFiles(clipboardData: DataTransfer): File[] {
+    const clipboardFiles = Array.from(clipboardData.files);
+    if (clipboardFiles.length > 0) return clipboardFiles;
+    return Array.from(clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+  }
+
   function handleReferencePaste(event: ClipboardEvent<HTMLElement>) {
-    const clipboardFiles = Array.from(event.clipboardData.files);
-    const itemFiles = clipboardFiles.length > 0
-      ? []
-      : Array.from(event.clipboardData.items)
-        .filter((item) => item.kind === "file")
-        .map((item) => item.getAsFile())
-        .filter((file): file is File => Boolean(file));
-    const files = clipboardFiles.length > 0 ? clipboardFiles : itemFiles;
+    const files = clipboardReferenceFiles(event.clipboardData);
     if (!files.some(isReferenceImageFile)) return;
     event.preventDefault();
     handleReferenceFiles(files);
+  }
+
+  function handleProductFactsPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = clipboardReferenceFiles(event.clipboardData);
+    if (!files.some(isReferenceImageFile)) return;
+    event.stopPropagation();
+    handleReferenceFiles(files);
+    if (!event.clipboardData.getData("text/plain")) {
+      event.preventDefault();
+    }
   }
 
   async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
@@ -3100,6 +3112,7 @@ function ProductCreationComposer({
                 rows={productFactsRows}
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
+                onPaste={handleProductFactsPaste}
                 placeholder="可以直接粘贴商品页、店小秘、1688 或补充描述；也可以按标题、分类、材质、尺寸/重量、卖点、使用场景来写。"
               />
             </div>
