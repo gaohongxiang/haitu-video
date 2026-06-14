@@ -498,6 +498,11 @@ describe("console API", () => {
     expect(creationWorkspaceSource).toContain("mergeLedgerJobs");
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
+    expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
+    expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
+    expect(appSource).toContain("defaultStoryboardDraftForTemplate");
+    expect(appSource).toContain("defaultStoryboardDraft(template, duration)");
+    expect(appSource).toContain("用户已手动编辑分镜时不覆盖");
     expect(creationComposerSource).toContain("product-creation-canvas");
     expect(creationComposerSource).toContain("product-control-bar");
     expect(creationComposerSource).toContain("video-parameter-row grid");
@@ -510,6 +515,8 @@ describe("console API", () => {
     expect(videoModelSource).toContain("seednice-2");
     expect(videoModelSource).toContain("seednice2.0 fast");
     expect(videoModelSource).toContain("seednice2.0");
+    expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
+    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast"');
     expect(creationComposerSource).toContain("videoModelChoice");
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
@@ -555,6 +562,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("AI 整理资料包");
+    expect(creationComposerSource).toContain("placeholder=\"\"");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain("视频风格");
     expect(creationComposerSource).toContain("视频时长");
@@ -667,7 +675,7 @@ describe("console API", () => {
     expect(appSource).toContain("setTemplate(record.template)");
     expect(appSource).toContain("setDuration(record.duration)");
     expect(appSource).toContain('setStudioScriptDraft("");');
-    expect(appSource).toContain('setStudioStoryboardDraft("");');
+    expect(appSource).toContain("setStudioStoryboardDraft(defaultStoryboardDraft(template, duration))");
     expect(appSource).not.toContain("setStudioScriptDraft(defaultStudioScriptDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("setStudioStoryboardDraft(defaultStudioStoryboardDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
@@ -834,7 +842,9 @@ describe("console API", () => {
     expect(modelPresetSource).toContain('model: "gemini-3-pro-image"');
     expect(modelPresetSource).toContain('name: "OpenAI 推荐-图片"');
     expect(modelPresetSource).toContain('model: "gpt-image-2"');
-    expect(modelPresetSource).toContain('name: "豆包 Seedance 推荐-视频"');
+    expect(modelPresetSource).toContain('name: "豆包 seednice2.0 fast 推荐-视频"');
+    expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-fast-260128"');
+    expect(modelPresetSource).toContain('name: "豆包 seednice2.0 推荐-视频"');
     expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-260128"');
     [
       "ChatFire 推荐-文本",
@@ -1385,12 +1395,22 @@ describe("console API", () => {
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
+    const defaultStoryboardSource = appSource.slice(appSource.indexOf("function defaultStoryboardDraft"), appSource.indexOf("function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
     expect(workspaceSource).toContain("selectedProductStoryboardHistory");
     expect(workspaceSource).not.toContain("<ProductStudio");
     expect(workspaceSource).not.toContain("<VideoCreationEmptyShell");
     expect(workspaceSource).not.toContain("ensureVideoProductSelection");
     expect(workspaceSource).not.toContain("ProductStudioPipeline");
+    expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
+    expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
+    expect(defaultStoryboardSource).toContain("scene");
+    expect(defaultStoryboardSource).toContain("pain-point");
+    expect(defaultStoryboardSource).toContain("benefit");
+    expect(defaultStoryboardSource).toContain("ugc");
+    expect(defaultStoryboardSource).toContain("unboxing");
+    expect(defaultStoryboardSource).toContain("storyboardTimeRanges(durationSeconds)");
+    expect(defaultStoryboardSource).toContain("`0-${firstEnd}s`");
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     expect(composerSource).toContain("video-creation-frame");
@@ -1406,6 +1426,8 @@ describe("console API", () => {
     expect(videoModelSource).toContain("seednice-2");
     expect(videoModelSource).toContain("seednice2.0 fast");
     expect(videoModelSource).toContain("seednice2.0");
+    expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
+    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast"');
     expect(composerSource).toContain("videoModelChoice");
     expect(composerSource).toContain("provider: videoModelConfig.provider");
     expect(composerSource).toContain("providerModel: videoModelConfig.model");
@@ -1451,6 +1473,7 @@ describe("console API", () => {
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("AI 整理资料包");
+    expect(composerSource).toContain("placeholder=\"\"");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain("视频风格");
     expect(composerSource).toContain("视频时长");
@@ -1922,11 +1945,11 @@ describe("console API", () => {
     await expect(server.fetchJson("/api/settings")).resolves.toEqual({
       settings: {
         defaultLanguage: "ja",
-        defaultDurationSeconds: 8,
+        defaultDurationSeconds: 10,
         defaultTemplate: "scene",
         enabledTemplates: ["scene", "pain-point", "benefit", "ugc", "unboxing"],
         defaultCta: "今すぐチェック",
-        defaultProvider: "mock",
+        defaultProvider: "volcengine-seedance",
         maxEstimatedCostCnyPerVideo: 5,
         testCreditBalanceCny: 0,
         forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],

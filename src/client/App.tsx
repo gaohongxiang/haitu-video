@@ -688,11 +688,11 @@ const defaultFilters: Filters = {
 
 const defaultSettings: SettingsState = {
   defaultLanguage: "ja",
-  defaultDurationSeconds: 8,
+  defaultDurationSeconds: 10,
   defaultTemplate: "scene",
   enabledTemplates: ["scene", "pain-point", "benefit", "ugc", "unboxing"],
   defaultCta: "今すぐチェック",
-  defaultProvider: "mock",
+  defaultProvider: "volcengine-seedance",
   maxEstimatedCostCnyPerVideo: 5,
   testCreditBalanceCny: 0,
   forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],
@@ -712,6 +712,8 @@ const defaultProductDraft: ProductDraft = {
 };
 
 const videoModelOptions: VideoModelChoice[] = ["mock", "seednice-2-fast", "seednice-2"];
+const defaultVideoDurationSeconds = 10;
+const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast";
 
 const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
   mock: {
@@ -780,7 +782,15 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
   ],
   "volcengine-seedance": [
     {
-      name: "豆包 Seedance 推荐-视频",
+      name: "豆包 seednice2.0 fast 推荐-视频",
+      vendor: "volcengine",
+      priority: 0,
+      apiKey: "",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-fast-260128"
+    },
+    {
+      name: "豆包 seednice2.0 推荐-视频",
       vendor: "volcengine",
       priority: 0,
       apiKey: "",
@@ -876,15 +886,16 @@ export function App() {
   const [videoJobs, setVideoJobs] = useState<VideoJob[]>([]);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [productPath, setProductPath] = useState("");
-  const [provider, setProvider] = useState<ProviderName>("mock");
-  const [videoModelChoice, setVideoModelChoice] = useState<VideoModelChoice>("mock");
-  const [duration, setDuration] = useState(8);
+  const [provider, setProvider] = useState<ProviderName>(videoModelConfigs[defaultVideoModelChoice].provider);
+  const [videoModelChoice, setVideoModelChoice] = useState<VideoModelChoice>(defaultVideoModelChoice);
+  const [duration, setDuration] = useState(defaultVideoDurationSeconds);
   const [versionCount, setVersionCount] = useState(1);
   const [template, setTemplate] = useState<TemplateName>("scene");
   const [finalLanguage, setFinalLanguage] = useState<FinalVideoLanguage>("ja");
   const [cta, setCta] = useState("今すぐチェック");
   const [studioScriptDraft, setStudioScriptDraft] = useState("");
-  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState("");
+  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => defaultStoryboardDraft("scene", defaultVideoDurationSeconds));
+  const [storyboardDraftTouched, setStoryboardDraftTouched] = useState(false);
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
   const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>(() => loadStoryboardHistory());
   const [reuseManifest, setReuseManifest] = useState("");
@@ -1042,14 +1053,22 @@ export function App() {
   useEffect(() => {
     if (!selectedProduct) {
       setStudioScriptDraft("");
-      setStudioStoryboardDraft("");
+      setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
+      setStoryboardDraftTouched(false);
       setStudioStoryboardCnDraft("");
       return;
     }
     setStudioScriptDraft("");
-    setStudioStoryboardDraft("");
+    setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
+    setStoryboardDraftTouched(false);
     setStudioStoryboardCnDraft("");
   }, [selectedProduct?.sku]);
+
+  useEffect(() => {
+    // 用户已手动编辑分镜时不覆盖。
+    if (storyboardDraftTouched) return;
+    setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
+  }, [template, duration, storyboardDraftTouched]);
 
   useEffect(() => {
     if (!authSession.authenticated || !hasActiveVideoJobs) return;
@@ -1177,8 +1196,9 @@ export function App() {
   }
 
   function applySettings(nextSettings = settings) {
-    setProvider(nextSettings.defaultProvider);
-    setDuration(nextSettings.defaultDurationSeconds);
+    setProvider(videoModelConfigs[defaultVideoModelChoice].provider);
+    setVideoModelChoice(defaultVideoModelChoice);
+    setDuration(defaultVideoDurationSeconds);
     setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)
       ? nextSettings.defaultTemplate
       : nextSettings.enabledTemplates[0] ?? "scene");
@@ -1211,6 +1231,7 @@ export function App() {
     setDuration(record.duration);
     setStudioScriptDraft(record.scriptDraft);
     setStudioStoryboardDraft(record.storyboardDraft);
+    setStoryboardDraftTouched(true);
     setStudioStoryboardCnDraft("");
     markPreflightStale();
     setStatusText(`已回填历史分镜: ${templateLabel(record.template)} / ${formatDuration(record.duration)}`);
@@ -1574,7 +1595,8 @@ export function App() {
     setPreflight(undefined);
     setPreflightSignature("");
     setStudioScriptDraft("");
-    setStudioStoryboardDraft("");
+    setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
+    setStoryboardDraftTouched(false);
     setStudioStoryboardCnDraft("");
     setActiveSection("video");
     setStatusText("已切换为新商品创作，可以直接填写资料并添加图片。");
@@ -1836,6 +1858,7 @@ export function App() {
       const nextStoryboardDraft = response.storyboardLines.join("\n");
       setStudioScriptDraft(nextScriptDraft);
       setStudioStoryboardDraft(nextStoryboardDraft);
+      setStoryboardDraftTouched(true);
       setStudioStoryboardCnDraft("");
       pushStoryboardHistory({
         id: `${selectedProduct.sku}-${Date.now()}`,
@@ -2266,6 +2289,7 @@ export function App() {
               }}
               storyboardDraft={studioStoryboardDraft}
               onStoryboardDraftChange={(nextDraft) => {
+                setStoryboardDraftTouched(true);
                 setStudioStoryboardDraft(nextDraft);
                 markPreflightStale();
               }}
@@ -3430,7 +3454,7 @@ function StoryboardComposerPanel({
           className="min-h-[230px] resize-y border-[#dbe4f0] bg-white text-sm font-bold leading-7"
           value={storyboardDraft}
           onChange={(event) => onStoryboardDraftChange(event.target.value)}
-          placeholder="0-2s：展示商品和使用场景..."
+          placeholder=""
         />
       </Field>
 
@@ -6956,6 +6980,62 @@ function splitLines(value: string) {
 function splitDraftLines(value: string): string[] | undefined {
   const lines = splitLines(value);
   return lines.length > 0 ? lines : undefined;
+}
+
+function defaultStoryboardDraft(template: TemplateName, durationSeconds: number): string {
+  const ranges = storyboardTimeRanges(durationSeconds);
+  return defaultStoryboardDraftForTemplate(template)
+    .map((description, index) => `${ranges[index]}: ${description}`)
+    .join("\n");
+}
+
+function defaultStoryboardDraftForTemplate(template: TemplateName): string[] {
+  const descriptions: Record<TemplateName, string[]> = {
+    scene: [
+      "展示商品所处的真实使用环境和整体外观。",
+      "切近景展示使用动作，让商品自然进入画面主体。",
+      "展示材质、尺寸、结构和手部操作细节。",
+      "回到完整使用场景，呈现使用后的效果和商品整体。"
+    ],
+    "pain-point": [
+      "先展示没有使用商品时的不便或痛点场景。",
+      "切到商品出现并快速解决核心问题。",
+      "用近景强化关键卖点和操作过程。",
+      "展示解决后的轻松状态和商品整体。"
+    ],
+    benefit: [
+      "开场直接展示最重要的卖点和结果。",
+      "用近景说明卖点对应的结构或材质细节。",
+      "切换到使用过程，连续展示多个优势。",
+      "用整体彩色或多角度画面收束，强化购买理由。"
+    ],
+    ugc: [
+      "以手持或第一视角开场，像真实用户刚拿到商品。",
+      "边展示边试用，用自然动作呈现第一感受。",
+      "近景拍摄细节、材质和使用中的小发现。",
+      "用真实使用后的评价式画面收尾。"
+    ],
+    unboxing: [
+      "从包装或桌面开场，展示开箱前的整洁画面。",
+      "打开包装并取出商品，让主体自然进入镜头。",
+      "依次展示配件、材质、尺寸和关键细节。",
+      "摆放商品并进入简单使用场景，完成开箱收尾。"
+    ]
+  };
+  return descriptions[template] ?? descriptions.scene;
+}
+
+function storyboardTimeRanges(durationSeconds: number): string[] {
+  const duration = Math.max(4, Math.min(15, Math.floor(durationSeconds || defaultVideoDurationSeconds)));
+  const firstEnd = Math.max(1, Math.min(2, Math.floor(duration * 0.2)));
+  const secondEnd = Math.max(firstEnd + 1, Math.min(duration - 2, Math.floor(duration * 0.4)));
+  const thirdEnd = Math.max(secondEnd + 1, Math.min(duration - 1, Math.floor(duration * 0.7)));
+  return [
+    `0-${firstEnd}s`,
+    `${firstEnd}-${secondEnd}s`,
+    `${secondEnd}-${thirdEnd}s`,
+    `${thirdEnd}-${duration}s`
+  ];
 }
 
 function defaultStudioScriptDraft(product: ProductDetail, durationSeconds: number, template: TemplateName): string {

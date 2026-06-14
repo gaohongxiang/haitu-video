@@ -21,11 +21,11 @@ export interface ConsoleSettings {
 
 export const defaultConsoleSettings: ConsoleSettings = {
   defaultLanguage: defaultFinalVideoLanguage,
-  defaultDurationSeconds: 8,
+  defaultDurationSeconds: 10,
   defaultTemplate: "scene",
   enabledTemplates: ["scene", "pain-point", "benefit", "ugc", "unboxing"],
   defaultCta: "今すぐチェック",
-  defaultProvider: "mock",
+  defaultProvider: "volcengine-seedance",
   maxEstimatedCostCnyPerVideo: 5,
   testCreditBalanceCny: 0,
   forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],
