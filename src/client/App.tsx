@@ -637,6 +637,8 @@ interface ConsoleToastState {
   tone: "warn" | "ok" | "neutral";
 }
 
+type ConsoleToastFn = (message: string, tone?: ConsoleToastState["tone"]) => void;
+
 interface ModelConfigTestStatus {
   tone: "neutral" | "ok" | "danger";
   message: string;
@@ -2260,6 +2262,7 @@ export function App() {
               }}
               storyboardHistory={storyboardHistory}
               onApplyStoryboardHistory={applyStoryboardHistory}
+              onToast={showConsoleToast}
             />
           </section>
         );
@@ -2502,19 +2505,28 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
   }
 
   const warn = consoleToast.tone === "warn";
+  const ok = consoleToast.tone === "ok";
   return (
     <div className="pointer-events-none fixed right-5 top-[86px] z-[70] w-[min(360px,calc(100vw-32px))]">
       <div
         className={cn(
           "pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2.5 shadow-[0_18px_46px_rgba(15,23,42,.14)] backdrop-blur-md",
-          warn ? "border-amber-200 bg-amber-50/88 text-amber-900" : "border-[#dbe4f0] bg-white/88 text-[#172033]"
+          warn
+            ? "border-amber-200 bg-amber-50/88 text-amber-900"
+            : ok
+              ? "border-emerald-200 bg-emerald-50/90 text-emerald-950"
+              : "border-[#dbe4f0] bg-white/88 text-[#172033]"
         )}
         role="status"
         aria-live="polite"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        <AlertTriangle className={cn("mt-0.5 shrink-0", warn ? "text-amber-600" : "text-[var(--accent)]")} size={15} />
+        {ok ? (
+          <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-600" size={15} />
+        ) : (
+          <AlertTriangle className={cn("mt-0.5 shrink-0", warn ? "text-amber-600" : "text-[var(--accent)]")} size={15} />
+        )}
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-black leading-5">{consoleToast.title}</div>
           <div className="text-[12px] font-semibold leading-5">{consoleToast.message}</div>
@@ -2704,7 +2716,8 @@ function ProductCreationWorkspace({
   storyboardDraft,
   onStoryboardDraftChange,
   storyboardHistory,
-  onApplyStoryboardHistory
+  onApplyStoryboardHistory,
+  onToast
 }: {
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -2750,6 +2763,7 @@ function ProductCreationWorkspace({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onToast: ConsoleToastFn;
 }) {
   const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
   const studioProductOptions = selectedProduct && !products.some((product) => product.sku === selectedProduct.sku)
@@ -2818,6 +2832,7 @@ function ProductCreationWorkspace({
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
+      onToast={onToast}
     />
   );
 }
@@ -2865,7 +2880,8 @@ function ProductCreationComposer({
   storyboardDraft,
   onStoryboardDraftChange,
   storyboardHistory,
-  onApplyStoryboardHistory
+  onApplyStoryboardHistory,
+  onToast
 }: {
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -2910,6 +2926,7 @@ function ProductCreationComposer({
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onToast: ConsoleToastFn;
 }) {
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
   const [isPacking, setIsPacking] = useState(false);
@@ -2962,16 +2979,21 @@ function ProductCreationComposer({
     return uploadedProduct ?? product;
   }
 
-  async function handleOrganizeProductPackage() {
+  async function handleOrganizeProductPackage(options: { silentSuccess?: boolean } = {}) {
     setIsPacking(true);
     try {
       const savedProduct = await onOrganizeProductPackage();
       if (!savedProduct) {
+        onToast("请先填写商品资料，或选择一个已有商品。");
         return undefined;
       }
       const productWithImages = await uploadPendingImages(savedProduct);
+      if (!options.silentSuccess) {
+        onToast("资料包已保存。", "ok");
+      }
       return productWithImages;
-    } catch {
+    } catch (error) {
+      onToast(errorMessage(error));
       return undefined;
     } finally {
       setIsPacking(false);
@@ -2981,11 +3003,12 @@ function ProductCreationComposer({
   async function handleGenerateVideo() {
     setIsSubmittingVideo(true);
     try {
-      const savedProduct = await handleOrganizeProductPackage();
+      const savedProduct = await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct));
-    } catch {
-      // Upstream actions already surface errors through the console status/toast.
+      onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok");
+    } catch (error) {
+      onToast(errorMessage(error));
     } finally {
       setIsSubmittingVideo(false);
     }
@@ -3067,13 +3090,13 @@ function ProductCreationComposer({
               onChange={(option) => onVersionCountChange(Number(option))}
             />
             <Button
-              className="min-h-12 w-full justify-center rounded-[14px] text-sm"
+              className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
               variant="primary"
               disabled={packingDisabled}
               onClick={() => void handleGenerateVideo()}
             >
-              <Play size={15} className={cn(isSubmittingVideo && "animate-pulse")} />
-              {isSubmittingVideo ? "创建生成任务中" : "整理资料并生成视频"}
+              <Play size={15} />
+              整理资料并生成视频
             </Button>
           </div>
           {provider !== "mock" ? (
@@ -3114,9 +3137,9 @@ function ProductCreationComposer({
             <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
-                <Button className="min-h-9 w-fit rounded-[11px] px-3" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
-                  <Package size={13} className={cn(isPacking && "animate-pulse")} />
-                  {isPacking ? "整理中" : "AI 整理资料包"}
+                <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
+                  <Package size={13} />
+                  AI 整理资料包
                 </Button>
               </div>
               <Textarea

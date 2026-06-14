@@ -516,6 +516,11 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("{submitHint ? (");
     expect(creationComposerSource).not.toContain("{submitHint}");
     expect(creationComposerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
+    expect(creationComposerSource).toContain('onToast("资料包已保存。", "ok")');
+    expect(creationComposerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
+    expect(creationComposerSource).toContain("disabled:opacity-100");
+    expect(creationComposerSource).not.toContain("创建生成任务中");
+    expect(creationComposerSource).not.toContain("整理中");
     expect(creationComposerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(creationComposerSource).not.toContain("max-h-[312px]");
     expect(creationComposerSource).not.toContain("min-h-[350px] resize-y border-0");
@@ -1381,6 +1386,11 @@ describe("console API", () => {
     expect(composerSource).not.toContain("{submitHint ? (");
     expect(composerSource).not.toContain("{submitHint}");
     expect(composerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
+    expect(composerSource).toContain('onToast("资料包已保存。", "ok")');
+    expect(composerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
+    expect(composerSource).toContain("disabled:opacity-100");
+    expect(composerSource).not.toContain("创建生成任务中");
+    expect(composerSource).not.toContain("整理中");
     expect(composerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(composerSource).not.toContain("max-h-[312px]");
     expect(composerSource).not.toContain("min-h-[350px] resize-y border-0");
