@@ -11,6 +11,7 @@ export interface VideoJobRequest {
   productPath: string;
   outDirName?: string;
   provider?: VideoProviderName;
+  providerModel?: string;
   duration?: number;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
@@ -27,6 +28,7 @@ export interface VideoJobRecord {
   productPath: string;
   productSku?: string;
   provider?: VideoProviderName;
+  providerModel?: string;
   durationSeconds?: number;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
@@ -85,13 +87,14 @@ export class LocalVideoJobQueue {
       status: "queued",
       productPath: request.productPath,
       provider,
+      providerModel: request.providerModel,
       durationSeconds,
       template,
       finalLanguage,
       cta,
       scriptLines: sanitizeLines(request.scriptLines),
       storyboardLines: sanitizeLines(request.storyboardLines),
-      confirmPaid: request.confirmPaid ?? false,
+      confirmPaid: request.confirmPaid ?? provider !== "mock",
       reuseManifest: request.reuseManifest,
       outDir,
       createdAt,
@@ -131,6 +134,7 @@ export class LocalVideoJobQueue {
       productPath: record.productPath,
       outDirName: `retry-${record.id}`,
       provider: record.provider,
+      providerModel: record.providerModel,
       duration: record.durationSeconds,
       template: record.template,
       finalLanguage: record.finalLanguage,
@@ -198,6 +202,7 @@ export class LocalVideoJobQueue {
         productPath: record.productPath,
         outDir: record.outDir,
         providerName: record.provider ?? "mock",
+        providerModel: record.providerModel,
         durationSeconds: record.durationSeconds ?? 8,
         template: record.template ?? "scene",
         finalLanguage: record.finalLanguage,

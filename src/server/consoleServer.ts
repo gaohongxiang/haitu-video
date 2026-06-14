@@ -84,6 +84,7 @@ interface MakeVideoRequest {
   productPath: string;
   outDirName?: string;
   provider?: VideoProviderName;
+  providerModel?: string;
   duration?: number;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
@@ -254,7 +255,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       ...input,
       apiKey: config.apiKey,
       providerBaseUrl: config.baseUrl,
-      providerModel: config.model
+      providerModel: input.providerModel ?? config.model
     });
   };
   const videoJobQueue = new LocalVideoJobQueue({
@@ -741,8 +742,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           settingsStore
         });
         const settings = await settingsStore.read();
+        const providerName = body.provider ?? settings.defaultProvider;
         await assertPaidProductReady({
-          provider: body.provider ?? settings.defaultProvider,
+          provider: providerName,
           productPath,
           rootDir
         });
@@ -751,13 +753,14 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             productPath,
             outDirName: body.outDirName,
             provider: body.provider,
+            providerModel: body.providerModel,
             duration: body.duration,
             template: body.template,
             finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
             cta: body.cta,
             scriptLines: sanitizeLines(body.scriptLines),
             storyboardLines: sanitizeLines(body.storyboardLines),
-            confirmPaid: body.confirmPaid,
+            confirmPaid: body.confirmPaid ?? providerName !== "mock",
             reuseManifest: body.reuseManifest ? resolveWithin(rootDir, body.reuseManifest) : undefined
           })
         });
@@ -1000,11 +1003,11 @@ async function runConsoleMakeVideo(
     cta: body.cta ?? settings.defaultCta,
     scriptLines: sanitizeLines(body.scriptLines),
     storyboardLines: sanitizeLines(body.storyboardLines),
-    confirmPaid: body.confirmPaid ?? false,
+    confirmPaid: body.confirmPaid ?? providerName !== "mock",
     reuseManifestPath: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined,
     apiKey: providerConfig.apiKey,
     providerBaseUrl: providerConfig.baseUrl,
-    providerModel: providerConfig.model,
+    providerModel: body.providerModel ?? providerConfig.model,
     fetchImpl: options.fetchImpl
   });
 }
@@ -1066,8 +1069,9 @@ async function enqueueBatchVideoJobs(
     outputsDir: options.outputsDir,
     settingsStore: options.settingsStore
   });
+  const providerName = body.provider ?? settings.defaultProvider;
   await assertPaidProductReady({
-    provider: body.provider ?? settings.defaultProvider,
+    provider: providerName,
     productPath,
     rootDir: options.rootDir
   });
@@ -1079,13 +1083,14 @@ async function enqueueBatchVideoJobs(
         ? `${sanitizePathSegment(body.outDirName)}-v${index}`
         : undefined,
       provider: body.provider,
+      providerModel: body.providerModel,
       duration: body.duration,
       template: body.template,
       finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
       cta: body.cta,
       scriptLines: sanitizeLines(body.scriptLines),
       storyboardLines: sanitizeLines(body.storyboardLines),
-      confirmPaid: body.confirmPaid,
+      confirmPaid: body.confirmPaid ?? providerName !== "mock",
       reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
     }));
   }

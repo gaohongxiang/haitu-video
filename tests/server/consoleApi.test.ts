@@ -476,6 +476,7 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<VideoAssetsPanel");
     const creationWorkspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
+    const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
     const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function productDraftToProductDetail"));
@@ -500,7 +501,20 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("product-creation-canvas");
     expect(creationComposerSource).toContain("product-control-bar");
     expect(creationComposerSource).toContain("video-parameter-row grid");
-    expect(creationComposerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)]");
+    expect(creationComposerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))]");
+    expect(creationComposerSource).toContain("video-generate-bar");
+    expect(creationComposerSource).toContain("generateVideoButtonLabel");
+    expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(creationComposerSource).toContain("videoModelOptions");
+    expect(videoModelSource).toContain("seednice-2-fast");
+    expect(videoModelSource).toContain("seednice-2");
+    expect(videoModelSource).toContain("seednice2.0 fast");
+    expect(videoModelSource).toContain("seednice2.0");
+    expect(creationComposerSource).toContain("videoModelChoice");
+    expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
+    expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
+    expect(creationComposerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(creationComposerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(creationComposerSource).not.toContain("creation-parameter-dock");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
     expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
@@ -541,7 +555,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("AI 整理资料包");
-    expect(creationComposerSource).toContain("整理资料并生成视频");
+    expect(creationComposerSource).not.toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain("视频风格");
     expect(creationComposerSource).toContain("视频时长");
     expect(creationComposerSource).toContain("成片语言");
@@ -549,7 +563,10 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain("function productDraftToComposerText");
     expect(creationComposerSource).toContain("handleGenerateVideo");
-    expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct))");
+    expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct), {");
+    expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
+    expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
+    expect(creationComposerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
     expect(creationComposerSource).toContain("previewReferenceIndex");
     expect(creationComposerSource).toContain("previewReferenceImages");
@@ -1367,6 +1384,7 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<ProductLibraryDialogMount");
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
+    const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
     expect(workspaceSource).toContain("selectedProductStoryboardHistory");
     expect(workspaceSource).not.toContain("<ProductStudio");
@@ -1379,7 +1397,20 @@ describe("console API", () => {
     expect(composerSource).toContain("product-creation-canvas");
     expect(composerSource).toContain("product-control-bar");
     expect(composerSource).toContain("video-parameter-row grid");
-    expect(composerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)]");
+    expect(composerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))]");
+    expect(composerSource).toContain("video-generate-bar");
+    expect(composerSource).toContain("generateVideoButtonLabel");
+    expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(composerSource).toContain("videoModelOptions");
+    expect(videoModelSource).toContain("seednice-2-fast");
+    expect(videoModelSource).toContain("seednice-2");
+    expect(videoModelSource).toContain("seednice2.0 fast");
+    expect(videoModelSource).toContain("seednice2.0");
+    expect(composerSource).toContain("videoModelChoice");
+    expect(composerSource).toContain("provider: videoModelConfig.provider");
+    expect(composerSource).toContain("providerModel: videoModelConfig.model");
+    expect(composerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(composerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(composerSource).not.toContain("creation-parameter-dock");
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
     expect(composerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
@@ -1420,7 +1451,7 @@ describe("console API", () => {
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("AI 整理资料包");
-    expect(composerSource).toContain("整理资料并生成视频");
+    expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain("视频风格");
     expect(composerSource).toContain("视频时长");
     expect(composerSource).toContain("成片语言");
@@ -4459,6 +4490,103 @@ describe("console API", () => {
         providerModel: "high-video-model",
         finalLanguage: "ja"
       }));
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
+  it("allows product video jobs to override the selected Seednice model without a separate paid confirmation", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-model-override-"));
+      tempDirs.push(root);
+      const fixturesDir = join(root, "fixtures", "products");
+      const outputsDir = join(root, "outputs");
+      await writeProduct(join(fixturesDir, "wallet.json"), {
+        sku: "WALLET-BLACK-001",
+        title_ja: "カード収納ミニ財布",
+        reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
+      });
+      await writeFile(join(fixturesDir, "main.jpg"), Buffer.from("main-image"));
+      await writeFile(join(fixturesDir, "detail.jpg"), Buffer.from("detail-image"));
+      await writeFile(join(fixturesDir, "use.jpg"), Buffer.from("use-image"));
+      const capturedInputs: unknown[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          capturedInputs.push(input);
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "WALLET-BLACK-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 0,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "configured-video-secret-9999",
+          name: "默认 Fast",
+          vendor: "volcengine",
+          priority: 9,
+          baseUrl: "https://seednice.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+
+      const response = await server.fetchJson("/api/products/WALLET-BLACK-001/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-260128",
+          duration: 8,
+          template: "scene",
+          cta: "今すぐチェック",
+          versions: 1
+        })
+      });
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const latest = await server.fetchJson(`/api/video-jobs/${response.jobs[0].id}`);
+        if (latest.job.status === "completed") {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+
+      expect(response.jobs[0]).toEqual(expect.objectContaining({
+        provider: "volcengine-seedance",
+        providerModel: "doubao-seedance-2-0-260128",
+        confirmPaid: true
+      }));
+      expect(capturedInputs[0]).toEqual(expect.objectContaining({
+        apiKey: "configured-video-secret-9999",
+        providerBaseUrl: "https://seednice.example.test",
+        providerModel: "doubao-seedance-2-0-260128",
+        confirmPaid: true
+      }));
+      await expect(readFile(join(outputsDir, "video-jobs", `${response.jobs[0].id}.json`), "utf8")).resolves.toContain(
+        "\"providerModel\": \"doubao-seedance-2-0-260128\""
+      );
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);

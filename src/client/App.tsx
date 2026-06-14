@@ -57,6 +57,7 @@ const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[#dbe4f0] bg-white px-2.5 py-1.5 text-[11px] font-black text-[#66748a] opacity-0 shadow-[0_10px_24px_rgba(30,42,68,.12)] transition";
 
 type ProviderName = "mock" | "seedance" | "volcengine-seedance";
+type VideoModelChoice = "mock" | "seednice-2-fast" | "seednice-2";
 type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "volcengine-seedance";
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
@@ -290,6 +291,7 @@ interface VideoJob {
   productPath: string;
   productSku?: string;
   provider?: ProviderName | string;
+  providerModel?: string;
   durationSeconds?: number;
   template?: TemplateName | string;
   cta?: string;
@@ -317,10 +319,17 @@ interface VideoJob {
   completedAt?: string;
 }
 
+interface ProductVideoGenerationOptions {
+  provider: ProviderName;
+  providerModel?: string;
+  confirmPaid: boolean;
+}
+
 interface CreativeVersionItem {
   id: string;
   status?: string;
   provider?: string;
+  providerModel?: string;
   durationSeconds?: number;
   selectedFinal: boolean;
   hasFinalVideo: boolean;
@@ -702,6 +711,28 @@ const defaultProductDraft: ProductDraft = {
   reference_images: ""
 };
 
+const videoModelOptions: VideoModelChoice[] = ["mock", "seednice-2-fast", "seednice-2"];
+
+const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
+  mock: {
+    provider: "mock",
+    label: "本地模拟",
+    confirmPaid: false
+  },
+  "seednice-2-fast": {
+    provider: "volcengine-seedance",
+    model: "doubao-seedance-2-0-fast-260128",
+    label: "seednice2.0 fast",
+    confirmPaid: true
+  },
+  "seednice-2": {
+    provider: "volcengine-seedance",
+    model: "doubao-seedance-2-0-260128",
+    label: "seednice2.0",
+    confirmPaid: true
+  }
+};
+
 const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
   "openai-compatible-text": [
     {
@@ -846,6 +877,7 @@ export function App() {
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [productPath, setProductPath] = useState("");
   const [provider, setProvider] = useState<ProviderName>("mock");
+  const [videoModelChoice, setVideoModelChoice] = useState<VideoModelChoice>("mock");
   const [duration, setDuration] = useState(8);
   const [versionCount, setVersionCount] = useState(1);
   const [template, setTemplate] = useState<TemplateName>("scene");
@@ -900,9 +932,10 @@ export function App() {
   const videoJobsRef = useRef<VideoJob[]>([]);
   const selectedProductSkuRef = useRef<string | undefined>(undefined);
 
-  const paidProvider = provider !== "mock";
+  const selectedVideoModelConfig = videoModelConfigs[videoModelChoice];
+  const paidProvider = selectedVideoModelConfig.provider !== "mock";
   const enabledTemplateOptions = settings.enabledTemplates;
-  const currentSignature = JSON.stringify({ productPath, provider, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
+  const currentSignature = JSON.stringify({ productPath, provider: selectedVideoModelConfig.provider, providerModel: selectedVideoModelConfig.model, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
   const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
   const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
   const batchEstimatedCostCny = freshPreflight
@@ -1237,17 +1270,19 @@ export function App() {
     setIsBusy(true);
     try {
       setStatusText("生成任务创建中...");
+      const videoModelConfig = videoModelConfigs[videoModelChoice];
       const requestBody = {
         productPath,
         outDirName: `${selectedProductSummary.sku}-${Date.now()}`,
-        provider,
+        provider: videoModelConfig.provider,
+        providerModel: videoModelConfig.model,
         duration,
         template,
         finalLanguage,
         cta,
         scriptLines: splitDraftLines(studioScriptDraft),
         storyboardLines: splitDraftLines(studioStoryboardDraft),
-        confirmPaid,
+        confirmPaid: videoModelConfig.provider !== "mock",
         reuseManifest: reuseManifest.trim() || undefined
       };
       if (safeVersionCount > 1) {
@@ -1617,7 +1652,7 @@ export function App() {
     }
   }
 
-  async function queueProductVideoJobs(product: ProductSummary) {
+  async function queueProductVideoJobs(product: ProductSummary, options?: ProductVideoGenerationOptions) {
     const readiness = referenceReadiness(product);
     if (!readiness.ready) {
       setStatusText(`${product.title_ja}: ${readiness.label}`);
@@ -1627,11 +1662,12 @@ export function App() {
       setStatusText("商品资料还没整理完整。");
       throw new Error("商品资料还没整理完整。");
     }
-    if (provider !== "mock" && !confirmPaid) {
-      const message = "选择付费生成通道前，请勾选允许使用付费模型。";
-      setStatusText(message);
-      throw new Error(message);
-    }
+    const selectedVideoModel = videoModelConfigs[videoModelChoice];
+    const videoGenerationOptions: ProductVideoGenerationOptions = options ?? {
+      provider: selectedVideoModel.provider,
+      providerModel: selectedVideoModel.model,
+      confirmPaid: selectedVideoModel.confirmPaid
+    };
     const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
     const selectedVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
     setIsBusy(true);
@@ -1641,13 +1677,14 @@ export function App() {
       setPreflight(undefined);
       setPreflightSignature("");
       const response = await postJson<{ productSku: string; jobs: VideoJob[] }>(`/api/products/${encodeURIComponent(product.sku)}/video-jobs`, {
-        provider,
+        provider: videoGenerationOptions.provider,
+        providerModel: videoGenerationOptions.providerModel,
         duration: selectedDuration,
         template,
         finalLanguage,
         cta,
         storyboardLines: splitDraftLines(studioStoryboardDraft),
-        confirmPaid: provider !== "mock" && confirmPaid,
+        confirmPaid: videoGenerationOptions.confirmPaid,
         versions: selectedVersionCount
       });
       setVideoJobs((current) => mergeVideoJobs(response.jobs, current));
@@ -2062,7 +2099,7 @@ export function App() {
         [
           "重试这个付费生成任务？",
           "",
-          `${providerLabel(job.provider)} / ${formatDuration(job.durationSeconds)}`,
+          `${videoModelLabel(job.provider, job.providerModel)} / ${formatDuration(job.durationSeconds)}`,
           "",
           "重试会重新创建生成任务，可能再次扣费。"
         ].join("\n")
@@ -2203,9 +2240,10 @@ export function App() {
               onGenerateReferenceImages={generateProductReferenceImages}
               onDeleteReferenceImage={deleteProductReferenceImage}
               onSelectFinal={selectFinalVersion}
-              provider={provider}
-              onProviderChange={(nextProvider) => {
-                setProvider(nextProvider);
+              videoModelChoice={videoModelChoice}
+              onVideoModelChoiceChange={(nextVideoModelChoice) => {
+                setVideoModelChoice(nextVideoModelChoice);
+                setProvider(videoModelConfigs[nextVideoModelChoice].provider);
                 markPreflightStale();
               }}
               duration={duration}
@@ -2215,8 +2253,6 @@ export function App() {
               }}
               versionCount={versionCount}
               onVersionCountChange={setVersionCount}
-              confirmPaid={confirmPaid}
-              onConfirmPaidChange={setConfirmPaid}
               template={template}
               enabledTemplateOptions={enabledTemplateOptions}
               onTemplateChange={(nextTemplate) => {
@@ -2673,14 +2709,12 @@ function ProductCreationWorkspace({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onSelectFinal,
-  provider,
-  onProviderChange,
+  videoModelChoice,
+  onVideoModelChoiceChange,
   duration,
   onDurationChange,
   versionCount,
   onVersionCountChange,
-  confirmPaid,
-  onConfirmPaidChange,
   template,
   enabledTemplateOptions,
   onTemplateChange,
@@ -2708,7 +2742,7 @@ function ProductCreationWorkspace({
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
-  onGenerateVideo: (product: ProductSummary) => Promise<void>;
+  onGenerateVideo: (product: ProductSummary, options: ProductVideoGenerationOptions) => Promise<void>;
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
@@ -2719,14 +2753,12 @@ function ProductCreationWorkspace({
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
-  provider: ProviderName;
-  onProviderChange: (provider: ProviderName) => void;
+  videoModelChoice: VideoModelChoice;
+  onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
   versionCount: number;
   onVersionCountChange: (versionCount: number) => void;
-  confirmPaid: boolean;
-  onConfirmPaidChange: (confirmPaid: boolean) => void;
   template: TemplateName;
   enabledTemplateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -2788,14 +2820,12 @@ function ProductCreationWorkspace({
       onGenerateReferenceImages={onGenerateReferenceImages}
       onDeleteReferenceImage={onDeleteReferenceImage}
       onSelectFinal={onSelectFinal}
-      provider={provider}
-      onProviderChange={onProviderChange}
+      videoModelChoice={videoModelChoice}
+      onVideoModelChoiceChange={onVideoModelChoiceChange}
       duration={duration}
       onDurationChange={onDurationChange}
       versionCount={versionCount}
       onVersionCountChange={onVersionCountChange}
-      confirmPaid={confirmPaid}
-      onConfirmPaidChange={onConfirmPaidChange}
       template={template}
       enabledTemplateOptions={enabledTemplateOptions}
       onTemplateChange={onTemplateChange}
@@ -2837,14 +2867,12 @@ function ProductCreationComposer({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onSelectFinal,
-  provider,
-  onProviderChange,
+  videoModelChoice,
+  onVideoModelChoiceChange,
   duration,
   onDurationChange,
   versionCount,
   onVersionCountChange,
-  confirmPaid,
-  onConfirmPaidChange,
   template,
   enabledTemplateOptions,
   onTemplateChange,
@@ -2871,7 +2899,7 @@ function ProductCreationComposer({
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
-  onGenerateVideo: (product: ProductSummary) => Promise<void>;
+  onGenerateVideo: (product: ProductSummary, options: ProductVideoGenerationOptions) => Promise<void>;
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
@@ -2882,14 +2910,12 @@ function ProductCreationComposer({
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
-  provider: ProviderName;
-  onProviderChange: (provider: ProviderName) => void;
+  videoModelChoice: VideoModelChoice;
+  onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
   versionCount: number;
   onVersionCountChange: (versionCount: number) => void;
-  confirmPaid: boolean;
-  onConfirmPaidChange: (confirmPaid: boolean) => void;
   template: TemplateName;
   enabledTemplateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -2910,9 +2936,7 @@ function ProductCreationComposer({
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
   const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
-  const providerOptions: ProviderName[] = provider === "seedance"
-    ? ["mock", "seedance", "volcengine-seedance"]
-    : ["mock", "volcengine-seedance"];
+  const videoModelConfig = videoModelConfigs[videoModelChoice];
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
   const languageOptions: FinalVideoLanguage[] = ["ja", "zh"];
@@ -2923,6 +2947,15 @@ function ProductCreationComposer({
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
+  const generateVideoButtonLabel = versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频";
+  const generateVideoSummary = [
+    selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "新商品",
+    storyboardDraft.trim() ? "已填分镜" : "自动分镜",
+    templateLabel(template),
+    formatDuration(duration),
+    finalLanguageLabel(finalLanguage),
+    videoModelChoiceLabel(videoModelChoice)
+  ].join(" · ");
 
   useEffect(() => {
     setPendingImageFiles([]);
@@ -2979,7 +3012,11 @@ function ProductCreationComposer({
     try {
       const savedProduct = await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
-      await onGenerateVideo(productActionSummary(savedProduct));
+      await onGenerateVideo(productActionSummary(savedProduct), {
+        provider: videoModelConfig.provider,
+        providerModel: videoModelConfig.model,
+        confirmPaid: videoModelConfig.confirmPaid
+      });
       onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok");
     } catch (error) {
       onToast(errorMessage(error));
@@ -3020,7 +3057,7 @@ function ProductCreationComposer({
     >
       <div className="product-creation-canvas overflow-visible">
         <div className="product-control-bar grid gap-2 border-b border-[#e5ecf6] bg-white p-3 min-[1280px]:px-4">
-          <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))_minmax(220px,1.25fr)] min-[1280px]:items-end">
+          <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))] min-[1280px]:items-end">
             <ProductCreationProductPicker
               className="product-creation-picker min-w-0"
               products={products}
@@ -3052,10 +3089,10 @@ function ProductCreationComposer({
             />
             <CompactChoiceDropdown
               label="生成模型"
-              value={provider}
-              options={providerOptions}
-              formatOption={providerLabel}
-              onChange={onProviderChange}
+              value={videoModelChoice}
+              options={videoModelOptions}
+              formatOption={videoModelChoiceLabel}
+              onChange={onVideoModelChoiceChange}
             />
             <CompactChoiceDropdown
               label="生成视频"
@@ -3064,27 +3101,7 @@ function ProductCreationComposer({
               formatOption={(option) => `${option} 个`}
               onChange={(option) => onVersionCountChange(Number(option))}
             />
-            <Button
-              className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
-              variant="primary"
-              disabled={packingDisabled}
-              onClick={() => void handleGenerateVideo()}
-            >
-              <Play size={15} />
-              整理资料并生成视频
-            </Button>
           </div>
-          {provider !== "mock" ? (
-            <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-[#7a4a12]">
-              <input
-                className="h-4 w-4 accent-[var(--accent)]"
-                type="checkbox"
-                checked={confirmPaid}
-                onChange={(event) => onConfirmPaidChange(event.target.checked)}
-              />
-              允许使用付费模型生成当前商品视频
-            </label>
-          ) : null}
         </div>
 
         {loadError ? (
@@ -3148,6 +3165,19 @@ function ProductCreationComposer({
               productReady={Boolean(selectedProduct)}
             />
           </div>
+        </div>
+
+        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+          <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
+          <Button
+            className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
+            variant="primary"
+            disabled={packingDisabled}
+            onClick={() => void handleGenerateVideo()}
+          >
+            {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
+            {isSubmittingVideo ? "提交中" : generateVideoButtonLabel}
+          </Button>
         </div>
 
       </div>
@@ -3550,7 +3580,7 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                    {providerLabel(job.provider)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
+                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
                   </div>
                 </div>
                 <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
@@ -3920,7 +3950,7 @@ function DeleteCreativeVersionDialog({
         </div>
         <div className="rounded-[14px] border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#6c7890]">
           <div className="font-black text-[#172033]">{videoLabel(index)}</div>
-          <div>{providerLabel(job.provider)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}</div>
+          <div>{videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}</div>
         </div>
         <div className="flex justify-end gap-2">
           <Button className="w-fit" variant="ghost" disabled={isDeleting} onClick={onClose}>
@@ -3996,7 +4026,7 @@ function VideoPreviewDialog({
               </Badge>
             </div>
             <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-              {providerLabel(job.provider)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
+              {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
             </div>
           </div>
           <Button className="w-fit" size="sm" variant="ghost" onClick={onClose}>
@@ -6147,8 +6177,20 @@ function toneClass(tone: "blue" | "green" | "orange" | "violet" | "rose" | "cyan
 
 function providerLabel(value?: string): string {
   if (value === "mock") return "本地模拟";
-  if (value === "volcengine-seedance" || value === "seedance") return "火山引擎 Seedance";
+  if (value === "volcengine-seedance" || value === "seedance") return "seednice2.0 fast";
   return value || "-";
+}
+
+function videoModelChoiceLabel(value: VideoModelChoice): string {
+  return videoModelConfigs[value]?.label ?? value;
+}
+
+function videoModelLabel(provider?: string, model?: string): string {
+  if (provider === "mock") return "本地模拟";
+  if (model === "doubao-seedance-2-0-260128") return "seednice2.0";
+  if (model === "doubao-seedance-2-0-fast-260128") return "seednice2.0 fast";
+  if (provider === "volcengine-seedance" || provider === "seedance") return "seednice2.0 fast";
+  return provider || "-";
 }
 
 function templateLabel(value?: string): string {
@@ -6276,6 +6318,7 @@ function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
     id: job.id,
     status: job.status,
     provider: job.provider,
+    providerModel: job.providerModel,
     durationSeconds: job.durationSeconds,
     selectedFinal: false,
     hasFinalVideo: hasPlayableVideo(job),
