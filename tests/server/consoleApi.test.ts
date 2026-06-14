@@ -512,7 +512,9 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("Math.max(8, Math.min(15");
     expect(creationComposerSource).toContain("grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]");
     expect(creationComposerSource).toContain("product-facts-body h-full min-h-0");
-    expect(creationComposerSource).toContain("{submitHint ? (");
+    expect(creationComposerSource).not.toContain("submitHint");
+    expect(creationComposerSource).not.toContain("{submitHint ? (");
+    expect(creationComposerSource).not.toContain("{submitHint}");
     expect(creationComposerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
     expect(creationComposerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(creationComposerSource).not.toContain("max-h-[312px]");
@@ -540,7 +542,6 @@ describe("console API", () => {
     expect(appSource).toContain("function productDraftToComposerText");
     expect(creationComposerSource).toContain("handleGenerateVideo");
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct))");
-    expect(creationComposerSource).toContain("已加入历史记录");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
     expect(creationComposerSource).toContain("previewReferenceIndex");
     expect(creationComposerSource).toContain("previewReferenceImages");
@@ -1376,7 +1377,9 @@ describe("console API", () => {
     expect(composerSource).toContain("Math.max(8, Math.min(15");
     expect(composerSource).toContain("grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]");
     expect(composerSource).toContain("product-facts-body h-full min-h-0");
-    expect(composerSource).toContain("{submitHint ? (");
+    expect(composerSource).not.toContain("submitHint");
+    expect(composerSource).not.toContain("{submitHint ? (");
+    expect(composerSource).not.toContain("{submitHint}");
     expect(composerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
     expect(composerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(composerSource).not.toContain("max-h-[312px]");

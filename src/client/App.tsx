@@ -2914,7 +2914,6 @@ function ProductCreationComposer({
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
   const [isPacking, setIsPacking] = useState(false);
   const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
-  const [submitHint, setSubmitHint] = useState("");
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
@@ -2965,18 +2964,14 @@ function ProductCreationComposer({
 
   async function handleOrganizeProductPackage() {
     setIsPacking(true);
-    setSubmitHint("正在整理资料包...");
     try {
       const savedProduct = await onOrganizeProductPackage();
       if (!savedProduct) {
-        setSubmitHint("请先填写商品资料。");
         return undefined;
       }
       const productWithImages = await uploadPendingImages(savedProduct);
-      setSubmitHint("资料包已保存。");
       return productWithImages;
-    } catch (error) {
-      setSubmitHint(errorMessage(error));
+    } catch {
       return undefined;
     } finally {
       setIsPacking(false);
@@ -2985,14 +2980,12 @@ function ProductCreationComposer({
 
   async function handleGenerateVideo() {
     setIsSubmittingVideo(true);
-    setSubmitHint("正在准备生成视频...");
     try {
       const savedProduct = await handleOrganizeProductPackage();
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct));
-      setSubmitHint("已加入历史记录，生成中可删除取消，完成后可预览和下载。");
-    } catch (error) {
-      setSubmitHint(errorMessage(error));
+    } catch {
+      // Upstream actions already surface errors through the console status/toast.
     } finally {
       setIsSubmittingVideo(false);
     }
@@ -3083,9 +3076,6 @@ function ProductCreationComposer({
               {isSubmittingVideo ? "创建生成任务中" : "整理资料并生成视频"}
             </Button>
           </div>
-          {submitHint ? (
-            <div className="truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>
-          ) : null}
           {provider !== "mock" ? (
             <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-[#7a4a12]">
               <input
