@@ -2894,9 +2894,15 @@ function ProductCreationComposer({
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
   const generateVideoButtonLabel = versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频";
+  const generationReadiness = productGenerationReadiness({
+    selectedProduct,
+    importText,
+    pendingImageCount: pendingImageFiles.length
+  });
+  const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoSummary = [
     selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "新商品",
-    storyboardDraft.trim() ? "已填分镜" : "自动分镜",
+    storyboardDraft.trim() && !storyboardDraftIsGuidance ? "已填分镜" : "自动分镜",
     templateLabel(template),
     formatDuration(duration),
     finalLanguageLabel(finalLanguage),
@@ -3163,12 +3169,16 @@ function ProductCreationComposer({
           </div>
         </div>
 
-        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,320px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
           <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
+          <div className="generation-readiness-message min-h-5 min-w-0 truncate text-xs font-black text-[var(--danger)]">
+            {generationReadiness.ready ? "" : generationReadiness.label}
+          </div>
           <Button
             className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
             variant="primary"
-            disabled={packingDisabled}
+            disabled={generateVideoDisabled}
+            title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
             onClick={() => void handleGenerateVideo()}
           >
             {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
@@ -4318,6 +4328,35 @@ function productReferenceCount(product?: ProductSummary | ProductDetail): number
     return product.reference_images.length;
   }
   return product.referenceImageCount ?? 0;
+}
+
+function productGenerationReadiness({
+  selectedProduct,
+  importText,
+  pendingImageCount
+}: {
+  selectedProduct?: ProductDetail;
+  importText: string;
+  pendingImageCount: number;
+}): { ready: boolean; label: string } {
+  const targetImageCount = 3;
+  if (selectedProduct) {
+    if (!selectedProduct.importQuality?.ready) {
+      return { ready: false, label: "请先补齐商品资料并整理资料包。" };
+    }
+    const imageCount = productReferenceCount(selectedProduct);
+    if (imageCount < targetImageCount) {
+      return { ready: false, label: `参考图至少 ${targetImageCount} 张，还差 ${targetImageCount - imageCount} 张。` };
+    }
+    return { ready: true, label: "参数已完整。" };
+  }
+  if (!importText.trim()) {
+    return { ready: false, label: "请先填写商品资料。" };
+  }
+  if (pendingImageCount < targetImageCount) {
+    return { ready: false, label: `参考图至少 ${targetImageCount} 张，还差 ${targetImageCount - pendingImageCount} 张。` };
+  }
+  return { ready: false, label: "请先点击 AI 整理资料包保存商品。" };
 }
 
 function dedupeProductSummaries(products: ProductSummary[]): ProductSummary[] {

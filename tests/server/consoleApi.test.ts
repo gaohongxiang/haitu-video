@@ -679,6 +679,14 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("video-parameter-row grid");
     expect(creationComposerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))]");
     expect(creationComposerSource).toContain("video-generate-bar");
+    expect(appSource).toContain("function productGenerationReadiness");
+    expect(creationComposerSource).toContain("const generationReadiness = productGenerationReadiness({");
+    expect(creationComposerSource).toContain("const generateVideoDisabled = packingDisabled || !generationReadiness.ready");
+    expect(creationComposerSource).toContain("disabled={generateVideoDisabled}");
+    expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
+    expect(creationComposerSource).toContain("generation-readiness-message");
+    expect(creationComposerSource).toContain("text-[var(--danger)]");
+    expect(creationComposerSource).toContain("{generationReadiness.ready ? \"\" : generationReadiness.label}");
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(creationComposerSource).toContain("videoModelOptions");
@@ -692,6 +700,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(creationComposerSource).toContain('storyboardDraft.trim() && !storyboardDraftIsGuidance ? "已填分镜" : "自动分镜"');
     expect(creationComposerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(creationComposerSource).not.toContain("creation-parameter-dock");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
