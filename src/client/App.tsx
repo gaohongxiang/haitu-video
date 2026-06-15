@@ -2898,8 +2898,8 @@ function ProductCreationComposer({
     generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100 disabled:opacity-100"
   );
   const generationReadinessMessageClass = cn(
-    "generation-readiness-message flex min-h-12 w-full max-w-[360px] justify-self-center items-center justify-center rounded-[14px] border px-4 text-center text-xs font-black leading-5",
-    generationReadiness.ready ? "border-[#dbe8f1] bg-[#f7fbff] text-[#6c7890]" : "border-red-200 bg-red-50 text-[var(--danger)]"
+    "generation-readiness-message flex min-h-12 w-full max-w-[360px] justify-self-center items-center justify-center text-center text-xs font-black leading-5",
+    generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]"
   );
   const generateVideoSummary = [
     productFactsStatusLabel({ selectedProduct, importText }),
@@ -3516,7 +3516,7 @@ function StoryboardComposerPanel({
         </div>
       </div>
 
-      <Field className="grid min-h-0 gap-2" label="视频分镜">
+      <div className="min-h-0">
         <Textarea
           className={cn(
             "h-full min-h-0 resize-none border-[#dbe4f0] bg-white text-sm leading-7 transition-colors",
@@ -3526,7 +3526,7 @@ function StoryboardComposerPanel({
           onChange={(event) => onStoryboardDraftChange(event.target.value)}
           placeholder=""
         />
-      </Field>
+      </div>
 
       <div className="grid gap-2">
         <Button
@@ -5120,7 +5120,7 @@ function ApiModelConfigPanel({
         API Key
       </PanelTitle>
       <div className="mb-3 rounded-lg border border-[#dbe4f0] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#5f6d84]">
-        API Key 只保存在你的本地部署环境（HAITU_DATA_DIR 或环境变量）里；我们不托管、不上传、不保存你的密钥。
+        API Key 只保存在这台服务本地；我们不托管、不上传、不保存你的密钥。
       </div>
       <div className="grid gap-3">
         {groups.map((group) => (

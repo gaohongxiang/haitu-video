@@ -694,6 +694,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('const generationReadinessMessageClass = cn(');
     expect(creationComposerSource).toContain("min-h-12 w-full max-w-[360px]");
     expect(creationComposerSource).toContain("justify-self-center");
+    expect(creationComposerSource).not.toContain("rounded-[14px] border px-4");
     expect(creationComposerSource).toContain("if (!generationReadiness.ready) {");
     expect(creationComposerSource).toContain("onToast(generationReadiness.label);");
     expect(creationComposerSource).toContain("if (packingDisabled) return;");
@@ -706,7 +707,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
     expect(creationComposerSource).toContain("generation-readiness-message");
     expect(creationComposerSource).toContain("text-[var(--danger)]");
-    expect(creationComposerSource).toContain('generationReadiness.ready ? "border-[#dbe8f1] bg-[#f7fbff] text-[#6c7890]" : "border-red-200 bg-red-50 text-[var(--danger)]"');
+    expect(creationComposerSource).toContain('generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]"');
     expect(creationComposerSource).toContain("{generationReadiness.label}");
     expect(creationComposerSource).toContain("productFactsStatusLabel({");
     expect(creationComposerSource).toContain("storyboardStatusLabel(storyboardDraftSource)");
@@ -849,9 +850,9 @@ describe("console API", () => {
     expect(referencePreviewSource).toContain("ArrowLeft");
     expect(referencePreviewSource).toContain("ArrowRight");
     expect(storyboardPanelSource).toContain("脚本分镜");
-    expect(storyboardPanelSource).toContain("视频分镜");
+    expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto]");
-    expect(storyboardPanelSource).toContain('className="grid min-h-0 gap-2"');
+    expect(storyboardPanelSource).toContain('className="min-h-0"');
     expect(storyboardPanelSource).toContain("h-full min-h-0 resize-none");
     expect(storyboardPanelSource).toContain("className=\"grid gap-2\"");
     expect(storyboardPanelSource).toContain("{hint ? (");
@@ -1029,8 +1030,9 @@ describe("console API", () => {
     expect(settingsCase).not.toContain("<SettingsPanel");
     const apiManagementSource = appSource.slice(appSource.indexOf("function ApiModelConfigPanel"), appSource.indexOf("function VideoJobsPanel"));
     expect(apiManagementSource).toContain("API Key");
-    expect(apiManagementSource).toContain("API Key 只保存在你的本地部署环境");
-    expect(apiManagementSource).toContain("HAITU_DATA_DIR");
+    expect(apiManagementSource).toContain("API Key 只保存在这台服务本地");
+    expect(apiManagementSource).not.toContain("HAITU_DATA_DIR");
+    expect(apiManagementSource).not.toContain("环境变量");
     expect(apiManagementSource).toContain("我们不托管、不上传、不保存你的密钥");
     expect(apiManagementSource).toContain("文本模型");
     expect(apiManagementSource).toContain("图片模型");
