@@ -2914,6 +2914,10 @@ function ProductCreationComposer({
     pendingImageCount: pendingImageFiles.length
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
+  const generateVideoButtonClass = cn(
+    "min-h-12 w-full justify-center rounded-[14px] text-sm",
+    generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100"
+  );
   const generateVideoSummary = [
     productFactsStatusLabel({ selectedProduct, importText }),
     selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "参考图 0 张",
@@ -2985,6 +2989,11 @@ function ProductCreationComposer({
   }
 
   async function handleGenerateVideo() {
+    if (!generationReadiness.ready) {
+      onToast(generationReadiness.label);
+      return;
+    }
+    if (packingDisabled) return;
     setIsSubmittingVideo(true);
     try {
       const savedProduct = await handleOrganizeProductPackage({ silentSuccess: true });
@@ -3190,9 +3199,10 @@ function ProductCreationComposer({
             {generationReadiness.label}
           </div>
           <Button
-            className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
+            className={generateVideoButtonClass}
             variant="primary"
             disabled={generateVideoDisabled}
+            aria-disabled={generateVideoDisabled}
             title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
             onClick={() => void handleGenerateVideo()}
           >

@@ -688,7 +688,15 @@ describe("console API", () => {
     expect(appSource).toContain("function storyboardStatusLabel");
     expect(creationComposerSource).toContain("const generationReadiness = productGenerationReadiness({");
     expect(creationComposerSource).toContain("const generateVideoDisabled = packingDisabled || !generationReadiness.ready");
+    expect(creationComposerSource).toContain("const generateVideoButtonClass = cn(");
+    expect(creationComposerSource).toContain('generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100"');
+    expect(creationComposerSource).toContain("if (!generationReadiness.ready) {");
+    expect(creationComposerSource).toContain("onToast(generationReadiness.label);");
+    expect(creationComposerSource).toContain("if (packingDisabled) return;");
     expect(creationComposerSource).toContain("disabled={generateVideoDisabled}");
+    expect(creationComposerSource).toContain("aria-disabled={generateVideoDisabled}");
+    expect(creationComposerSource).toContain("className={generateVideoButtonClass}");
+    expect(creationComposerSource).not.toContain('className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"');
     expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
     expect(creationComposerSource).toContain("generation-readiness-message");
     expect(creationComposerSource).toContain("text-[var(--danger)]");
