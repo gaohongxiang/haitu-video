@@ -1398,7 +1398,7 @@ export function App() {
           apiKey: ""
         }
       }));
-      setStatusText("已清除本地 API Key。环境变量密钥如存在仍会优先生效。");
+      setStatusText("已清除平台 API Key。");
       await refreshConsole();
     } catch (error) {
       showError(error);
@@ -5120,7 +5120,7 @@ function ApiModelConfigPanel({
         API Key
       </PanelTitle>
       <div className="mb-3 rounded-lg border border-[#dbe4f0] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#5f6d84]">
-        API Key 只保存在这台服务本地；我们不托管、不上传、不保存你的密钥。
+        这里配置的是平台自己的模型 API Key，用于统一生成视频。不要让普通用户在这里填写他们自己的密钥。
       </div>
       <div className="grid gap-3">
         {groups.map((group) => (

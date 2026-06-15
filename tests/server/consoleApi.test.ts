@@ -1030,10 +1030,12 @@ describe("console API", () => {
     expect(settingsCase).not.toContain("<SettingsPanel");
     const apiManagementSource = appSource.slice(appSource.indexOf("function ApiModelConfigPanel"), appSource.indexOf("function VideoJobsPanel"));
     expect(apiManagementSource).toContain("API Key");
-    expect(apiManagementSource).toContain("API Key 只保存在这台服务本地");
+    expect(apiManagementSource).toContain("这里配置的是平台自己的模型 API Key");
+    expect(apiManagementSource).toContain("不要让普通用户在这里填写他们自己的密钥");
     expect(apiManagementSource).not.toContain("HAITU_DATA_DIR");
     expect(apiManagementSource).not.toContain("环境变量");
-    expect(apiManagementSource).toContain("我们不托管、不上传、不保存你的密钥");
+    expect(apiManagementSource).not.toContain("你的密钥");
+    expect(appSource).toContain("已清除平台 API Key");
     expect(apiManagementSource).toContain("文本模型");
     expect(apiManagementSource).toContain("图片模型");
     expect(apiManagementSource).toContain("视频模型");
