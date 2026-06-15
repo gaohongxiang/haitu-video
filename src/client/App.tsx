@@ -1161,10 +1161,10 @@ export function App() {
     }
   }
 
-  async function pushStoryboardHistory(input: { style: TemplateName; duration: number; script: string }) {
-    if (!selectedProduct) return;
+  async function pushStoryboardHistory(input: { style: TemplateName; duration: number; script: string }, product = selectedProduct) {
+    if (!product) return;
     const response = await postJson<{ storyboard: StoryboardHistoryRecord }>(
-      `/api/products/${encodeURIComponent(selectedProduct.sku)}/storyboards`,
+      `/api/products/${encodeURIComponent(product.sku)}/storyboards`,
       input
     );
     setStoryboardHistory((current) => [response.storyboard, ...current.filter((item) => item.id !== response.storyboard.id)]);
@@ -1780,8 +1780,8 @@ export function App() {
     }
   }
 
-  async function generateStoryboardDraft() {
-    if (!selectedProduct) {
+  async function generateStoryboardDraft(product = selectedProduct) {
+    if (!product) {
       setStatusText("请先选择商品。");
       return;
     }
@@ -1797,7 +1797,7 @@ export function App() {
     setStatusText("正在请求文本模型生成分镜，通常需要 10-30 秒...");
     try {
       const response = await postJsonWithSignal<StoryboardDraftResponse>(
-        `/api/products/${encodeURIComponent(selectedProduct.sku)}/storyboard-draft`,
+        `/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`,
         {
           duration,
           template
@@ -1815,7 +1815,7 @@ export function App() {
         style: template,
         duration,
         script: nextStoryboardDraft
-      });
+      }, product);
       setPreflight(undefined);
       setPreflightSignature("");
       setStatusText([
@@ -2404,28 +2404,6 @@ export function App() {
                 退出登录
               </Button>
             ) : null}
-            <div className="relative group">
-              <Button
-                className="h-8 w-8 rounded-full p-0 text-[var(--muted)] hover:border-[var(--border)]"
-                size="icon"
-                variant="ghost"
-                aria-label="刷新控制台数据"
-                title="重新拉取最新商品、任务、费用和配置数据"
-                onClick={() => void refreshConsole()}
-                disabled={isBusy}
-              >
-                <RefreshCcw size={15} />
-                <span className="sr-only">刷新最新数据</span>
-              </Button>
-              <span
-                className={cn(
-                  floatingTooltipClass,
-                  "refresh-tooltip right-0 top-[calc(100%+8px)] z-30 font-bold group-hover:opacity-100 group-focus-within:opacity-100",
-                )}
-              >
-                重新拉取最新数据
-              </span>
-            </div>
           </div>
         </header>
 
@@ -2686,7 +2664,7 @@ function ProductCreationWorkspace({
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: () => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
@@ -2851,7 +2829,7 @@ function ProductCreationComposer({
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: () => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
@@ -2908,6 +2886,7 @@ function ProductCreationComposer({
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
   const generateVideoButtonLabel = versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频";
+  const storyboardProductReady = Boolean(selectedProduct || importText.trim());
   const generationReadiness = productGenerationReadiness({
     selectedProduct,
     importText,
@@ -2916,7 +2895,11 @@ function ProductCreationComposer({
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoButtonClass = cn(
     "min-h-12 w-full justify-center rounded-[14px] text-sm",
-    generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100"
+    generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100 disabled:opacity-100"
+  );
+  const generationReadinessMessageClass = cn(
+    "generation-readiness-message flex min-h-12 w-full max-w-[360px] justify-self-center items-center justify-center rounded-[14px] border px-4 text-center text-xs font-black leading-5",
+    generationReadiness.ready ? "border-[#dbe8f1] bg-[#f7fbff] text-[#6c7890]" : "border-red-200 bg-red-50 text-[var(--danger)]"
   );
   const generateVideoSummary = [
     productFactsStatusLabel({ selectedProduct, importText }),
@@ -3009,6 +2992,12 @@ function ProductCreationComposer({
     } finally {
       setIsSubmittingVideo(false);
     }
+  }
+
+  async function handleGenerateStoryboardDraft() {
+    const productForStoryboard = selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
+    if (!productForStoryboard) return;
+    await onGenerateStoryboardDraft(productForStoryboard);
   }
 
   function handleReferenceFiles(files: FileList | File[] | null) {
@@ -3186,25 +3175,25 @@ function ProductCreationComposer({
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
               onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-              onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+              onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
               isGeneratingStoryboard={isGeneratingStoryboard}
-              productReady={Boolean(selectedProduct)}
+              productReady={storyboardProductReady}
             />
           </div>
         </div>
 
-        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,320px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
           <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
-          <div className={cn("generation-readiness-message min-h-5 min-w-0 truncate text-xs font-black", generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]")}>
+          <div className={generationReadinessMessageClass}>
             {generationReadiness.label}
           </div>
           <Button
             className={generateVideoButtonClass}
-            variant="primary"
+            variant={generateVideoDisabled ? "default" : "primary"}
             disabled={generateVideoDisabled}
             aria-disabled={generateVideoDisabled}
             title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
-            onClick={() => void handleGenerateVideo()}
+            onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}
           >
             {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
             {isSubmittingVideo ? "提交中" : generateVideoButtonLabel}
@@ -3508,14 +3497,14 @@ function StoryboardComposerPanel({
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
-  onGenerateStoryboardDraft: () => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
   productReady: boolean;
 }) {
   const [hint, setHint] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
-    <section className="storyboard-side-panel grid h-full min-h-[398px] content-start gap-3">
+    <section className="storyboard-side-panel grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-base font-black text-[#172033]">脚本分镜</div>
@@ -3527,10 +3516,10 @@ function StoryboardComposerPanel({
         </div>
       </div>
 
-      <Field label="视频分镜">
+      <Field className="grid min-h-0 gap-2" label="视频分镜">
         <Textarea
           className={cn(
-            "min-h-[230px] resize-y border-[#dbe4f0] bg-white text-sm leading-7 transition-colors",
+            "h-full min-h-0 resize-none border-[#dbe4f0] bg-white text-sm leading-7 transition-colors",
             storyboardDraftIsGuidance ? "font-semibold text-[#9aa7ba]" : "font-bold text-[#172033]"
           )}
           value={storyboardDraft}
@@ -3546,7 +3535,7 @@ function StoryboardComposerPanel({
           disabled={isGeneratingStoryboard || !productReady}
           onClick={() => {
             if (!productReady) {
-              setHint("请先整理并保存资料包。");
+              setHint("请先填写商品资料。");
               return;
             }
             setHint("正在请求文本模型，通常需要 10-30 秒。");
@@ -3556,7 +3545,9 @@ function StoryboardComposerPanel({
           <Sparkles size={15} className={cn(isGeneratingStoryboard && "animate-spin")} />
           {isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}
         </Button>
-        <div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{hint}</div>
+        {hint ? (
+          <div className="truncate rounded-lg bg-[color-mix(in_srgb,var(--accent)_8%,white)] px-2.5 py-1.5 text-xs font-bold text-[var(--accent)]">{hint}</div>
+        ) : null}
       </div>
 
       <div
@@ -5128,6 +5119,9 @@ function ApiModelConfigPanel({
       <PanelTitle icon={<KeyRound size={16} />} right={<Badge>{configuredCount} 条已配置</Badge>}>
         API Key
       </PanelTitle>
+      <div className="mb-3 rounded-lg border border-[#dbe4f0] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#5f6d84]">
+        API Key 只保存在你的本地部署环境（HAITU_DATA_DIR 或环境变量）里；我们不托管、不上传、不保存你的密钥。
+      </div>
       <div className="grid gap-3">
         {groups.map((group) => (
           <ApiModelConfigGroup
