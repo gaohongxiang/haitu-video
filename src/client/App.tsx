@@ -61,6 +61,7 @@ type VideoModelChoice = "mock" | "seednice-2-fast" | "seednice-2";
 type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "volcengine-seedance";
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
+type StoryboardDraftSource = "default" | "ai" | "manual";
 interface AuthSession {
   authEnabled: boolean;
   authenticated: boolean;
@@ -838,6 +839,7 @@ export function App() {
   const [studioScriptDraft, setStudioScriptDraft] = useState("");
   const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => defaultStoryboardDraft("scene", defaultVideoDurationSeconds));
   const [storyboardDraftTouched, setStoryboardDraftTouched] = useState(false);
+  const [storyboardDraftSource, setStoryboardDraftSource] = useState<StoryboardDraftSource>("default");
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
   const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>([]);
   const [reuseManifest, setReuseManifest] = useState("");
@@ -988,12 +990,14 @@ export function App() {
       setStudioScriptDraft("");
       setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
       setStoryboardDraftTouched(false);
+      setStoryboardDraftSource("default");
       setStudioStoryboardCnDraft("");
       return;
     }
     setStudioScriptDraft("");
     setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
     setStoryboardDraftTouched(false);
+    setStoryboardDraftSource("default");
     setStudioStoryboardCnDraft("");
   }, [selectedProduct?.sku]);
 
@@ -1172,6 +1176,7 @@ export function App() {
     setStudioScriptDraft("");
     setStudioStoryboardDraft(record.script);
     setStoryboardDraftTouched(true);
+    setStoryboardDraftSource("ai");
     setStudioStoryboardCnDraft("");
     markPreflightStale();
     setStatusText(`已回填历史分镜: ${templateLabel(record.style)} / ${formatDuration(record.duration)}`);
@@ -1540,6 +1545,7 @@ export function App() {
     setStudioScriptDraft("");
     setStudioStoryboardDraft(defaultStoryboardDraft(template, duration));
     setStoryboardDraftTouched(false);
+    setStoryboardDraftSource("default");
     setStudioStoryboardCnDraft("");
     setStoryboardHistory([]);
     setActiveSection("video");
@@ -1803,6 +1809,7 @@ export function App() {
       setStudioScriptDraft(nextScriptDraft);
       setStudioStoryboardDraft(nextStoryboardDraft);
       setStoryboardDraftTouched(true);
+      setStoryboardDraftSource("ai");
       setStudioStoryboardCnDraft("");
       await pushStoryboardHistory({
         style: template,
@@ -2228,8 +2235,10 @@ export function App() {
               }}
               storyboardDraft={studioStoryboardDraft}
               storyboardDraftIsGuidance={!storyboardDraftTouched}
+              storyboardDraftSource={storyboardDraftSource}
               onStoryboardDraftChange={(nextDraft) => {
                 setStoryboardDraftTouched(true);
+                setStoryboardDraftSource("manual");
                 setStudioStoryboardDraft(nextDraft);
                 markPreflightStale();
               }}
@@ -2651,6 +2660,7 @@ function ProductCreationWorkspace({
   onFinalLanguageChange,
   storyboardDraft,
   storyboardDraftIsGuidance,
+  storyboardDraftSource,
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
@@ -2696,6 +2706,7 @@ function ProductCreationWorkspace({
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
+  storyboardDraftSource: StoryboardDraftSource;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -2766,6 +2777,7 @@ function ProductCreationWorkspace({
       onFinalLanguageChange={onFinalLanguageChange}
       storyboardDraft={storyboardDraft}
       storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+      storyboardDraftSource={storyboardDraftSource}
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -2814,6 +2826,7 @@ function ProductCreationComposer({
   onFinalLanguageChange,
   storyboardDraft,
   storyboardDraftIsGuidance,
+  storyboardDraftSource,
   onStoryboardDraftChange,
   storyboardHistory,
   onApplyStoryboardHistory,
@@ -2858,6 +2871,7 @@ function ProductCreationComposer({
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
+  storyboardDraftSource: StoryboardDraftSource;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -2901,8 +2915,9 @@ function ProductCreationComposer({
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoSummary = [
-    selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "新商品",
-    storyboardDraft.trim() && !storyboardDraftIsGuidance ? "已填分镜" : "自动分镜",
+    productFactsStatusLabel({ selectedProduct, importText }),
+    selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "参考图 0 张",
+    storyboardStatusLabel(storyboardDraftSource),
     templateLabel(template),
     formatDuration(duration),
     finalLanguageLabel(finalLanguage),
@@ -3171,8 +3186,8 @@ function ProductCreationComposer({
 
         <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,320px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
           <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
-          <div className="generation-readiness-message min-h-5 min-w-0 truncate text-xs font-black text-[var(--danger)]">
-            {generationReadiness.ready ? "" : generationReadiness.label}
+          <div className={cn("generation-readiness-message min-h-5 min-w-0 truncate text-xs font-black", generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]")}>
+            {generationReadiness.label}
           </div>
           <Button
             className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"
@@ -4356,7 +4371,36 @@ function productGenerationReadiness({
   if (pendingImageCount < targetImageCount) {
     return { ready: false, label: `参考图至少 ${targetImageCount} 张，还差 ${targetImageCount - pendingImageCount} 张。` };
   }
-  return { ready: false, label: "请先点击 AI 整理资料包保存商品。" };
+  return { ready: true, label: "将先整理资料包，再生成视频。" };
+}
+
+function productFactsStatusLabel({
+  selectedProduct,
+  importText
+}: {
+  selectedProduct?: ProductDetail;
+  importText: string;
+}): string {
+  if (!selectedProduct) {
+    if (importText.trim()) {
+      return "原始资料";
+    }
+    return "未填资料";
+  }
+  if (selectedProduct.importQuality?.ready) {
+    return "已整理资料包";
+  }
+  return "资料待补";
+}
+
+function storyboardStatusLabel(storyboardDraftSource: StoryboardDraftSource): string {
+  if (storyboardDraftSource === "default") {
+    return "默认分镜";
+  }
+  if (storyboardDraftSource === "ai") {
+    return "AI 生成分镜";
+  }
+  return "手动分镜";
 }
 
 function dedupeProductSummaries(products: ProductSummary[]): ProductSummary[] {
