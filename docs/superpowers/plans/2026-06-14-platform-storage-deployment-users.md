@@ -2,11 +2,11 @@
 
 > **给执行新会话的要求：** 实施本计划时必须使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans`，逐项执行并在任务完成后打勾。本项目还在创建阶段，不需要兼容旧目录、旧数据结构或旧浏览器缓存。
 
-**目标：** 分阶段把海兔视频从本地原型升级成可部署、可备份、可接用户系统的平台：第一阶段完成 VPS 单实例文件存储和免费部署，第二阶段接入 PostgreSQL 和用户系统，第三阶段按需要迁移图片/视频到对象存储。
+**目标：** 分阶段把海兔视频从本地原型升级成可部署、可备份、可接用户系统的平台：第一阶段完成 VPS 单实例文件存储和免费部署，第二阶段接入 SQLite 和用户系统，第三阶段按需要迁移图片/视频到对象存储，未来托管规模变大时再迁 PostgreSQL。
 
-**架构：** 代码目录和数据目录必须分离。第一阶段服务端通过 `HAITU_DATA_DIR` 找到运行时数据根目录；本地开发默认使用项目内 `./data`，生产服务器推荐使用 `/var/lib/haitu-video`。第二阶段引入 PostgreSQL 保存用户、工作区、权限、商品索引、任务索引和状态；图片、视频等大文件仍留在文件系统或后续对象存储里，数据库只保存元数据和归属关系。
+**架构：** 代码目录和数据目录必须分离。第一阶段服务端通过 `HAITU_DATA_DIR` 找到运行时数据根目录；本地开发默认使用项目内 `./data`，生产服务器推荐使用 `/var/lib/haitu-video`。第二阶段引入 SQLite 保存用户、工作区、权限、商品索引、任务索引、模型配置和状态；图片、视频等大文件仍留在文件系统或后续对象存储里，数据库只保存元数据和归属关系。
 
-**技术栈：** 现有 Node.js / TypeScript 服务端、React 控制台、Vitest 测试、VPS 单实例部署、Cloudflare 免费入口、第一阶段文件系统存储、第二阶段 PostgreSQL。
+**技术栈：** 现有 Node.js / TypeScript 服务端、React 控制台、Vitest 测试、VPS 单实例部署、Cloudflare 免费入口、第一阶段文件系统存储、第二阶段 SQLite。
 
 ---
 
@@ -35,11 +35,11 @@
 - 自动清理过期视频。
 - 可备份和恢复。
 
-### 第二阶段：PostgreSQL + 用户系统
+### 第二阶段：SQLite + 用户系统
 
 目标：让多个用户或团队安全使用同一个平台。
 
-- 引入 PostgreSQL。
+- 引入 SQLite，数据库文件放在 `HAITU_DATA_DIR` 下。
 - 增加用户注册、登录、退出、密码重置或第三方登录。
 - 增加 `workspaces` 表。
 - 增加用户和工作区成员关系。
@@ -59,7 +59,8 @@
 目标：当 VPS 磁盘或访问量成为瓶颈时再做。
 
 - 图片和视频迁到 Cloudflare R2 或 S3 兼容对象存储。
-- PostgreSQL 继续保存文件元数据和对象 key。
+- SQLite 继续保存文件元数据和对象 key。
+- 如果后续变成多人托管、高并发、计费和多实例部署，再把 SQLite 迁移到 PostgreSQL。
 - 视频仍默认 24 小时过期。
 - 可以增加队列、后台 worker、限额、计费和更多安全审计。
 
@@ -67,14 +68,25 @@
 
 ## 二、数据库和用户系统规划
 
-第二阶段数据库选 PostgreSQL。
+第二阶段数据库选 SQLite。
 
-为什么选 PostgreSQL：
+当前第一阶段和 Huobao Drama 的定位一致：`API 管理`配置的是平台服务端使用的模型服务 Key，不是普通用户浏览器里的个人 Key。区别是 Huobao Drama 把 Key 存在 SQLite 的 `ai_service_configs.api_key`；海兔第一阶段把 Key 存在 `<HAITU_DATA_DIR>/workspaces/default/settings/provider-keys.json`。第二阶段迁到 SQLite 后，Key 进入数据库，但必须加密存储，API 返回时只返回 `keyPreview`，不能把完整 Key 返回浏览器、写进任务记录或审计日志。
 
-- VPS 上自建成本低，成熟稳定。
-- 适合用户、权限、任务、配置、审计这类关系数据。
-- 后续如果要统计、计费、团队协作，比纯文件 JSON 稳很多。
-- 迁移到托管 PostgreSQL 也容易。
+为什么选 SQLite：
+
+- 部署最简单，不需要安装数据库服务、建库、建用户或开放端口。
+- 对开源自部署用户友好，复制一个 `HAITU_DATA_DIR` 就能备份和迁移。
+- 适合当前单 VPS、单 Node 进程、小规模用户试用的阶段。
+- 比纯文件 JSON 更适合用户、权限、任务、配置、审计这类关系数据。
+- 可以用 WAL 模式提升读写体验；后续如果托管规模变大，再迁移 PostgreSQL。
+
+SQLite 数据文件放在：
+
+```text
+<HAITU_DATA_DIR>/haitu.sqlite
+<HAITU_DATA_DIR>/haitu.sqlite-wal
+<HAITU_DATA_DIR>/haitu.sqlite-shm
+```
 
 数据库不存大文件：
 
@@ -162,8 +174,15 @@ video_assets
 provider_keys
   id
   workspace_id
+  service_type
   provider
+  name
+  base_url
+  model
   encrypted_key
+  key_preview
+  priority
+  enabled
   created_at
   updated_at
 
@@ -189,6 +208,9 @@ audit_logs
 
 - 启动迁移脚本扫描 `<HAITU_DATA_DIR>/workspaces/default`。
 - 为现有数据创建一个管理员用户和默认工作区。
+- 把 `<HAITU_DATA_DIR>/workspaces/default/settings/provider-keys.json` 里的模型配置迁入 `provider_keys` 表。
+- 迁入 `provider_keys` 时，使用服务端环境变量 `HAITU_SECRET_KEY` 或同等级密钥派生出的加密 key 生成 `encrypted_key`，数据库不能保存明文 API Key。
+- 迁移后 API 仍只返回 `configured`、`keySource` 和 `keyPreview`，不能返回完整 API Key。
 - 把已有商品写入 `products` 表。
 - 把已有参考图写入 `product_assets` 表。
 - 把已有分镜历史写入 `storyboards` 表。
@@ -813,31 +835,83 @@ mkdir -p data/products data/jobs data/settings data/backups
 
 注意：执行删除前先确认没有需要保留的真实数据。
 
-：PostgreSQL 和用户系统
+## 九、第一阶段验收状态
+
+状态：已完成，可以开始第二阶段 SQLite + 用户系统。
+
+已完成的第一阶段范围：
+
+- [x] 运行时数据由 `HAITU_DATA_DIR` 控制，本地默认 `./data`，生产推荐 `/var/lib/haitu-video`。
+- [x] 不兼容旧 `fixtures/products`、`assets/products`、`outputs` 和旧浏览器分镜缓存。
+- [x] 预留 `workspaces/default`，`product.json` 和 `job.json` 写入 `workspaceId: "default"`。
+- [x] 商品、参考图、分镜历史、任务记录、系统设置、API 管理配置和审计日志都写入数据目录。
+- [x] 视频只保留 24 小时，过期自动删除视频大文件，页面显示过期/下载提醒。
+- [x] 备份只处理数据根目录里的长期数据和任务元数据，默认不包含视频大文件。
+- [x] 部署文档以 Cloudflare Tunnel 为首选入口，Caddy 只作为备用。
+- [x] SQLite 和用户系统没有阻塞第一阶段上线，已作为第二阶段规划。
+
+2026-06-15 已运行第一阶段完整验证命令：
+
+```bash
+npm test -- tests/server/storagePaths.test.ts
+npm test -- tests/server/consoleApi.test.ts tests/server/consoleVideoJobQueue.test.ts tests/server/videoRetention.test.ts
+npm run typecheck
+npm test
+npm run build:console
+npm test -- tests/deploy/noDockerDeploy.test.ts
+```
+
+验证结果：
+
+- `tests/server/storagePaths.test.ts`：6 tests passed。
+- `tests/server/consoleApi.test.ts`、`tests/server/consoleVideoJobQueue.test.ts`、`tests/server/videoRetention.test.ts`：101 tests passed。
+- `npm run typecheck`：passed。
+- `npm test`：32 files / 205 tests passed。
+- `npm run build:console`：passed；仅有 Vite chunk size warning，不影响第一阶段验收。
+- `tests/deploy/noDockerDeploy.test.ts`：1 test passed。
+
+## 十、第二阶段：SQLite 和用户系统
 
 第二阶段不要和第一阶段混在同一个 PR 里。第一阶段先把 VPS 单实例文件存储跑稳；第二阶段再按下面任务执行。
 
-### 任务 11：接入 PostgreSQL 基础设施
+### 任务 11：接入 SQLite 基础设施
 
 **文件：**
 
 - 新增：`src/server/db/client.ts`
 - 新增：`src/server/db/migrations/`
-- 新增：`src/server/db/schema.sql`
+- 新增：`src/server/db/schema.ts`
+- 新增：`src/server/db/migrate.ts`
+- 修改：`package.json`
 - 修改：`deploy/env/haitu-video.env.example`
 - 修改：`docs/deployment/vps-no-docker.md`
 - 新增：`tests/server/db.test.ts`
 
 **步骤：**
 
+- [ ] 增加 SQLite 依赖和迁移工具，优先使用 `better-sqlite3` + Drizzle ORM。
 - [ ] 环境变量增加：
 
 ```bash
-DATABASE_URL=postgresql://haitu:<密码>@127.0.0.1:5432/haitu_video
+HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
+HAITU_SECRET_KEY=<至少32字节随机密钥，用于加密数据库中的模型 API Key>
 ```
 
-- [ ] 新增数据库连接模块。
-- [ ] 新增迁移执行命令。
+- [ ] 如果未设置 `HAITU_DB_PATH`，默认使用 `<HAITU_DATA_DIR>/haitu.sqlite`。
+- [ ] 新增数据库连接模块，启动时开启 WAL：
+
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA busy_timeout = 30000;
+PRAGMA foreign_keys = ON;
+```
+
+- [ ] 新增迁移执行命令，例如：
+
+```bash
+npm run db:migrate
+```
+
 - [ ] 新增首批表：
   - `users`
   - `workspaces`
@@ -849,7 +923,14 @@ DATABASE_URL=postgresql://haitu:<密码>@127.0.0.1:5432/haitu_video
   - `video_assets`
   - `provider_keys`
   - `audit_logs`
-- [ ] 部署文档增加 PostgreSQL 安装、建库、建用户、备份命令。
+- [ ] `provider_keys` 表禁止保存明文 API Key，只保存 `encrypted_key`、`key_preview` 和配置元数据。
+- [ ] 新增服务端 Key 加密/解密 helper，并覆盖测试：
+  - 同一个明文 Key 加密后数据库不包含原文。
+  - 解密后可以供模型调用。
+  - API 响应只包含 `keyPreview`，不包含完整 Key。
+- [ ] 保留第一阶段 `provider-keys.json` 读取能力用于迁移；迁移成功后运行时优先读 SQLite。
+- [ ] 部署文档增加 SQLite 文件位置、权限、WAL 文件、备份和恢复命令。
+- [ ] 备份时包含 `haitu.sqlite`，并说明在线备份前先执行 checkpoint 或使用 SQLite backup API，避免漏掉 WAL 里的新数据。
 
 运行：
 
@@ -857,7 +938,7 @@ DATABASE_URL=postgresql://haitu:<密码>@127.0.0.1:5432/haitu_video
 npm test -- tests/server/db.test.ts
 ```
 
-预期：测试库可连接，迁移可执行，基础表存在。
+预期：测试库可连接，迁移可执行，基础表存在，WAL/外键配置生效。
 
 ### 任务 12：用户登录和工作区解析
 
@@ -920,7 +1001,7 @@ npm test -- tests/server/consoleApi.test.ts
 npm test -- tests/server/importFileWorkspace.test.ts
 ```
 
-预期：第一阶段的文件数据可以无损登记进 PostgreSQL。
+预期：第一阶段的文件数据可以无损登记进 SQLite。
 
 ### 任务 14：用数据库索引驱动列表和权限
 
@@ -949,7 +1030,7 @@ npm test -- tests/server/consoleApi.test.ts tests/server/videoRetention.test.ts
 
 预期：所有列表和删除操作都受工作区权限约束。
 
-## 十、最终验证
+## 十一、最终验证
 
 第一阶段完成后运行：
 
@@ -1008,8 +1089,11 @@ npm test
 4. 退出登录后不能访问商品、分镜、视频接口。
 5. 第一阶段 `workspaces/default` 数据可以导入到管理员默认工作区。
 6. 数据库删除记录和文件删除保持一致。
+7. `provider_keys` 中的模型 Key 只能加密保存，API 只能看到预览值。
+8. 视频过期后，文件删除，数据库状态也更新。
+9. 自部署只需要复制 `HAITU_DATA_DIR` 即可带走 SQLite 数据库和文件产物。
 
-## 十一、推荐执行顺序
+## 十二、推荐执行顺序
 
 1. 统一路径模块和测试。
 2. 控制台服务接入数据根目录。
@@ -1021,13 +1105,13 @@ npm test
 8. 备份逻辑。
 9. 删除旧目录逻辑和旧测试断言。
 10. 第一阶段全量验证并推送。
-11. 另开第二阶段分支接入 PostgreSQL。
+11. 另开第二阶段分支接入 SQLite。
 12. 实现用户系统和工作区权限。
 13. 导入第一阶段文件数据到数据库。
 14. 用数据库索引驱动列表和权限。
 15. 第二阶段全量验证并推送。
 
-## 十二、新会话接力提示词
+## 十三、新会话接力提示词
 
 ```text
 请执行 /Users/gaohongxiang/projects/haitu-video/docs/superpowers/plans/2026-06-14-platform-storage-deployment-users.md
@@ -1044,9 +1128,10 @@ npm test
 9. 不要把 Cloudflare Pages、Stream、R2 做成本阶段必需依赖。
 10. 生成视频只保留 24 小时，过期自动删除视频文件，页面提醒用户尽快下载。
 11. 备份默认不包含视频大文件，只保留长期数据和必要任务元数据。
-12. PostgreSQL 和用户系统是第二阶段，不要阻塞第一阶段上线。
-13. 第二阶段数据库选 PostgreSQL，图片和视频大文件仍不进数据库。
-14. 每个任务先补测试，再改实现。
-15. UI 行为保持当前视频创作流程，但本次重点是分阶段完成平台存储、免费部署、用户系统规划和视频过期清理。
-16. 完成对应阶段后运行计划里的验证命令。
+12. SQLite 和用户系统是第二阶段，不要阻塞第一阶段上线。
+13. 第二阶段数据库选 SQLite，图片和视频大文件仍不进数据库；未来托管规模变大时再评估迁移 PostgreSQL。
+14. API 管理第一阶段保存平台服务端模型 Key 到 provider-keys.json；第二阶段迁入 SQLite 的 provider_keys 表并加密保存，不做浏览器 BYOK 作为默认方案。
+15. 每个任务先补测试，再改实现。
+16. UI 行为保持当前视频创作流程，但本次重点是分阶段完成平台存储、免费部署、用户系统规划和视频过期清理。
+17. 完成对应阶段后运行计划里的验证命令。
 ```

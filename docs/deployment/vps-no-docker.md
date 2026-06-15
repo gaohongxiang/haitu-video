@@ -1,6 +1,6 @@
 # VPS 无 Docker 部署
 
-这份步骤用于第一阶段把 Haitu console 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。这一版不使用 Docker，不安装 PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
+这份步骤用于第一阶段把 Haitu console 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。这一版不使用 Docker，不安装 SQLite/PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
 
 ## 适用范围
 
@@ -178,7 +178,7 @@ curl -s http://127.0.0.1:4173/api/health
 ## 运维注意
 
 - 不要删除 `/var/lib/haitu-video`，里面包含商品、参考图、分镜历史、配置、审计日志和任务元数据。
-- `/var/lib/haitu-video/workspaces/default` 是第一阶段默认工作区，第二阶段 PostgreSQL 和用户系统会把它映射成数据库里的默认工作区。
+- `/var/lib/haitu-video/workspaces/default` 是第一阶段默认工作区，第二阶段 SQLite 和用户系统会把它映射成数据库里的默认工作区。
 - 视频大文件只保留 24 小时，过期后会自动删除，用户应尽快下载。
-- 先保持单机本地存储；后续用户变多后再迁移 PostgreSQL、Cloudflare R2/S3 和对象存储。
+- 先保持单机本地存储；第二阶段优先迁入 SQLite；后续托管规模变大后再评估 PostgreSQL、Cloudflare R2/S3 和对象存储。
 - 付费视频生成仍需要 `confirmPaid` 或 UI 里的确认动作。
