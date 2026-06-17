@@ -132,6 +132,45 @@ describe("LocalVideoJobQueue", () => {
     );
   });
 
+  it("keeps job ids unique across queue instances sharing one jobs directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-unique-id-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const queues: LocalVideoJobQueue[] = [];
+    const makeQueue = () => {
+      const queue = new LocalVideoJobQueue({
+        rootDir: root,
+        outputsDir,
+        settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+        now: () => new Date("2026-06-07T09:00:00.000Z"),
+        runMakeVideoPipeline: async (input) => makeReport(input)
+      });
+      queues.push(queue);
+      return queue;
+    };
+
+    const first = await makeQueue().enqueue({ productPath, provider: "mock", duration: 8 });
+    const second = await makeQueue().enqueue({ productPath, provider: "mock", duration: 8 });
+    const third = await makeQueue().enqueue({ productPath, provider: "mock", duration: 8 });
+
+    expect([first.id, second.id, third.id]).toEqual([
+      "job-20260607090000000-001",
+      "job-20260607090000000-002",
+      "job-20260607090000000-003"
+    ]);
+    await expect(readFile(join(outputsDir, first.id, "job.json"), "utf8")).resolves.toContain(first.id);
+    await expect(readFile(join(outputsDir, second.id, "job.json"), "utf8")).resolves.toContain(second.id);
+    await expect(readFile(join(outputsDir, third.id, "job.json"), "utf8")).resolves.toContain(third.id);
+    await Promise.all([
+      queues[0].waitForIdle(first.id),
+      queues[1].waitForIdle(second.id),
+      queues[2].waitForIdle(third.id)
+    ]);
+  });
+
   it("cancels a queued make-video job before it starts", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-cancel-"));
     tempDirs.push(root);

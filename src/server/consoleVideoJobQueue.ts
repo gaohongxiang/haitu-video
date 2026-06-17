@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
@@ -80,7 +80,7 @@ export class LocalVideoJobQueue {
   async enqueue(request: VideoJobRequest): Promise<VideoJobRecord> {
     const settings = await this.options.settingsStore.read();
     const createdAt = this.nowIso();
-    const id = this.nextId(createdAt);
+    const id = await this.nextId(createdAt);
     const provider = request.provider ?? settings.defaultProvider;
     const durationSeconds = request.duration ?? settings.defaultDurationSeconds;
     const template = request.template ?? settings.defaultTemplate;
@@ -285,9 +285,15 @@ export class LocalVideoJobQueue {
     this.upsertDatabaseJob(record);
   }
 
-  private nextId(createdAt: string): string {
-    this.sequence += 1;
-    return `job-${createdAt.replace(/\D/g, "")}-${String(this.sequence).padStart(3, "0")}`;
+  private async nextId(createdAt: string): Promise<string> {
+    const timestamp = createdAt.replace(/\D/g, "");
+    while (true) {
+      this.sequence += 1;
+      const id = `job-${timestamp}-${String(this.sequence).padStart(3, "0")}`;
+      if (!(await this.jobExists(id))) {
+        return id;
+      }
+    }
   }
 
   private nowIso(): string {
@@ -300,6 +306,15 @@ export class LocalVideoJobQueue {
 
   private pathFor(id: string): string {
     return join(this.jobsDir(), sanitizePathSegment(id), "job.json");
+  }
+
+  private async jobExists(id: string): Promise<boolean> {
+    try {
+      await access(dirname(this.pathFor(id)));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async removeGeneratedOutputs(outDir: string): Promise<void> {
