@@ -5514,6 +5514,79 @@ describe("console API", () => {
     });
   });
 
+  it("keeps video jobs for one workspace on a single request queue", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-video-workspace-queue-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
+    await writeProduct(productPath);
+    let releaseFirstJob!: () => void;
+    const firstJobGate = new Promise<void>((resolve) => {
+      releaseFirstJob = resolve;
+    });
+    const calls: string[] = [];
+    const server = createConsoleServer({
+      rootDir: root,
+      fixturesDir,
+      outputsDir,
+      runMakeVideoPipeline: async (input) => {
+        calls.push(input.outDir);
+        if (calls.length === 1) {
+          await firstJobGate;
+        }
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.txt")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
+      }
+    });
+
+    const first = await server.fetchJson("/api/video-jobs", {
+      method: "POST",
+      body: JSON.stringify({
+        productPath,
+        provider: "mock",
+        duration: 8,
+        template: "scene",
+        cta: "今すぐチェック"
+      })
+    });
+    const second = await server.fetchJson("/api/video-jobs", {
+      method: "POST",
+      body: JSON.stringify({
+        productPath,
+        provider: "mock",
+        duration: 8,
+        template: "scene",
+        cta: "今すぐチェック"
+      })
+    });
+    await sleep(25);
+    const queued = await server.fetchJson(`/api/video-jobs/${second.job.id}`);
+
+    expect(calls).toEqual([first.job.outDir]);
+    expect(queued.job.status).toBe("queued");
+
+    releaseFirstJob();
+    await waitForJobStatus(server, second.job.id, "completed");
+  });
+
   it("rejects paid video jobs before enqueue when product reference images are not usable", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-readiness-"));
     tempDirs.push(root);
@@ -6292,6 +6365,26 @@ function productAssetPath(productFilePath: string, fileName: string): string {
 
 function jobFilePath(jobsDir: string, jobId: string): string {
   return join(jobsDir, jobId, "job.json");
+}
+
+async function waitForJobStatus(
+  server: TestConsoleServerHandle,
+  jobId: string,
+  status: string
+): Promise<Record<string, unknown>> {
+  let latest: Record<string, unknown> = {};
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    latest = await server.fetchJson(`/api/video-jobs/${jobId}`);
+    if ((latest.job as { status?: string } | undefined)?.status === status) {
+      return latest;
+    }
+    await sleep(10);
+  }
+  throw new Error(`Timed out waiting for video job ${jobId} to become ${status}.`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function writeFileReport(path: string, report: unknown): Promise<void> {

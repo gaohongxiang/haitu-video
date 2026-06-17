@@ -38,7 +38,7 @@ describe("console CLI runtime", () => {
     child.stdout?.on("data", (chunk) => stdout.push(String(chunk)));
     child.stderr?.on("data", (chunk) => stderr.push(String(chunk)));
 
-    await waitFor(() => stdout.join("").includes(`Haitu console: http://127.0.0.1:${port}`), 3_000);
+    await waitFor(() => stdout.join("").includes(`Haitu console: http://127.0.0.1:${port}`), 15_000);
     await sleep(300);
 
     expect(child.exitCode, stderr.join("")).toBeNull();

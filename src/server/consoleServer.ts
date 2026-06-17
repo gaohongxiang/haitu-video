@@ -314,6 +314,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     runMakeVideoPipeline: runConfiguredMakeVideoPipeline,
     databaseHandle
   });
+  const workspaceVideoJobQueues = new Map<string, LocalVideoJobQueue>([
+    [DEFAULT_WORKSPACE_ID, videoJobQueue]
+  ]);
   const runVideoRetentionCleanup = async () => {
     for (const workspaceId of retentionWorkspaceIds(databaseHandle)) {
       await cleanupExpiredVideos({
@@ -446,6 +449,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         authStore,
         defaultProviderKeyStore,
         defaultVideoJobQueue: videoJobQueue,
+        workspaceVideoJobQueues,
         settingsStore,
         fetchImpl: options.fetchImpl,
         runMakeVideoPipeline: options.runMakeVideoPipeline
@@ -1168,6 +1172,7 @@ async function createRequestContext(input: {
   authStore: ConsoleAuthStore;
   defaultProviderKeyStore: ProviderKeyStore;
   defaultVideoJobQueue: LocalVideoJobQueue;
+  workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
   settingsStore: FileConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
@@ -1186,19 +1191,54 @@ async function createRequestContext(input: {
     fixturesDir: workspacePaths.productsDir,
     outputsDir: workspacePaths.jobsDir,
     providerKeyStore,
-    videoJobQueue: new LocalVideoJobQueue({
-      rootDir: input.rootDir,
-      outputsDir: workspacePaths.jobsDir,
+    videoJobQueue: videoJobQueueForWorkspace({
       workspaceId: resolved.workspaceId,
+      workspacePaths,
+      providerKeyStore,
+      defaultVideoJobQueue: input.defaultVideoJobQueue,
+      workspaceVideoJobQueues: input.workspaceVideoJobQueues,
+      rootDir: input.rootDir,
       settingsStore: input.settingsStore,
       fetchImpl: input.fetchImpl,
-      runMakeVideoPipeline: createConfiguredMakeVideoPipeline({
-        providerKeyStore,
-        runMakeVideoPipeline: input.runMakeVideoPipeline
-      }),
+      runMakeVideoPipeline: input.runMakeVideoPipeline,
       databaseHandle: input.databaseHandle
     })
   };
+}
+
+function videoJobQueueForWorkspace(input: {
+  workspaceId: string;
+  workspacePaths: ReturnType<typeof getWorkspacePaths>;
+  providerKeyStore: ProviderKeyStore;
+  defaultVideoJobQueue: LocalVideoJobQueue;
+  workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
+  rootDir: string;
+  settingsStore: FileConsoleSettingsStore;
+  fetchImpl?: typeof fetch;
+  runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+  databaseHandle: DatabaseHandle;
+}): LocalVideoJobQueue {
+  if (input.workspaceId === DEFAULT_WORKSPACE_ID) {
+    return input.defaultVideoJobQueue;
+  }
+  const existing = input.workspaceVideoJobQueues.get(input.workspaceId);
+  if (existing) {
+    return existing;
+  }
+  const queue = new LocalVideoJobQueue({
+    rootDir: input.rootDir,
+    outputsDir: input.workspacePaths.jobsDir,
+    workspaceId: input.workspaceId,
+    settingsStore: input.settingsStore,
+    fetchImpl: input.fetchImpl,
+    runMakeVideoPipeline: createConfiguredMakeVideoPipeline({
+      providerKeyStore: input.providerKeyStore,
+      runMakeVideoPipeline: input.runMakeVideoPipeline
+    }),
+    databaseHandle: input.databaseHandle
+  });
+  input.workspaceVideoJobQueues.set(input.workspaceId, queue);
+  return queue;
 }
 
 function createConfiguredMakeVideoPipeline(input: {
