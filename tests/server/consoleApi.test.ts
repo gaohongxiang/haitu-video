@@ -851,12 +851,15 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(creationComposerSource).toContain("videoModelOptions");
-    expect(videoModelSource).toContain("seednice-2-fast");
-    expect(videoModelSource).toContain("seednice-2");
-    expect(videoModelSource).toContain("seednice2.0 fast");
-    expect(videoModelSource).toContain("seednice2.0");
+    expect(videoModelSource).toContain("seedance-2-fast");
+    expect(videoModelSource).toContain("seedance-2");
+    expect(videoModelSource).toContain("seedance-1-5-pro");
+    expect(videoModelSource).toContain("seedance2.0 fast");
+    expect(videoModelSource).toContain("seedance2.0");
+    expect(videoModelSource).toContain("seedance1.5 pro");
     expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
-    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast"');
+    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast"');
+    expect(appSource).not.toContain("seed" + "nice");
     expect(creationComposerSource).toContain("videoModelChoice");
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
@@ -868,6 +871,14 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
     expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
+    expect(appSource).not.toContain("window.confirm");
+    expect(appSource).not.toContain("window.alert");
+    expect(appSource).not.toContain("window.prompt");
+    expect(appSource).toContain("function ConfirmActionDialog");
+    expect(appSource).toContain("<ConfirmActionDialog");
+    expect(appSource).toContain("删除这个商品资料？");
+    expect(appSource).toContain("重试这个付费生成任务？");
+    expect(appSource).toContain("删除这个本地视频文件？");
     expect(creationComposerSource).toContain("product-reference-inline");
     expect(creationComposerSource).toContain("acceptReferenceFiles");
     expect(creationComposerSource).toContain("isReferenceImageFile");
@@ -1271,10 +1282,12 @@ describe("console API", () => {
     expect(modelPresetSource).toContain('model: "gemini-3-pro-image"');
     expect(modelPresetSource).toContain('name: "OpenAI 推荐-图片"');
     expect(modelPresetSource).toContain('model: "gpt-image-2"');
-    expect(modelPresetSource).toContain('name: "豆包 seednice2.0 fast 推荐-视频"');
+    expect(modelPresetSource).toContain('name: "豆包 seedance2.0 fast 推荐-视频"');
     expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-fast-260128"');
-    expect(modelPresetSource).toContain('name: "豆包 seednice2.0 推荐-视频"');
+    expect(modelPresetSource).toContain('name: "豆包 seedance2.0 推荐-视频"');
     expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-260128"');
+    expect(modelPresetSource).toContain('name: "豆包 seedance1.5 pro 推荐-视频"');
+    expect(modelPresetSource).toContain('model: "doubao-seedance-1-5-pro-251215"');
     [
       "ChatFire 推荐-文本",
       "OpenRouter 推荐-文本",
@@ -2009,12 +2022,15 @@ describe("console API", () => {
     expect(composerSource).toContain("generateVideoButtonLabel");
     expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(composerSource).toContain("videoModelOptions");
-    expect(videoModelSource).toContain("seednice-2-fast");
-    expect(videoModelSource).toContain("seednice-2");
-    expect(videoModelSource).toContain("seednice2.0 fast");
-    expect(videoModelSource).toContain("seednice2.0");
+    expect(videoModelSource).toContain("seedance-2-fast");
+    expect(videoModelSource).toContain("seedance-2");
+    expect(videoModelSource).toContain("seedance-1-5-pro");
+    expect(videoModelSource).toContain("seedance2.0 fast");
+    expect(videoModelSource).toContain("seedance2.0");
+    expect(videoModelSource).toContain("seedance1.5 pro");
     expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
-    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast"');
+    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast"');
+    expect(appSource).not.toContain("seed" + "nice");
     expect(composerSource).toContain("videoModelChoice");
     expect(composerSource).toContain("provider: videoModelConfig.provider");
     expect(composerSource).toContain("providerModel: videoModelConfig.model");
@@ -5518,7 +5534,7 @@ describe("console API", () => {
     }
   });
 
-  it("allows product video jobs to override the selected Seednice model without a separate paid confirmation", async () => {
+  it("allows product video jobs to override the selected Seedance model without a separate paid confirmation", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
@@ -5572,7 +5588,7 @@ describe("console API", () => {
           name: "默认 Fast",
           vendor: "volcengine",
           priority: 9,
-          baseUrl: "https://seednice.example.test",
+          baseUrl: "https://seedance.example.test",
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
@@ -5603,7 +5619,7 @@ describe("console API", () => {
       }));
       expect(capturedInputs[0]).toEqual(expect.objectContaining({
         apiKey: "configured-video-secret-9999",
-        providerBaseUrl: "https://seednice.example.test",
+        providerBaseUrl: "https://seedance.example.test",
         providerModel: "doubao-seedance-2-0-260128",
         confirmPaid: true
       }));

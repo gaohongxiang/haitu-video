@@ -58,7 +58,7 @@ const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[#dbe4f0] bg-white px-2.5 py-1.5 text-[11px] font-black text-[#66748a] opacity-0 shadow-[0_10px_24px_rgba(30,42,68,.12)] transition";
 
 type ProviderName = "mock" | "seedance" | "volcengine-seedance";
-type VideoModelChoice = "mock" | "seednice-2-fast" | "seednice-2";
+type VideoModelChoice = "mock" | "seedance-2-fast" | "seedance-2" | "seedance-1-5-pro";
 type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "volcengine-seedance";
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
@@ -670,6 +670,18 @@ interface ConsoleToastState {
 
 type ConsoleToastFn = (message: string, tone?: ConsoleToastState["tone"]) => void;
 
+interface ConfirmActionState {
+  id: number;
+  title: string;
+  message: string;
+  details?: string[];
+  confirmLabel: string;
+  cancelLabel?: string;
+  tone: "danger" | "paid" | "neutral";
+}
+
+type ConfirmActionRequest = Omit<ConfirmActionState, "id">;
+
 interface ModelConfigTestStatus {
   tone: "neutral" | "ok" | "danger";
   message: string;
@@ -735,9 +747,9 @@ const defaultProductDraft: ProductDraft = {
   source_text: ""
 };
 
-const videoModelOptions: VideoModelChoice[] = ["mock", "seednice-2-fast", "seednice-2"];
+const videoModelOptions: VideoModelChoice[] = ["mock", "seedance-2-fast", "seedance-2", "seedance-1-5-pro"];
 const defaultVideoDurationSeconds = 10;
-const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast";
+const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast";
 const defaultVideoTemplate: TemplateName = "scene";
 
 const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
@@ -746,16 +758,22 @@ const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; mode
     label: "本地模拟",
     confirmPaid: false
   },
-  "seednice-2-fast": {
+  "seedance-2-fast": {
     provider: "volcengine-seedance",
     model: "doubao-seedance-2-0-fast-260128",
-    label: "seednice2.0 fast",
+    label: "seedance2.0 fast",
     confirmPaid: true
   },
-  "seednice-2": {
+  "seedance-2": {
     provider: "volcengine-seedance",
     model: "doubao-seedance-2-0-260128",
-    label: "seednice2.0",
+    label: "seedance2.0",
+    confirmPaid: true
+  },
+  "seedance-1-5-pro": {
+    provider: "volcengine-seedance",
+    model: "doubao-seedance-1-5-pro-251215",
+    label: "seedance1.5 pro",
     confirmPaid: true
   }
 };
@@ -807,7 +825,7 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
   ],
   "volcengine-seedance": [
     {
-      name: "豆包 seednice2.0 fast 推荐-视频",
+      name: "豆包 seedance2.0 fast 推荐-视频",
       vendor: "volcengine",
       priority: 0,
       apiKey: "",
@@ -815,12 +833,20 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
       model: "doubao-seedance-2-0-fast-260128"
     },
     {
-      name: "豆包 seednice2.0 推荐-视频",
+      name: "豆包 seedance2.0 推荐-视频",
       vendor: "volcengine",
       priority: 0,
       apiKey: "",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-260128"
+    },
+    {
+      name: "豆包 seedance1.5 pro 推荐-视频",
+      vendor: "volcengine",
+      priority: 0,
+      apiKey: "",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-1-5-pro-251215"
     }
   ]
 };
@@ -875,6 +901,7 @@ export function App() {
   const [preflightSignature, setPreflightSignature] = useState("");
   const [statusText, setStatusText] = useState("等待操作");
   const [consoleToast, setConsoleToast] = useState<ConsoleToastState | undefined>();
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionState | undefined>();
   const [selectedProduct, setSelectedProduct] = useState<ProductDetail | undefined>();
   const [productStudioLoadError, setProductStudioLoadError] = useState("");
   const [productDraft, setProductDraft] = useState<ProductDraft>(defaultProductDraft);
@@ -914,6 +941,7 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const contentScrollerRef = useRef<HTMLDivElement | null>(null);
   const videoJobsRef = useRef<VideoJob[]>([]);
+  const confirmActionResolverRef = useRef<((confirmed: boolean) => void) | undefined>(undefined);
   const selectedProductSkuRef = useRef<string | undefined>(undefined);
   const selectedProductRef = useRef<ProductDetail | undefined>(undefined);
   const productDraftRef = useRef<ProductDraft>(defaultProductDraft);
@@ -993,6 +1021,20 @@ export function App() {
       message,
       tone
     });
+  }
+
+  function requestConfirmAction(request: ConfirmActionRequest): Promise<boolean> {
+    confirmActionResolverRef.current?.(false);
+    return new Promise((resolve) => {
+      confirmActionResolverRef.current = resolve;
+      setConfirmAction({ ...request, id: Date.now() });
+    });
+  }
+
+  function resolveConfirmAction(confirmed: boolean) {
+    confirmActionResolverRef.current?.(confirmed);
+    confirmActionResolverRef.current = undefined;
+    setConfirmAction(undefined);
   }
 
   function ensureTextModelConfigured(): boolean {
@@ -1945,7 +1987,13 @@ export function App() {
 
   async function deleteProduct(sku: string) {
     const productTitle = productTitleForSku(sku);
-    const confirmed = typeof window === "undefined" ? true : window.confirm(`删除这个商品资料？\n\n${productTitle}\n\n已有视频和生成记录不会被删除。`);
+    const confirmed = await requestConfirmAction({
+      title: "删除这个商品资料？",
+      message: productTitle || sku,
+      details: ["已有视频和生成记录不会被删除。"],
+      confirmLabel: "确认删除",
+      tone: "danger"
+    });
     if (!confirmed) return;
     setIsBusy(true);
     try {
@@ -2413,15 +2461,13 @@ export function App() {
       return;
     }
     if (paidRetry) {
-      const confirmed = window.confirm(
-        [
-          "重试这个付费生成任务？",
-          "",
-          `${videoModelLabel(job.provider, job.providerModel)} / ${formatDuration(job.durationSeconds)}`,
-          "",
-          "重试会重新创建生成任务，可能再次扣费。"
-        ].join("\n")
-      );
+      const confirmed = await requestConfirmAction({
+        title: "重试这个付费生成任务？",
+        message: `${videoModelLabel(job.provider, job.providerModel)} / ${formatDuration(job.durationSeconds)}`,
+        details: ["重试会重新创建生成任务，可能再次扣费。"],
+        confirmLabel: "确认重试",
+        tone: "paid"
+      });
       if (!confirmed) {
         setStatusText("已取消重试付费任务。");
         return;
@@ -2467,7 +2513,13 @@ export function App() {
       setStatusText("该视频文件已经不存在。");
       return;
     }
-    const confirmed = window.confirm(`删除这个本地视频文件？\n\n${asset.path}\n\n任务记录、成本、脚本和报告会保留。`);
+    const confirmed = await requestConfirmAction({
+      title: "删除这个本地视频文件？",
+      message: asset.path,
+      details: ["任务记录、成本、脚本和报告会保留。"],
+      confirmLabel: "确认删除",
+      tone: "danger"
+    });
     if (!confirmed) {
       return;
     }
@@ -2779,6 +2831,12 @@ export function App() {
           {renderActiveSection()}
         </div>
         <ConsoleToast consoleToast={consoleToast} onClose={() => setConsoleToast(undefined)} />
+        <ConfirmActionDialog
+          action={confirmAction}
+          isBusy={isBusy}
+          onCancel={() => resolveConfirmAction(false)}
+          onConfirm={() => resolveConfirmAction(true)}
+        />
       </section>
     </main>
   );
@@ -2916,6 +2974,87 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
           <X size={13} />
         </button>
       </div>
+    </div>
+  );
+}
+
+function ConfirmActionDialog({
+  action,
+  isBusy,
+  onCancel,
+  onConfirm
+}: {
+  action?: ConfirmActionState;
+  isBusy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    if (!action || isBusy) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [action, isBusy, onCancel]);
+
+  if (!action) {
+    return null;
+  }
+
+  const paid = action.tone === "paid";
+  const danger = action.tone === "danger";
+  const Icon = paid ? CircleDollarSign : danger ? AlertTriangle : ShieldCheck;
+  const iconClass = paid ? "text-amber-700" : danger ? "text-[var(--danger)]" : "text-[var(--accent)]";
+  const iconBgClass = paid ? "bg-amber-50" : danger ? "bg-red-50" : "bg-[color-mix(in_srgb,var(--accent)_10%,white)]";
+  const confirmVariant = danger ? "danger" : paid ? "primary" : "primary";
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(23,32,51,.45)] p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label={action.title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isBusy) {
+          onCancel();
+        }
+      }}
+    >
+      <section className="grid w-full max-w-[500px] gap-4 rounded-[18px] border border-[#dbe4f0] bg-white p-5 shadow-[0_28px_90px_rgba(23,32,51,.26)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)] gap-3">
+            <div className={cn("grid h-10 w-10 place-items-center rounded-xl border border-white shadow-[0_12px_24px_rgba(30,42,68,.08)]", iconBgClass)}>
+              <Icon className={iconClass} size={19} strokeWidth={2.4} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[17px] font-black leading-6 text-[#172033]">{action.title}</div>
+              <div className="mt-2 break-words text-[13px] font-bold leading-6 text-[#2b3445]">{action.message}</div>
+            </div>
+          </div>
+          <Button className="w-fit" size="icon" variant="ghost" aria-label="关闭确认弹窗" disabled={isBusy} onClick={onCancel}>
+            <X size={15} />
+          </Button>
+        </div>
+        {action.details?.length ? (
+          <div className="grid gap-1.5 rounded-[12px] border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2.5 text-xs font-semibold leading-5 text-[#6c7890]">
+            {action.details.map((detail) => (
+              <div key={detail}>{detail}</div>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button className="w-fit" variant="ghost" disabled={isBusy} onClick={onCancel}>
+            {action.cancelLabel ?? "取消"}
+          </Button>
+          <Button className="w-fit" variant={confirmVariant} disabled={isBusy} onClick={onConfirm}>
+            {danger ? <X size={13} /> : paid ? <CircleDollarSign size={13} /> : <ShieldCheck size={13} />}
+            {action.confirmLabel}
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -7050,7 +7189,7 @@ function toneClass(tone: "blue" | "green" | "orange" | "violet" | "rose" | "cyan
 
 function providerLabel(value?: string): string {
   if (value === "mock") return "本地模拟";
-  if (value === "volcengine-seedance" || value === "seedance") return "seednice2.0 fast";
+  if (value === "volcengine-seedance" || value === "seedance") return "seedance2.0 fast";
   return value || "-";
 }
 
@@ -7060,9 +7199,10 @@ function videoModelChoiceLabel(value: VideoModelChoice): string {
 
 function videoModelLabel(provider?: string, model?: string): string {
   if (provider === "mock") return "本地模拟";
-  if (model === "doubao-seedance-2-0-260128") return "seednice2.0";
-  if (model === "doubao-seedance-2-0-fast-260128") return "seednice2.0 fast";
-  if (provider === "volcengine-seedance" || provider === "seedance") return "seednice2.0 fast";
+  if (model === "doubao-seedance-1-5-pro-251215") return "seedance1.5 pro";
+  if (model === "doubao-seedance-2-0-260128") return "seedance2.0";
+  if (model === "doubao-seedance-2-0-fast-260128") return "seedance2.0 fast";
+  if (provider === "volcengine-seedance" || provider === "seedance") return "seedance2.0 fast";
   return provider || "-";
 }
 
