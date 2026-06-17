@@ -9,6 +9,7 @@ import { resolveReferenceImages } from "../core/productAssetResolver.js";
 import {
   buildProductImportQuality,
   cleanImportedProductText,
+  riskyClaimPatterns,
   type ImportedProductPreview
 } from "../core/productImportCleaner.js";
 import { parseProductFacts } from "../core/productFacts.js";
@@ -2624,7 +2625,14 @@ function buildImportedProductPreview(input: ImportProductPreviewRequest): Import
   if (!text) {
     throw new Error("Product import requires source text.");
   }
-  return cleanImportedProductText(text);
+  const preview = cleanImportedProductText(text);
+  return {
+    ...preview,
+    product: {
+      ...preview.product,
+      source_text: text
+    }
+  };
 }
 
 async function buildAiImportedProductPreview(input: {
@@ -2643,7 +2651,8 @@ async function buildAiImportedProductPreview(input: {
       "只输出 JSON object，不要 markdown。",
       "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
       "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
-      "只把可确认事实放入 verified_selling_points；销量、排名、医用、防水、UV 数值、功效等未证明内容放入 forbidden_claims。",
+      "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
+      "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
       "价格、店铺名、物流信息不要写入商品资料。"
     ].join("\n"),
     user: [
@@ -2665,17 +2674,65 @@ async function buildAiImportedProductPreview(input: {
 function normalizeAiProductFacts(input: unknown, sourceText: string): unknown {
   const fallback = cleanImportedProductText(sourceText).product;
   const raw = isPlainObject(input) ? input : {};
+  const aiVerifiedSellingPoints = textListFromAiValue(raw.verified_selling_points, fallback.verified_selling_points);
+  const aiForbiddenClaims = textListFromAiValue(raw.forbidden_claims, fallback.forbidden_claims);
+  const normalizedClaims = normalizeAiClaims({
+    verifiedSellingPoints: aiVerifiedSellingPoints,
+    forbiddenClaims: aiForbiddenClaims,
+    fallbackVerifiedSellingPoints: fallback.verified_selling_points,
+    sourceText
+  });
   return {
     sku: textFromAiValue(raw.sku) || fallback.sku,
     title_ja: textFromAiValue(raw.title_ja) || fallback.title_ja,
     category: textFromAiValue(raw.category) || fallback.category,
     materials: textListFromAiValue(raw.materials, fallback.materials),
     dimensions: dimensionTextFromAiValue(raw.dimensions) || fallback.dimensions,
-    verified_selling_points: textListFromAiValue(raw.verified_selling_points, fallback.verified_selling_points),
+    verified_selling_points: normalizedClaims.verifiedSellingPoints,
     usage_scenes: textListFromAiValue(raw.usage_scenes, fallback.usage_scenes),
-    forbidden_claims: textListFromAiValue(raw.forbidden_claims, fallback.forbidden_claims),
-    reference_images: textListFromAiValue(raw.reference_images, fallback.reference_images)
+    forbidden_claims: normalizedClaims.forbiddenClaims,
+    reference_images: referenceImagesFromAiValue(raw.reference_images, fallback.reference_images, sourceText),
+    source_text: sourceText
   };
+}
+
+function normalizeAiClaims(input: {
+  verifiedSellingPoints: string[];
+  forbiddenClaims: string[];
+  fallbackVerifiedSellingPoints: string[];
+  sourceText: string;
+}): { verifiedSellingPoints: string[]; forbiddenClaims: string[] } {
+  const verifiedSellingPoints = [...input.verifiedSellingPoints];
+  const forbiddenClaims: string[] = [];
+  for (const claim of input.forbiddenClaims) {
+    if (isRiskyProductClaim(claim) || claimMarkedUnverified(claim)) {
+      forbiddenClaims.push(claim);
+      continue;
+    }
+    if (input.sourceText.includes(claim)) {
+      verifiedSellingPoints.push(claim);
+    }
+  }
+  return {
+    verifiedSellingPoints: uniqueTextItems([
+      ...verifiedSellingPoints,
+      ...input.fallbackVerifiedSellingPoints.filter((point) => !point.includes("待确认"))
+    ]),
+    forbiddenClaims: uniqueTextItems(forbiddenClaims)
+  };
+}
+
+function isRiskyProductClaim(claim: string): boolean {
+  return riskyClaimPatterns.some((pattern) => pattern.test(claim));
+}
+
+function claimMarkedUnverified(claim: string): boolean {
+  return /未确认|未確認|証明未確認|根拠なし|证据不足|エビデンスなし/.test(claim);
+}
+
+function referenceImagesFromAiValue(value: unknown, fallback: string[], sourceText: string): string[] {
+  const references = textListFromAiValue(value, fallback);
+  return references.filter((reference) => sourceText.includes(reference));
 }
 
 function textListFromAiValue(value: unknown, fallback: string[]): string[] {
@@ -2684,7 +2741,11 @@ function textListFromAiValue(value: unknown, fallback: string[]): string[] {
     .flatMap((item) => textFromAiValue(item).split(/[、,\n]/))
     .map((item) => item.trim())
     .filter(Boolean);
-  return normalized.length > 0 ? Array.from(new Set(normalized)) : fallback;
+  return normalized.length > 0 ? uniqueTextItems(normalized) : fallback;
+}
+
+function uniqueTextItems(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function dimensionTextFromAiValue(value: unknown): string {
@@ -2719,6 +2780,10 @@ function textFromAiValue(value: unknown): string {
     return Object.values(value).map(textFromAiValue).filter(Boolean).join(" ");
   }
   return "";
+}
+
+function withoutPlaceholderReferenceImages(referenceImages: string[]): string[] {
+  return referenceImages.filter((reference) => reference.trim() && reference.trim() !== "reference.jpg");
 }
 
 async function importProductFromText(input: {
@@ -3230,7 +3295,7 @@ async function importProductReferenceAssets(input: {
     rootDir: input.rootDir
   });
   const imported: ImportedProductAsset[] = [];
-  const nextReferenceImages = [...product.reference_images];
+  const nextReferenceImages = withoutPlaceholderReferenceImages(product.reference_images);
   for (const [index, image] of statuses.entries()) {
     if (image.status !== "outside-project-root") {
       continue;
@@ -3292,7 +3357,7 @@ async function uploadProductReferenceImages(input: {
   if (!Array.isArray(files) || files.length === 0) {
     throw new Error("Reference image upload requires at least one file.");
   }
-  const nextReferenceImages = [...product.reference_images];
+  const nextReferenceImages = withoutPlaceholderReferenceImages(product.reference_images);
   const uploaded: UploadedProductReferenceImage[] = [];
   for (const file of files) {
     const fileName = typeof file.fileName === "string" && file.fileName.trim() ? file.fileName.trim() : "reference.jpg";

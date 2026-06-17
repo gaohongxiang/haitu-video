@@ -21,8 +21,7 @@ interface FieldReadResult {
   lineIndex?: number;
 }
 
-const defaultForbiddenClaims = ["销量未确认", "排名未确认", "防水未确认", "功效未确认"];
-const riskyClaimPatterns = [
+export const riskyClaimPatterns = [
   /UV\s*カット\s*\d+%以上/i,
   /UV\s*\d+%/i,
   /防水/,
@@ -88,7 +87,6 @@ export function cleanImportedProductText(sourceText: string): ImportedProductPre
 
   const explicitForbiddenClaims = splitImportedList(forbiddenField.value);
   const explicitRiskyClaims = explicitForbiddenClaims?.filter((claim) => riskyClaimPatterns.some((pattern) => pattern.test(claim))) ?? [];
-  const fallbackForbiddenClaims = explicitForbiddenClaims ? [] : defaultForbiddenClaims;
   const title = titleField.value ?? firstLikelyTitleLine(lines);
   if (!title || title === "未命名商品") {
     throw new Error("Imported product title is missing or invalid.");
@@ -106,8 +104,7 @@ export function cleanImportedProductText(sourceText: string): ImportedProductPre
     usage_scenes: splitImportedList(usageField.value) ?? inferUsageScenes(categoryField.value, titleField.value),
     forbidden_claims: uniqueNonEmpty([
       ...(explicitForbiddenClaims ?? []),
-      ...riskyClaims.map((claim) => `${claim}は証明未確認`),
-      ...fallbackForbiddenClaims
+      ...riskyClaims.map((claim) => `${claim}は証明未確認`)
     ]),
     reference_images: collectImageReferences(lines, imageField.value)
   };
@@ -305,7 +302,7 @@ function collectImageReferences(lines: string[], explicitImages: string | undefi
   if (candidates.length === 0 && explicitImages) {
     candidates.push(...(splitImportedImageList(explicitImages) ?? []));
   }
-  return uniqueNonEmpty(candidates).length > 0 ? uniqueNonEmpty(candidates) : ["reference.jpg"];
+  return uniqueNonEmpty(candidates);
 }
 
 function splitImportedList(value: string | undefined): string[] | undefined {

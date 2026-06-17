@@ -62,11 +62,7 @@ describe("cleanImportedProductText", () => {
       ],
       usage_scenes: ["通勤", "屋外での移動", "スポーツ"],
       forbidden_claims: [
-        "UVカット96%以上は証明未確認",
-        "销量未确认",
-        "排名未确认",
-        "防水未确认",
-        "功效未确认"
+        "UVカット96%以上は証明未確認"
       ],
       reference_images: ["https://cdn.example.com/main.jpg", "/tmp/detail.jpg"]
     });
@@ -114,6 +110,44 @@ describe("cleanImportedProductText", () => {
         "请补充尺寸/重量，避免生成脚本时编造大小、容量或便携性。"
       ]
     });
+  });
+
+  it("does not invent placeholder reference images when the pasted text has no image", () => {
+    const preview = cleanImportedProductText([
+      "商品ID 9988",
+      "商品タイトル ラウンドファスナー ミニ財布 ブラック",
+      "カテゴリ 財布",
+      "素材 PUレザー",
+      "サイズ 約11x9x3cm",
+      "卖点：カードを整理しやすい",
+      "使用场景：買い物"
+    ].join("\n"));
+
+    expect(preview.product.reference_images).toEqual([]);
+    expect(preview.quality.missingFields).toContain("参考图");
+    expect(preview.quality.verifiedFacts).not.toContain("参考图");
+  });
+
+  it("does not add generic default forbidden claims when no risky claim is present", () => {
+    const preview = cleanImportedProductText([
+      "商品ID 9988",
+      "商品タイトル 接触冷感アームカバー",
+      "カテゴリ アームカバー",
+      "素材 ポリエステル",
+      "サイズ 約52cm",
+      "・接触冷感",
+      "・通気性が良い",
+      "・紫外線対策",
+      "主图：https://cdn.example.com/main.jpg"
+    ].join("\n"));
+
+    expect(preview.product.verified_selling_points).toEqual([
+      "接触冷感",
+      "通気性が良い",
+      "紫外線対策"
+    ]);
+    expect(preview.product.forbidden_claims).toEqual([]);
+    expect(preview.quality.blockedClaims).toEqual([]);
   });
 
   it("treats explicit unverified claim fields as blocked claims", () => {

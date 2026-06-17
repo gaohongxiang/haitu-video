@@ -87,6 +87,39 @@ describe("console API", () => {
     await expect(readFile(refFile, "utf8")).resolves.toBe("image-bytes");
   });
 
+  it("persists optional source text with saved product facts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-source-text-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: "SOURCE-001",
+        title_ja: "接触冷感アームカバー",
+        category: "アームカバー",
+        materials: ["ポリエステル"],
+        dimensions: "約52cm",
+        verified_selling_points: ["接触冷感"],
+        usage_scenes: ["通勤"],
+        forbidden_claims: [],
+        reference_images: [],
+        source_text: "原始资料：接触冷感アームカバー"
+      })
+    });
+
+    const productPath = testProductPath(fixturesDir, "SOURCE-001");
+    const stored = JSON.parse(await readFile(productPath, "utf8"));
+    expect(response.product).toEqual(expect.objectContaining({
+      sku: "SOURCE-001",
+      source_text: "原始资料：接触冷感アームカバー"
+    }));
+    expect(stored).toEqual(expect.objectContaining({
+      source_text: "原始资料：接触冷感アームカバー"
+    }));
+  });
+
   it("persists storyboard history in the selected product directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-storyboards-"));
     const dataDir = join(root, "data");
@@ -569,7 +602,8 @@ describe("console API", () => {
     expect(appSource).toContain("缺失信息");
     expect(appSource).toContain("不可用卖点");
     expect(appSource).toContain("quality");
-    expect(appSource).toContain("检查结果没问题后保存到商品库。");
+    expect(appSource).toContain("可以继续手动编辑，保存时会使用修改后的内容。");
+    expect(appSource).not.toContain("检查结果没问题后保存到商品库。");
     ["商品资料草稿", "资料完整度", "拦截宣称", "禁用/未确认宣称", "手动微调", "禁止/未确认宣称", "生成资料草稿"].forEach((label) => {
       expect(appSource).not.toContain(label);
     });
@@ -685,7 +719,8 @@ describe("console API", () => {
     expect(productLibraryDialog).not.toContain("批量保存");
     expect(productLibraryDialog.split("AI 整理并保存")).toHaveLength(2);
     const productImportResultPreview = appSource.slice(appSource.indexOf("function ProductImportResultPreview"), appSource.indexOf("function ProductImportQualityPanel"));
-    expect(productImportResultPreview).toContain("检查结果没问题后保存到商品库。");
+    expect(productImportResultPreview).toContain("可以继续手动编辑，保存时会使用修改后的内容。");
+    expect(productImportResultPreview).not.toContain("检查结果没问题后保存到商品库。");
     expect(productImportResultPreview).not.toContain("确认后可直接保存");
     expect(productImportResultPreview).not.toContain('label="SKU"');
     expect(productLibraryDialog).not.toContain("逐项填写 SKU");
@@ -850,7 +885,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("clipboardReferenceFiles");
     expect(creationComposerSource).toContain("handleProductFactsPaste");
     expect(creationComposerSource).toContain("event.stopPropagation()");
-    expect(creationComposerSource).toContain('event.clipboardData.getData("text/plain")');
+    expect(creationComposerSource).toContain("event.preventDefault()");
+    expect(creationComposerSource).not.toContain('event.clipboardData.getData("text/plain")');
     expect(creationComposerSource).toContain("onPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
@@ -873,6 +909,9 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('onToast("资料包已保存。", "ok")');
     expect(creationComposerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
     expect(creationComposerSource).toContain("disabled:opacity-100");
+    expect(creationComposerSource).toContain("productPackageButtonLabel");
+    expect(creationComposerSource).toContain('"保存资料包"');
+    expect(creationComposerSource).toContain('"AI 整理资料包"');
     expect(creationComposerSource).not.toContain("创建生成任务中");
     expect(creationComposerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(creationComposerSource).not.toContain("max-h-[312px]");
@@ -896,7 +935,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("AI 整理资料包");
     expect(creationComposerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
-    expect(creationComposerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(creationComposerSource).toContain('{isPacking ? "处理中" : productPackageButtonLabel}');
+    expect(creationComposerSource).toContain('const productPackageButtonLabel = importText.trim() && isStructuredProductComposerText(importText) ? "保存资料包" : "AI 整理资料包";');
     expect(storyboardPanelSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
     expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
     expect(creationComposerSource).toContain("placeholder=\"\"");
@@ -1987,6 +2027,9 @@ describe("console API", () => {
     expect(composerSource).toContain('onToast("资料包已保存。", "ok")');
     expect(composerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
     expect(composerSource).toContain("disabled:opacity-100");
+    expect(composerSource).toContain("productPackageButtonLabel");
+    expect(composerSource).toContain('"保存资料包"');
+    expect(composerSource).toContain('"AI 整理资料包"');
     expect(composerSource).not.toContain("创建生成任务中");
     expect(composerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(composerSource).not.toContain("max-h-[312px]");
@@ -2014,7 +2057,8 @@ describe("console API", () => {
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("AI 整理资料包");
     expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
-    expect(composerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(composerSource).toContain('{isPacking ? "处理中" : productPackageButtonLabel}');
+    expect(composerSource).toContain('const productPackageButtonLabel = importText.trim() && isStructuredProductComposerText(importText) ? "保存资料包" : "AI 整理资料包";');
     expect(composerSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
     expect(composerSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
     expect(composerSource).toContain("placeholder=\"\"");
@@ -2062,20 +2106,21 @@ describe("console API", () => {
     const fixturesDir = testProductsDir(root);
     const server = createConsoleServer({ rootDir: root, fixturesDir });
 
+    const sourceText = [
+      "SKU: WALLET-BLACK-001",
+      "商品名：ラウンドファスナー ミニ財布 ブラック",
+      "カテゴリ：財布",
+      "素材：PUレザー、ポリエステル",
+      "サイズ：約11x9x3cm",
+      "卖点：カードを整理しやすい / 小銭入れ付き / ラウンドファスナー",
+      "使用场景：買い物、通勤、旅行",
+      "禁止：本革未確認、防水未確認、日本で大人気は未確認",
+      "图片：/tmp/wallet-main.jpg, detail1.jpg"
+    ].join("\n");
     const response = await server.fetchJson("/api/products/import-preview", {
       method: "POST",
       body: JSON.stringify({
-        text: [
-          "SKU: WALLET-BLACK-001",
-          "商品名：ラウンドファスナー ミニ財布 ブラック",
-          "カテゴリ：財布",
-          "素材：PUレザー、ポリエステル",
-          "サイズ：約11x9x3cm",
-          "卖点：カードを整理しやすい / 小銭入れ付き / ラウンドファスナー",
-          "使用场景：買い物、通勤、旅行",
-          "禁止：本革未確認、防水未確認、日本で大人気は未確認",
-          "图片：/tmp/wallet-main.jpg, detail1.jpg"
-        ].join("\n")
+        text: sourceText
       })
     });
 
@@ -2088,7 +2133,8 @@ describe("console API", () => {
       verified_selling_points: ["カードを整理しやすい", "小銭入れ付き", "ラウンドファスナー"],
       usage_scenes: ["買い物", "通勤", "旅行"],
       forbidden_claims: ["本革未確認", "防水未確認", "日本で大人気は未確認"],
-      reference_images: ["/tmp/wallet-main.jpg", "detail1.jpg"]
+      reference_images: ["/tmp/wallet-main.jpg", "detail1.jpg"],
+      source_text: sourceText
     });
     expect(response.notes).toEqual([]);
     await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
@@ -2135,10 +2181,11 @@ describe("console API", () => {
         })
       });
 
+      const sourceText = "商品名：AI整理 ミニ収納ケース\n素材：PP";
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
-          text: "商品名：AI整理 ミニ収納ケース\n素材：PP"
+          text: sourceText
         })
       });
 
@@ -2151,10 +2198,12 @@ describe("console API", () => {
         verified_selling_points: ["小物を整理しやすい", "折りたたみ収納に対応"],
         usage_scenes: ["デスク", "旅行"],
         forbidden_claims: ["防水効果は未確認"],
-        reference_images: ["ai-case-01.jpg", "ai-case-02.jpg", "ai-case-03.jpg"]
+        reference_images: [],
+        source_text: sourceText
       });
       expect(response.notes).toContain("文本模型已整理商品资料。");
-      expect(response.quality.ready).toBe(true);
+      expect(response.quality.ready).toBe(false);
+      expect(response.quality.missingFields).toContain("参考图");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/chat/completions");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
         authorization: "Bearer text-model-secret-key-123456"
@@ -2163,6 +2212,86 @@ describe("console API", () => {
       expect(body.model).toBe("gpt-5.5");
       expect(body.messages.at(-1).content).toContain("商品名");
       await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("keeps ordinary source-backed product features out of AI forbidden claims", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-ai-less-strict-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "ARM-COVER-COOL",
+                  title_ja: "接触冷感アームカバー",
+                  category: "アームカバー",
+                  materials: ["ポリエステル"],
+                  dimensions: "約52cm",
+                  verified_selling_points: ["指先までカバー"],
+                  usage_scenes: ["通勤"],
+                  forbidden_claims: [
+                    "UVカット96%以上",
+                    "日焼け防止",
+                    "紫外線対策",
+                    "接触冷感",
+                    "肌に触れるとひんやりする",
+                    "通気性が良い",
+                    "真夏でも快適に着用可能",
+                    "快適で冷たい着用感"
+                  ],
+                  reference_images: []
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 789
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-model-secret-key-123456"
+        })
+      });
+
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: [
+            "商品名：接触冷感アームカバー",
+            "素材：ポリエステル",
+            "サイズ：約52cm",
+            "卖点：日焼け防止、紫外線対策、接触冷感、肌に触れるとひんやりする、通気性が良い、真夏でも快適に着用可能、快適で冷たい着用感、UVカット96%以上"
+          ].join("\n")
+        })
+      });
+
+      expect(response.product.forbidden_claims).toEqual(["UVカット96%以上"]);
+      expect(response.product.verified_selling_points).toEqual(expect.arrayContaining([
+        "指先までカバー",
+        "日焼け防止",
+        "紫外線対策",
+        "接触冷感",
+        "肌に触れるとひんやりする",
+        "通気性が良い",
+        "真夏でも快適に着用可能",
+        "快適で冷たい着用感"
+      ]));
+      expect(response.quality.blockedClaims).toEqual(["UVカット96%以上"]);
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
@@ -2222,7 +2351,7 @@ describe("console API", () => {
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
-          text: "接触冷感アームカバー UV カット 96% 指穴付き"
+          text: "接触冷感アームカバー UV カット 96% 指穴付き\n参考图：https://cdn.example.com/arm-cover.jpg"
         })
       });
 
@@ -2239,6 +2368,63 @@ describe("console API", () => {
       }));
       expect(response.notes).toContain("文本模型已整理商品资料。");
       expect(response.quality.ready).toBe(true);
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("does not trust AI-invented reference images when the source text has no image", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-ai-no-image-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "ITEM-AI-002",
+                  title_ja: "AI整理 ミニ収納ケース",
+                  category: "収納ケース",
+                  materials: ["PP"],
+                  dimensions: "約12x8x4cm",
+                  verified_selling_points: ["小物を整理しやすい"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: ["防水効果は未確認"],
+                  reference_images: ["reference.jpg", "ai-case-01.jpg"]
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 456
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-model-secret-key-123456"
+        })
+      });
+
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：AI整理 ミニ収納ケース\n素材：PP"
+        })
+      });
+
+      expect(response.product.reference_images).toEqual([]);
+      expect(response.quality.missingFields).toContain("参考图");
+      expect(response.quality.verifiedFacts).not.toContain("参考图");
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
@@ -3033,6 +3219,39 @@ describe("console API", () => {
       previewUrl: `/media?path=${encodeURIComponent(uploadedPath)}`,
       status: "previewable"
     });
+  });
+
+  it("replaces placeholder reference image entries when uploading real product images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-upload-replaces-placeholder-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(productPath, {
+      reference_images: ["reference.jpg"]
+    });
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products/TK-001/reference-images", {
+      method: "POST",
+      body: JSON.stringify({
+        files: [
+          {
+            fileName: "wallet.png",
+            mimeType: "image/png",
+            base64: Buffer.from("uploaded-wallet-image").toString("base64")
+          }
+        ]
+      })
+    });
+
+    const uploadedReference = "refs/reference-01.png";
+    expect(response.product.reference_images).toEqual([uploadedReference]);
+    expect(response.product.reference_image_statuses).toEqual([
+      expect.objectContaining({
+        original: uploadedReference,
+        status: "previewable"
+      })
+    ]);
   });
 
   it("deletes a product reference image from the product file", async () => {

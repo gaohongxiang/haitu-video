@@ -103,6 +103,7 @@ interface ProductDetail extends ProductSummary {
   usage_scenes: string[];
   forbidden_claims: string[];
   reference_images: string[];
+  source_text?: string;
   reference_image_statuses?: ReferenceImageStatus[];
 }
 
@@ -646,6 +647,7 @@ interface ProductDraft {
   usage_scenes: string;
   forbidden_claims: string;
   reference_images: string;
+  source_text: string;
 }
 
 interface ModelConfigDraft {
@@ -727,8 +729,9 @@ const defaultProductDraft: ProductDraft = {
   dimensions: "",
   verified_selling_points: "",
   usage_scenes: "",
-  forbidden_claims: "本革未確認\n防水未確認\n日本で大人気は未確認",
-  reference_images: ""
+  forbidden_claims: "",
+  reference_images: "",
+  source_text: ""
 };
 
 const videoModelOptions: VideoModelChoice[] = ["mock", "seednice-2-fast", "seednice-2"];
@@ -1730,6 +1733,7 @@ export function App() {
         });
         const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
         await applyProductToCreationComposerWithStoryboards(response.product);
+        setProductComposerSource("structured");
         setImportNotes(preview.notes);
         setImportQuality(preview.quality);
         persistProductStudioSku(response.product.sku);
@@ -1745,7 +1749,10 @@ export function App() {
       }
 
       const draftToSave = importText ? structuredDraft : productDraft;
-      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts(draftToSave));
+      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts({
+        ...draftToSave,
+        source_text: draftToSave.source_text || productDraft.source_text || selectedProduct?.source_text || ""
+      }));
       await applyProductToCreationComposerWithStoryboards(response.product);
       setImportNotes([]);
       setImportQuality(response.product.importQuality);
@@ -1880,6 +1887,8 @@ export function App() {
         setProductPath(response.product.path);
         setProductDraft(productFactsToDraft(response.product));
       }
+      setProductImportText(productDraftToComposerText(productFactsToDraft(response.product)));
+      setProductComposerSource("structured");
       setImportNotes(preview.notes);
       setImportQuality(preview.quality);
       setProductLibraryDialogMode(undefined);
@@ -1996,7 +2005,10 @@ export function App() {
     setIsBusy(true);
     try {
       const editingCurrentProduct = productLibraryDialogMode === "edit";
-      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts(productDraft));
+      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts({
+        ...productDraft,
+        source_text: productDraft.source_text || selectedProduct?.source_text || ""
+      }));
       const continueCreation = activeSection === "video";
       if (editingCurrentProduct || continueCreation) {
         if (continueCreation) {
@@ -3360,6 +3372,7 @@ function ProductCreationComposer({
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
+  const productPackageButtonLabel = importText.trim() && isStructuredProductComposerText(importText) ? "保存资料包" : "AI 整理资料包";
   const generateVideoButtonLabel = versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频";
   const storyboardProductReady = Boolean(selectedProduct || importText.trim());
   const generationReadiness = productGenerationReadiness({
@@ -3508,10 +3521,8 @@ function ProductCreationComposer({
     const files = clipboardReferenceFiles(event.clipboardData);
     if (!files.some(isReferenceImageFile)) return;
     event.stopPropagation();
+    event.preventDefault();
     handleReferenceFiles(files);
-    if (!event.clipboardData.getData("text/plain")) {
-      event.preventDefault();
-    }
   }
 
   async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
@@ -3614,7 +3625,7 @@ function ProductCreationComposer({
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
                 <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
                   {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
-                  {isPacking ? "整理中" : "AI 整理资料包"}
+                  {isPacking ? "处理中" : productPackageButtonLabel}
                 </Button>
               </div>
               <Textarea
@@ -5151,12 +5162,12 @@ function ProductImportResultPreview({
         <div className="min-w-0">
           <div className="text-sm font-black">整理后的商品资料</div>
           <div className="mt-1 text-xs font-semibold text-[var(--muted)]">
-            检查结果没问题后保存到商品库。
+            可以继续手动编辑，保存时会使用修改后的内容。
           </div>
         </div>
         <Button className="w-fit" size="sm" onClick={onEditManually}>
           <Settings size={14} />
-          手动填写
+          手动编辑
         </Button>
       </div>
       <div className="grid gap-2 lg:grid-cols-3">
@@ -7425,7 +7436,8 @@ function productDraftToFacts(draft: ProductDraft) {
     verified_selling_points: splitLines(draft.verified_selling_points),
     usage_scenes: splitLines(draft.usage_scenes),
     forbidden_claims: splitLines(draft.forbidden_claims),
-    reference_images: splitLines(draft.reference_images)
+    reference_images: splitLines(draft.reference_images),
+    source_text: draft.source_text.trim() || undefined
   };
 }
 
@@ -7488,7 +7500,8 @@ function productComposerTextToDraft(value: string, fallback: ProductDraft): Prod
     dimensions: bucketText("dimensions") ?? fallback.dimensions,
     verified_selling_points: bucketText("verified_selling_points") ?? fallback.verified_selling_points,
     usage_scenes: bucketText("usage_scenes") ?? fallback.usage_scenes,
-    forbidden_claims: bucketText("forbidden_claims") ?? fallback.forbidden_claims
+    forbidden_claims: bucketText("forbidden_claims") ?? fallback.forbidden_claims,
+    source_text: fallback.source_text
   };
 }
 
@@ -7514,7 +7527,8 @@ function productFactsToDraft(product: ProductFactsResponse): ProductDraft {
     verified_selling_points: product.verified_selling_points.join("\n"),
     usage_scenes: product.usage_scenes.join("\n"),
     forbidden_claims: product.forbidden_claims.join("\n"),
-    reference_images: product.reference_images.join("\n")
+    reference_images: product.reference_images.join("\n"),
+    source_text: product.source_text ?? ""
   };
 }
 

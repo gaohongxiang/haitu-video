@@ -32,13 +32,18 @@ describe("parseProductFacts", () => {
     ).toThrow(/verified_selling_points/);
   });
 
-  it("rejects products without forbidden claim notes", () => {
-    expect(() =>
-      parseProductFacts({
-        ...validProduct,
-        forbidden_claims: []
-      })
-    ).toThrow(/forbidden_claims/);
+  it("accepts products without forbidden claim notes", () => {
+    expect(parseProductFacts({
+      ...validProduct,
+      forbidden_claims: []
+    }).forbidden_claims).toEqual([]);
+  });
+
+  it("accepts optional original source text for later editing", () => {
+    expect(parseProductFacts({
+      ...validProduct,
+      source_text: "商品ページからコピーした原始資料"
+    }).source_text).toBe("商品ページからコピーした原始資料");
   });
 
   it("accepts a saved product before reference images are uploaded", () => {
