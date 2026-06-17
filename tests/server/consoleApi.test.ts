@@ -439,7 +439,10 @@ describe("console API", () => {
       appSource.indexOf("返回账号入口", appSource.indexOf("onSubmit={onResetPassword}"))
     );
     expect(resetPasswordFormSource.indexOf('label="新密码"')).toBeLessThan(resetPasswordFormSource.indexOf("<AuthOtpField"));
+    expect(appSource).not.toContain("验证码已发送到邮箱，请输入后继续。");
+    expect(appSource).not.toContain("验证码已重新发送，请查看邮箱。");
     expect(appSource).not.toContain("验证码已发送到邮箱，请输入验证码和新密码。");
+    expect(appSource).toContain("密码已重置，请用新密码登录。");
     expect(appSource).not.toContain("onSubmit={onRequestPasswordReset}");
     expect(appSource).toContain("setActiveSection(defaultConsoleSection)");
     expect(appSource).not.toContain("已退出登录");

@@ -1076,7 +1076,7 @@ export function App() {
         setAuthOtp("");
         setForgotPasswordOtpSent(false);
         startAuthOtpCooldown();
-        setAuthStatus("验证码已发送到邮箱，请输入后继续。");
+        setAuthStatus("");
         return;
       }
       await enterConsoleAfterAuth(session);
@@ -1117,7 +1117,7 @@ export function App() {
         setAuthOtp("");
         setForgotPasswordOtpSent(false);
         startAuthOtpCooldown();
-        setAuthStatus("验证码已重新发送，请查看邮箱。");
+        setAuthStatus("");
         return;
       }
       await enterConsoleAfterAuth(session);
