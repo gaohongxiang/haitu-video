@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import * as EChartsForReact from "echarts-for-react";
 import type { EChartsOption, EChartsReactProps } from "echarts-for-react";
-import { FormEvent, ReactNode, type ClipboardEvent, type ComponentType, type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, type ClipboardEvent, type ComponentType, type Dispatch, type DragEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
@@ -874,6 +874,7 @@ export function App() {
   const [productStudioLoadError, setProductStudioLoadError] = useState("");
   const [productDraft, setProductDraft] = useState<ProductDraft>(defaultProductDraft);
   const [productImportText, setProductImportText] = useState("");
+  const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
   const [productComposerSource, setProductComposerSource] = useState<ProductComposerSource>("freeform");
   const [importNotes, setImportNotes] = useState<string[]>([]);
   const [importQuality, setImportQuality] = useState<ProductImportQuality | undefined>();
@@ -1610,6 +1611,7 @@ export function App() {
     setProductPath(product.path);
     setProductDraft(nextDraft);
     setProductImportText(productDraftToComposerText(nextDraft));
+    setPendingImageFiles([]);
     setProductComposerSource("structured");
     setImportQuality(product.importQuality);
   }
@@ -1689,6 +1691,7 @@ export function App() {
     persistProductStudioSku("");
     setProductDraft(defaultProductDraft);
     setProductImportText("");
+    setPendingImageFiles([]);
     setProductComposerSource("freeform");
     setImportNotes([]);
     setImportQuality(undefined);
@@ -1716,6 +1719,7 @@ export function App() {
     }
     if (!importText && !productDraft.title_ja.trim()) {
       setStatusText("请先填写商品资料，或选择一个已有商品。");
+      showConsoleToast("请先填写商品资料，或选择一个已有商品。");
       return undefined;
     }
 
@@ -2347,7 +2351,9 @@ export function App() {
               videoJobs={videoJobs}
               draft={productDraft}
               importText={productImportText}
-              setImportText={setProductImportText}
+              setImportText={updateProductComposerText}
+              pendingImageFiles={pendingImageFiles}
+              setPendingImageFiles={setPendingImageFiles}
               importNotes={importNotes}
               onOrganizeProductPackage={organizeProductPackage}
               onSelectProduct={openProductStudio}
@@ -3071,6 +3077,8 @@ function ProductCreationWorkspace({
   draft,
   importText,
   setImportText,
+  pendingImageFiles,
+  setPendingImageFiles,
   importNotes,
   onOrganizeProductPackage,
   onSelectProduct,
@@ -3117,6 +3125,8 @@ function ProductCreationWorkspace({
   draft: ProductDraft;
   importText: string;
   setImportText: (text: string) => void;
+  pendingImageFiles: File[];
+  setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -3188,6 +3198,8 @@ function ProductCreationWorkspace({
       draft={draft}
       importText={importText}
       setImportText={setImportText}
+      pendingImageFiles={pendingImageFiles}
+      setPendingImageFiles={setPendingImageFiles}
       importNotes={importNotes}
       onOrganizeProductPackage={onOrganizeProductPackage}
       onSelectProduct={onSelectProduct}
@@ -3237,6 +3249,8 @@ function ProductCreationComposer({
   draft,
   importText,
   setImportText,
+  pendingImageFiles,
+  setPendingImageFiles,
   importNotes,
   onOrganizeProductPackage,
   onSelectProduct,
@@ -3282,6 +3296,8 @@ function ProductCreationComposer({
   draft: ProductDraft;
   importText: string;
   setImportText: (text: string) => void;
+  pendingImageFiles: File[];
+  setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -3318,7 +3334,6 @@ function ProductCreationComposer({
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
-  const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
   const [isPacking, setIsPacking] = useState(false);
   const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
@@ -3374,11 +3389,7 @@ function ProductCreationComposer({
   ].join(" · ");
 
   useEffect(() => {
-    setPendingImageFiles([]);
     setPreviewReferenceIndex(undefined);
-    if (selectedProduct) {
-      setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)));
-    }
     if (productFactsBodyRef.current) {
       productFactsBodyRef.current.scrollTop = 0;
     }
@@ -3417,7 +3428,6 @@ function ProductCreationComposer({
     try {
       const savedProduct = await onOrganizeProductPackage();
       if (!savedProduct) {
-        onToast("请先填写商品资料，或选择一个已有商品。");
         return undefined;
       }
       const productWithImages = await uploadPendingImages(savedProduct);

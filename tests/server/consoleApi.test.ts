@@ -739,10 +739,16 @@ describe("console API", () => {
     expect(videoCase).toContain("onOrganizeProductPackage={organizeProductPackage}");
     expect(videoCase).toContain("onStartNewProduct={startNewVideoProduct}");
     expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
+    expect(videoCase).toContain("pendingImageFiles={pendingImageFiles}");
+    expect(videoCase).toContain("setPendingImageFiles={setPendingImageFiles}");
     expect(videoCase).toContain("ledgerJobs={ledger?.jobs ?? []}");
     expect(creationWorkspaceSource).toContain("<ProductCreationComposer");
     expect(creationWorkspaceSource).toContain("selectedProductStoryboardHistory");
     expect(creationWorkspaceSource).toContain("ledgerJobs: LedgerJob[];");
+    expect(creationWorkspaceSource).toContain("pendingImageFiles: File[];");
+    expect(creationWorkspaceSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
+    expect(creationWorkspaceSource).toContain("pendingImageFiles={pendingImageFiles}");
+    expect(creationWorkspaceSource).toContain("setPendingImageFiles={setPendingImageFiles}");
     expect(creationWorkspaceSource).toContain("mergeLedgerJobs");
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
@@ -871,7 +877,11 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("max-h-[340px]");
     expect(creationComposerSource).not.toContain("grid min-h-[430px]");
     expect(creationComposerSource).toContain("grid items-stretch gap-0");
-    expect(creationComposerSource).toContain("setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)))");
+    expect(appSource).toContain("const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);");
+    expect(creationComposerSource).toContain("pendingImageFiles: File[];");
+    expect(creationComposerSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
+    expect(creationComposerSource).not.toContain("useState<File[]>([])");
+    expect(creationComposerSource).not.toContain("setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)))");
     expect(creationComposerSource).not.toContain("选择已有商品");
     expect(creationComposerSource).not.toContain('label="商品来源"');
     expect(creationComposerSource).not.toContain("商品资料完整，可进入视频预检");
@@ -982,6 +992,11 @@ describe("console API", () => {
     expect(appSource).toContain("setProductDraft(productFactsToDraft(response.product))");
     expect(appSource).toContain("uploadPendingImages(savedProduct)");
     expect(appSource).toContain("onUploadImages(product.sku, pendingImageFiles)");
+    const organizeProductPackageWrapperSource = appSource.slice(
+      appSource.indexOf("async function handleOrganizeProductPackage"),
+      appSource.indexOf("async function handleGenerateVideo")
+    );
+    expect(organizeProductPackageWrapperSource).not.toContain("请先填写商品资料，或选择一个已有商品。");
     expect(appSource).toContain("detectCompletedVideoJobTransitions");
     expect(appSource).toContain("refreshSelectedProductForStudio");
     expect(appSource).toContain("当前商品创作已刷新");
@@ -1965,7 +1980,15 @@ describe("console API", () => {
     expect(composerSource).not.toContain("max-h-[340px]");
     expect(composerSource).not.toContain("grid min-h-[430px]");
     expect(composerSource).toContain("grid items-stretch gap-0");
-    expect(composerSource).toContain("setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)))");
+    expect(appSource).toContain("const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);");
+    expect(videoCase).toContain("pendingImageFiles={pendingImageFiles}");
+    expect(videoCase).toContain("setPendingImageFiles={setPendingImageFiles}");
+    expect(workspaceSource).toContain("pendingImageFiles: File[];");
+    expect(workspaceSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
+    expect(composerSource).toContain("pendingImageFiles: File[];");
+    expect(composerSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
+    expect(composerSource).not.toContain("useState<File[]>([])");
+    expect(composerSource).not.toContain("setImportText(productDraftToComposerText(productFactsToDraft(selectedProduct)))");
     expect(composerSource).not.toContain("选择已有商品");
     expect(composerSource).not.toContain('label="商品来源"');
     expect(composerSource).not.toContain("商品资料完整，可进入视频预检");
