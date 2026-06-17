@@ -822,6 +822,7 @@ const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
 
 const NEW_PRODUCT_SELECT_VALUE = "__new_product__";
 const storyboardTemplateNames: TemplateName[] = ["scene", "pain-point", "benefit", "ugc", "unboxing"];
+const authOtpCooldownDurationSeconds = 60;
 
 function isTemplateName(value: unknown): value is TemplateName {
   return typeof value === "string" && storyboardTemplateNames.includes(value as TemplateName);
@@ -842,6 +843,7 @@ export function App() {
   const [authOtp, setAuthOtp] = useState("");
   const [authNewPassword, setAuthNewPassword] = useState("");
   const [authStatus, setAuthStatus] = useState("正在检查登录状态...");
+  const [authOtpCooldownSeconds, setAuthOtpCooldownSeconds] = useState(0);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [ledger, setLedger] = useState<Ledger | undefined>();
@@ -997,6 +999,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (authOtpCooldownSeconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      setAuthOtpCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [authOtpCooldownSeconds]);
+
+  useEffect(() => {
     videoJobsRef.current = videoJobs;
   }, [videoJobs]);
 
@@ -1063,17 +1073,11 @@ export function App() {
         setAuthFlowMode("verify-email");
         setAuthEmail(session.email ?? authEmail.trim());
         setAuthOtp("");
+        startAuthOtpCooldown();
         setAuthStatus("验证码已发送到邮箱，请输入后继续。");
         return;
       }
-      setAuthSession(session);
-      setAuthEmail("");
-      setAuthPassword("");
-      setAuthOtp("");
-      setAuthNewPassword("");
-      setAuthFlowMode("entry");
-      setAuthStatus("正在载入控制台。");
-      await refreshConsole({ applySettings: true });
+      await enterConsoleAfterAuth(session);
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1089,14 +1093,31 @@ export function App() {
         email: authEmail.trim() || undefined,
         otp: authOtp.trim()
       });
-      setAuthSession(session);
-      setAuthEmail("");
-      setAuthPassword("");
-      setAuthOtp("");
-      setAuthNewPassword("");
-      setAuthFlowMode("entry");
-      setAuthStatus("正在载入控制台。");
-      await refreshConsole({ applySettings: true });
+      await enterConsoleAfterAuth(session);
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function resendVerificationCode() {
+    if (authOtpCooldownSeconds > 0) return;
+    setIsBusy(true);
+    try {
+      const session = await postJson<AuthEntryResponse>("/api/auth/enter", {
+        email: authEmail.trim() || undefined,
+        password: authPassword
+      });
+      if (session.verificationRequired) {
+        setAuthFlowMode("verify-email");
+        setAuthEmail(session.email ?? authEmail.trim());
+        setAuthOtp("");
+        startAuthOtpCooldown();
+        setAuthStatus("验证码已重新发送，请查看邮箱。");
+        return;
+      }
+      await enterConsoleAfterAuth(session);
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1112,7 +1133,7 @@ export function App() {
         email: authEmail.trim() || undefined
       });
       setAuthOtp("");
-      setAuthNewPassword("");
+      startAuthOtpCooldown();
       setAuthStatus("验证码已发送到邮箱，请输入验证码和新密码。");
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
@@ -1134,6 +1155,7 @@ export function App() {
       setAuthPassword("");
       setAuthOtp("");
       setAuthNewPassword("");
+      setAuthOtpCooldownSeconds(0);
       setAuthStatus("密码已重置，请用新密码登录。");
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
@@ -1152,12 +1174,38 @@ export function App() {
       setAuthPassword("");
       setAuthOtp("");
       setAuthNewPassword("");
-      setAuthStatus("已退出登录。");
+      setAuthOtpCooldownSeconds(0);
+      setAuthStatus("");
     } catch (error) {
       showError(error);
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function enterConsoleAfterAuth(session: AuthSession) {
+    setAuthSession(session);
+    setAuthEmail("");
+    setAuthPassword("");
+    setAuthOtp("");
+    setAuthNewPassword("");
+    setAuthFlowMode("entry");
+    setAuthOtpCooldownSeconds(0);
+    setActiveSection(defaultConsoleSection);
+    setAuthStatus("正在载入控制台。");
+    await refreshConsole({ applySettings: true });
+  }
+
+  function changeAuthFlowMode(mode: AuthFlowMode) {
+    setAuthFlowMode(mode);
+    setAuthStatus("");
+    if (mode === "entry") {
+      setAuthOtpCooldownSeconds(0);
+    }
+  }
+
+  function startAuthOtpCooldown() {
+    setAuthOtpCooldownSeconds(authOtpCooldownDurationSeconds);
   }
 
   async function refreshConsole(options: { applySettings?: boolean; reason?: RefreshConsoleReason } = {}) {
@@ -2375,7 +2423,7 @@ export function App() {
     return (
       <LoginScreen
         mode={authFlowMode}
-        setMode={setAuthFlowMode}
+        setMode={changeAuthFlowMode}
         email={authEmail}
         setEmail={setAuthEmail}
         password={authPassword}
@@ -2385,9 +2433,11 @@ export function App() {
         newPassword={authNewPassword}
         setNewPassword={setAuthNewPassword}
         status={authStatus}
+        authOtpCooldownSeconds={authOtpCooldownSeconds}
         isBusy={isBusy || isLoading}
         onLogin={login}
         onVerifyEmail={verifyEmail}
+        onResendVerificationCode={resendVerificationCode}
         onRequestPasswordReset={requestPasswordReset}
         onResetPassword={resetPassword}
       />
@@ -2589,9 +2639,11 @@ function LoginScreen({
   newPassword,
   setNewPassword,
   status,
+  authOtpCooldownSeconds,
   isBusy,
   onLogin,
   onVerifyEmail,
+  onResendVerificationCode,
   onRequestPasswordReset,
   onResetPassword
 }: {
@@ -2606,13 +2658,18 @@ function LoginScreen({
   newPassword: string;
   setNewPassword: (value: string) => void;
   status: string;
+  authOtpCooldownSeconds: number;
   isBusy: boolean;
   onLogin: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onVerifyEmail: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onResendVerificationCode: () => Promise<void>;
   onRequestPasswordReset: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onResetPassword: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const resetDisabled = isBusy || !email.trim() || !otp.trim() || !newPassword.trim();
+  const resendLabel = authOtpCooldownSeconds > 0
+    ? `${authOtpCooldownSeconds} 秒后可重新发送`
+    : "重新发送验证码";
   return (
     <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(10,163,148,.15),transparent_26%),radial-gradient(circle_at_85%_0,rgba(37,99,235,.12),transparent_30%),var(--bg)] px-4 py-8 text-[var(--text)]">
       <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(15,23,42,.12)]">
@@ -2625,7 +2682,7 @@ function LoginScreen({
                 ? "用邮箱验证码重置密码"
                 : mode === "verify-email"
                   ? "输入邮箱验证码完成账号创建"
-                  : "登录已有账号，或用新邮箱创建账号"}
+                  : "登录或创建账号"}
             </p>
           </div>
         </div>
@@ -2655,7 +2712,7 @@ function LoginScreen({
               登录 / 创建账号
             </Button>
             <div className="flex items-center justify-between gap-3 text-xs font-semibold">
-              <span className="text-[var(--muted)]">未注册邮箱会自动创建账号</span>
+              <span className="text-[var(--muted)]">新邮箱首次登录会验证后创建</span>
               <button
                 type="button"
                 className="font-black text-[var(--accent)] hover:underline"
@@ -2697,6 +2754,15 @@ function LoginScreen({
               <MailCheck size={15} />
               验证邮箱并进入
             </Button>
+            <Button
+              variant="soft"
+              type="button"
+              disabled={isBusy || !email.trim() || !password.trim() || authOtpCooldownSeconds > 0}
+              onClick={() => void onResendVerificationCode()}
+            >
+              <RefreshCcw size={15} />
+              {resendLabel}
+            </Button>
             <button
               type="button"
               className="justify-self-center text-xs font-black text-[var(--accent)] hover:underline"
@@ -2721,9 +2787,9 @@ function LoginScreen({
                   placeholder="请输入邮箱"
                 />
               </Field>
-              <Button variant="soft" type="submit" disabled={isBusy || !email.trim()}>
+              <Button variant="soft" type="submit" disabled={isBusy || !email.trim() || authOtpCooldownSeconds > 0}>
                 <MailCheck size={15} />
-                发送验证码
+                {authOtpCooldownSeconds > 0 ? resendLabel : "发送验证码"}
               </Button>
             </form>
             <form className="grid gap-4" onSubmit={onResetPassword}>
