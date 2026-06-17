@@ -178,7 +178,7 @@ function renderLedger() {
   els.ledger.innerHTML = [
     ["商品", formatNumber(state.products.length), "可创作商品"],
     ["视频任务", formatNumber(summary.totalJobs), `${formatNumber(summary.completedJobs)} 完成`],
-    ["付费任务", formatNumber(summary.paidJobs), `${formatNumber(summary.mockJobs)} mock`],
+    ["付费任务", formatNumber(summary.paidJobs), "真实模型生成"],
     ["今日 Token", formatNumber(summary.totalTokens), `¥${Number(summary.estimatedCostCny).toFixed(2)}`],
     ["最终视频", formatNumber(summary.finalVideos), "可下载视频"],
     ["复用 raw", formatNumber(summary.reusedRawManifests), "省一次生成"]
@@ -293,7 +293,7 @@ function renderProductGroups() {
             </div>
             <div class="group-metrics">
               <span>付费</span><strong>${formatNumber(group.paidJobs)}</strong>
-              <span>mock</span><strong>${formatNumber(group.mockJobs)}</strong>
+              <span>内部任务</span><strong>${formatNumber(group.mockJobs)}</strong>
               <span>Token</span><strong>${formatNumber(group.totalTokens)}</strong>
               <span>成本</span><strong>¥${Number(group.estimatedCostCny).toFixed(2)}</strong>
               <span>最终视频</span><strong>${formatNumber(group.finalVideos)}</strong>
@@ -302,19 +302,12 @@ function renderProductGroups() {
               ${group.jobs
                 .map(
                   (job) => `
-                    <div class="version-row ${job.selectedFinal ? "selected" : ""}">
+                    <div class="version-row">
                       <span>${escapeHtml(job.id)}</span>
                       <span>${escapeHtml(job.provider || "-")}</span>
                       <span>${formatDuration(job.durationSeconds)}</span>
                       <span>${job.hasFinalVideo ? "final" : "raw"}</span>
                       <strong>¥${Number(job.estimatedCostCny).toFixed(2)}</strong>
-                      <button
-                        class="ghost compact"
-                        type="button"
-                        data-select-final="${escapeAttribute(group.productSku)}"
-                        data-job-id="${escapeAttribute(job.id)}"
-                        ${job.hasFinalVideo ? "" : "disabled"}
-                      >${job.selectedFinal ? "已选" : "设为最终"}</button>
                     </div>
                   `
                 )
@@ -400,11 +393,6 @@ function renderReports() {
   els.reports.querySelectorAll("[data-cancel-task]").forEach((button) => {
     button.addEventListener("click", async () => {
       await cancelProviderTask(button.dataset.cancelTask || "");
-    });
-  });
-  els.productGroups.querySelectorAll("[data-select-final]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      await selectFinalVersion(button.dataset.selectFinal || "", button.dataset.jobId || "");
     });
   });
 }
@@ -531,24 +519,6 @@ async function cancelProviderTask(taskId) {
     els.status.textContent = `尝试取消 queued 任务: ${taskId}`;
     const response = await postJson(`/api/provider-tasks/${encodeURIComponent(taskId)}/cancel`, {});
     els.status.textContent = `已取消 queued 任务: ${response.taskId}`;
-    await refresh();
-  } catch (error) {
-    showError(error);
-  }
-}
-
-async function selectFinalVersion(productSku, jobId) {
-  if (!productSku || !jobId) {
-    return;
-  }
-  try {
-    els.status.textContent = `保存最终版本: ${productSku} / ${jobId}`;
-    await postJson("/api/reviews/select-final", {
-      productSku,
-      jobId,
-      note: "控制台手动选择"
-    });
-    els.status.textContent = `已选择最终版本: ${jobId}`;
     await refresh();
   } catch (error) {
     showError(error);

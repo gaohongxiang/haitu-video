@@ -1167,6 +1167,11 @@ describe("console API", () => {
     expect(staticConsoleHtml).not.toContain("发布包");
     expect(staticConsoleJs).not.toContain("mock 免费");
     expect(staticConsoleJs).not.toContain("本地 mock");
+    expect(staticConsoleJs).not.toContain("本地模拟");
+    expect(staticConsoleJs).not.toContain(">mock<");
+    expect(staticConsoleJs).not.toContain("设为最终");
+    expect(staticConsoleJs).not.toContain("已选");
+    expect(staticConsoleJs).not.toContain("data-select-final");
     expect(staticConsoleJs).not.toContain("发布素材");
     expect(staticConsoleJs).not.toContain("审核发布");
     expect(staticConsoleJs).not.toContain("品牌设置");
