@@ -844,6 +844,7 @@ export function App() {
   const [authNewPassword, setAuthNewPassword] = useState("");
   const [authStatus, setAuthStatus] = useState("正在检查登录状态...");
   const [authOtpCooldownSeconds, setAuthOtpCooldownSeconds] = useState(0);
+  const [forgotPasswordOtpSent, setForgotPasswordOtpSent] = useState(false);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [ledger, setLedger] = useState<Ledger | undefined>();
@@ -1073,6 +1074,7 @@ export function App() {
         setAuthFlowMode("verify-email");
         setAuthEmail(session.email ?? authEmail.trim());
         setAuthOtp("");
+        setForgotPasswordOtpSent(false);
         startAuthOtpCooldown();
         setAuthStatus("验证码已发送到邮箱，请输入后继续。");
         return;
@@ -1113,6 +1115,7 @@ export function App() {
         setAuthFlowMode("verify-email");
         setAuthEmail(session.email ?? authEmail.trim());
         setAuthOtp("");
+        setForgotPasswordOtpSent(false);
         startAuthOtpCooldown();
         setAuthStatus("验证码已重新发送，请查看邮箱。");
         return;
@@ -1125,16 +1128,17 @@ export function App() {
     }
   }
 
-  async function requestPasswordReset(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function requestPasswordReset() {
+    if (authOtpCooldownSeconds > 0) return;
     setIsBusy(true);
     try {
       await postJson<{ success: true }>("/api/auth/request-password-reset", {
         email: authEmail.trim() || undefined
       });
       setAuthOtp("");
+      setForgotPasswordOtpSent(true);
       startAuthOtpCooldown();
-      setAuthStatus("验证码已发送到邮箱，请输入验证码和新密码。");
+      setAuthStatus("");
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1156,6 +1160,7 @@ export function App() {
       setAuthOtp("");
       setAuthNewPassword("");
       setAuthOtpCooldownSeconds(0);
+      setForgotPasswordOtpSent(false);
       setAuthStatus("密码已重置，请用新密码登录。");
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
@@ -1175,6 +1180,7 @@ export function App() {
       setAuthOtp("");
       setAuthNewPassword("");
       setAuthOtpCooldownSeconds(0);
+      setForgotPasswordOtpSent(false);
       setAuthStatus("");
     } catch (error) {
       showError(error);
@@ -1191,6 +1197,7 @@ export function App() {
     setAuthNewPassword("");
     setAuthFlowMode("entry");
     setAuthOtpCooldownSeconds(0);
+    setForgotPasswordOtpSent(false);
     setActiveSection(defaultConsoleSection);
     setAuthStatus("正在载入控制台。");
     await refreshConsole({ applySettings: true });
@@ -1201,6 +1208,10 @@ export function App() {
     setAuthStatus("");
     if (mode === "entry") {
       setAuthOtpCooldownSeconds(0);
+      setForgotPasswordOtpSent(false);
+    }
+    if (mode === "forgot-password") {
+      setForgotPasswordOtpSent(false);
     }
   }
 
@@ -2434,6 +2445,7 @@ export function App() {
         setNewPassword={setAuthNewPassword}
         status={authStatus}
         authOtpCooldownSeconds={authOtpCooldownSeconds}
+        forgotPasswordOtpSent={forgotPasswordOtpSent}
         isBusy={isBusy || isLoading}
         onLogin={login}
         onVerifyEmail={verifyEmail}
@@ -2640,6 +2652,7 @@ function LoginScreen({
   setNewPassword,
   status,
   authOtpCooldownSeconds,
+  forgotPasswordOtpSent,
   isBusy,
   onLogin,
   onVerifyEmail,
@@ -2659,17 +2672,23 @@ function LoginScreen({
   setNewPassword: (value: string) => void;
   status: string;
   authOtpCooldownSeconds: number;
+  forgotPasswordOtpSent: boolean;
   isBusy: boolean;
   onLogin: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onVerifyEmail: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onResendVerificationCode: () => Promise<void>;
-  onRequestPasswordReset: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onRequestPasswordReset: () => Promise<void>;
   onResetPassword: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const resetDisabled = isBusy || !email.trim() || !otp.trim() || !newPassword.trim();
-  const resendLabel = authOtpCooldownSeconds > 0
-    ? `${authOtpCooldownSeconds} 秒后可重新发送`
-    : "重新发送验证码";
+  const verifiedEmailOtpLabel = authOtpSendLabel({
+    cooldownSeconds: authOtpCooldownSeconds,
+    sent: true
+  });
+  const passwordResetOtpLabel = authOtpSendLabel({
+    cooldownSeconds: authOtpCooldownSeconds,
+    sent: forgotPasswordOtpSent
+  });
   return (
     <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(10,163,148,.15),transparent_26%),radial-gradient(circle_at_85%_0,rgba(37,99,235,.12),transparent_30%),var(--bg)] px-4 py-8 text-[var(--text)]">
       <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(15,23,42,.12)]">
@@ -2740,28 +2759,17 @@ function LoginScreen({
                 placeholder="请输入邮箱"
               />
             </Field>
-            <Field label="验证码">
-              <Input
-                autoFocus
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                value={otp}
-                onChange={(event) => setOtp(event.target.value)}
-                placeholder="6 位验证码"
-              />
-            </Field>
+            <AuthOtpField
+              autoFocus
+              value={otp}
+              onChange={setOtp}
+              sendLabel={verifiedEmailOtpLabel}
+              disabled={isBusy || !email.trim() || !password.trim() || authOtpCooldownSeconds > 0}
+              onSend={onResendVerificationCode}
+            />
             <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !otp.trim()}>
               <MailCheck size={15} />
               验证邮箱并进入
-            </Button>
-            <Button
-              variant="soft"
-              type="button"
-              disabled={isBusy || !email.trim() || !password.trim() || authOtpCooldownSeconds > 0}
-              onClick={() => void onResendVerificationCode()}
-            >
-              <RefreshCcw size={15} />
-              {resendLabel}
             </Button>
             <button
               type="button"
@@ -2776,41 +2784,33 @@ function LoginScreen({
 
         {mode === "forgot-password" ? (
           <div className="grid gap-4">
-            <form className="grid gap-4" onSubmit={onRequestPasswordReset}>
-              <Field label="邮箱">
-                <Input
-                  autoFocus
-                  autoComplete="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="请输入邮箱"
-                />
-              </Field>
-              <Button variant="soft" type="submit" disabled={isBusy || !email.trim() || authOtpCooldownSeconds > 0}>
-                <MailCheck size={15} />
-                {authOtpCooldownSeconds > 0 ? resendLabel : "发送验证码"}
-              </Button>
-            </form>
+            <Field label="邮箱">
+              <Input
+                autoFocus
+                autoComplete="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="请输入邮箱"
+              />
+            </Field>
             <form className="grid gap-4" onSubmit={onResetPassword}>
-              <Field label="验证码">
-                <Input
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  value={otp}
-                  onChange={(event) => setOtp(event.target.value)}
-                  placeholder="6 位验证码"
-                />
-              </Field>
               <Field label="新密码">
                 <Input
                   autoComplete="new-password"
                   type="password"
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
-                  placeholder="至少 12 位"
+                  placeholder="至少 8 位"
                 />
               </Field>
+              <AuthOtpField
+                value={otp}
+                onChange={setOtp}
+                sendLabel={passwordResetOtpLabel}
+                disabled={isBusy || !email.trim() || authOtpCooldownSeconds > 0}
+                onSend={onRequestPasswordReset}
+              />
               <Button variant="primary" type="submit" disabled={resetDisabled}>
                 <KeyRound size={15} />
                 重置密码
@@ -2829,6 +2829,60 @@ function LoginScreen({
       </Card>
     </main>
   );
+}
+
+function AuthOtpField({
+  autoFocus,
+  disabled,
+  onChange,
+  onSend,
+  sendLabel,
+  value
+}: {
+  autoFocus?: boolean;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onSend: () => Promise<void>;
+  sendLabel: string;
+  value: string;
+}) {
+  return (
+    <Field label="验证码">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <Input
+          autoFocus={autoFocus}
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="6 位验证码"
+        />
+        <Button
+          variant="soft"
+          type="button"
+          className="min-w-[132px] px-3"
+          disabled={disabled}
+          onClick={() => void onSend()}
+        >
+          <RefreshCcw size={15} />
+          {sendLabel}
+        </Button>
+      </div>
+    </Field>
+  );
+}
+
+function authOtpSendLabel({
+  cooldownSeconds,
+  sent
+}: {
+  cooldownSeconds: number;
+  sent: boolean;
+}) {
+  if (cooldownSeconds > 0) {
+    return `${cooldownSeconds} 秒后可重新发送`;
+  }
+  return sent ? "重发验证码" : "发送验证码";
 }
 
 function AuthStatus({ status }: { status: string }) {

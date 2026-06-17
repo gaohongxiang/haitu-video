@@ -420,12 +420,27 @@ describe("console API", () => {
     expect(appSource).not.toContain("登录已有账号，或用新邮箱创建账号");
     expect(appSource).toContain("忘记密码");
     expect(appSource).toContain("验证邮箱并进入");
-    expect(appSource).toContain("重新发送验证码");
+    expect(appSource).toContain("发送验证码");
+    expect(appSource).toContain("重发验证码");
+    expect(appSource).not.toContain("重新发送验证码");
     expect(appSource).toContain("秒后可重新发送");
     expect(appSource).toContain("authOtpCooldownSeconds");
     expect(appSource).toContain("startAuthOtpCooldown");
+    expect(appSource).toContain("forgotPasswordOtpSent");
+    expect(appSource).toContain("authOtpSendLabel");
     expect(appSource).toContain("onResendVerificationCode");
+    expect(appSource).toContain("function AuthOtpField");
+    expect(appSource.split("<AuthOtpField")).toHaveLength(3);
     expect(appSource).toContain("重置密码");
+    expect(appSource).toContain("至少 8 位");
+    expect(appSource).not.toContain("至少 12 位");
+    const resetPasswordFormSource = appSource.slice(
+      appSource.indexOf("onSubmit={onResetPassword}"),
+      appSource.indexOf("返回账号入口", appSource.indexOf("onSubmit={onResetPassword}"))
+    );
+    expect(resetPasswordFormSource.indexOf('label="新密码"')).toBeLessThan(resetPasswordFormSource.indexOf("<AuthOtpField"));
+    expect(appSource).not.toContain("验证码已发送到邮箱，请输入验证码和新密码。");
+    expect(appSource).not.toContain("onSubmit={onRequestPasswordReset}");
     expect(appSource).toContain("setActiveSection(defaultConsoleSection)");
     expect(appSource).not.toContain("已退出登录");
     expect(appSource).not.toContain("管理员密码");

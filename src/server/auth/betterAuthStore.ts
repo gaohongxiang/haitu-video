@@ -28,7 +28,7 @@ interface WorkspaceRow {
   role: string;
 }
 
-const minPasswordLength = 12;
+const minPasswordLength = 8;
 
 export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
   private readonly auth: {
