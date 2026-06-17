@@ -2568,10 +2568,11 @@ export function App() {
               ))}
             </Select>
             {authSession.authEnabled ? (
-              <Button className="shadow-[0_8px_18px_rgba(15,23,42,.05)]" size="sm" onClick={() => void logout()} disabled={isBusy}>
-                <KeyRound size={15} />
-                退出登录
-              </Button>
+              <AccountMenu
+                email={authSession.user?.email}
+                disabled={isBusy}
+                onLogout={() => void logout()}
+              />
             ) : null}
           </div>
         </header>
@@ -2582,6 +2583,88 @@ export function App() {
         <ConsoleToast consoleToast={consoleToast} onClose={() => setConsoleToast(undefined)} />
       </section>
     </main>
+  );
+}
+
+function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?: boolean; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const accountLabel = email?.trim() || "账号";
+  const accountInitial = accountLabel.slice(0, 1).toUpperCase();
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", closeOnOutsideClick);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeOnOutsideClick);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function handleLogout() {
+    setOpen(false);
+    onLogout();
+  }
+
+  return (
+    <div ref={menuRef} className="relative min-w-0">
+      <button
+        type="button"
+        aria-label="账号菜单"
+        aria-expanded={open}
+        className={cn(
+          "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border)] bg-white px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(15,23,42,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,white)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
+          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,white)]"
+        )}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="grid h-6 w-6 place-items-center rounded-md bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[11px] font-black text-[var(--accent)]">
+          {accountInitial}
+        </span>
+        <span className="truncate">{accountLabel}</span>
+        <ChevronDown className={cn("text-[var(--muted)] transition-transform", open && "rotate-180")} size={14} strokeWidth={2.4} />
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[#dbe4f0] bg-white shadow-[0_18px_46px_rgba(15,23,42,.16)]">
+          <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-2.5 border-b border-[#e8eef6] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-3 py-3">
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--accent2),var(--accent))] text-sm font-black text-white shadow-[0_10px_20px_rgba(10,163,148,.18)]">
+              {accountInitial}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
+              <div className="mt-1 truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
+            </div>
+          </div>
+          <div className="p-1.5">
+            <button
+              type="button"
+              className="flex min-h-9 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[13px] font-black text-[var(--danger)] transition hover:bg-red-50 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(239,68,68,.14)] disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={disabled}
+              onClick={handleLogout}
+            >
+              <KeyRound size={15} />
+              <span>退出登录</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

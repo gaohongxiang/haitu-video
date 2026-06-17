@@ -449,6 +449,12 @@ describe("console API", () => {
     expect(appSource).not.toContain("管理员密码");
     expect(appSource).not.toContain("进入控制台");
     expect(appSource).toContain("退出登录");
+    expect(appSource).toContain("function AccountMenu");
+    expect(appSource).toContain("<AccountMenu");
+    expect(appSource).toContain("authSession.user?.email");
+    expect(appSource).toContain("账号菜单");
+    expect(appSource).toContain("账号");
+    expect(appSource).not.toContain('onClick={() => void logout()} disabled={isBusy}');
     expect(appSource).toContain("setAuthSession");
     expect(appSource).toContain("Authentication required");
     expect(appSource).toContain("h-dvh");
