@@ -734,6 +734,7 @@ const defaultProductDraft: ProductDraft = {
 const videoModelOptions: VideoModelChoice[] = ["mock", "seednice-2-fast", "seednice-2"];
 const defaultVideoDurationSeconds = 10;
 const defaultVideoModelChoice: VideoModelChoice = "seednice-2-fast";
+const defaultVideoTemplate: TemplateName = "scene";
 
 const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
   mock: {
@@ -855,11 +856,11 @@ export function App() {
   const [videoModelChoice, setVideoModelChoice] = useState<VideoModelChoice>(defaultVideoModelChoice);
   const [duration, setDuration] = useState(defaultVideoDurationSeconds);
   const [versionCount, setVersionCount] = useState(1);
-  const [template, setTemplate] = useState<TemplateName>("scene");
+  const [template, setTemplate] = useState<TemplateName>(defaultVideoTemplate);
   const [finalLanguage, setFinalLanguage] = useState<FinalVideoLanguage>("ja");
   const [cta, setCta] = useState("今すぐチェック");
   const [studioScriptDraft, setStudioScriptDraft] = useState("");
-  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => defaultStoryboardDraft("scene", defaultVideoDurationSeconds));
+  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => defaultStoryboardDraft(defaultVideoTemplate, defaultVideoDurationSeconds));
   const [storyboardDraftTouched, setStoryboardDraftTouched] = useState(false);
   const [storyboardDraftSource, setStoryboardDraftSource] = useState<StoryboardDraftSource>("default");
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
@@ -1292,9 +1293,7 @@ export function App() {
     setProvider(videoModelConfigs[defaultVideoModelChoice].provider);
     setVideoModelChoice(defaultVideoModelChoice);
     setDuration(defaultVideoDurationSeconds);
-    setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)
-      ? nextSettings.defaultTemplate
-      : nextSettings.enabledTemplates[0] ?? "scene");
+    setTemplate(defaultVideoTemplate);
     setFinalLanguage(nextSettings.defaultLanguage);
     setCta(nextSettings.defaultCta);
     setConfirmPaid(false);
@@ -1953,7 +1952,6 @@ export function App() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 45000);
     setIsGeneratingStoryboard(true);
-    setStatusText("正在请求文本模型生成分镜，通常需要 10-30 秒...");
     try {
       const response = await postJsonWithSignal<StoryboardDraftResponse>(
         `/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`,
@@ -3615,8 +3613,8 @@ function ProductCreationComposer({
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
                 <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
-                  <Package size={13} />
-                  AI 整理资料包
+                  {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
+                  {isPacking ? "整理中" : "AI 整理资料包"}
                 </Button>
               </div>
               <Textarea
@@ -3973,7 +3971,6 @@ function StoryboardComposerPanel({
   isGeneratingStoryboard: boolean;
   productReady: boolean;
 }) {
-  const [hint, setHint] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <section className="storyboard-side-panel grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
@@ -4007,19 +4004,14 @@ function StoryboardComposerPanel({
           disabled={isGeneratingStoryboard || !productReady}
           onClick={() => {
             if (!productReady) {
-              setHint("请先填写商品资料。");
               return;
             }
-            setHint("正在请求文本模型，通常需要 10-30 秒。");
-            void onGenerateStoryboardDraft().finally(() => setHint(""));
+            void onGenerateStoryboardDraft();
           }}
         >
-          <Sparkles size={15} className={cn(isGeneratingStoryboard && "animate-spin")} />
+          {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />}
           {isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}
         </Button>
-        {hint ? (
-          <div className="truncate rounded-lg bg-[color-mix(in_srgb,var(--accent)_8%,white)] px-2.5 py-1.5 text-xs font-bold text-[var(--accent)]">{hint}</div>
-        ) : null}
       </div>
 
       <div
@@ -5813,7 +5805,7 @@ function ApiModelConfigDialog({
           <Field label="模型（逗号分隔）">
             <Input value={draft.model} onChange={(event) => onDraftChange(providerId, { model: event.target.value })} />
           </Field>
-          {testStatus ? (
+          {!isTesting && testStatus ? (
             <div
               className={cn(
                 "whitespace-pre-wrap rounded-lg border px-3 py-2 text-[12px] font-bold leading-5",
@@ -5829,6 +5821,7 @@ function ApiModelConfigDialog({
           ) : null}
           <div className="flex flex-wrap justify-end gap-2 pt-3">
             <Button type="button" variant="ghost" disabled={isBusy} onClick={() => void onTest(providerId)}>
+              {isTesting ? <RefreshCcw className="h-4 w-4 animate-spin" /> : null}
               {isTesting ? "测试中" : "测试配置"}
             </Button>
             <Button type="button" disabled={isBusy} onClick={onClose}>

@@ -754,6 +754,10 @@ describe("console API", () => {
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
     expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
+    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
+    expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
+    expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
+    expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(appSource).toContain('type StoryboardDraftSource = "default" | "ai" | "manual";');
     expect(appSource).toContain('useState<StoryboardDraftSource>("default")');
     expect(appSource).toContain('setStoryboardDraftSource("ai")');
@@ -870,7 +874,6 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
     expect(creationComposerSource).toContain("disabled:opacity-100");
     expect(creationComposerSource).not.toContain("创建生成任务中");
-    expect(creationComposerSource).not.toContain("整理中");
     expect(creationComposerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(creationComposerSource).not.toContain("max-h-[312px]");
     expect(creationComposerSource).not.toContain("min-h-[350px] resize-y border-0");
@@ -892,6 +895,10 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("AI 整理资料包");
+    expect(creationComposerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
+    expect(creationComposerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(storyboardPanelSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
+    expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
     expect(creationComposerSource).toContain("placeholder=\"\"");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain("视频风格");
@@ -947,7 +954,7 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain('className="min-h-0"');
     expect(storyboardPanelSource).toContain("h-full min-h-0 resize-none");
     expect(storyboardPanelSource).toContain("className=\"grid gap-2\"");
-    expect(storyboardPanelSource).toContain("{hint ? (");
+    expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
     expect(storyboardPanelSource).toContain("AI 生成分镜");
     expect(storyboardPanelSource).toContain("分镜历史记录");
@@ -962,8 +969,9 @@ describe("console API", () => {
     expect(storyboardPanelSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
     expect(storyboardPanelSource).not.toContain("scriptDraft");
     expect(storyboardPanelSource).not.toContain("onScriptDraftChange");
-    expect(storyboardPanelSource).toContain("正在请求文本模型");
-    expect(storyboardPanelSource).toContain("请先填写商品资料。");
+    expect(storyboardPanelSource).not.toContain("正在请求文本模型");
+    expect(storyboardPanelSource).not.toContain("通常需要 10-30 秒");
+    expect(storyboardPanelSource).not.toContain("请先填写商品资料。");
     expect(storyboardPanelSource).not.toContain("请先整理并保存资料包。");
     expect(storyboardPanelSource).not.toContain("时间线");
     expect(storyboardPanelSource).not.toContain("镜头脚本");
@@ -1173,6 +1181,9 @@ describe("console API", () => {
     expect(appSource).toContain("testModelConfig");
     expect(appSource).toContain("测试配置中");
     expect(appSource).toContain("testStatus");
+    expect(apiManagementSource).toContain("{isTesting ? <RefreshCcw className=\"h-4 w-4 animate-spin\" /> : null}");
+    expect(apiManagementSource).toContain("{isTesting ? \"测试中\" : \"测试配置\"}");
+    expect(apiManagementSource).toContain("{!isTesting && testStatus ? (");
     expect(appSource).toContain("测试成功");
     expect(appSource).toContain("测试失败");
     expect(appSource).toContain("setModelConfigTestStatus");
@@ -1918,6 +1929,10 @@ describe("console API", () => {
     expect(workspaceSource).not.toContain("ProductStudioPipeline");
     expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
+    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
+    expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
+    expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
+    expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(defaultStoryboardSource).toContain("scene");
     expect(defaultStoryboardSource).toContain("pain-point");
     expect(defaultStoryboardSource).toContain("benefit");
@@ -1973,7 +1988,6 @@ describe("console API", () => {
     expect(composerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
     expect(composerSource).toContain("disabled:opacity-100");
     expect(composerSource).not.toContain("创建生成任务中");
-    expect(composerSource).not.toContain("整理中");
     expect(composerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(composerSource).not.toContain("max-h-[312px]");
     expect(composerSource).not.toContain("min-h-[350px] resize-y border-0");
@@ -1999,6 +2013,10 @@ describe("console API", () => {
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("AI 整理资料包");
+    expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
+    expect(composerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(composerSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
+    expect(composerSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
     expect(composerSource).toContain("placeholder=\"\"");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain("视频风格");
@@ -2145,6 +2163,82 @@ describe("console API", () => {
       expect(body.model).toBe("gpt-5.5");
       expect(body.messages.at(-1).content).toContain("商品名");
       await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("normalizes object-shaped AI import fields before validating product facts", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-ai-shape-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "ARM-COVER-001",
+                  title_ja: "接触冷感アームカバー",
+                  category: "アームカバー",
+                  materials: [
+                    { name: "ポリエステル", ratio: "100%" },
+                    { name: "ポリウレタン", ratio: "10%" }
+                  ],
+                  dimensions: {
+                    length: "52cm",
+                    wrist: "16-32cm"
+                  },
+                  verified_selling_points: [
+                    { text: "接触冷感素材" },
+                    { text: "指穴付き" }
+                  ],
+                  usage_scenes: [{ scene: "通勤" }, { scene: "日焼け対策" }],
+                  forbidden_claims: [{ claim: "UVカット96%以上は証明未確認" }],
+                  reference_images: [{ url: "https://cdn.example.com/arm-cover.jpg" }]
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 789
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-model-secret-key-123456"
+        })
+      });
+
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "接触冷感アームカバー UV カット 96% 指穴付き"
+        })
+      });
+
+      expect(response.product).toEqual(expect.objectContaining({
+        sku: "ARM-COVER-001",
+        title_ja: "接触冷感アームカバー",
+        category: "アームカバー",
+        materials: ["ポリエステル 100%", "ポリウレタン 10%"],
+        dimensions: "52cm、16-32cm",
+        verified_selling_points: ["接触冷感素材", "指穴付き"],
+        usage_scenes: ["通勤", "日焼け対策"],
+        forbidden_claims: ["UVカット96%以上は証明未確認"],
+        reference_images: ["https://cdn.example.com/arm-cover.jpg"]
+      }));
+      expect(response.notes).toContain("文本模型已整理商品资料。");
+      expect(response.quality.ready).toBe(true);
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);

@@ -32,6 +32,7 @@ import {
   textModelBaseUrl,
   textModelName
 } from "../providers/openaiCompatibleTextProvider.js";
+import { ZodError } from "zod";
 import { OpenAiCompatibleImageProvider } from "../providers/openaiCompatibleImageProvider.js";
 import { FileAuditLog } from "./auditLog.js";
 import { buildJobLedger, buildJobLedgerFromReports, deleteJobLedgerEntry } from "./jobLedger.js";
@@ -1058,7 +1059,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       return jsonResponse({ error: "Not found" }, 404);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = userFacingErrorMessage(error);
       if (message.includes("outside project root") || message.includes("outside data root")) {
         return jsonResponse({ error: message }, 403);
       }
@@ -2650,7 +2651,7 @@ async function buildAiImportedProductPreview(input: {
       text
     ].join("\n\n")
   });
-  const product = parseProductFacts(rawProduct);
+  const product = parseProductFacts(normalizeAiProductFacts(rawProduct, text));
   return {
     product,
     notes: ["文本模型已整理商品资料。"],
@@ -2659,6 +2660,65 @@ async function buildAiImportedProductPreview(input: {
       riskyClaims: product.forbidden_claims
     })
   };
+}
+
+function normalizeAiProductFacts(input: unknown, sourceText: string): unknown {
+  const fallback = cleanImportedProductText(sourceText).product;
+  const raw = isPlainObject(input) ? input : {};
+  return {
+    sku: textFromAiValue(raw.sku) || fallback.sku,
+    title_ja: textFromAiValue(raw.title_ja) || fallback.title_ja,
+    category: textFromAiValue(raw.category) || fallback.category,
+    materials: textListFromAiValue(raw.materials, fallback.materials),
+    dimensions: dimensionTextFromAiValue(raw.dimensions) || fallback.dimensions,
+    verified_selling_points: textListFromAiValue(raw.verified_selling_points, fallback.verified_selling_points),
+    usage_scenes: textListFromAiValue(raw.usage_scenes, fallback.usage_scenes),
+    forbidden_claims: textListFromAiValue(raw.forbidden_claims, fallback.forbidden_claims),
+    reference_images: textListFromAiValue(raw.reference_images, fallback.reference_images)
+  };
+}
+
+function textListFromAiValue(value: unknown, fallback: string[]): string[] {
+  const items = Array.isArray(value) ? value : [value];
+  const normalized = items
+    .flatMap((item) => textFromAiValue(item).split(/[、,\n]/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return normalized.length > 0 ? Array.from(new Set(normalized)) : fallback;
+}
+
+function dimensionTextFromAiValue(value: unknown): string {
+  if (isPlainObject(value)) {
+    const preferredKeys = ["text", "value", "label", "size", "length", "width", "height", "weight", "wrist"];
+    return preferredKeys
+      .map((key) => textFromAiValue(value[key]))
+      .filter(Boolean)
+      .join("、");
+  }
+  return textFromAiValue(value);
+}
+
+function textFromAiValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(textFromAiValue).filter(Boolean).join("、");
+  }
+  if (isPlainObject(value)) {
+    const preferredKeys = ["text", "name", "value", "label", "url", "path", "claim", "scene", "description", "size", "length", "width", "height", "weight", "ratio", "wrist"];
+    const preferred = preferredKeys
+      .map((key) => textFromAiValue(value[key]))
+      .filter(Boolean);
+    if (preferred.length > 0) {
+      return preferred.join(" ");
+    }
+    return Object.values(value).map(textFromAiValue).filter(Boolean).join(" ");
+  }
+  return "";
 }
 
 async function importProductFromText(input: {
@@ -4483,6 +4543,13 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { "content-type": "application/json; charset=utf-8" }
   });
+}
+
+function userFacingErrorMessage(error: unknown): string {
+  if (error instanceof ZodError) {
+    return "文本模型返回的商品资料格式不完整，请再点一次 AI 整理或补充商品资料后重试。";
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 function csvResponse(body: string, filename: string): Response {
