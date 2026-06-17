@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("SQLite-backed user auth and workspace resolution", () => {
-  it("registers users, stores password hashes, and exposes session workspace context", async () => {
+  it("registers users with an email verification code before exposing workspace context", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
     const server = createConsoleServer({
@@ -34,22 +34,41 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     });
     const cookie = registerResponse.headers.get("set-cookie") ?? "";
     const registerBody = await registerResponse.json();
-    const session = await server.fetchJson("/api/auth/session", {
+    const sessionBeforeVerification = await server.fetchJson("/api/auth/session", {
       headers: { cookie }
     });
+    const verificationCode = await latestEmailOtp(root, "alice@example.com", "email-verification");
+    const verifyResponse = await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        otp: verificationCode
+      })
+    });
+    const verifiedCookie = verifyResponse.headers.get("set-cookie") ?? "";
+    const verifyBody = await verifyResponse.json();
+    const session = await server.fetchJson("/api/auth/session", {
+      headers: { cookie: verifiedCookie }
+    });
 
-    expect(registerResponse.status).toBe(200);
-    expect(cookie).toContain("haitu_session=");
+    expect(registerResponse.status).toBe(202);
+    expect(cookie).not.toContain("haitu_session=");
     expect(registerBody).toMatchObject({
+      authEnabled: true,
+      authenticated: false,
+      verificationRequired: true,
+      email: "alice@example.com"
+    });
+    expect(sessionBeforeVerification).toMatchObject({
+      authenticated: false
+    });
+    expect(verifyResponse.status).toBe(200);
+    expect(verifiedCookie).toContain("better-auth.session_token=");
+    expect(verifyBody).toMatchObject({
       authEnabled: true,
       authenticated: true,
       user: {
-        email: "alice@example.com",
-        displayName: "alice@example.com"
-      },
-      workspace: {
-        id: "default",
-        name: "alice@example.com 的工作区"
+        email: "alice@example.com"
       }
     });
     expect(session).toMatchObject({
@@ -59,7 +78,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         email: "alice@example.com"
       },
       workspace: {
-        id: registerBody.workspace.id
+        id: "default"
       }
     });
 
@@ -67,10 +86,17 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     try {
       runMigrations(handle);
       const row = handle.sqlite
-        .prepare("SELECT email, password_hash FROM users WHERE email = ?")
-        .get("alice@example.com") as { email: string; password_hash: string };
-      expect(row.password_hash).toBeTruthy();
-      expect(row.password_hash).not.toContain("correct horse battery staple");
+        .prepare("SELECT id, email, email_verified FROM auth_users WHERE email = ?")
+        .get("alice@example.com") as { id: string; email: string; email_verified: number };
+      const account = handle.sqlite
+        .prepare("SELECT password FROM auth_accounts WHERE user_id = ?")
+        .get(row.id) as { password: string };
+      expect(row).toMatchObject({
+        email: "alice@example.com",
+        email_verified: 1
+      });
+      expect(account.password).toBeTruthy();
+      expect(account.password).not.toContain("correct horse battery staple");
     } finally {
       closeDatabase(handle);
     }
@@ -92,7 +118,16 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         password: "correct horse battery staple"
       })
     });
-    const cookie = registerResponse.headers.get("set-cookie") ?? "";
+    expect(registerResponse.status).toBe(202);
+    const verificationCode = await latestEmailOtp(root, "alice@example.com", "email-verification");
+    const verifyResponse = await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        otp: verificationCode
+      })
+    });
+    const cookie = verifyResponse.headers.get("set-cookie") ?? "";
     const afterLogin = await server.fetch("/api/products", {
       headers: { cookie }
     });
@@ -105,9 +140,62 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       }
     });
 
+    expect(verifyResponse.status).toBe(200);
     expect(beforeLogin.status).toBe(401);
     expect(afterLogin.status).toBe(200);
     expect(afterLogout.status).toBe(401);
+  });
+
+  it("resets forgotten passwords with an email verification code and revokes old sessions", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+
+    const oldCookie = await registerUser(root, server, "alice@example.com", "correct horse battery staple");
+    const requestReset = await server.fetch("/api/auth/request-password-reset", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com"
+      })
+    });
+    const resetCode = await latestEmailOtp(root, "alice@example.com", "forget-password");
+    const reset = await server.fetch("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        otp: resetCode,
+        password: "new correct horse battery"
+      })
+    });
+    const oldPassword = await server.fetch("/api/auth/enter", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "correct horse battery staple"
+      })
+    });
+    const newPassword = await server.fetch("/api/auth/enter", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "new correct horse battery"
+      })
+    });
+    const oldSessionProducts = await server.fetch("/api/products", {
+      headers: { cookie: oldCookie }
+    });
+
+    expect(requestReset.status).toBe(200);
+    expect(await requestReset.json()).toEqual({ success: true });
+    expect(reset.status).toBe(200);
+    expect(await reset.json()).toEqual({ success: true });
+    expect(oldPassword.status).toBe(401);
+    expect(newPassword.status).toBe(200);
+    expect(newPassword.headers.get("set-cookie")).toContain("better-auth.session_token=");
+    expect(oldSessionProducts.status).toBe(401);
   });
 
   it("serves the console shell before SQLite login so users can sign in", async () => {
@@ -134,8 +222,8 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       autoStartSavedJobs: false
     });
 
-    const aliceCookie = await registerUser(server, "alice@example.com");
-    const bobCookie = await registerUser(server, "bob@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
+    const bobCookie = await registerUser(root, server, "bob@example.com");
 
     await server.fetchJson("/api/products", {
       method: "POST",
@@ -170,7 +258,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       rootDir: root,
       autoStartSavedJobs: false
     });
-    const aliceCookie = await registerUser(server, "alice@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
 
     const saved = await server.fetchJson("/api/products", {
       method: "POST",
@@ -210,8 +298,8 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       rootDir: root,
       autoStartSavedJobs: false
     });
-    const aliceCookie = await registerUser(server, "alice@example.com");
-    const bobCookie = await registerUser(server, "bob@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
+    const bobCookie = await registerUser(root, server, "bob@example.com");
 
     const imported = await server.fetchJson("/api/products/import", {
       method: "POST",
@@ -253,8 +341,8 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       rootDir: root,
       autoStartSavedJobs: false
     });
-    const aliceCookie = await registerUser(server, "alice@example.com");
-    const bobCookie = await registerUser(server, "bob@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
+    const bobCookie = await registerUser(root, server, "bob@example.com");
 
     const saved = await server.fetchJson("/api/products", {
       method: "POST",
@@ -332,8 +420,8 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         return report;
       }
     });
-    const aliceCookie = await registerUser(server, "alice@example.com");
-    const bobCookie = await registerUser(server, "bob@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
+    const bobCookie = await registerUser(root, server, "bob@example.com");
     await server.fetchJson("/api/products", {
       method: "POST",
       headers: { cookie: aliceCookie },
@@ -452,7 +540,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         return report;
       }
     });
-    const aliceCookie = await registerUser(server, "alice@example.com");
+    const aliceCookie = await registerUser(root, server, "alice@example.com");
 
     await server.fetchJson("/api/provider-keys/volcengine-seedance", {
       method: "PUT",
@@ -531,7 +619,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       autoStartSavedJobs: false
     });
 
-    await registerUser(server, "alice@example.com", "correct horse battery staple");
+    await registerUser(root, server, "alice@example.com", "correct horse battery staple");
     const rejected = await server.fetch("/api/auth/enter", {
       method: "POST",
       body: JSON.stringify({
@@ -562,6 +650,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
 });
 
 async function registerUser(
+  root: string,
   server: ReturnType<typeof createConsoleServer>,
   email: string,
   password = "correct horse battery staple"
@@ -573,8 +662,37 @@ async function registerUser(
       password
     })
   });
+  if (response.status === 202) {
+    const otp = await latestEmailOtp(root, email, "email-verification");
+    const verified = await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        otp
+      })
+    });
+    expect(verified.status).toBe(200);
+    return verified.headers.get("set-cookie") ?? "";
+  }
   expect(response.status).toBe(200);
   return response.headers.get("set-cookie") ?? "";
+}
+
+async function latestEmailOtp(root: string, email: string, type: "email-verification" | "forget-password"): Promise<string> {
+  const outboxPath = join(testDataDir(root), "system", "auth-email-outbox.jsonl");
+  const raw = await readFile(outboxPath, "utf8");
+  const rows = raw
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { email: string; type: string; otp: string });
+  const found = rows
+    .reverse()
+    .find((row) => row.email === email && row.type === type);
+  if (!found) {
+    throw new Error(`No OTP found for ${email} (${type})`);
+  }
+  return found.otp;
 }
 
 async function queueCompletedMockJob(

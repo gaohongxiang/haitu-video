@@ -4,6 +4,9 @@ export interface ConsoleAuthStore {
   requireAuth(request: Request): Promise<Response | undefined>;
   resolveCurrentWorkspace(request: Request): Promise<ConsoleWorkspaceContext>;
   enter(input: ConsoleAuthLoginInput): Promise<Response>;
+  verifyEmail(input: ConsoleAuthVerifyEmailInput): Promise<Response>;
+  requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput): Promise<Response>;
+  resetPassword(input: ConsoleAuthPasswordResetInput): Promise<Response>;
   logout(request: Request): Promise<Response>;
 }
 
@@ -33,7 +36,20 @@ export interface ConsoleAuthLoginInput {
   password?: string;
 }
 
-const cookieName = "haitu_session";
+export interface ConsoleAuthVerifyEmailInput {
+  email?: string;
+  otp?: string;
+}
+
+export interface ConsoleAuthPasswordResetRequestInput {
+  email?: string;
+}
+
+export interface ConsoleAuthPasswordResetInput {
+  email?: string;
+  otp?: string;
+  password?: string;
+}
 
 export function isPublicConsoleRoute(request: Request): boolean {
   const url = new URL(request.url);
@@ -53,28 +69,6 @@ export function isPublicConsoleRoute(request: Request): boolean {
     return true;
   }
   return false;
-}
-
-export function readSessionCookie(request: Request): string | undefined {
-  const cookieHeader = request.headers.get("cookie");
-  if (!cookieHeader) {
-    return undefined;
-  }
-  const cookies = cookieHeader.split(";").map((item) => item.trim());
-  const prefix = `${cookieName}=`;
-  const raw = cookies.find((item) => item.startsWith(prefix))?.slice(prefix.length);
-  return raw ? decodeURIComponent(raw) : undefined;
-}
-
-export function serializeSessionCookie(token: string, options: { maxAgeSeconds: number }): string {
-  const encoded = encodeURIComponent(token);
-  return [
-    `${cookieName}=${encoded}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    `Max-Age=${options.maxAgeSeconds}`
-  ].join("; ");
 }
 
 export function jsonResponse(body: unknown, status = 200, headers: HeadersInit = {}): Response {

@@ -21,6 +21,10 @@ const migrations: Migration[] = [
   {
     id: "0002_auth_sessions",
     sql: readMigrationSql("0002_auth_sessions.sql")
+  },
+  {
+    id: "0003_better_auth",
+    sql: readMigrationSql("0003_better_auth.sql")
   }
 ];
 

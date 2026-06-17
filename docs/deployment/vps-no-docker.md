@@ -68,11 +68,16 @@ HAITU_PORT=4173
 HAITU_DATA_DIR=/var/lib/haitu-video
 HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
 HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes
+BETTER_AUTH_URL=https://haitu.online
+HAITU_AUTH_EMAIL_FROM=login@haitu.online
+RESEND_API_KEY=
 SEEDANCE_RESOLUTION=480p
 SEEDANCE_WATERMARK=false
 ```
 
 `HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。真实 API key 只放在 `/etc/haitu-video.env` 或控制台 API 管理设置里，不写进仓库。
+
+账号注册和忘记密码使用邮箱验证码。配置 `RESEND_API_KEY` 和 `HAITU_AUTH_EMAIL_FROM` 后会发送真实邮件；未配置时验证码会写入 `/var/lib/haitu-video/system/auth-email-outbox.jsonl`，只适合本地调试。
 
 初始化或升级 SQLite 表结构：
 
@@ -105,7 +110,7 @@ curl -s http://127.0.0.1:4173/api/health
 {"ok":true,"service":"haitu-video-console","storage":"local"}
 ```
 
-登录保护不会拦截 `/api/health`，所以 systemd/Cloudflare Tunnel 健康检查可以直接请求它。业务 API、视频文件、导出文件、BYOK 设置和控制台数据都需要管理员登录。
+登录保护不会拦截 `/api/health`，所以 systemd/Cloudflare Tunnel 健康检查可以直接请求它。业务 API、视频文件、导出文件、BYOK 设置和控制台数据都需要账号登录。
 
 ## Cloudflare Tunnel 免费入口
 

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -170,7 +170,7 @@ describe("console API", () => {
     await expect(readFile(join(dataDir, "workspaces", "default", "settings", "provider-keys.json"), "utf8")).rejects.toThrow();
     const handle = openDatabase({ dataDir, env: process.env });
     try {
-      const sessions = handle.sqlite.prepare("SELECT COUNT(*) AS count FROM user_sessions").get() as { count: number };
+      const sessions = handle.sqlite.prepare("SELECT COUNT(*) AS count FROM auth_sessions").get() as { count: number };
       const keys = handle.sqlite.prepare("SELECT key_preview, encrypted_key FROM provider_keys").all() as Array<{ key_preview: string; encrypted_key: string }>;
       expect(sessions.count).toBeGreaterThanOrEqual(1);
       expect(keys[0]).toEqual(expect.objectContaining({
@@ -200,7 +200,15 @@ describe("console API", () => {
         password: "correct horse battery staple"
       })
     });
-    const cookie = firstEntry.headers.get("set-cookie") ?? "";
+    const verificationCode = await latestEmailOtp(testDataDir(root), "owner@example.com", "email-verification");
+    const verified = await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "owner@example.com",
+        otp: verificationCode
+      })
+    });
+    const cookie = verified.headers.get("set-cookie") ?? "";
     const failedEntry = await server.fetch("/api/auth/enter", {
       method: "POST",
       body: JSON.stringify({
@@ -238,10 +246,11 @@ describe("console API", () => {
       authEnabled: true,
       authenticated: false
     });
-    expect(firstEntry.status).toBe(200);
+    expect(firstEntry.status).toBe(202);
+    expect(verified.status).toBe(200);
     expect(failedEntry.status).toBe(401);
     expect(secondEntry.status).toBe(200);
-    expect(cookie).toContain("haitu_session=");
+    expect(cookie).toContain("better-auth.session_token=");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(authedProducts.status).toBe(200);
@@ -275,6 +284,23 @@ describe("console API", () => {
     await writeFile(videoPath, Buffer.from("final-video"));
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
+    const auditEntry = await server.fetch("/api/auth/enter", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "audit@example.com",
+        password: "correct horse battery staple"
+      })
+    });
+    const auditOtp = await latestEmailOtp(dataDir, "audit@example.com", "email-verification");
+    await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "audit@example.com",
+        otp: auditOtp
+      })
+    });
     await server.fetch("/api/auth/enter", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -307,9 +333,11 @@ describe("console API", () => {
     const events = audit.events.map((event: { action: string }) => event.action);
     const auditFile = await readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8");
 
+    expect(auditEntry.status).toBe(202);
     expect(events).toEqual(expect.arrayContaining([
       "auth.enter_failed",
       "auth.enter",
+      "auth.email_verified",
       "provider_key.saved",
       "provider_key.deleted",
       "video_asset.deleted"
@@ -377,15 +405,23 @@ describe("console API", () => {
     expect(appSource).toContain("from \"./components/ui/field.js\"");
     expect(appSource).toContain("/api/auth/session");
     expect(appSource).toContain("/api/auth/enter");
+    expect(appSource).toContain("/api/auth/verify-email");
+    expect(appSource).toContain("/api/auth/request-password-reset");
+    expect(appSource).toContain("/api/auth/reset-password");
     expect(appSource).not.toContain("/api/auth/login");
     expect(appSource).not.toContain("/api/auth/register");
     expect(appSource).toContain("/api/auth/logout");
-    expect(appSource).toContain("Haitu 管理登录");
+    expect(appSource).toContain("Haitu 账号入口");
+    expect(appSource).toContain("登录已有账号，或用新邮箱创建账号");
     expect(appSource).toContain("邮箱");
     expect(appSource).toContain("密码");
-    expect(appSource).toContain("进入控制台");
+    expect(appSource).toContain("登录 / 创建账号");
+    expect(appSource).toContain("未注册邮箱会自动创建账号");
+    expect(appSource).toContain("忘记密码");
+    expect(appSource).toContain("验证邮箱并进入");
+    expect(appSource).toContain("重置密码");
     expect(appSource).not.toContain("管理员密码");
-    expect(appSource).not.toContain("创建账号");
+    expect(appSource).not.toContain("进入控制台");
     expect(appSource).toContain("退出登录");
     expect(appSource).toContain("setAuthSession");
     expect(appSource).toContain("Authentication required");
@@ -1301,7 +1337,7 @@ describe("console API", () => {
       const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-sqlite-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-      const session = await registerConsoleUser(server, "sqlite-key@example.com");
+      const session = await registerConsoleUser(testDataDir(root), server, "sqlite-key@example.com");
 
       const saved = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
         method: "PUT",
@@ -1364,7 +1400,7 @@ describe("console API", () => {
       const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-migrate-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-      const session = await registerConsoleUser(server, "sqlite-migrate@example.com");
+      const session = await registerConsoleUser(testDataDir(root), server, "sqlite-migrate@example.com");
       const workspaceSettingsDir = join(testDataDir(root), "workspaces", session.workspaceId, "settings");
       await mkdir(workspaceSettingsDir, { recursive: true });
       await writeFile(
@@ -4535,7 +4571,7 @@ describe("console API", () => {
     const response = await server.fetchJson("/api/storage-backup");
 
     expect(response.summary.totalBytes).toBeGreaterThan(0);
-    expect(response.summary.totalFiles).toBe(5);
+    expect(response.summary.totalFiles).toBe(6);
     expect(response.summary.videoFiles).toBe(0);
     expect(response.summary.manifestFiles).toBe(0);
     expect(response.summary.productFiles).toBe(1);
@@ -5668,8 +5704,18 @@ describe("console API", () => {
         cta: "今すぐチェック"
       })
     });
+    const third = await server.fetchJson("/api/video-jobs", {
+      method: "POST",
+      body: JSON.stringify({
+        productPath,
+        provider: "mock",
+        duration: 8,
+        template: "scene",
+        cta: "今すぐチェック"
+      })
+    });
 
-    const cancelled = await server.fetchJson(`/api/video-jobs/${second.job.id}/cancel`, {
+    const cancelled = await server.fetchJson(`/api/video-jobs/${third.job.id}/cancel`, {
       method: "POST"
     });
     releaseFirstJob();
@@ -5680,10 +5726,10 @@ describe("console API", () => {
       }
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    const jobPath = jobFilePath(outputsDir, second.job.id);
+    const jobPath = jobFilePath(outputsDir, third.job.id);
 
     expect(cancelled.job).toEqual(expect.objectContaining({
-      id: second.job.id,
+      id: third.job.id,
       status: "canceled"
     }));
     expect(calls.length).toBeGreaterThanOrEqual(1);
@@ -6058,14 +6104,20 @@ function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleSer
   if (!process.env.HAITU_SECRET_KEY) {
     vi.stubEnv("HAITU_SECRET_KEY", "0123456789abcdef0123456789abcdef");
   }
+  const rootDir = options.rootDir ?? process.cwd();
+  const dataDir = options.dataDir
+    ? isAbsolute(options.dataDir)
+      ? options.dataDir
+      : join(rootDir, options.dataDir)
+    : testDataDir(rootDir);
   const raw = createRawConsoleServer(options);
   let authSession: Promise<{ cookie: string; workspaceId: string }> | undefined;
 
   async function session(): Promise<{ cookie: string; workspaceId: string }> {
     if (!authSession) {
-      authSession = registerConsoleUser(raw, "console-test@example.com")
+      authSession = registerConsoleUser(dataDir, raw, "console-test@example.com")
         .then(async (current) => {
-          await importDefaultWorkspaceFiles(options.rootDir ?? process.cwd(), current.workspaceId);
+          await importDefaultWorkspaceFiles(dataDir, current.workspaceId);
           return current;
         });
     }
@@ -6099,11 +6151,10 @@ function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleSer
   return server;
 }
 
-async function importDefaultWorkspaceFiles(rootDir: string, workspaceId: string): Promise<void> {
+async function importDefaultWorkspaceFiles(dataDir: string, workspaceId: string): Promise<void> {
   if (workspaceId !== "default") {
     return;
   }
-  const dataDir = testDataDir(rootDir);
   const handle = openDatabase({ dataDir, env: process.env });
   try {
     runMigrations(handle);
@@ -6140,6 +6191,7 @@ function withCookie(init: RequestInit, cookie: string): RequestInit {
 }
 
 async function registerConsoleUser(
+  dataDir: string,
   server: ConsoleServerHandle,
   email: string
 ): Promise<{ cookie: string; workspaceId: string }> {
@@ -6150,12 +6202,45 @@ async function registerConsoleUser(
       password: "correct horse battery staple"
     })
   });
+  if (response.status === 202) {
+    const otp = await latestEmailOtp(dataDir, email, "email-verification");
+    const verified = await server.fetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        otp
+      })
+    });
+    expect(verified.status).toBe(200);
+    const body = await verified.json() as { workspace: { id: string } };
+    return {
+      cookie: verified.headers.get("set-cookie") ?? "",
+      workspaceId: body.workspace.id
+    };
+  }
   expect(response.status).toBe(200);
   const body = await response.json() as { workspace: { id: string } };
   return {
     cookie: response.headers.get("set-cookie") ?? "",
     workspaceId: body.workspace.id
   };
+}
+
+async function latestEmailOtp(dataDir: string, email: string, type: "email-verification" | "forget-password"): Promise<string> {
+  const outboxPath = join(dataDir, "system", "auth-email-outbox.jsonl");
+  const raw = await readFile(outboxPath, "utf8");
+  const rows = raw
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { email: string; type: string; otp: string });
+  const found = rows
+    .reverse()
+    .find((row) => row.email === email && row.type === type);
+  if (!found) {
+    throw new Error(`No OTP found for ${email} (${type})`);
+  }
+  return found.otp;
 }
 
 async function readStoredProviderKey(root: string, provider: string): Promise<{

@@ -20,6 +20,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Package,
+  MailCheck,
   Play,
   RefreshCcw,
   Settings,
@@ -62,6 +63,7 @@ type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "vol
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
 type StoryboardDraftSource = "default" | "ai" | "manual";
+type AuthFlowMode = "entry" | "verify-email" | "forgot-password";
 interface AuthSession {
   authEnabled: boolean;
   authenticated: boolean;
@@ -73,6 +75,11 @@ interface AuthSession {
     name?: string;
     role?: string;
   };
+}
+
+interface AuthEntryResponse extends AuthSession {
+  verificationRequired?: boolean;
+  email?: string;
 }
 
 interface ProductSummary {
@@ -829,8 +836,11 @@ function restoreProductStudioSku(availableProducts: ProductSummary[]): string {
 
 export function App() {
   const [authSession, setAuthSession] = useState<AuthSession>({ authEnabled: false, authenticated: true });
+  const [authFlowMode, setAuthFlowMode] = useState<AuthFlowMode>("entry");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authOtp, setAuthOtp] = useState("");
+  const [authNewPassword, setAuthNewPassword] = useState("");
   const [authStatus, setAuthStatus] = useState("正在检查登录状态...");
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
@@ -1045,15 +1055,86 @@ export function App() {
     event.preventDefault();
     setIsBusy(true);
     try {
-      const session = await postJson<AuthSession>("/api/auth/enter", {
+      const session = await postJson<AuthEntryResponse>("/api/auth/enter", {
         email: authEmail.trim() || undefined,
         password: authPassword
+      });
+      if (session.verificationRequired) {
+        setAuthFlowMode("verify-email");
+        setAuthEmail(session.email ?? authEmail.trim());
+        setAuthOtp("");
+        setAuthStatus("验证码已发送到邮箱，请输入后继续。");
+        return;
+      }
+      setAuthSession(session);
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthOtp("");
+      setAuthNewPassword("");
+      setAuthFlowMode("entry");
+      setAuthStatus("正在载入控制台。");
+      await refreshConsole({ applySettings: true });
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function verifyEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    try {
+      const session = await postJson<AuthSession>("/api/auth/verify-email", {
+        email: authEmail.trim() || undefined,
+        otp: authOtp.trim()
       });
       setAuthSession(session);
       setAuthEmail("");
       setAuthPassword("");
+      setAuthOtp("");
+      setAuthNewPassword("");
+      setAuthFlowMode("entry");
       setAuthStatus("正在载入控制台。");
       await refreshConsole({ applySettings: true });
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function requestPasswordReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    try {
+      await postJson<{ success: true }>("/api/auth/request-password-reset", {
+        email: authEmail.trim() || undefined
+      });
+      setAuthOtp("");
+      setAuthNewPassword("");
+      setAuthStatus("验证码已发送到邮箱，请输入验证码和新密码。");
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function resetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    try {
+      await postJson<{ success: true }>("/api/auth/reset-password", {
+        email: authEmail.trim() || undefined,
+        otp: authOtp.trim(),
+        password: authNewPassword
+      });
+      setAuthFlowMode("entry");
+      setAuthPassword("");
+      setAuthOtp("");
+      setAuthNewPassword("");
+      setAuthStatus("密码已重置，请用新密码登录。");
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1066,8 +1147,11 @@ export function App() {
     try {
       const session = await postJson<AuthSession>("/api/auth/logout", {});
       setAuthSession(session);
+      setAuthFlowMode("entry");
       setAuthEmail("");
       setAuthPassword("");
+      setAuthOtp("");
+      setAuthNewPassword("");
       setAuthStatus("已退出登录。");
     } catch (error) {
       showError(error);
@@ -2290,13 +2374,22 @@ export function App() {
   if (authSession.authEnabled && !authSession.authenticated) {
     return (
       <LoginScreen
+        mode={authFlowMode}
+        setMode={setAuthFlowMode}
         email={authEmail}
         setEmail={setAuthEmail}
         password={authPassword}
         setPassword={setAuthPassword}
+        otp={authOtp}
+        setOtp={setAuthOtp}
+        newPassword={authNewPassword}
+        setNewPassword={setAuthNewPassword}
         status={authStatus}
         isBusy={isBusy || isLoading}
         onLogin={login}
+        onVerifyEmail={verifyEmail}
+        onRequestPasswordReset={requestPasswordReset}
+        onResetPassword={resetPassword}
       />
     );
   }
@@ -2485,64 +2578,201 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
 }
 
 function LoginScreen({
+  mode,
+  setMode,
   email,
   setEmail,
   password,
   setPassword,
+  otp,
+  setOtp,
+  newPassword,
+  setNewPassword,
   status,
   isBusy,
-  onLogin
+  onLogin,
+  onVerifyEmail,
+  onRequestPasswordReset,
+  onResetPassword
 }: {
+  mode: AuthFlowMode;
+  setMode: (value: AuthFlowMode) => void;
   email: string;
   setEmail: (value: string) => void;
   password: string;
   setPassword: (value: string) => void;
+  otp: string;
+  setOtp: (value: string) => void;
+  newPassword: string;
+  setNewPassword: (value: string) => void;
   status: string;
   isBusy: boolean;
   onLogin: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onVerifyEmail: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onRequestPasswordReset: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onResetPassword: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const resetDisabled = isBusy || !email.trim() || !otp.trim() || !newPassword.trim();
   return (
     <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(10,163,148,.15),transparent_26%),radial-gradient(circle_at_85%_0,rgba(37,99,235,.12),transparent_30%),var(--bg)] px-4 py-8 text-[var(--text)]">
       <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(15,23,42,.12)]">
         <div className="mb-5 flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--accent2),var(--accent))] text-lg font-black text-white shadow-[0_12px_24px_rgba(10,163,148,.22)]">海</div>
           <div className="min-w-0">
-            <h1 className="m-0 text-xl font-black leading-tight">Haitu 管理登录</h1>
-            <p className="m-0 mt-1 text-xs font-semibold text-[var(--muted)]">商品视频生成控制台</p>
+            <h1 className="m-0 text-xl font-black leading-tight">Haitu 账号入口</h1>
+            <p className="m-0 mt-1 text-xs font-semibold text-[var(--muted)]">
+              {mode === "forgot-password"
+                ? "用邮箱验证码重置密码"
+                : mode === "verify-email"
+                  ? "输入邮箱验证码完成账号创建"
+                  : "登录已有账号，或用新邮箱创建账号"}
+            </p>
           </div>
         </div>
-        <form className="grid gap-4" onSubmit={onLogin}>
-          <Field label="邮箱">
-            <Input
-              autoFocus
-              autoComplete="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="请输入邮箱"
-            />
-          </Field>
-          <Field label="密码">
-            <Input
-              autoComplete="current-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="请输入密码"
-            />
-          </Field>
-          <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !password.trim()}>
-            <KeyRound size={15} />
-            进入控制台
-          </Button>
-          {status ? (
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 text-xs font-semibold leading-5 text-[var(--muted)]">
-              {status}
+        {mode === "entry" ? (
+          <form className="grid gap-4" onSubmit={onLogin}>
+            <Field label="邮箱">
+              <Input
+                autoFocus
+                autoComplete="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="请输入邮箱"
+              />
+            </Field>
+            <Field label="密码">
+              <Input
+                autoComplete="current-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="请输入密码"
+              />
+            </Field>
+            <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !password.trim()}>
+              <KeyRound size={15} />
+              登录 / 创建账号
+            </Button>
+            <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+              <span className="text-[var(--muted)]">未注册邮箱会自动创建账号</span>
+              <button
+                type="button"
+                className="font-black text-[var(--accent)] hover:underline"
+                onClick={() => {
+                  setMode("forgot-password");
+                  setOtp("");
+                  setNewPassword("");
+                }}
+              >
+                忘记密码
+              </button>
             </div>
-          ) : null}
-        </form>
+            <AuthStatus status={status} />
+          </form>
+        ) : null}
+
+        {mode === "verify-email" ? (
+          <form className="grid gap-4" onSubmit={onVerifyEmail}>
+            <Field label="邮箱">
+              <Input
+                autoComplete="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="请输入邮箱"
+              />
+            </Field>
+            <Field label="验证码">
+              <Input
+                autoFocus
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                value={otp}
+                onChange={(event) => setOtp(event.target.value)}
+                placeholder="6 位验证码"
+              />
+            </Field>
+            <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !otp.trim()}>
+              <MailCheck size={15} />
+              验证邮箱并进入
+            </Button>
+            <button
+              type="button"
+              className="justify-self-center text-xs font-black text-[var(--accent)] hover:underline"
+              onClick={() => setMode("entry")}
+            >
+              返回账号入口
+            </button>
+            <AuthStatus status={status} />
+          </form>
+        ) : null}
+
+        {mode === "forgot-password" ? (
+          <div className="grid gap-4">
+            <form className="grid gap-4" onSubmit={onRequestPasswordReset}>
+              <Field label="邮箱">
+                <Input
+                  autoFocus
+                  autoComplete="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="请输入邮箱"
+                />
+              </Field>
+              <Button variant="soft" type="submit" disabled={isBusy || !email.trim()}>
+                <MailCheck size={15} />
+                发送验证码
+              </Button>
+            </form>
+            <form className="grid gap-4" onSubmit={onResetPassword}>
+              <Field label="验证码">
+                <Input
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value)}
+                  placeholder="6 位验证码"
+                />
+              </Field>
+              <Field label="新密码">
+                <Input
+                  autoComplete="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder="至少 12 位"
+                />
+              </Field>
+              <Button variant="primary" type="submit" disabled={resetDisabled}>
+                <KeyRound size={15} />
+                重置密码
+              </Button>
+            </form>
+            <button
+              type="button"
+              className="justify-self-center text-xs font-black text-[var(--accent)] hover:underline"
+              onClick={() => setMode("entry")}
+            >
+              返回账号入口
+            </button>
+            <AuthStatus status={status} />
+          </div>
+        ) : null}
       </Card>
     </main>
+  );
+}
+
+function AuthStatus({ status }: { status: string }) {
+  if (!status) {
+    return null;
+  }
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 text-xs font-semibold leading-5 text-[var(--muted)]">
+      {status}
+    </div>
   );
 }
 
@@ -6710,8 +6940,11 @@ function videoAssetKindLabel(kind: VideoAsset["kind"]): string {
 
 function auditActionLabel(action: string): string {
   const labels: Record<string, string> = {
-    "auth.login": "登录成功",
-    "auth.login_failed": "登录失败",
+    "auth.enter": "账号进入",
+    "auth.enter_failed": "登录失败",
+    "auth.email_verified": "邮箱验证",
+    "auth.password_reset_requested": "请求重置密码",
+    "auth.password_reset": "重置密码",
     "auth.logout": "退出登录",
     "provider_key.saved": "保存 Key",
     "provider_key.deleted": "清除 Key",

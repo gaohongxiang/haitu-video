@@ -69,7 +69,7 @@ import {
   type ProviderStoredConfig
 } from "./providerKeyStore.js";
 import { cleanupExpiredVideos } from "./videoRetention.js";
-import { SqliteConsoleAuthStore } from "./auth/sqliteAuthStore.js";
+import { BetterAuthConsoleAuthStore } from "./auth/betterAuthStore.js";
 import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
@@ -296,8 +296,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     legacyFilePath: workspacePaths.providerKeysFile
   });
   const auditLog = new FileAuditLog(join(storageRoots.systemDir, "audit-log.jsonl"));
-  const authStore = new SqliteConsoleAuthStore({
-    handle: databaseHandle
+  const authStore = new BetterAuthConsoleAuthStore({
+    handle: databaseHandle,
+    dataDir,
+    env: process.env
   });
   const runConfiguredMakeVideoPipeline = createConfiguredMakeVideoPipeline({
     providerKeyStore: defaultProviderKeyStore,
@@ -373,6 +375,36 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const response = await authStore.enter(await request.json());
         await auditLog.append({
           action: response.ok ? "auth.enter" : "auth.enter_failed",
+          metadata: {
+            status: response.status
+          }
+        });
+        return response;
+      }
+      if (request.method === "POST" && url.pathname === "/api/auth/verify-email") {
+        const response = await authStore.verifyEmail(await request.json());
+        await auditLog.append({
+          action: response.ok ? "auth.email_verified" : "auth.email_verification_failed",
+          metadata: {
+            status: response.status
+          }
+        });
+        return response;
+      }
+      if (request.method === "POST" && url.pathname === "/api/auth/request-password-reset") {
+        const response = await authStore.requestPasswordReset(await request.json());
+        await auditLog.append({
+          action: response.ok ? "auth.password_reset_requested" : "auth.password_reset_request_failed",
+          metadata: {
+            status: response.status
+          }
+        });
+        return response;
+      }
+      if (request.method === "POST" && url.pathname === "/api/auth/reset-password") {
+        const response = await authStore.resetPassword(await request.json());
+        await auditLog.append({
+          action: response.ok ? "auth.password_reset" : "auth.password_reset_failed",
           metadata: {
             status: response.status
           }
