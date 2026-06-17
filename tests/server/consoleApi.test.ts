@@ -1099,6 +1099,8 @@ describe("console API", () => {
     expect(videoHistorySource).toContain("下载视频");
     expect(videoHistorySource).not.toContain("设为最终");
     expect(videoHistorySource).not.toContain("已设最终");
+    expect(appSource).not.toContain("selectFinalVersion");
+    expect(appSource).not.toContain("已选择最终版本");
     expect(videoHistorySource).toContain("删除");
     expect(videoHistorySource).toContain("onDelete(job)");
     expect(buildLatestCreativeJobsSource).toContain("new Set(productVideoJobs.map((job) => job.id))");

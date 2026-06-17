@@ -2367,23 +2367,6 @@ export function App() {
     }
   }
 
-  async function selectFinalVersion(productSku: string, jobId: string) {
-    setIsBusy(true);
-    try {
-      await postJson("/api/reviews/select-final", {
-        productSku,
-        jobId,
-        note: "控制台手动选择"
-      });
-      setStatusText(`已选择最终版本: ${jobId}`);
-      await refreshConsole();
-    } catch (error) {
-      showError(error);
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
   async function showProviderUsage(taskId: string) {
     setIsBusy(true);
     try {
