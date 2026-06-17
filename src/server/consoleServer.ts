@@ -518,6 +518,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             outputsDir: requestContext.outputsDir,
             fixturesDir: requestContext.fixturesDir,
             settingsStore,
+            providerKeyStore: requestContext.providerKeyStore,
             videoJobQueue: requestContext.videoJobQueue
           })
         });
@@ -921,6 +922,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             outputsDir: requestContext.outputsDir,
             fixturesDir: requestContext.fixturesDir,
             settingsStore,
+            providerKeyStore: requestContext.providerKeyStore,
             videoJobQueue: requestContext.videoJobQueue
           })
         });
@@ -928,14 +930,15 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && url.pathname === "/api/video-jobs") {
         const body = (await request.json()) as MakeVideoRequest;
         const productPath = resolveWithin(dataDir, body.productPath);
+        const settings = await settingsStore.read();
+        const providerName = body.provider ?? settings.defaultProvider;
+        await assertVideoModelConfigured(requestContext.providerKeyStore, providerName);
         await assertTemplateEnabled(body, settingsStore);
         await assertWithinVideoBudget(body, settingsStore);
         await assertWithinTestCredit(body, {
           outputsDir: requestContext.outputsDir,
           settingsStore
         });
-        const settings = await settingsStore.read();
-        const providerName = body.provider ?? settings.defaultProvider;
         await assertPaidProductReady({
           provider: providerName,
           productPath,
@@ -997,6 +1000,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           confirmPaid: body.confirmPaid,
           videoJobQueue: requestContext.videoJobQueue,
           settingsStore,
+          providerKeyStore: requestContext.providerKeyStore,
           outputsDir: requestContext.outputsDir
         });
         const job = await requestContext.videoJobQueue.retry(jobId, {
@@ -1074,6 +1078,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse({ error: message }, 422);
       }
       if (message.includes("requires confirmPaid")) {
+        return jsonResponse({ error: message }, 402);
+      }
+      if (message.includes("请先配置视频模型")) {
         return jsonResponse({ error: message }, 402);
       }
       if (message.includes("is disabled. Enable it in template management")) {
@@ -1372,19 +1379,21 @@ async function enqueueBatchVideoJobs(
     outputsDir: string;
     fixturesDir: string;
     settingsStore: FileConsoleSettingsStore;
+    providerKeyStore: ProviderKeyStore;
     videoJobQueue: LocalVideoJobQueue;
   }
 ) {
   const productPath = resolveWithin(options.rootDir, body.productPath);
   const versions = clampInteger(body.versions ?? 1, 1, 5);
   const settings = await options.settingsStore.read();
+  const providerName = body.provider ?? settings.defaultProvider;
+  await assertVideoModelConfigured(options.providerKeyStore, providerName);
   await assertTemplateEnabled(body, options.settingsStore);
   await assertWithinVideoBudget(body, options.settingsStore);
   await assertWithinBatchTestCredit(body, versions, {
     outputsDir: options.outputsDir,
     settingsStore: options.settingsStore
   });
-  const providerName = body.provider ?? settings.defaultProvider;
   await assertPaidProductReady({
     provider: providerName,
     productPath,
@@ -1420,6 +1429,7 @@ async function enqueueProductVideoJobsBySku(
     outputsDir: string;
     fixturesDir: string;
     settingsStore: FileConsoleSettingsStore;
+    providerKeyStore: ProviderKeyStore;
     videoJobQueue: LocalVideoJobQueue;
   }
 ) {
@@ -1435,12 +1445,14 @@ async function assertRetryVideoJobAllowed(input: {
   confirmPaid?: boolean;
   videoJobQueue: LocalVideoJobQueue;
   settingsStore: FileConsoleSettingsStore;
+  providerKeyStore: ProviderKeyStore;
   outputsDir: string;
 }): Promise<void> {
   const record = await input.videoJobQueue.get(input.jobId);
   if (record.provider && record.provider !== "mock" && input.confirmPaid !== true) {
     throw new Error("Retrying a paid video job requires confirmPaid: true.");
   }
+  await assertVideoModelConfigured(input.providerKeyStore, record.provider);
   const body: MakeVideoRequest = {
     productPath: record.productPath,
     provider: record.provider,
@@ -1952,6 +1964,19 @@ async function selectedVideoProviderConfig(
     baseUrl: config.baseUrl,
     model: config.model
   };
+}
+
+async function assertVideoModelConfigured(
+  providerKeyStore: ProviderKeyStore,
+  provider: VideoProviderName | undefined
+): Promise<void> {
+  if (!provider || provider === "mock") {
+    return;
+  }
+  const config = await selectedVideoProviderConfig(providerKeyStore, provider);
+  if (!config.apiKey) {
+    throw new Error("请先配置视频模型，再生成视频。");
+  }
 }
 
 function extensionFromMimeType(mimeType: string): ".jpg" | ".png" | ".webp" {

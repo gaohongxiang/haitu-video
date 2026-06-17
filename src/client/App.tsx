@@ -964,6 +964,7 @@ export function App() {
   const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
   const textModelConfigured = providerConfig.textModels.some((model) => model.configured);
   const imageModelConfigured = providerConfig.imageModels.some((model) => model.configured);
+  const videoModelConfigured = selectedVideoModelConfig.provider === "mock" || providerConfig.videoModels.some((model) => model.configured);
 
   function setActiveSection(section: ConsoleSection) {
     setActiveSectionState(section);
@@ -1007,6 +1008,14 @@ export function App() {
       return true;
     }
     showConsoleToast("请先配置图片模型，再生成参考图。");
+    return false;
+  }
+
+  function ensureVideoModelConfigured(): boolean {
+    if (videoModelConfigured) {
+      return true;
+    }
+    showConsoleToast("请先配置视频模型，再生成视频。");
     return false;
   }
 
@@ -1423,6 +1432,10 @@ export function App() {
     }
     if (paidRunBlockedReason) {
       setStatusText(paidRunBlockedReason);
+      return;
+    }
+    if (!ensureVideoModelConfigured()) {
+      setStatusText("请先配置视频模型，再生成视频。");
       return;
     }
     setIsBusy(true);
@@ -1950,6 +1963,9 @@ export function App() {
   }
 
   async function queueProductVideoJobs(product: ProductSummary, options?: ProductVideoGenerationOptions) {
+    if (!ensureVideoModelConfigured()) {
+      throw new Error("请先配置视频模型，再生成视频。");
+    }
     const readiness = referenceReadiness(product);
     if (!readiness.ready) {
       setStatusText(`${product.title_ja}: ${readiness.label}`);
@@ -2392,6 +2408,10 @@ export function App() {
 
   async function retryVideoJob(job: VideoJob) {
     const paidRetry = Boolean(job.provider && job.provider !== "mock");
+    if (paidRetry && !ensureVideoModelConfigured()) {
+      setStatusText("请先配置视频模型，再重试生成视频。");
+      return;
+    }
     if (paidRetry) {
       const confirmed = window.confirm(
         [
@@ -4318,6 +4338,7 @@ function VideoHistoryPanel({
             const playableVideo = hasPlayableVideo(job);
             const retryJob = job.status === "failed" ? job.videoJob : undefined;
             const canSelectFinal = actionProduct && playableVideo && !activeVersion;
+            const failureReason = creativeVersionFailureReason(job);
             return (
               <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
@@ -4329,7 +4350,7 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {videoExpiryLabel(job)}
+                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {failureReason || videoExpiryLabel(job)}
                   </div>
                 </div>
                 <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
@@ -4751,6 +4772,7 @@ function VideoPreviewDialog({
   const canSelectFinal = playableVideo && !activeVersion;
   const previewTitle = videoLabel(index);
   const statusText = creativeVersionDisplayStatus(job);
+  const failureReason = creativeVersionFailureReason(job);
 
   return (
     <div
@@ -4810,7 +4832,7 @@ function VideoPreviewDialog({
                 <div className="max-w-[520px] text-xs font-semibold leading-5 text-[#6c7890]">
                   {activeVersion
                     ? "生成完成后这里会自动变成可播放预览。"
-                    : job.videoJob?.error || "这个记录暂时没有成片文件，可以保留记录或删除后重新生成。"}
+                    : failureReason || "这个记录暂时没有成片文件，可以保留记录或删除后重新生成。"}
                 </div>
               </div>
             </div>
@@ -7094,7 +7116,7 @@ function creativeVersionStatusLabel(value?: string): string {
   if (value === "completed" || value === "succeeded") return "可预览";
   if (value === "queued") return "排队中";
   if (value === "running") return "生成中";
-  if (value === "failed") return "需重试";
+  if (value === "failed") return "生成失败";
   if (value === "canceled" || value === "cancelled") return "已取消";
   return value || "-";
 }
@@ -7108,6 +7130,13 @@ function creativeVersionDisplayStatus(job: CreativeVersionItem): string {
   if (hasPlayableVideo(job)) return "可预览";
   if (job.status === "completed" || job.status === "succeeded") return "已完成";
   return creativeVersionStatusLabel(job.status);
+}
+
+function creativeVersionFailureReason(job: CreativeVersionItem): string {
+  if (job.status !== "failed") {
+    return "";
+  }
+  return job.videoJob?.error || "生成失败，请检查视频模型配置后重试。";
 }
 
 function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {

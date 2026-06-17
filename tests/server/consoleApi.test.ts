@@ -611,6 +611,7 @@ describe("console API", () => {
     expect(appSource).toContain("AI 整理并保存");
     expect(appSource).toContain("ensureTextModelConfigured");
     expect(appSource).toContain("ensureImageModelConfigured");
+    expect(appSource).toContain("ensureVideoModelConfigured");
     expect(appSource).toContain("ConsoleToast");
     expect(appSource).toContain("consoleToast={consoleToast}");
     expect(appSource).toContain("showConsoleToast");
@@ -618,13 +619,16 @@ describe("console API", () => {
     expect(appSource).toContain("操作提示");
     expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
     expect(appSource).toContain("请先配置图片模型，再生成参考图。");
+    expect(appSource).toContain("请先配置视频模型，再生成视频。");
     expect(appSource).not.toContain("openApiManagementWithMessage");
     expect(appSource).not.toContain("ModelConfigNotice");
     expect(appSource).not.toContain("ConsoleStatusNotice");
     const textModelGuard = appSource.slice(appSource.indexOf("function ensureTextModelConfigured"), appSource.indexOf("function ensureImageModelConfigured"));
-    const imageModelGuard = appSource.slice(appSource.indexOf("function ensureImageModelConfigured"), appSource.indexOf("useEffect(() =>"));
+    const imageModelGuard = appSource.slice(appSource.indexOf("function ensureImageModelConfigured"), appSource.indexOf("function ensureVideoModelConfigured"));
+    const videoModelGuard = appSource.slice(appSource.indexOf("function ensureVideoModelConfigured"), appSource.indexOf("useEffect(() =>"));
     expect(textModelGuard).not.toContain('setActiveSection("settings")');
     expect(imageModelGuard).not.toContain('setActiveSection("settings")');
+    expect(videoModelGuard).not.toContain('setActiveSection("settings")');
     expect(appSource).toContain("importProductsBatch");
     expect(appSource).toContain("/api/products/import-batch");
     expect(appSource).toContain("importProductAndSave");
@@ -1033,6 +1037,8 @@ describe("console API", () => {
     expect(videoHistorySource).toContain("overflow-y-auto");
     expect(videoHistorySource).toContain("videoLabel(index)");
     expect(videoHistorySource).toContain("hasPlayableVideo(job)");
+    expect(videoHistorySource).toContain("creativeVersionFailureReason(job)");
+    expect(appSource).toContain('if (value === "failed") return "生成失败";');
     expect(videoHistorySource).toContain("预览视频");
     expect(videoHistorySource).toContain("下载视频");
     expect(videoHistorySource).toContain("设为最终");
@@ -1062,6 +1068,7 @@ describe("console API", () => {
     expect(appSource).toContain("/video-jobs");
     expect(appSource).toContain("/storyboards");
     expect(appSource).toContain("queueProductVideoJobs");
+    expect(queueProductVideoJobsSource).toContain("ensureVideoModelConfigured()");
     expect(queueProductVideoJobsSource).toContain("mergeVideoJobs(response.jobs, current)");
     expect(queueProductVideoJobsSource).not.toContain("scriptLines: splitDraftLines(studioScriptDraft)");
     expect(queueProductVideoJobsSource).toContain("storyboardLines: splitDraftLines(studioStoryboardDraft)");
@@ -2090,6 +2097,8 @@ describe("console API", () => {
     expect(composerSource).toContain("脚本分镜");
     expect(composerSource).toContain("AI 生成分镜");
     expect(composerSource).toContain("历史记录");
+    expect(composerSource).toContain("creativeVersionFailureReason(job)");
+    expect(appSource).toContain('if (value === "failed") return "生成失败";');
     expect(composerSource).toContain("预览视频");
     expect(composerSource).toContain("下载视频");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
@@ -5452,6 +5461,57 @@ describe("console API", () => {
         providerModel: "high-video-model",
         finalLanguage: "ja"
       }));
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
+  it("rejects real video jobs before enqueue when the video model API key is missing", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-missing-key-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      await writeFile(productAssetPath(productPath, "detail1.jpg"), Buffer.from("detail-image"));
+      const calls: string[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        autoStartSavedJobs: false,
+        runMakeVideoPipeline: async (input) => {
+          calls.push(input.outDir);
+          throw new Error("Provider should not be called when video API key is missing.");
+        }
+      });
+
+      const response = await server.fetch("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          duration: 8,
+          template: "scene",
+          cta: "今すぐチェック",
+          confirmPaid: true
+        })
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(402);
+      expect(body.error).toBe("请先配置视频模型，再生成视频。");
+      expect(calls).toEqual([]);
+      await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
+        jobs: []
+      });
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
