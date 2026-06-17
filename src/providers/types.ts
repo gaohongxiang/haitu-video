@@ -5,6 +5,8 @@ export interface MoneyAmount {
   currency: "USD" | "JPY" | "CNY";
 }
 
+export type ReferenceImageUrlResolver = (reference: string) => Promise<string>;
+
 export interface VideoProviderRequest {
   jobId: string;
   productSku: string;

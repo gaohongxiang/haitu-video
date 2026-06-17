@@ -747,7 +747,7 @@ const defaultProductDraft: ProductDraft = {
   source_text: ""
 };
 
-const videoModelOptions: VideoModelChoice[] = ["mock", "seedance-2-fast", "seedance-2", "seedance-1-5-pro"];
+const videoModelOptions: VideoModelChoice[] = ["seedance-2-fast", "seedance-2", "seedance-1-5-pro"];
 const defaultVideoDurationSeconds = 10;
 const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast";
 const defaultVideoTemplate: TemplateName = "scene";
@@ -901,6 +901,7 @@ export function App() {
   const [preflightSignature, setPreflightSignature] = useState("");
   const [statusText, setStatusText] = useState("等待操作");
   const [consoleToast, setConsoleToast] = useState<ConsoleToastState | undefined>();
+  const consoleToastCloseRef = useRef<() => void>(() => undefined);
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState | undefined>();
   const [selectedProduct, setSelectedProduct] = useState<ProductDetail | undefined>();
   const [productStudioLoadError, setProductStudioLoadError] = useState("");
@@ -993,6 +994,12 @@ export function App() {
   const textModelConfigured = providerConfig.textModels.some((model) => model.configured);
   const imageModelConfigured = providerConfig.imageModels.some((model) => model.configured);
   const videoModelConfigured = selectedVideoModelConfig.provider === "mock" || providerConfig.videoModels.some((model) => model.configured);
+
+  consoleToastCloseRef.current = () => setConsoleToast(undefined);
+  const handleConsoleToastClose = useMemo(
+    () => () => consoleToastCloseRef.current(),
+    []
+  );
 
   function setActiveSection(section: ConsoleSection) {
     setActiveSectionState(section);
@@ -1647,7 +1654,7 @@ export function App() {
           apiKey: ""
         }
       }));
-      setStatusText("已清除平台 API Key。");
+      setStatusText("已清除 API Key。");
       await refreshConsole();
     } catch (error) {
       showError(error);
@@ -2613,7 +2620,6 @@ export function App() {
               onUploadImages={uploadProductReferenceImages}
               onGenerateReferenceImages={generateProductReferenceImages}
               onDeleteReferenceImage={deleteProductReferenceImage}
-              onSelectFinal={selectFinalVersion}
               videoModelChoice={videoModelChoice}
               onVideoModelChoiceChange={(nextVideoModelChoice) => {
                 setVideoModelChoice(nextVideoModelChoice);
@@ -2830,7 +2836,7 @@ export function App() {
         <div ref={contentScrollerRef} className="min-h-0 overflow-y-auto px-4 py-4 min-[1100px]:px-6">
           {renderActiveSection()}
         </div>
-        <ConsoleToast consoleToast={consoleToast} onClose={() => setConsoleToast(undefined)} />
+        <ConsoleToast consoleToast={consoleToast} onClose={handleConsoleToastClose} />
         <ConfirmActionDialog
           action={confirmAction}
           isBusy={isBusy}
@@ -2930,7 +2936,7 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
     if (!consoleToast || paused) {
       return;
     }
-    const timeout = window.setTimeout(onClose, 3200);
+    const timeout = window.setTimeout(onClose, 3000);
     return () => window.clearTimeout(timeout);
   }, [consoleToast?.id, onClose, paused]);
 
@@ -3345,13 +3351,13 @@ function PreflightPanel({ preflight, fresh }: { preflight?: Preflight; fresh: bo
         <MiniMetric label="期望成本" value={`¥${money(preflight.estimatedCostCny.expected)}`} hint={`区间 ¥${money(preflight.estimatedCostCny.low)} - ¥${money(preflight.estimatedCostCny.high)}`} />
         <MiniMetric label="期望 Token" value={formatNumber(preflight.estimatedTokens.expected)} hint={`${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`} />
         <MiniMetric label="时长" value={`${preflight.durationSeconds}s`} hint={preflight.aspectRatio} />
-        <MiniMetric label="生成通道" value={providerLabel(preflight.provider)} hint={preflight.requiresPaidConfirmation ? "运行会扣费" : "本地模拟"} />
+        <MiniMetric label="生成通道" value={providerLabel(preflight.provider)} hint={preflight.requiresPaidConfirmation ? "运行会扣费" : "无需付费确认"} />
         <MiniMetric label="测试额度" value={`¥${money(preflight.credit.availableEstimatedCostCny)}`} hint={`总额 ¥${money(preflight.credit.testCreditBalanceCny)} / 已用 ¥${money(preflight.credit.usedEstimatedCostCny)}`} />
         <MiniMetric label="额度状态" value={preflight.credit.enoughCredit ? "足够" : "不足"} hint={`本次约 ¥${money(preflight.credit.estimatedCostCny)}`} />
       </div>
       {!preflight.credit.enoughCredit ? (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-bold text-[var(--danger)]">
-          剩余测试额度不足，请提高测试额度或改用本地模拟 / 更短时长后再运行付费任务。
+          剩余测试额度不足，请提高测试额度或缩短时长后再运行付费任务。
         </div>
       ) : null}
       {preflight.paidProvider ? (
@@ -3427,7 +3433,6 @@ function ProductCreationWorkspace({
   onUploadImages,
   onGenerateReferenceImages,
   onDeleteReferenceImage,
-  onSelectFinal,
   videoModelChoice,
   onVideoModelChoiceChange,
   duration,
@@ -3477,7 +3482,6 @@ function ProductCreationWorkspace({
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
   videoModelChoice: VideoModelChoice;
   onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
@@ -3527,7 +3531,6 @@ function ProductCreationWorkspace({
       products={studioProductOptions}
       pendingProductSku={pendingProductSku}
       selectedProduct={selectedProduct}
-      actionProduct={actionProduct}
       latestCreativeJobs={latestCreativeJobs}
       loadError={loadError}
       draft={draft}
@@ -3552,7 +3555,6 @@ function ProductCreationWorkspace({
       onUploadImages={onUploadImages}
       onGenerateReferenceImages={onGenerateReferenceImages}
       onDeleteReferenceImage={onDeleteReferenceImage}
-      onSelectFinal={onSelectFinal}
       videoModelChoice={videoModelChoice}
       onVideoModelChoiceChange={onVideoModelChoiceChange}
       duration={duration}
@@ -3580,7 +3582,6 @@ function ProductCreationComposer({
   products,
   pendingProductSku,
   selectedProduct,
-  actionProduct,
   latestCreativeJobs,
   loadError,
   draft,
@@ -3605,7 +3606,6 @@ function ProductCreationComposer({
   onUploadImages,
   onGenerateReferenceImages,
   onDeleteReferenceImage,
-  onSelectFinal,
   videoModelChoice,
   onVideoModelChoiceChange,
   duration,
@@ -3629,7 +3629,6 @@ function ProductCreationComposer({
   products: ProductSummary[];
   pendingProductSku?: string;
   selectedProduct?: ProductDetail;
-  actionProduct?: ProductSummary;
   latestCreativeJobs: CreativeVersionItem[];
   loadError?: string;
   draft: ProductDraft;
@@ -3654,7 +3653,6 @@ function ProductCreationComposer({
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
   videoModelChoice: VideoModelChoice;
   onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
@@ -3972,7 +3970,7 @@ function ProductCreationComposer({
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
                 onPaste={handleProductFactsPaste}
-                placeholder="可以直接粘贴商品页、店小秘、1688 或补充描述；也可以按标题、分类、材质、尺寸/重量、卖点、使用场景来写。"
+                placeholder="可以直接粘贴或填写商品标题、分类、材质、尺寸/重量、卖点、使用场景。"
               />
             </div>
 
@@ -4021,22 +4019,18 @@ function ProductCreationComposer({
       </div>
 
       <VideoHistoryPanel
-        actionProduct={actionProduct}
         jobs={latestCreativeJobs}
         onPreview={setPreviewJob}
         onDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
-        onSelectFinal={onSelectFinal}
       />
 
       <VideoPreviewDialog
         job={previewJob}
         index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === previewJob?.id))}
-        actionProduct={actionProduct ?? productActionSummary(selectedProduct ?? productDraftToProductDetail(draft))}
         onClose={() => setPreviewJob(undefined)}
         onRequestDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
-        onSelectFinal={onSelectFinal}
       />
       <DeleteCreativeVersionDialog
         job={deleteTarget}
@@ -4447,19 +4441,15 @@ function StoryboardComposerPanel({
 }
 
 function VideoHistoryPanel({
-  actionProduct,
   jobs,
   onPreview,
   onDelete,
-  onRetryVideoJob,
-  onSelectFinal
+  onRetryVideoJob
 }: {
-  actionProduct?: ProductSummary;
   jobs: CreativeVersionItem[];
   onPreview: (job: CreativeVersionItem) => void;
   onDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
 }) {
   return (
     <section className="grid gap-3 border-t border-[#e5ecf6] bg-[#fbfdff] p-5">
@@ -4476,7 +4466,6 @@ function VideoHistoryPanel({
             const activeVersion = isActiveCreativeVersion(job);
             const playableVideo = hasPlayableVideo(job);
             const retryJob = job.status === "failed" ? job.videoJob : undefined;
-            const canSelectFinal = actionProduct && playableVideo && !activeVersion;
             const failureReason = creativeVersionFailureReason(job);
             return (
               <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -4511,11 +4500,6 @@ function VideoHistoryPanel({
                     <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
                       <RefreshCcw size={13} />
                       重试
-                    </Button>
-                  ) : null}
-                  {canSelectFinal ? (
-                    <Button className="w-fit" size="sm" disabled={job.selectedFinal} onClick={() => void onSelectFinal(actionProduct.sku, job.id)}>
-                      {job.selectedFinal ? "已设最终" : "设为最终"}
                     </Button>
                   ) : null}
                   <Button className="w-fit" size="sm" variant="danger" onClick={() => onDelete(job)}>
@@ -4726,7 +4710,7 @@ function ProductLibraryDialog({
               <ProductEntryModeButton
                 active={activeMode === "import"}
                 badge="粘贴导入"
-                description="从店小秘、1688、商品页复制整段资料。"
+                description="粘贴或填写商品标题、分类、材质、尺寸/重量、卖点和使用场景。"
                 icon={<Sparkles size={16} />}
                 title="导入商品"
                 onClick={() => setEditorMode("import")}
@@ -4755,7 +4739,7 @@ function ProductLibraryDialog({
                   rows={8}
                   value={importText}
                   onChange={(event) => setImportText(event.target.value)}
-                  placeholder={"店小秘/1688/商品页资料可整段粘贴\n标题、分类、材质、卖点、参考图..."}
+                  placeholder={"商品标题、分类、材质、尺寸/重量、卖点、使用场景...\n参考图也可以单独上传"}
                 />
               </Field>
               <div className="flex flex-wrap gap-2">
@@ -4878,19 +4862,15 @@ function DeleteCreativeVersionDialog({
 function VideoPreviewDialog({
   job,
   index,
-  actionProduct,
   onClose,
   onRequestDelete,
-  onRetryVideoJob,
-  onSelectFinal
+  onRetryVideoJob
 }: {
   job?: CreativeVersionItem;
   index: number;
-  actionProduct: ProductSummary;
   onClose: () => void;
   onRequestDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
-  onSelectFinal: (productSku: string, jobId: string) => Promise<void>;
 }) {
   useEffect(() => {
     if (!job) return;
@@ -4908,7 +4888,6 @@ function VideoPreviewDialog({
   const activeVersion = isActiveCreativeVersion(job);
   const playableVideo = hasPlayableVideo(job);
   const retryJob = job.status === "failed" ? job.videoJob : undefined;
-  const canSelectFinal = playableVideo && !activeVersion;
   const previewTitle = videoLabel(index);
   const statusText = creativeVersionDisplayStatus(job);
   const failureReason = creativeVersionFailureReason(job);
@@ -4982,16 +4961,6 @@ function VideoPreviewDialog({
               <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
                 <RefreshCcw size={13} />
                 重试
-              </Button>
-            ) : null}
-            {canSelectFinal ? (
-              <Button
-                className="w-fit"
-                size="sm"
-                disabled={job.selectedFinal}
-                onClick={() => void onSelectFinal(actionProduct.sku, job.id)}
-              >
-                {job.selectedFinal ? "已设最终" : "设为最终"}
               </Button>
             ) : null}
             {job.finalVideoUrl ? (
@@ -5947,7 +5916,7 @@ function ApiModelConfigPanel({
         API Key
       </PanelTitle>
       <div className="mb-3 rounded-lg border border-[#dbe4f0] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#5f6d84]">
-        这里配置的是平台自己的模型 API Key，用于统一生成视频。不要让普通用户在这里填写他们自己的密钥。
+        这里配置的是你自己的模型 API Key，系统会按你的配置调用文本、图片和视频模型。
       </div>
       <div className="grid gap-3">
         {groups.map((group) => (
@@ -6243,7 +6212,7 @@ function VideoJobsPanel({
                 <MetricLine label="更新" value={formatDateTime(job.updatedAt)} />
                 <MetricLine label="Tokens" value={formatNumber(job.totalTokens)} />
                 <MetricLine label="估算成本" value={job.estimatedCostCny === undefined ? "-" : `¥${money(job.estimatedCostCny)}`} />
-                {job.error ? <MetricLine label="错误" value={job.error} /> : null}
+                {job.error ? <MetricLine label="错误" value={readableVideoJobError(job.error)} /> : null}
               </div>
               <div className="grid min-w-0 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-2">
                 <div className="text-[11px] font-black text-[var(--muted)]">任务结果</div>
@@ -7276,7 +7245,23 @@ function creativeVersionFailureReason(job: CreativeVersionItem): string {
   if (job.status !== "failed") {
     return "";
   }
-  return job.videoJob?.error || "生成失败，请检查视频模型配置后重试。";
+  return readableVideoJobError(job.videoJob?.error) || "生成失败，请检查视频模型配置后重试。";
+}
+
+function readableVideoJobError(message?: string): string {
+  if (!message) {
+    return "";
+  }
+  if (
+    message.includes("InputImageSensitiveContentDetected.PrivacyInformation") ||
+    message.includes("input image may contain real person")
+  ) {
+    return "参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。";
+  }
+  if (message.includes("fetch failed")) {
+    return "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。";
+  }
+  return message;
 }
 
 function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {
@@ -7291,8 +7276,35 @@ function videoExpiryLabel(job: { expiresAt?: string; expired?: boolean }): strin
   if (!job.expiresAt) return "24 小时内可下载";
   const expiresAt = Date.parse(job.expiresAt);
   if (!Number.isFinite(expiresAt)) return "24 小时内可下载";
-  const remainingHours = Math.max(1, Math.ceil((expiresAt - Date.now()) / 3_600_000));
-  return `剩余 ${remainingHours} 小时`;
+  return `将于 ${formatDeletionTime(expiresAt)} 删除`;
+}
+
+function formatDeletionTime(value: number): string {
+  const date = new Date(value);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const sameDay =
+    sameYear &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(now.getDate() + 1);
+  const tomorrow =
+    sameYear &&
+    date.getMonth() === tomorrowDate.getMonth() &&
+    date.getDate() === tomorrowDate.getDate();
+  const time = date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  if (sameDay) return `今天 ${time}`;
+  if (tomorrow) return `明天 ${time}`;
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function removeLedgerJob(ledger: Ledger, jobId: string): Ledger {
@@ -7778,7 +7790,7 @@ function paidRunBlockReason({
     return `商品资料暂不可付费生成：${reason}`;
   }
   if (!preflight.credit.enoughCredit) {
-    return "剩余测试额度不足，请提高测试额度、缩短时长或改用本地模拟。";
+    return "剩余测试额度不足，请提高测试额度或缩短时长。";
   }
   if (!confirmPaid) {
     return "请先生成预检并勾选确认允许付费请求。";

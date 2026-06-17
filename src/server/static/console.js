@@ -203,7 +203,7 @@ function renderSettings() {
   if (!settings) {
     return;
   }
-  els.settingsProvider.value = settings.defaultProvider;
+  els.settingsProvider.value = visibleProviderValue(settings.defaultProvider);
   els.settingsDuration.value = String(settings.defaultDurationSeconds);
   els.settingsTemplate.value = settings.defaultTemplate;
   els.settingsCta.value = settings.defaultCta;
@@ -217,7 +217,7 @@ async function saveSettings() {
   try {
     els.settingsState.textContent = "保存中";
     const response = await putJson("/api/settings", {
-      defaultProvider: els.settingsProvider.value,
+      defaultProvider: visibleProviderValue(els.settingsProvider.value),
       defaultDurationSeconds: Number(els.settingsDuration.value),
       defaultTemplate: els.settingsTemplate.value,
       defaultCta: els.settingsCta.value,
@@ -239,7 +239,7 @@ function applySettingsToTask() {
   if (!settings) {
     return;
   }
-  els.provider.value = settings.defaultProvider;
+  els.provider.value = visibleProviderValue(settings.defaultProvider);
   els.duration.value = String(settings.defaultDurationSeconds);
   els.template.value = settings.defaultTemplate;
   els.cta.value = settings.defaultCta;
@@ -477,7 +477,7 @@ function uniqueOptionValues(values) {
 
 function updateMode() {
   const paid = isPaidProvider(els.provider.value);
-  els.modePill.textContent = paid ? "付费需确认" : "mock 免费";
+  els.modePill.textContent = paid ? "付费需确认" : "无需付费确认";
   els.modePill.style.color = paid ? "var(--accent-2)" : "var(--accent)";
   els.paidSafety.classList.toggle("active", paid);
 }
@@ -600,7 +600,7 @@ function renderPreflight(preflight) {
     ["期望成本", `¥${Number(preflight.estimatedCostCny.expected).toFixed(2)}`, `区间 ¥${Number(preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.estimatedCostCny.high).toFixed(2)}`],
     ["期望 Token", formatNumber(preflight.estimatedTokens.expected), `${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`],
     ["时长", `${preflight.durationSeconds}s`, preflight.aspectRatio],
-    ["Provider", preflight.provider, preflight.requiresPaidConfirmation ? "运行会扣费" : "本地 mock"]
+    ["Provider", preflight.provider, preflight.requiresPaidConfirmation ? "运行会扣费" : "无需付费确认"]
   ]
     .map(
       ([label, value, subtext]) => `
@@ -654,6 +654,14 @@ function currentPreflightSignature() {
 
 function isPaidProvider(provider) {
   return provider !== "mock";
+}
+
+function visibleProviderValue(provider) {
+  const defaultVisibleProvider = "volcengine-seedance";
+  if (provider === defaultVisibleProvider || provider === "seedance") {
+    return defaultVisibleProvider;
+  }
+  return defaultVisibleProvider;
 }
 
 function highlightPaidSafety() {

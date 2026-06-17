@@ -5,6 +5,7 @@ import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import type { ReferenceImageUrlResolver } from "../providers/types.js";
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
 import type { DatabaseHandle } from "./db/client.js";
 
@@ -53,11 +54,24 @@ export interface VideoJobRecord {
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
+  errorDetails?: VideoJobErrorDetails;
   createdAt: string;
   updatedAt: string;
   expiresAt?: string;
   startedAt?: string;
   completedAt?: string;
+}
+
+export interface VideoJobErrorDetails {
+  message: string;
+  name?: string;
+  causeMessage?: string;
+  causeCode?: string;
+  providerPhase?: string;
+  providerName?: string;
+  providerModel?: string;
+  referenceImageCount?: number;
+  usedTemporaryAssetUrls?: boolean;
 }
 
 export interface LocalVideoJobQueueOptions {
@@ -68,6 +82,7 @@ export interface LocalVideoJobQueueOptions {
   fetchImpl?: typeof fetch;
   now?: () => Date;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+  referenceImageUrlResolver?: ReferenceImageUrlResolver;
   databaseHandle?: DatabaseHandle;
 }
 
@@ -222,7 +237,8 @@ export class LocalVideoJobQueue {
         storyboardLines: record.storyboardLines,
         confirmPaid: record.confirmPaid,
         reuseManifestPath: record.reuseManifest,
-        fetchImpl: this.options.fetchImpl
+        fetchImpl: this.options.fetchImpl,
+        referenceImageUrlResolver: this.options.referenceImageUrlResolver
       });
       if ((await this.read(id)).status === "canceled") {
         await this.removeGeneratedOutputs(record.outDir);
@@ -250,9 +266,11 @@ export class LocalVideoJobQueue {
         await this.removeGeneratedOutputs(record.outDir);
         return;
       }
+      const errorDetails = serializeJobError(error);
       await this.update(record, {
         status: "failed",
-        error: error instanceof Error ? error.message : String(error),
+        error: readableJobError(errorDetails),
+        errorDetails,
         completedAt: this.nowIso()
       });
     }
@@ -475,4 +493,45 @@ function sanitizeLines(lines?: string[]): string[] | undefined {
 
 function mediaUrl(path: string): string {
   return `/media?path=${encodeURIComponent(path)}`;
+}
+
+function serializeJobError(error: unknown): VideoJobErrorDetails {
+  const err = error as {
+    message?: unknown;
+    name?: unknown;
+    cause?: {
+      message?: unknown;
+      code?: unknown;
+    };
+    providerPhase?: unknown;
+    providerName?: unknown;
+    providerModel?: unknown;
+    referenceImageCount?: unknown;
+    usedTemporaryAssetUrls?: unknown;
+  };
+  return {
+    message: typeof err.message === "string" ? err.message : String(error),
+    name: typeof err.name === "string" ? err.name : undefined,
+    causeMessage: typeof err.cause?.message === "string" ? err.cause.message : undefined,
+    causeCode: typeof err.cause?.code === "string" ? err.cause.code : undefined,
+    providerPhase: typeof err.providerPhase === "string" ? err.providerPhase : undefined,
+    providerName: typeof err.providerName === "string" ? err.providerName : undefined,
+    providerModel: typeof err.providerModel === "string" ? err.providerModel : undefined,
+    referenceImageCount: typeof err.referenceImageCount === "number" ? err.referenceImageCount : undefined,
+    usedTemporaryAssetUrls: typeof err.usedTemporaryAssetUrls === "boolean" ? err.usedTemporaryAssetUrls : undefined
+  };
+}
+
+function readableJobError(details: VideoJobErrorDetails): string {
+  const message = details.message;
+  if (
+    message.includes("InputImageSensitiveContentDetected.PrivacyInformation") ||
+    message.includes("input image may contain real person")
+  ) {
+    return "参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。";
+  }
+  if (message.includes("fetch failed") && details.providerPhase === "create-task") {
+    return "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。";
+  }
+  return message;
 }

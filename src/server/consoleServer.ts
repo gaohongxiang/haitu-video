@@ -25,6 +25,7 @@ import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVide
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { generateJapaneseAdScript } from "../core/scriptGenerator.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import type { ReferenceImageUrlResolver } from "../providers/types.js";
 import { VolcengineUsageClient, type ListUsageTasksRequest } from "../providers/volcengine/usageClient.js";
 import {
   OpenAiCompatibleTextProvider,
@@ -76,6 +77,7 @@ import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
 import { SqliteProviderKeyStore } from "./db/sqliteProviderKeyStore.js";
+import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
 
 export interface ConsoleServerOptions {
   rootDir?: string;
@@ -86,6 +88,7 @@ export interface ConsoleServerOptions {
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: LocalVideoJobQueueOptions["runMakeVideoPipeline"];
   autoStartSavedJobs?: boolean;
+  now?: () => Date;
 }
 
 export interface ConsoleServerHandle {
@@ -95,6 +98,7 @@ export interface ConsoleServerHandle {
     url: string;
     close(): Promise<void>;
   }>;
+  publicAssetTokenStoreForTests?: PublicAssetTokenStore;
 }
 
 interface MakeVideoRequest {
@@ -274,7 +278,10 @@ interface ConsoleRequestContext {
   outputsDir: string;
   providerKeyStore: ProviderKeyStore;
   videoJobQueue: LocalVideoJobQueue;
+  referenceImageUrlResolver?: ReferenceImageUrlResolver;
 }
+
+const PUBLIC_ASSET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 
 export function createConsoleServer(options: ConsoleServerOptions = {}): ConsoleServerHandle {
   const rootDir = options.rootDir ?? process.cwd();
@@ -291,6 +298,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
   const consoleDistDir = options.consoleDistDir ?? join(rootDir, "dist", "console");
   const reviewStore = new FileReviewStore(join(workspacePaths.settingsDir, "review-state.json"));
   const settingsStore = new FileConsoleSettingsStore(join(storageRoots.systemDir, "console-settings.json"));
+  const publicAssetTokenStore = new PublicAssetTokenStore({
+    rootDir: dataDir,
+    now: options.now
+  });
+  const publicBaseUrl = publicBaseUrlFromEnv();
   const databaseHandle = createDatabaseHandle(dataDir);
   const defaultProviderKeyStore = createProviderKeyStore({
     databaseHandle,
@@ -307,6 +319,12 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     providerKeyStore: defaultProviderKeyStore,
     runMakeVideoPipeline: options.runMakeVideoPipeline
   });
+  const defaultReferenceImageUrlResolver = createReferenceImageUrlResolver({
+    dataDir,
+    workspaceId: DEFAULT_WORKSPACE_ID,
+    publicBaseUrl,
+    publicAssetTokenStore
+  });
   const videoJobQueue = new LocalVideoJobQueue({
     rootDir,
     outputsDir,
@@ -314,6 +332,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     settingsStore,
     fetchImpl: options.fetchImpl,
     runMakeVideoPipeline: runConfiguredMakeVideoPipeline,
+    referenceImageUrlResolver: defaultReferenceImageUrlResolver,
     databaseHandle
   });
   const workspaceVideoJobQueues = new Map<string, LocalVideoJobQueue>([
@@ -423,6 +442,12 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         });
         return response;
       }
+      const publicAssetMatch = url.pathname.match(/^\/api\/public-assets\/([A-Za-z0-9_-]+)$/);
+      if (publicAssetMatch && (request.method === "GET" || request.method === "HEAD")) {
+        return publicAssetResponse(publicAssetTokenStore, publicAssetMatch[1] ?? "", {
+          head: request.method === "HEAD"
+        });
+      }
       if (!isPublicConsoleRoute(request)) {
         const authResponse = await authStore.requireAuth(request);
         if (authResponse) {
@@ -454,7 +479,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         workspaceVideoJobQueues,
         settingsStore,
         fetchImpl: options.fetchImpl,
-        runMakeVideoPipeline: options.runMakeVideoPipeline
+        runMakeVideoPipeline: options.runMakeVideoPipeline,
+        publicBaseUrl,
+        publicAssetTokenStore
       });
       if (request.method === "GET" && url.pathname === "/api/products") {
         return jsonResponse({
@@ -897,9 +924,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const body = (await request.json()) as PreflightRequest;
         return jsonResponse({
           preflight: await runConsolePreflight(body, {
-          rootDir: dataDir,
-          outputsDir: requestContext.outputsDir,
-          settingsStore
+            rootDir: dataDir,
+            outputsDir: requestContext.outputsDir,
+            settingsStore
           })
         });
       }
@@ -910,7 +937,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           outputsDir: requestContext.outputsDir,
           settingsStore,
           providerKeyStore: requestContext.providerKeyStore,
-          fetchImpl: options.fetchImpl
+          fetchImpl: options.fetchImpl,
+          runMakeVideoPipeline: options.runMakeVideoPipeline,
+          referenceImageUrlResolver: requestContext.referenceImageUrlResolver
         });
         return jsonResponse({ report });
       }
@@ -1152,7 +1181,8 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             }
           })
       };
-    }
+    },
+    publicAssetTokenStoreForTests: publicAssetTokenStore
   };
 }
 
@@ -1185,6 +1215,8 @@ async function createRequestContext(input: {
   settingsStore: FileConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+  publicBaseUrl?: string;
+  publicAssetTokenStore: PublicAssetTokenStore;
 }): Promise<ConsoleRequestContext> {
   const resolved = await input.authStore.resolveCurrentWorkspace(input.request);
   const workspacePaths = getWorkspacePaths(input.dataDir, resolved.workspaceId);
@@ -1193,6 +1225,12 @@ async function createRequestContext(input: {
     workspaceId: resolved.workspaceId,
     legacyFilePath: workspacePaths.providerKeysFile
   });
+  const referenceImageUrlResolver = createReferenceImageUrlResolver({
+    dataDir: input.dataDir,
+    workspaceId: resolved.workspaceId,
+    publicBaseUrl: input.publicBaseUrl,
+    publicAssetTokenStore: input.publicAssetTokenStore
+  });
   return {
     workspaceId: resolved.workspaceId,
     databaseHandle: input.databaseHandle,
@@ -1200,6 +1238,7 @@ async function createRequestContext(input: {
     fixturesDir: workspacePaths.productsDir,
     outputsDir: workspacePaths.jobsDir,
     providerKeyStore,
+    referenceImageUrlResolver,
     videoJobQueue: videoJobQueueForWorkspace({
       workspaceId: resolved.workspaceId,
       workspacePaths,
@@ -1210,6 +1249,10 @@ async function createRequestContext(input: {
       settingsStore: input.settingsStore,
       fetchImpl: input.fetchImpl,
       runMakeVideoPipeline: input.runMakeVideoPipeline,
+      dataDir: input.dataDir,
+      publicBaseUrl: input.publicBaseUrl,
+      publicAssetTokenStore: input.publicAssetTokenStore,
+      referenceImageUrlResolver,
       databaseHandle: input.databaseHandle
     })
   };
@@ -1225,6 +1268,10 @@ function videoJobQueueForWorkspace(input: {
   settingsStore: FileConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+  dataDir: string;
+  publicBaseUrl?: string;
+  publicAssetTokenStore: PublicAssetTokenStore;
+  referenceImageUrlResolver?: ReferenceImageUrlResolver;
   databaseHandle: DatabaseHandle;
 }): LocalVideoJobQueue {
   if (input.workspaceId === DEFAULT_WORKSPACE_ID) {
@@ -1244,6 +1291,7 @@ function videoJobQueueForWorkspace(input: {
       providerKeyStore: input.providerKeyStore,
       runMakeVideoPipeline: input.runMakeVideoPipeline
     }),
+    referenceImageUrlResolver: input.referenceImageUrlResolver,
     databaseHandle: input.databaseHandle
   });
   input.workspaceVideoJobQueues.set(input.workspaceId, queue);
@@ -1296,6 +1344,8 @@ async function runConsoleMakeVideo(
     settingsStore: FileConsoleSettingsStore;
     providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
+    runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+    referenceImageUrlResolver?: ReferenceImageUrlResolver;
   }
 ): Promise<MakeVideoReport> {
   const productPath = resolveWithin(options.rootDir, body.productPath);
@@ -1315,7 +1365,8 @@ async function runConsoleMakeVideo(
   });
   await mkdir(options.outputsDir, { recursive: true });
   const providerConfig = await selectedVideoProviderConfig(options.providerKeyStore, providerName);
-  return runMakeVideoPipeline({
+  const runPipeline = options.runMakeVideoPipeline ?? runMakeVideoPipeline;
+  return runPipeline({
     productPath,
     outDir: join(options.outputsDir, outDirName),
     providerName,
@@ -1330,7 +1381,8 @@ async function runConsoleMakeVideo(
     apiKey: providerConfig.apiKey,
     providerBaseUrl: providerConfig.baseUrl,
     providerModel: body.providerModel ?? providerConfig.model,
-    fetchImpl: options.fetchImpl
+    fetchImpl: options.fetchImpl,
+    referenceImageUrlResolver: options.referenceImageUrlResolver
   });
 }
 
@@ -4401,6 +4453,54 @@ function resolveWithin(rootDir: string, path: string): string {
   return resolved;
 }
 
+function publicBaseUrlFromEnv(): string | undefined {
+  return process.env.HAITU_PUBLIC_BASE_URL ?? process.env.BETTER_AUTH_URL;
+}
+
+function joinPublicUrl(baseUrl: string, path: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}${path}`;
+}
+
+function mimeTypeForAssetPath(filePath: string): string {
+  const extension = extname(filePath).toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg") {
+    return "image/jpeg";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  return "image/png";
+}
+
+function localReferencePathForPublicAsset(dataDir: string, reference: string): string {
+  const filePath = isAbsolute(reference) ? resolve(reference) : resolve(dataDir, reference);
+  if (!isPathInsideRoot(dataDir, filePath)) {
+    throw new Error(`Path is outside data root: ${reference}`);
+  }
+  return filePath;
+}
+
+function createReferenceImageUrlResolver(input: {
+  dataDir: string;
+  workspaceId: string;
+  publicBaseUrl?: string;
+  publicAssetTokenStore: PublicAssetTokenStore;
+}): ReferenceImageUrlResolver | undefined {
+  if (!input.publicBaseUrl) {
+    return undefined;
+  }
+  return async (reference) => {
+    const filePath = localReferencePathForPublicAsset(input.dataDir, reference);
+    const token = input.publicAssetTokenStore.create({
+      filePath,
+      mimeType: mimeTypeForAssetPath(filePath),
+      workspaceId: input.workspaceId,
+      ttlMs: PUBLIC_ASSET_TOKEN_TTL_MS
+    });
+    return joinPublicUrl(input.publicBaseUrl ?? "", token.urlPath);
+  };
+}
+
 function isPathInsideRoot(rootDir: string, path: string): boolean {
   const resolved = resolve(path);
   const root = resolve(rootDir);
@@ -4744,6 +4844,28 @@ async function mediaResponse(
   return new Response(options.head ? undefined : await readFile(filePath), {
     headers: { "content-type": contentType }
   });
+}
+
+async function publicAssetResponse(
+  store: PublicAssetTokenStore,
+  token: string,
+  options: { head: boolean }
+): Promise<Response> {
+  const record = store.resolve(token);
+  if (!record) {
+    return jsonResponse({ error: "Public asset not found or expired." }, 404);
+  }
+  try {
+    await stat(record.filePath);
+    return new Response(options.head ? undefined : await readFile(record.filePath), {
+      headers: {
+        "content-type": record.mimeType,
+        "cache-control": "private, max-age=300"
+      }
+    });
+  } catch {
+    return jsonResponse({ error: "Public asset not found or expired." }, 404);
+  }
 }
 
 function mediaContentType(path: string): string {

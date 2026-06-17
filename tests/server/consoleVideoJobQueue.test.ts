@@ -132,6 +132,136 @@ describe("LocalVideoJobQueue", () => {
     );
   });
 
+  it("passes the reference image URL resolver into the make-video pipeline", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-reference-resolver-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const referenceImageUrlResolver = async (reference: string) => `https://assets.example.test/${reference}`;
+    const capturedInputs: unknown[] = [];
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-07T09:00:00.000Z"),
+      referenceImageUrlResolver,
+      runMakeVideoPipeline: async (input) => {
+        capturedInputs.push(input);
+        return makeReport(input);
+      }
+    });
+
+    const enqueued = await queue.enqueue({
+      productPath,
+      provider: "volcengine-seedance",
+      duration: 8,
+      confirmPaid: true
+    });
+    await queue.waitForIdle(enqueued.id);
+
+    expect(capturedInputs[0]).toEqual(expect.objectContaining({
+      referenceImageUrlResolver
+    }));
+  });
+
+  it("stores provider error details when a video job fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-error-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-07T09:00:00.000Z"),
+      runMakeVideoPipeline: async () => {
+        const cause = Object.assign(new Error("Headers Timeout Error"), {
+          code: "UND_ERR_HEADERS_TIMEOUT"
+        });
+        throw Object.assign(new Error("fetch failed"), {
+          name: "TypeError",
+          cause,
+          providerPhase: "create-task",
+          providerName: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          referenceImageCount: 1,
+          usedTemporaryAssetUrls: true
+        });
+      }
+    });
+
+    const job = await queue.enqueue({
+      productPath,
+      provider: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      confirmPaid: true
+    });
+    const completed = await queue.waitForIdle(job.id);
+
+    expect(completed.status).toBe("failed");
+    expect(completed.error).toBe("视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。");
+    expect(completed.errorDetails).toMatchObject({
+      message: "fetch failed",
+      name: "TypeError",
+      causeMessage: "Headers Timeout Error",
+      causeCode: "UND_ERR_HEADERS_TIMEOUT",
+      providerPhase: "create-task",
+      providerName: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      referenceImageCount: 1,
+      usedTemporaryAssetUrls: true
+    });
+  });
+
+  it("stores a readable error when Seedance rejects reference images with real people", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-readable-error-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "arm-cover.json");
+    await writeProduct(productPath);
+    const providerError =
+      'Volcengine Seedance API error 400: {"error":{"code":"InputImageSensitiveContentDetected.PrivacyInformation","message":"The request failed because the input image may contain real person.","type":"BadRequest"}}';
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-18T09:00:00.000Z"),
+      runMakeVideoPipeline: async () => {
+        throw Object.assign(new Error(providerError), {
+          providerPhase: "create-task",
+          providerName: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          referenceImageCount: 8,
+          usedTemporaryAssetUrls: true
+        });
+      }
+    });
+
+    const job = await queue.enqueue({
+      productPath,
+      provider: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      confirmPaid: true
+    });
+    const completed = await queue.waitForIdle(job.id);
+
+    expect(completed.status).toBe("failed");
+    expect(completed.error).toBe("参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。");
+    expect(completed.errorDetails).toMatchObject({
+      message: providerError,
+      providerPhase: "create-task",
+      providerName: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      referenceImageCount: 8,
+      usedTemporaryAssetUrls: true
+    });
+  });
+
   it("keeps job ids unique across queue instances sharing one jobs directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-unique-id-"));
     tempDirs.push(root);

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -216,6 +216,36 @@ describe("console API", () => {
     await expect(readFile(join(root, "outputs", "provider-keys.json"), "utf8")).rejects.toThrow();
     expect(mediaResponse.status).toBe(200);
     expect(outsideMedia.status).toBe(403);
+  });
+
+  it("serves public asset tokens without auth and rejects unknown tokens", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-public-assets-"));
+    const dataDir = join(root, "data");
+    tempDirs.push(root);
+    const assetPath = join(dataDir, "workspaces", "default", "products", "TK-001", "refs", "reference-01.png");
+    await mkdir(dirname(assetPath), { recursive: true });
+    await writeFile(assetPath, "image-bytes");
+    const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
+    const tokenStore = server.raw.publicAssetTokenStoreForTests;
+    expect(tokenStore).toBeDefined();
+    const token = tokenStore?.create({
+      filePath: assetPath,
+      mimeType: "image/png",
+      workspaceId: "default",
+      ttlMs: 60_000
+    });
+
+    const response = await server.raw.fetch(token?.urlPath ?? "");
+    const missing = await server.raw.fetch("/api/public-assets/missing");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=300");
+    await expect(response.text()).resolves.toBe("image-bytes");
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toEqual({
+      error: "Public asset not found or expired."
+    });
   });
 
   it("protects console APIs with a SQLite user session from the unified entrypoint", async () => {
@@ -594,7 +624,10 @@ describe("console API", () => {
     expect(appSource).not.toContain("开始创作");
     expect(appSource).not.toContain("用此商品创作视频");
     expect(appSource).toContain("粘贴商品信息");
-    expect(appSource).toContain("从店小秘、1688、商品页复制整段资料");
+    expect(appSource).toContain("粘贴或填写商品标题、分类、材质、尺寸/重量、卖点和使用场景");
+    expect(appSource).not.toContain("店小秘");
+    expect(appSource).not.toContain("1688");
+    expect(appSource).not.toContain("商品页");
     expect(appSource).toContain("整理后的商品资料");
     expect(appSource).toContain("资料是否够用");
     expect(appSource).toContain("可生成视频");
@@ -615,8 +648,14 @@ describe("console API", () => {
     expect(appSource).toContain("ConsoleToast");
     expect(appSource).toContain("consoleToast={consoleToast}");
     expect(appSource).toContain("showConsoleToast");
+    expect(appSource).toContain("handleConsoleToastClose");
+    expect(appSource).toContain("consoleToastCloseRef");
     expect(appSource).toContain("setConsoleToast(undefined)");
+    expect(appSource).toContain("window.setTimeout(onClose, 3000)");
+    expect(appSource).toContain("window.clearTimeout(timeout)");
     expect(appSource).toContain("操作提示");
+    expect(appSource).toContain("readableVideoJobError");
+    expect(appSource).toContain("参考图里可能包含真人、人脸或隐私信息");
     expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
     expect(appSource).toContain("请先配置图片模型，再生成参考图。");
     expect(appSource).toContain("请先配置视频模型，再生成视频。");
@@ -763,6 +802,7 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<VideoAssetsPanel");
     const creationWorkspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
+    const videoModelOptionsSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const defaultVideoDurationSeconds"));
     const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
     const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
@@ -851,6 +891,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(creationComposerSource).toContain("videoModelOptions");
+    expect(videoModelOptionsSource).not.toContain('"mock"');
     expect(videoModelSource).toContain("seedance-2-fast");
     expect(videoModelSource).toContain("seedance-2");
     expect(videoModelSource).toContain("seedance-1-5-pro");
@@ -1050,9 +1091,13 @@ describe("console API", () => {
     expect(videoHistorySource).toContain("hasPlayableVideo(job)");
     expect(videoHistorySource).toContain("creativeVersionFailureReason(job)");
     expect(appSource).toContain('if (value === "failed") return "生成失败";');
+    expect(appSource).toContain("formatDeletionTime");
+    expect(appSource).toContain("将于");
+    expect(appSource).not.toContain("剩余 ${remainingHours} 小时");
     expect(videoHistorySource).toContain("预览视频");
     expect(videoHistorySource).toContain("下载视频");
-    expect(videoHistorySource).toContain("设为最终");
+    expect(videoHistorySource).not.toContain("设为最终");
+    expect(videoHistorySource).not.toContain("已设最终");
     expect(videoHistorySource).toContain("删除");
     expect(videoHistorySource).toContain("onDelete(job)");
     expect(buildLatestCreativeJobsSource).toContain("new Set(productVideoJobs.map((job) => job.id))");
@@ -1114,10 +1159,14 @@ describe("console API", () => {
     expect(appSource).not.toContain("审核发布");
     expect(appSource).toContain("onGenerateVideo");
     expect(staticConsoleHtml).toContain("API 管理");
+    expect(staticConsoleHtml).not.toContain('value="mock"');
+    expect(staticConsoleHtml).not.toContain("mock 免费");
     expect(staticConsoleHtml).not.toContain("发布素材");
     expect(staticConsoleHtml).not.toContain("审核发布");
     expect(staticConsoleHtml).not.toContain("品牌设置");
     expect(staticConsoleHtml).not.toContain("发布包");
+    expect(staticConsoleJs).not.toContain("mock 免费");
+    expect(staticConsoleJs).not.toContain("本地 mock");
     expect(staticConsoleJs).not.toContain("发布素材");
     expect(staticConsoleJs).not.toContain("审核发布");
     expect(staticConsoleJs).not.toContain("品牌设置");
@@ -1203,12 +1252,13 @@ describe("console API", () => {
     expect(settingsCase).not.toContain("<SettingsPanel");
     const apiManagementSource = appSource.slice(appSource.indexOf("function ApiModelConfigPanel"), appSource.indexOf("function VideoJobsPanel"));
     expect(apiManagementSource).toContain("API Key");
-    expect(apiManagementSource).toContain("这里配置的是平台自己的模型 API Key");
-    expect(apiManagementSource).toContain("不要让普通用户在这里填写他们自己的密钥");
+    expect(apiManagementSource).toContain("这里配置的是你自己的模型 API Key");
+    expect(apiManagementSource).toContain("系统会按你的配置调用文本、图片和视频模型");
+    expect(apiManagementSource).not.toContain("这里配置的是平台自己的模型 API Key");
+    expect(apiManagementSource).not.toContain("不要让普通用户在这里填写他们自己的密钥");
     expect(apiManagementSource).not.toContain("HAITU_DATA_DIR");
     expect(apiManagementSource).not.toContain("环境变量");
-    expect(apiManagementSource).not.toContain("你的密钥");
-    expect(appSource).toContain("已清除平台 API Key");
+    expect(appSource).toContain("已清除 API Key");
     expect(apiManagementSource).toContain("文本模型");
     expect(apiManagementSource).toContain("图片模型");
     expect(apiManagementSource).toContain("视频模型");
@@ -1989,6 +2039,7 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<ProductLibraryDialogMount");
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
+    const videoModelOptionsSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const defaultVideoDurationSeconds"));
     const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
     const defaultStoryboardSource = appSource.slice(appSource.indexOf("function defaultStoryboardDraft"), appSource.indexOf("function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
@@ -2022,6 +2073,7 @@ describe("console API", () => {
     expect(composerSource).toContain("generateVideoButtonLabel");
     expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(composerSource).toContain("videoModelOptions");
+    expect(videoModelOptionsSource).not.toContain('"mock"');
     expect(videoModelSource).toContain("seedance-2-fast");
     expect(videoModelSource).toContain("seedance-2");
     expect(videoModelSource).toContain("seedance-1-5-pro");
@@ -5337,6 +5389,84 @@ describe("console API", () => {
     );
   });
 
+  it("provides temporary public asset URLs to direct paid make-video requests", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousBaseUrl = process.env.BETTER_AUTH_URL;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.BETTER_AUTH_URL = "https://haitu.online";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-direct-public-assets-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      await writeFile(productAssetPath(productPath, "detail1.jpg"), Buffer.from("detail-image"));
+      let resolvedUrl = "";
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          resolvedUrl = await input.referenceImageUrlResolver?.(productAssetPath(productPath, "main.jpg")) ?? "";
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "TK-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 8,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "paid-key",
+          baseUrl: "https://ark.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+
+      const response = await server.fetchJson("/api/make-video", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          outDirName: "paid-direct",
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      const publicAssetResponse = await server.raw.fetch(new URL(resolvedUrl).pathname);
+
+      expect(response.report.provider).toBe("volcengine-seedance");
+      expect(resolvedUrl).toMatch(/^https:\/\/haitu\.online\/api\/public-assets\/[A-Za-z0-9_-]+$/);
+      expect(publicAssetResponse.status).toBe(200);
+      await expect(publicAssetResponse.text()).resolves.toBe("main-image");
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("BETTER_AUTH_URL", previousBaseUrl);
+    }
+  });
+
   it("queues a mock video job and exposes async job status", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-"));
     tempDirs.push(root);
@@ -5480,6 +5610,82 @@ describe("console API", () => {
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
+  it("provides temporary public asset URLs to queued paid video generation", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousBaseUrl = process.env.BETTER_AUTH_URL;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.BETTER_AUTH_URL = "https://haitu.online";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-public-assets-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      let resolvedUrl = "";
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          resolvedUrl = await input.referenceImageUrlResolver?.(productAssetPath(productPath, "main.jpg")) ?? "";
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "TK-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 8,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "paid-key",
+          baseUrl: "https://ark.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+
+      const queued = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      await waitForJobStatus(server, queued.job.id, "completed");
+      const publicAssetResponse = await server.raw.fetch(new URL(resolvedUrl).pathname);
+
+      expect(resolvedUrl).toMatch(/^https:\/\/haitu\.online\/api\/public-assets\/[A-Za-z0-9_-]+$/);
+      expect(publicAssetResponse.status).toBe(200);
+      await expect(publicAssetResponse.text()).resolves.toBe("main-image");
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("BETTER_AUTH_URL", previousBaseUrl);
     }
   });
 

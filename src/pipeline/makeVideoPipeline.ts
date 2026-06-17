@@ -7,7 +7,7 @@ import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import type { FinalVideoLanguage } from "../core/videoLanguage.js";
 import { postprocessVideo } from "../postprocess/postprocessVideo.js";
 import { createVideoProvider, type VideoProviderName } from "../providers/providerFactory.js";
-import type { MoneyAmount } from "../providers/types.js";
+import type { MoneyAmount, ReferenceImageUrlResolver } from "../providers/types.js";
 import { runProductJob, type ProductJobManifest } from "./runProductJob.js";
 
 export interface MakeVideoPipelineInput {
@@ -26,6 +26,7 @@ export interface MakeVideoPipelineInput {
   apiKey?: string;
   providerBaseUrl?: string;
   providerModel?: string;
+  referenceImageUrlResolver?: ReferenceImageUrlResolver;
   tokenPriceCnyPerMillion?: number;
   forceRegenerate?: boolean;
   reuseManifestPath?: string;
@@ -92,7 +93,8 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
         apiKey: input.apiKey,
         baseUrl: input.providerBaseUrl,
         model: input.providerModel,
-        fetchImpl: input.fetchImpl
+        fetchImpl: input.fetchImpl,
+        referenceImageUrlResolver: input.referenceImageUrlResolver
       }),
       cta: input.cta,
       template: input.template,

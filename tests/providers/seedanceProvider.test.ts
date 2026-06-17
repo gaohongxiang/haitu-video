@@ -192,6 +192,157 @@ describe("SeedanceProvider", () => {
     });
   });
 
+  it("uses the configured reference image URL resolver for local files", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-reference-resolver-"));
+    tempDirs.push(outDir);
+    const resolverCalls: string[] = [];
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const provider = new SeedanceProvider({
+      apiKey: "seedance-key",
+      baseUrl: "https://ark.example.test",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      referenceImageUrlResolver: async (reference) => {
+        resolverCalls.push(reference);
+        return `https://haitu.online/api/public-assets/token-${resolverCalls.length}`;
+      },
+      fetchImpl: (async (url, init) => {
+        fetchCalls.push({ url: String(url), init });
+        if (String(url).endsWith("/api/v3/contents/generations/tasks") && init?.method === "POST") {
+          return jsonResponse({ id: "task-1", status: "queued" });
+        }
+        if (String(url).endsWith("/api/v3/contents/generations/tasks/task-1")) {
+          return jsonResponse({
+            id: "task-1",
+            status: "succeeded",
+            output: { video_url: "https://video.example.test/out.mp4" }
+          });
+        }
+        if (String(url) === "https://video.example.test/out.mp4") {
+          return new Response("video", { status: 200 });
+        }
+        throw new Error(`Unexpected URL: ${String(url)}`);
+      }) as typeof fetch
+    });
+
+    await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "sku-1",
+      prompt: "prompt",
+      script: "script",
+      durationSeconds: 10,
+      aspectRatio: "9:16",
+      outputDir: outDir,
+      referenceImages: ["/local/reference.png"],
+      finalLanguage: "ja"
+    });
+
+    const createCall = fetchCalls.find((call) => call.url.endsWith("/api/v3/contents/generations/tasks"));
+    const body = JSON.parse(String(createCall?.init?.body)) as {
+      content: Array<{ type: string; image_url?: { url: string } }>;
+    };
+    expect(resolverCalls).toEqual(["/local/reference.png"]);
+    expect(body.content[1]?.image_url?.url).toBe("https://haitu.online/api/public-assets/token-1");
+  });
+
+  it("does not call the resolver for remote HTTPS reference images", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-remote-reference-"));
+    tempDirs.push(outDir);
+    let resolverCalls = 0;
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const provider = new SeedanceProvider({
+      apiKey: "seedance-key",
+      baseUrl: "https://ark.example.test",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      referenceImageUrlResolver: async () => {
+        resolverCalls += 1;
+        return "https://haitu.online/api/public-assets/unused";
+      },
+      fetchImpl: (async (url, init) => {
+        fetchCalls.push({ url: String(url), init });
+        if (String(url).endsWith("/api/v3/contents/generations/tasks") && init?.method === "POST") {
+          return jsonResponse({ id: "task-1", status: "queued" });
+        }
+        if (String(url).endsWith("/api/v3/contents/generations/tasks/task-1")) {
+          return jsonResponse({
+            id: "task-1",
+            status: "succeeded",
+            output: { video_url: "https://video.example.test/out.mp4" }
+          });
+        }
+        if (String(url) === "https://video.example.test/out.mp4") {
+          return new Response("video", { status: 200 });
+        }
+        throw new Error(`Unexpected URL: ${String(url)}`);
+      }) as typeof fetch
+    });
+
+    await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "sku-1",
+      prompt: "prompt",
+      script: "script",
+      durationSeconds: 10,
+      aspectRatio: "9:16",
+      outputDir: outDir,
+      referenceImages: ["https://cdn.example.test/reference.png"],
+      finalLanguage: "ja"
+    });
+
+    const createCall = fetchCalls.find((call) => call.url.endsWith("/api/v3/contents/generations/tasks"));
+    const body = JSON.parse(String(createCall?.init?.body)) as {
+      content: Array<{ type: string; image_url?: { url: string } }>;
+    };
+    expect(resolverCalls).toBe(0);
+    expect(body.content[1]?.image_url?.url).toBe("https://cdn.example.test/reference.png");
+  });
+
+  it("annotates create task failures with provider debugging metadata", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-create-failure-"));
+    tempDirs.push(outDir);
+    const cause = Object.assign(new Error("Headers Timeout Error"), {
+      code: "UND_ERR_HEADERS_TIMEOUT"
+    });
+    const provider = new SeedanceProvider({
+      apiKey: "seedance-key",
+      baseUrl: "https://ark.example.test",
+      model: "doubao-seedance-2-0-fast-260128",
+      referenceImageUrlResolver: async () => "https://haitu.online/api/public-assets/token-1",
+      fetchImpl: (async () => {
+        throw Object.assign(new Error("fetch failed"), {
+          name: "TypeError",
+          cause
+        });
+      }) as typeof fetch
+    });
+
+    await expect(
+      provider.generateVideo({
+        jobId: "job-1",
+        productSku: "sku-1",
+        prompt: "prompt",
+        script: "script",
+        durationSeconds: 10,
+        aspectRatio: "9:16",
+        outputDir: outDir,
+        referenceImages: ["/local/reference.png"],
+        finalLanguage: "ja"
+      })
+    ).rejects.toMatchObject({
+      message: "fetch failed",
+      name: "TypeError",
+      cause,
+      providerPhase: "create-task",
+      providerName: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      referenceImageCount: 1,
+      usedTemporaryAssetUrls: true
+    });
+  });
+
   it("downloads the video when Volcengine returns the completed video URL in content.video_url", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-content-object-"));
     tempDirs.push(outDir);

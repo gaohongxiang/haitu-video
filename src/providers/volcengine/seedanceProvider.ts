@@ -2,7 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, join, resolve } from "node:path";
 
 import { defaultFinalVideoLanguage, providerScriptLanguageLabel } from "../../core/videoLanguage.js";
-import type { VideoProvider, VideoProviderRequest, VideoProviderResult } from "../types.js";
+import type {
+  ReferenceImageUrlResolver,
+  VideoProvider,
+  VideoProviderRequest,
+  VideoProviderResult
+} from "../types.js";
 
 interface VolcengineSeedanceProviderOptions {
   apiKey?: string;
@@ -16,6 +21,7 @@ interface VolcengineSeedanceProviderOptions {
   estimatedCostPerSecond?: number;
   estimatedCostCurrency?: "USD" | "JPY" | "CNY";
   fetchImpl?: typeof fetch;
+  referenceImageUrlResolver?: ReferenceImageUrlResolver;
 }
 
 interface VolcengineSeedanceTaskResponse {
@@ -53,6 +59,13 @@ type VolcengineSeedanceContent =
       video_url?: string;
     };
 
+interface ProviderErrorMetadata {
+  providerName: string;
+  providerModel: string;
+  referenceImageCount: number;
+  usedTemporaryAssetUrls: boolean;
+}
+
 export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -65,6 +78,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly estimatedCostPerSecond: number;
   private readonly estimatedCostCurrency: "USD" | "JPY" | "CNY";
   private readonly fetchImpl: typeof fetch;
+  private readonly referenceImageUrlResolver?: ReferenceImageUrlResolver;
 
   constructor(options: VolcengineSeedanceProviderOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
@@ -89,6 +103,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
       ((process.env.SEEDANCE_ESTIMATED_COST_CURRENCY as "USD" | "JPY" | "CNY" | undefined) ??
         "CNY");
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.referenceImageUrlResolver = options.referenceImageUrlResolver;
   }
 
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
@@ -97,30 +112,54 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     }
 
     await mkdir(request.outputDir, { recursive: true });
-    const createResponse = await this.postJson<VolcengineSeedanceTaskResponse>(
-      "/api/v3/contents/generations/tasks",
-      {
-        model: this.model,
-        content: await this.buildContent(request),
-        resolution: this.resolution,
-        ratio: request.aspectRatio,
-        duration: request.durationSeconds,
-        watermark: this.watermark
-      }
-    );
+    const errorMetadata = this.errorMetadata(request);
+    let createResponse: VolcengineSeedanceTaskResponse;
+    try {
+      createResponse = await this.postJson<VolcengineSeedanceTaskResponse>(
+        "/api/v3/contents/generations/tasks",
+        {
+          model: this.model,
+          content: await this.buildContent(request),
+          resolution: this.resolution,
+          ratio: request.aspectRatio,
+          duration: request.durationSeconds,
+          watermark: this.watermark
+        }
+      );
+    } catch (error) {
+      throw annotateProviderError(error, {
+        ...errorMetadata,
+        providerPhase: "create-task"
+      });
+    }
     const taskId = getTaskId(createResponse);
     if (!taskId) {
       throw new Error("Volcengine Seedance create task response did not include a task id.");
     }
 
-    const completedTask = await this.waitForTask(taskId);
+    let completedTask: VolcengineSeedanceTaskResponse;
+    try {
+      completedTask = await this.waitForTask(taskId);
+    } catch (error) {
+      throw annotateProviderError(error, {
+        ...errorMetadata,
+        providerPhase: "poll-task"
+      });
+    }
     const videoUrl = getVideoUrl(completedTask);
     if (!videoUrl) {
       throw new Error(`Volcengine Seedance task ${taskId} completed without a video URL.`);
     }
 
     const outputPath = join(request.outputDir, `${request.jobId}.seedance.mp4`);
-    await this.download(videoUrl, outputPath);
+    try {
+      await this.download(videoUrl, outputPath);
+    } catch (error) {
+      throw annotateProviderError(error, {
+        ...errorMetadata,
+        providerPhase: "download-output"
+      });
+    }
 
     return {
       provider: "volcengine-seedance",
@@ -159,12 +198,34 @@ export class VolcengineSeedanceProvider implements VideoProvider {
         type: "image_url",
         role: "reference_image",
         image_url: {
-          url: await normalizeImageReference(referenceImage)
+          url: await this.normalizeReferenceImage(referenceImage)
         }
       });
     }
 
     return content;
+  }
+
+  private async normalizeReferenceImage(reference: string): Promise<string> {
+    if (reference.startsWith("http://") || reference.startsWith("https://")) {
+      return reference;
+    }
+    if (reference.startsWith("data:image/") || reference.startsWith("asset://")) {
+      return reference;
+    }
+    if (this.referenceImageUrlResolver) {
+      return this.referenceImageUrlResolver(reference);
+    }
+    return normalizeImageReference(reference);
+  }
+
+  private errorMetadata(request: VideoProviderRequest): ProviderErrorMetadata {
+    return {
+      providerName: "volcengine-seedance",
+      providerModel: this.model,
+      referenceImageCount: request.referenceImages?.length ?? 0,
+      usedTemporaryAssetUrls: Boolean(this.referenceImageUrlResolver)
+    };
   }
 
   private async waitForTask(taskId: string): Promise<VolcengineSeedanceTaskResponse> {
@@ -313,4 +374,9 @@ function parseOptionalNumber(value: string | undefined): number | undefined {
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function annotateProviderError(error: unknown, metadata: ProviderErrorMetadata & { providerPhase: string }): Error {
+  const err = error instanceof Error ? error : new Error(String(error));
+  return Object.assign(err, metadata);
 }
