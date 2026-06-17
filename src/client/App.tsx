@@ -62,6 +62,7 @@ type VideoModelChoice = "mock" | "seednice-2-fast" | "seednice-2";
 type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "volcengine-seedance";
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
+type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";
 type StoryboardDraftSource = "default" | "ai" | "manual";
 type AuthFlowMode = "entry" | "verify-email" | "forgot-password";
 interface AuthSession {
@@ -880,6 +881,7 @@ export function App() {
   const [productImportText, setProductImportText] = useState("");
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
   const [productComposerSource, setProductComposerSource] = useState<ProductComposerSource>("freeform");
+  const [productAutoSaveStatus, setProductAutoSaveStatus] = useState<ProductAutoSaveStatus>("idle");
   const [importNotes, setImportNotes] = useState<string[]>([]);
   const [importQuality, setImportQuality] = useState<ProductImportQuality | undefined>();
   const [productEditorMode, setProductEditorMode] = useState<ProductEditorMode>("import");
@@ -913,6 +915,14 @@ export function App() {
   const contentScrollerRef = useRef<HTMLDivElement | null>(null);
   const videoJobsRef = useRef<VideoJob[]>([]);
   const selectedProductSkuRef = useRef<string | undefined>(undefined);
+  const selectedProductRef = useRef<ProductDetail | undefined>(undefined);
+  const productDraftRef = useRef<ProductDraft>(defaultProductDraft);
+  const productImportTextRef = useRef("");
+  const productComposerSourceRef = useRef<ProductComposerSource>("freeform");
+  const productAutoSaveTimerRef = useRef<number | undefined>(undefined);
+  const productAutoSaveStatusRef = useRef<ProductAutoSaveStatus>("idle");
+  const productAutoSaveSignatureRef = useRef("");
+  const productAutoSaveInFlightRef = useRef<Promise<ProductDetail | undefined> | undefined>(undefined);
 
   const selectedVideoModelConfig = videoModelConfigs[videoModelChoice];
   const paidProvider = selectedVideoModelConfig.provider !== "mock";
@@ -1019,6 +1029,32 @@ export function App() {
   useEffect(() => {
     selectedProductSkuRef.current = selectedProduct?.sku;
   }, [selectedProduct?.sku]);
+
+  useEffect(() => {
+    selectedProductRef.current = selectedProduct;
+  }, [selectedProduct]);
+
+  useEffect(() => {
+    productDraftRef.current = productDraft;
+  }, [productDraft]);
+
+  useEffect(() => {
+    productImportTextRef.current = productImportText;
+  }, [productImportText]);
+
+  useEffect(() => {
+    productComposerSourceRef.current = productComposerSource;
+  }, [productComposerSource]);
+
+  useEffect(() => {
+    productAutoSaveStatusRef.current = productAutoSaveStatus;
+  }, [productAutoSaveStatus]);
+
+  useEffect(() => {
+    return () => {
+      clearProductFactsAutoSaveTimer();
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -1616,6 +1652,45 @@ export function App() {
     setPendingImageFiles([]);
     setProductComposerSource("structured");
     setImportQuality(product.importQuality);
+    productDraftRef.current = nextDraft;
+    productImportTextRef.current = productDraftToComposerText(nextDraft);
+    productComposerSourceRef.current = "structured";
+    resetProductFactsAutoSaveState("idle");
+  }
+
+  function clearProductFactsAutoSaveTimer() {
+    if (productAutoSaveTimerRef.current !== undefined) {
+      window.clearTimeout(productAutoSaveTimerRef.current);
+      productAutoSaveTimerRef.current = undefined;
+    }
+  }
+
+  function resetProductFactsAutoSaveState(nextStatus: ProductAutoSaveStatus = "idle") {
+    clearProductFactsAutoSaveTimer();
+    productAutoSaveSignatureRef.current = "";
+    productAutoSaveStatusRef.current = nextStatus;
+    setProductAutoSaveStatus(nextStatus);
+  }
+
+  function applyAutoSavedProductToCreationComposer(product: ProductDetail, draftToSave: ProductDraft) {
+    const nextDraft = {
+      ...draftToSave,
+      sku: product.sku,
+      reference_images: product.reference_images.join("\n"),
+      source_text: product.source_text ?? draftToSave.source_text
+    };
+    setSelectedProduct(product);
+    setProductPath(product.path);
+    setProductDraft(nextDraft);
+    setProductComposerSource("structured");
+    setImportQuality(product.importQuality);
+    setImportNotes([]);
+    selectedProductRef.current = product;
+    productDraftRef.current = nextDraft;
+    productComposerSourceRef.current = "structured";
+    persistProductStudioSku(product.sku);
+    setPreflight(undefined);
+    setPreflightSignature("");
   }
 
   async function applyProductToCreationComposerWithStoryboards(product: ProductDetail) {
@@ -1623,14 +1698,113 @@ export function App() {
     await loadProductStoryboards(product.sku);
   }
 
+  function productFactsAutoSaveDraft() {
+    const importText = productImportTextRef.current.trim();
+    if (!importText || productComposerSourceRef.current !== "structured") {
+      return undefined;
+    }
+    const currentDraft = productDraftRef.current;
+    const currentProduct = selectedProductRef.current;
+    const draftToSave = productComposerTextToDraft(productImportTextRef.current, currentDraft);
+    if (!draftToSave.title_ja.trim()) {
+      return undefined;
+    }
+    return {
+      ...draftToSave,
+      source_text: draftToSave.source_text || currentDraft.source_text || currentProduct?.source_text || ""
+    };
+  }
+
+  function productFactsAutoSaveSignature(draftToSave: ProductDraft) {
+    return JSON.stringify(productDraftToFacts(draftToSave));
+  }
+
+  async function autoSaveProductFacts(): Promise<ProductDetail | undefined> {
+    clearProductFactsAutoSaveTimer();
+    const draftToSave = productFactsAutoSaveDraft();
+    if (!draftToSave) {
+      resetProductFactsAutoSaveState("idle");
+      return undefined;
+    }
+    const signature = productFactsAutoSaveSignature(draftToSave);
+    if (signature === productAutoSaveSignatureRef.current && productAutoSaveStatusRef.current === "saved") {
+      return selectedProductRef.current;
+    }
+    if (productAutoSaveInFlightRef.current) {
+      await productAutoSaveInFlightRef.current;
+      if (signature === productAutoSaveSignatureRef.current && productAutoSaveStatusRef.current === "saved") {
+        return selectedProductRef.current;
+      }
+    }
+    productAutoSaveStatusRef.current = "saving";
+    setProductAutoSaveStatus("saving");
+    const savePromise = (async () => {
+      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts(draftToSave));
+      applyAutoSavedProductToCreationComposer(response.product, draftToSave);
+      productAutoSaveSignatureRef.current = signature;
+      productAutoSaveStatusRef.current = "saved";
+      setProductAutoSaveStatus("saved");
+      setProducts((current) => dedupeProductSummaries([productActionSummary(response.product), ...current]));
+      setStatusText(`资料已自动保存: ${response.product.title_ja}`);
+      return response.product;
+    })();
+    productAutoSaveInFlightRef.current = savePromise;
+    try {
+      return await savePromise;
+    } catch (error) {
+      productAutoSaveStatusRef.current = "failed";
+      setProductAutoSaveStatus("failed");
+      setStatusText(`资料自动保存失败: ${errorMessage(error)}`);
+      return undefined;
+    } finally {
+      if (productAutoSaveInFlightRef.current === savePromise) {
+        productAutoSaveInFlightRef.current = undefined;
+      }
+      const latestDraft = productFactsAutoSaveDraft();
+      if (latestDraft && productFactsAutoSaveSignature(latestDraft) !== productAutoSaveSignatureRef.current) {
+        scheduleProductFactsAutoSave();
+      }
+    }
+  }
+
+  function scheduleProductFactsAutoSave() {
+    clearProductFactsAutoSaveTimer();
+    if (productComposerSourceRef.current !== "structured") {
+      resetProductFactsAutoSaveState("idle");
+      return;
+    }
+    productAutoSaveStatusRef.current = "dirty";
+    setProductAutoSaveStatus("dirty");
+    productAutoSaveTimerRef.current = window.setTimeout(() => {
+      void autoSaveProductFacts();
+    }, 1000);
+  }
+
+  async function flushProductFactsAutoSave(): Promise<ProductDetail | undefined> {
+    if (productAutoSaveTimerRef.current !== undefined || productAutoSaveStatusRef.current === "dirty") {
+      return autoSaveProductFacts();
+    }
+    if (productAutoSaveInFlightRef.current) {
+      return productAutoSaveInFlightRef.current;
+    }
+    return selectedProductRef.current;
+  }
+
   function updateProductComposerText(text: string) {
     setProductImportText(text);
+    productImportTextRef.current = text;
     if (isStructuredProductComposerText(text)) {
-      setProductDraft(productComposerTextToDraft(text, productDraft));
+      const nextDraft = productComposerTextToDraft(text, productDraftRef.current);
+      setProductDraft(nextDraft);
+      productDraftRef.current = nextDraft;
       setProductComposerSource("structured");
+      productComposerSourceRef.current = "structured";
+      scheduleProductFactsAutoSave();
       return;
     }
     setProductComposerSource("freeform");
+    productComposerSourceRef.current = "freeform";
+    resetProductFactsAutoSaveState("idle");
   }
 
   async function refreshSelectedProductForStudio(sku = selectedProductSkuRef.current) {
@@ -1695,6 +1869,11 @@ export function App() {
     setProductImportText("");
     setPendingImageFiles([]);
     setProductComposerSource("freeform");
+    productDraftRef.current = defaultProductDraft;
+    productImportTextRef.current = "";
+    productComposerSourceRef.current = "freeform";
+    selectedProductRef.current = undefined;
+    resetProductFactsAutoSaveState("idle");
     setImportNotes([]);
     setImportQuality(undefined);
     setProductEditorMode("import");
@@ -1714,52 +1893,33 @@ export function App() {
 
   async function organizeProductPackage(): Promise<ProductDetail | undefined> {
     const importText = productImportText.trim();
-    const structuredDraft = productComposerTextToDraft(productImportText, productDraft);
-    const shouldUseAiImport = Boolean(importText && productComposerSource === "freeform" && !structuredDraft.title_ja.trim());
-    if (shouldUseAiImport && !ensureTextModelConfigured()) {
+    if (importText && !ensureTextModelConfigured()) {
       return undefined;
     }
-    if (!importText && !productDraft.title_ja.trim()) {
-      setStatusText("请先填写商品资料，或选择一个已有商品。");
-      showConsoleToast("请先填写商品资料，或选择一个已有商品。");
-      return undefined;
+    if (!importText) {
+      return selectedProduct;
     }
 
     setIsBusy(true);
     try {
-      if (shouldUseAiImport) {
-        const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
-          text: importText
-        });
-        const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
-        await applyProductToCreationComposerWithStoryboards(response.product);
-        setProductComposerSource("structured");
-        setImportNotes(preview.notes);
-        setImportQuality(preview.quality);
-        persistProductStudioSku(response.product.sku);
-        setPreflight(undefined);
-        setPreflightSignature("");
-        setStatusText([
-          `AI 已整理资料包: ${response.product.title_ja}`,
-          preview.quality.summary,
-          ...preview.notes.map((note) => `- ${note}`)
-        ].join("\n"));
-        await refreshConsole();
-        return response.product;
-      }
-
-      const draftToSave = importText ? structuredDraft : productDraft;
-      const response = await postJson<{ product: ProductDetail }>("/api/products", productDraftToFacts({
-        ...draftToSave,
-        source_text: draftToSave.source_text || productDraft.source_text || selectedProduct?.source_text || ""
-      }));
+      const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
+        text: importText
+      });
+      const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       await applyProductToCreationComposerWithStoryboards(response.product);
-      setImportNotes([]);
-      setImportQuality(response.product.importQuality);
+      setProductComposerSource("structured");
+      productComposerSourceRef.current = "structured";
+      resetProductFactsAutoSaveState("idle");
+      setImportNotes(preview.notes);
+      setImportQuality(preview.quality);
       persistProductStudioSku(response.product.sku);
       setPreflight(undefined);
       setPreflightSignature("");
-      setStatusText(`资料包已保存: ${response.product.title_ja}`);
+      setStatusText([
+        `AI 已整理资料包: ${response.product.title_ja}`,
+        preview.quality.summary,
+        ...preview.notes.map((note) => `- ${note}`)
+      ].join("\n"));
       await refreshConsole();
       return response.product;
     } catch (error) {
@@ -2365,7 +2525,9 @@ export function App() {
               pendingImageFiles={pendingImageFiles}
               setPendingImageFiles={setPendingImageFiles}
               importNotes={importNotes}
+              productAutoSaveStatus={productAutoSaveStatus}
               onOrganizeProductPackage={organizeProductPackage}
+              onFlushProductFactsAutoSave={flushProductFactsAutoSave}
               onSelectProduct={openProductStudio}
               onStartNewProduct={startNewVideoProduct}
               onDeleteProduct={deleteProduct}
@@ -3090,7 +3252,9 @@ function ProductCreationWorkspace({
   pendingImageFiles,
   setPendingImageFiles,
   importNotes,
+  productAutoSaveStatus,
   onOrganizeProductPackage,
+  onFlushProductFactsAutoSave,
   onSelectProduct,
   onStartNewProduct,
   onDeleteProduct,
@@ -3138,7 +3302,9 @@ function ProductCreationWorkspace({
   pendingImageFiles: File[];
   setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
+  productAutoSaveStatus: ProductAutoSaveStatus;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
+  onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
@@ -3211,7 +3377,9 @@ function ProductCreationWorkspace({
       pendingImageFiles={pendingImageFiles}
       setPendingImageFiles={setPendingImageFiles}
       importNotes={importNotes}
+      productAutoSaveStatus={productAutoSaveStatus}
       onOrganizeProductPackage={onOrganizeProductPackage}
+      onFlushProductFactsAutoSave={onFlushProductFactsAutoSave}
       onSelectProduct={onSelectProduct}
       onStartNewProduct={onStartNewProduct}
       onDeleteProduct={onDeleteProduct}
@@ -3262,7 +3430,9 @@ function ProductCreationComposer({
   pendingImageFiles,
   setPendingImageFiles,
   importNotes,
+  productAutoSaveStatus,
   onOrganizeProductPackage,
+  onFlushProductFactsAutoSave,
   onSelectProduct,
   onStartNewProduct,
   onDeleteProduct,
@@ -3309,7 +3479,9 @@ function ProductCreationComposer({
   pendingImageFiles: File[];
   setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
+  productAutoSaveStatus: ProductAutoSaveStatus;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
+  onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onStartNewProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
@@ -3372,7 +3544,7 @@ function ProductCreationComposer({
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
-  const productPackageButtonLabel = importText.trim() && isStructuredProductComposerText(importText) ? "保存资料包" : "AI 整理资料包";
+  const productAutoSaveLabel = productAutoSaveStatusLabel(productAutoSaveStatus);
   const generateVideoButtonLabel = versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频";
   const storyboardProductReady = Boolean(selectedProduct || importText.trim());
   const generationReadiness = productGenerationReadiness({
@@ -3443,7 +3615,7 @@ function ProductCreationComposer({
       }
       const productWithImages = await uploadPendingImages(savedProduct);
       if (!options.silentSuccess) {
-        onToast("资料包已保存。", "ok");
+        onToast("资料包已整理。", "ok");
       }
       return productWithImages;
     } catch (error) {
@@ -3462,7 +3634,8 @@ function ProductCreationComposer({
     if (packingDisabled) return;
     setIsSubmittingVideo(true);
     try {
-      const savedProduct = await handleOrganizeProductPackage({ silentSuccess: true });
+      const autoSavedProduct = await onFlushProductFactsAutoSave();
+      const savedProduct = autoSavedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct), {
         provider: videoModelConfig.provider,
@@ -3478,7 +3651,7 @@ function ProductCreationComposer({
   }
 
   async function handleGenerateStoryboardDraft() {
-    const productForStoryboard = selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
+    const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
     if (!productForStoryboard) return;
     await onGenerateStoryboardDraft(productForStoryboard);
   }
@@ -3623,10 +3796,15 @@ function ProductCreationComposer({
             <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
-                <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
-                  {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
-                  {isPacking ? "处理中" : productPackageButtonLabel}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {productAutoSaveLabel ? (
+                    <span className="text-[11px] font-black text-[#8b9bb3]">{productAutoSaveLabel}</span>
+                  ) : null}
+                  <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
+                    {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
+                    {isPacking ? "整理中" : "AI 整理资料包"}
+                  </Button>
+                </div>
               </div>
               <Textarea
                 ref={productFactsBodyRef}
@@ -4867,6 +5045,19 @@ function productFactsStatusLabel({
     return "已整理资料包";
   }
   return "资料待补";
+}
+
+function productAutoSaveStatusLabel(status: ProductAutoSaveStatus): string {
+  if (status === "saving") {
+    return "保存中";
+  }
+  if (status === "saved") {
+    return "已保存";
+  }
+  if (status === "failed") {
+    return "保存失败";
+  }
+  return "";
 }
 
 function storyboardStatusLabel(storyboardDraftSource: StoryboardDraftSource): string {
