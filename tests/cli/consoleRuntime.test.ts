@@ -31,7 +31,7 @@ describe("console CLI runtime", () => {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        HAITU_AUTH_PASSWORD: ""
+        HAITU_SECRET_KEY: "0123456789abcdef0123456789abcdef"
       },
       stdio: ["ignore", "pipe", "pipe"]
     });

@@ -889,16 +889,16 @@ npm test -- tests/deploy/noDockerDeploy.test.ts
 
 **步骤：**
 
-- [ ] 增加 SQLite 依赖和迁移工具，优先使用 `better-sqlite3` + Drizzle ORM。
-- [ ] 环境变量增加：
+- [x] 增加 SQLite 依赖和迁移工具，优先使用 `better-sqlite3` + Drizzle ORM。
+- [x] 环境变量增加：
 
 ```bash
 HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
 HAITU_SECRET_KEY=<至少32字节随机密钥，用于加密数据库中的模型 API Key>
 ```
 
-- [ ] 如果未设置 `HAITU_DB_PATH`，默认使用 `<HAITU_DATA_DIR>/haitu.sqlite`。
-- [ ] 新增数据库连接模块，启动时开启 WAL：
+- [x] 如果未设置 `HAITU_DB_PATH`，默认使用 `<HAITU_DATA_DIR>/haitu.sqlite`。
+- [x] 新增数据库连接模块，启动时开启 WAL：
 
 ```sql
 PRAGMA journal_mode = WAL;
@@ -906,13 +906,13 @@ PRAGMA busy_timeout = 30000;
 PRAGMA foreign_keys = ON;
 ```
 
-- [ ] 新增迁移执行命令，例如：
+- [x] 新增迁移执行命令，例如：
 
 ```bash
 npm run db:migrate
 ```
 
-- [ ] 新增首批表：
+- [x] 新增首批表：
   - `users`
   - `workspaces`
   - `workspace_members`
@@ -923,14 +923,14 @@ npm run db:migrate
   - `video_assets`
   - `provider_keys`
   - `audit_logs`
-- [ ] `provider_keys` 表禁止保存明文 API Key，只保存 `encrypted_key`、`key_preview` 和配置元数据。
-- [ ] 新增服务端 Key 加密/解密 helper，并覆盖测试：
+- [x] `provider_keys` 表禁止保存明文 API Key，只保存 `encrypted_key`、`key_preview` 和配置元数据。
+- [x] 新增服务端 Key 加密/解密 helper，并覆盖测试：
   - 同一个明文 Key 加密后数据库不包含原文。
   - 解密后可以供模型调用。
   - API 响应只包含 `keyPreview`，不包含完整 Key。
-- [ ] 保留第一阶段 `provider-keys.json` 读取能力用于迁移；迁移成功后运行时优先读 SQLite。
-- [ ] 部署文档增加 SQLite 文件位置、权限、WAL 文件、备份和恢复命令。
-- [ ] 备份时包含 `haitu.sqlite`，并说明在线备份前先执行 checkpoint 或使用 SQLite backup API，避免漏掉 WAL 里的新数据。
+- [x] 保留第一阶段 `provider-keys.json` 读取能力用于迁移；迁移成功后运行时优先读 SQLite。
+- [x] 部署文档增加 SQLite 文件位置、权限、WAL 文件、备份和恢复命令。
+- [x] 备份时包含 `haitu.sqlite`，并说明在线备份前先执行 checkpoint 或使用 SQLite backup API，避免漏掉 WAL 里的新数据。
 
 运行：
 
@@ -951,10 +951,10 @@ npm test -- tests/server/db.test.ts
 
 **步骤：**
 
-- [ ] 增加用户注册、登录、退出接口。
-- [ ] 密码只保存哈希，不保存明文。
-- [ ] 登录后服务端会话关联 `userId`。
-- [ ] 新增当前工作区解析函数：
+- [x] 增加用户注册、登录、退出接口。
+- [x] 密码只保存哈希，不保存明文。
+- [x] 登录后服务端会话关联 `userId`。
+- [x] 新增当前工作区解析函数：
 
 ```ts
 async function resolveCurrentWorkspace(request: Request): Promise<{
@@ -963,9 +963,9 @@ async function resolveCurrentWorkspace(request: Request): Promise<{
 }>;
 ```
 
-- [ ] 第一版每个用户默认创建一个个人工作区。
-- [ ] API 层不再默认写死 `default`，而是从登录会话解析 `workspaceId`。
-- [ ] 未登录请求不能访问商品、分镜、视频任务接口。
+- [x] 第一版每个用户默认创建一个个人工作区。
+- [x] API 层不再默认写死 `default`，而是从登录会话解析 `workspaceId`。
+- [x] 未登录请求不能访问商品、分镜、视频任务接口。
 
 运行：
 
@@ -985,15 +985,15 @@ npm test -- tests/server/consoleApi.test.ts
 
 **步骤：**
 
-- [ ] 扫描 `<HAITU_DATA_DIR>/workspaces/default`。
-- [ ] 创建一个管理员用户。
-- [ ] 创建默认工作区。
-- [ ] 把商品登记到 `products` 表。
-- [ ] 把参考图登记到 `product_assets` 表。
-- [ ] 把分镜历史登记到 `storyboards` 表。
-- [ ] 把视频任务登记到 `video_jobs` 表。
-- [ ] 把视频文件登记到 `video_assets` 表。
-- [ ] 文件本身先不移动，只登记路径。
+- [x] 扫描 `<HAITU_DATA_DIR>/workspaces/default`。
+- [x] 创建一个管理员用户。
+- [x] 创建默认工作区。
+- [x] 把商品登记到 `products` 表。
+- [x] 把参考图登记到 `product_assets` 表。
+- [x] 把分镜历史登记到 `storyboards` 表。
+- [x] 把视频任务登记到 `video_jobs` 表。
+- [x] 把视频文件登记到 `video_assets` 表。
+- [x] 文件本身先不移动，只登记路径。
 
 运行：
 
@@ -1014,13 +1014,13 @@ npm test -- tests/server/importFileWorkspace.test.ts
 
 **步骤：**
 
-- [ ] 商品列表从数据库查，不再全量扫描文件目录。
-- [ ] 视频历史从数据库查，不再全量扫描任务目录。
-- [ ] 分镜历史从数据库查。
-- [ ] 文件路径仍指向文件系统。
-- [ ] 删除商品时先校验 `workspaceId` 权限，再删除数据库记录和文件目录。
-- [ ] 删除视频时先校验 `workspaceId` 权限，再删除数据库记录和文件。
-- [ ] 24 小时视频过期清理同时更新 `video_assets.deleted_at` 和状态。
+- [x] 商品列表从数据库查，不再全量扫描文件目录。
+- [x] 视频历史从数据库查，不再全量扫描任务目录。
+- [x] 分镜历史从数据库查。
+- [x] 文件路径仍指向文件系统。
+- [x] 删除商品时先校验 `workspaceId` 权限，再删除数据库记录和文件目录。
+- [x] 删除视频时先校验 `workspaceId` 权限，再删除数据库记录和文件。
+- [x] 24 小时视频过期清理同时更新 `video_assets.deleted_at` 和状态。
 
 运行：
 
@@ -1029,6 +1029,16 @@ npm test -- tests/server/consoleApi.test.ts tests/server/videoRetention.test.ts
 ```
 
 预期：所有列表和删除操作都受工作区权限约束。
+
+验证结果：
+
+- `tests/server/auth.test.ts`：11 tests passed，覆盖注册/登录/退出、未登录控制台 shell、会话解析、用户工作区隔离、商品/导入/分镜/视频历史权限边界、SQLite 索引同步、当前工作区 provider key 使用、全工作区视频过期清理。
+- `tests/server/importFileWorkspace.test.ts`：1 test passed，覆盖第一阶段 `workspaces/default` 文件数据导入 SQLite。
+- `tests/server/consoleApi.test.ts`：92 tests passed，覆盖原控制台 API、SQLite provider key 加密、legacy key 迁移和前端邮箱密码统一入口。
+- `tests/server/videoRetention.test.ts`：3 tests passed，覆盖过期文件清理和 `video_assets.deleted_at`/状态更新。
+- `npm run typecheck`：passed。
+- `npm test`：35 files / 228 tests passed。
+- `npm run build:console`：passed；Vite 仍提示单个 chunk 超过 500 kB，是既有体积警告，不影响构建产物。
 
 ## 十一、最终验证
 
@@ -1079,6 +1089,7 @@ npm test -- tests/server/importFileWorkspace.test.ts
 npm test -- tests/server/consoleApi.test.ts tests/server/videoRetention.test.ts
 npm run typecheck
 npm test
+npm run build:console
 ```
 
 第二阶段手动验证：

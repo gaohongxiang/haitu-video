@@ -34,8 +34,8 @@ import {
 } from "../providers/openaiCompatibleTextProvider.js";
 import { OpenAiCompatibleImageProvider } from "../providers/openaiCompatibleImageProvider.js";
 import { FileAuditLog } from "./auditLog.js";
-import { buildJobLedger, deleteJobLedgerEntry } from "./jobLedger.js";
-import { FileConsoleAuthStore, isPublicConsoleRoute } from "./consoleAuth.js";
+import { buildJobLedger, buildJobLedgerFromReports, deleteJobLedgerEntry } from "./jobLedger.js";
+import { isPublicConsoleRoute, type ConsoleAuthStore } from "./consoleAuth.js";
 import {
   DEFAULT_WORKSPACE_ID,
   getProductPaths,
@@ -58,7 +58,6 @@ import {
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
 import { LocalVideoJobQueue, type LocalVideoJobQueueOptions } from "./consoleVideoJobQueue.js";
 import {
-  FileProviderKeyStore,
   maskSecret,
   providerKeyStatus,
   resolveImageModelApiKey,
@@ -66,9 +65,15 @@ import {
   resolveTextModelApiKey,
   type ApiProviderId,
   type ProviderKeySource,
+  type ProviderKeyStore,
   type ProviderStoredConfig
 } from "./providerKeyStore.js";
 import { cleanupExpiredVideos } from "./videoRetention.js";
+import { SqliteConsoleAuthStore } from "./auth/sqliteAuthStore.js";
+import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js";
+import { resolveDatabaseSecretKey } from "./db/crypto.js";
+import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
+import { SqliteProviderKeyStore } from "./db/sqliteProviderKeyStore.js";
 
 export interface ConsoleServerOptions {
   rootDir?: string;
@@ -259,6 +264,16 @@ interface ProductListQuality {
   warnings: string[];
 }
 
+interface ConsoleRequestContext {
+  workspaceId: string;
+  databaseHandle: DatabaseHandle;
+  workspacePaths: ReturnType<typeof getWorkspacePaths>;
+  fixturesDir: string;
+  outputsDir: string;
+  providerKeyStore: ProviderKeyStore;
+  videoJobQueue: LocalVideoJobQueue;
+}
+
 export function createConsoleServer(options: ConsoleServerOptions = {}): ConsoleServerHandle {
   const rootDir = options.rootDir ?? process.cwd();
   const dataDir = resolveDataDir({
@@ -274,44 +289,47 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
   const consoleDistDir = options.consoleDistDir ?? join(rootDir, "dist", "console");
   const reviewStore = new FileReviewStore(join(workspacePaths.settingsDir, "review-state.json"));
   const settingsStore = new FileConsoleSettingsStore(join(storageRoots.systemDir, "console-settings.json"));
-  const providerKeyStore = new FileProviderKeyStore(workspacePaths.providerKeysFile);
-  const auditLog = new FileAuditLog(join(storageRoots.systemDir, "audit-log.jsonl"));
-  const authStore = new FileConsoleAuthStore({
-    password: process.env.HAITU_AUTH_PASSWORD,
-    sessionFilePath: join(storageRoots.systemDir, "console-sessions.json")
+  const databaseHandle = createDatabaseHandle(dataDir);
+  const defaultProviderKeyStore = createProviderKeyStore({
+    databaseHandle,
+    workspaceId: DEFAULT_WORKSPACE_ID,
+    legacyFilePath: workspacePaths.providerKeysFile
   });
-  const runConfiguredMakeVideoPipeline: LocalVideoJobQueueOptions["runMakeVideoPipeline"] = async (input) => {
-    const config = await selectedVideoProviderConfig(providerKeyStore, input.providerName);
-    const runPipeline = options.runMakeVideoPipeline ?? runMakeVideoPipeline;
-    return runPipeline({
-      ...input,
-      apiKey: config.apiKey,
-      providerBaseUrl: config.baseUrl,
-      providerModel: input.providerModel ?? config.model
-    });
-  };
+  const auditLog = new FileAuditLog(join(storageRoots.systemDir, "audit-log.jsonl"));
+  const authStore = new SqliteConsoleAuthStore({
+    handle: databaseHandle
+  });
+  const runConfiguredMakeVideoPipeline = createConfiguredMakeVideoPipeline({
+    providerKeyStore: defaultProviderKeyStore,
+    runMakeVideoPipeline: options.runMakeVideoPipeline
+  });
   const videoJobQueue = new LocalVideoJobQueue({
     rootDir,
     outputsDir,
     workspaceId: DEFAULT_WORKSPACE_ID,
     settingsStore,
     fetchImpl: options.fetchImpl,
-    runMakeVideoPipeline: runConfiguredMakeVideoPipeline
+    runMakeVideoPipeline: runConfiguredMakeVideoPipeline,
+    databaseHandle
   });
   const runVideoRetentionCleanup = async () => {
-    await cleanupExpiredVideos({
-      dataDir,
-      workspaceId: DEFAULT_WORKSPACE_ID,
-      onDeleteError: async (error, filePath) => {
-        await auditLog.append({
-          action: "video_retention.delete_failed",
-          target: filePath,
-          metadata: {
-            error: error instanceof Error ? error.message : String(error)
-          }
-        });
-      }
-    });
+    for (const workspaceId of retentionWorkspaceIds(databaseHandle)) {
+      await cleanupExpiredVideos({
+        dataDir,
+        workspaceId,
+        databaseHandle,
+        onDeleteError: async (error, filePath) => {
+          await auditLog.append({
+            action: "video_retention.delete_failed",
+            target: filePath,
+            metadata: {
+              workspaceId,
+              error: error instanceof Error ? error.message : String(error)
+            }
+          });
+        }
+      });
+    }
   };
   void runVideoRetentionCleanup().catch((error: unknown) => {
     void auditLog.append({
@@ -351,10 +369,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && url.pathname === "/api/auth/session") {
         return jsonResponse(await authStore.sessionStatus(request));
       }
-      if (request.method === "POST" && url.pathname === "/api/auth/login") {
-        const response = await authStore.login((await request.json()) as { password?: string });
+      if (request.method === "POST" && url.pathname === "/api/auth/enter") {
+        const response = await authStore.enter(await request.json());
         await auditLog.append({
-          action: response.ok ? "auth.login" : "auth.login_failed",
+          action: response.ok ? "auth.enter" : "auth.enter_failed",
           metadata: {
             status: response.status
           }
@@ -374,14 +392,47 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           return authResponse;
         }
       }
+      if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console")) {
+        return new Response(request.method === "HEAD" ? undefined : await readConsoleIndex(consoleDistDir), {
+          headers: { "content-type": "text/html; charset=utf-8" }
+        });
+      }
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/assets/")) {
+        return await consoleAssetResponse(url.pathname, {
+          consoleDistDir,
+          head: request.method === "HEAD"
+        });
+      }
+      if (request.method === "GET" && url.pathname.startsWith("/static/")) {
+        return staticResponse(url.pathname.slice("/static/".length));
+      }
+      const requestContext = await createRequestContext({
+        request,
+        dataDir,
+        rootDir,
+        databaseHandle,
+        authStore,
+        defaultProviderKeyStore,
+        defaultVideoJobQueue: videoJobQueue,
+        settingsStore,
+        fetchImpl: options.fetchImpl,
+        runMakeVideoPipeline: options.runMakeVideoPipeline
+      });
       if (request.method === "GET" && url.pathname === "/api/products") {
-        return jsonResponse({ products: await listProducts(fixturesDir, dataDir) });
+        return jsonResponse({
+          products: await listProducts(requestContext.fixturesDir, dataDir, {
+            databaseHandle: requestContext.databaseHandle,
+            workspaceId: requestContext.workspaceId
+          })
+        });
       }
       if (request.method === "POST" && url.pathname === "/api/products") {
         return jsonResponse({
           product: await saveProductFactPackage({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
+            workspaceId: requestContext.workspaceId,
+            databaseHandle: requestContext.databaseHandle,
             input: await request.json()
           })
         });
@@ -391,7 +442,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "POST" && url.pathname === "/api/products/import-ai-preview") {
         return jsonResponse(await buildAiImportedProductPreview({
-          providerKeyStore,
+          providerKeyStore: requestContext.providerKeyStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as ImportProductPreviewRequest
         }));
@@ -399,8 +450,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && url.pathname === "/api/products/import") {
         return jsonResponse(
           await importProductFromText({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
+            workspaceId: requestContext.workspaceId,
+            databaseHandle: requestContext.databaseHandle,
             input: (await request.json()) as ImportProductPreviewRequest
           })
         );
@@ -408,8 +461,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && url.pathname === "/api/products/import-batch") {
         return jsonResponse(
           await importProductsBatchFromText({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
+            workspaceId: requestContext.workspaceId,
+            databaseHandle: requestContext.databaseHandle,
             input: (await request.json()) as ImportProductsBatchRequest
           })
         );
@@ -422,10 +477,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           jobs: await enqueueProductVideoJobsBySku((await request.json()) as ProductVideoJobRequest, {
             sku,
             rootDir: dataDir,
-            outputsDir,
-            fixturesDir,
+            outputsDir: requestContext.outputsDir,
+            fixturesDir: requestContext.fixturesDir,
             settingsStore,
-            videoJobQueue
+            videoJobQueue: requestContext.videoJobQueue
           })
         });
       }
@@ -434,9 +489,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const sku = decodeURIComponent(productStoryboardDraftMatch[1] ?? "");
         return jsonResponse(await buildAiStoryboardDraft({
           sku,
-          fixturesDir,
+          fixturesDir: requestContext.fixturesDir,
           rootDir: dataDir,
-          providerKeyStore,
+          providerKeyStore: requestContext.providerKeyStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as StoryboardDraftRequest
         }));
@@ -445,7 +500,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && productStoryboardsMatch) {
         return jsonResponse({
           storyboards: await listProductStoryboards({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
+            databaseHandle: requestContext.databaseHandle,
+            workspaceId: requestContext.workspaceId,
             sku: decodeURIComponent(productStoryboardsMatch[1] ?? "")
           })
         });
@@ -453,7 +510,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && productStoryboardsMatch) {
         return jsonResponse({
           storyboard: await createProductStoryboard({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
+            databaseHandle: requestContext.databaseHandle,
+            workspaceId: requestContext.workspaceId,
             sku: decodeURIComponent(productStoryboardsMatch[1] ?? ""),
             input: (await request.json()) as StoryboardHistoryRequest
           })
@@ -462,7 +521,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       const deleteProductStoryboardMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/storyboards\/([^/]+)$/);
       if (request.method === "DELETE" && deleteProductStoryboardMatch) {
         return jsonResponse(await deleteProductStoryboard({
-          fixturesDir,
+          fixturesDir: requestContext.fixturesDir,
+          databaseHandle: requestContext.databaseHandle,
+          workspaceId: requestContext.workspaceId,
           sku: decodeURIComponent(deleteProductStoryboardMatch[1] ?? ""),
           id: decodeURIComponent(deleteProductStoryboardMatch[2] ?? "")
         }));
@@ -471,7 +532,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && productMatch) {
         return jsonResponse({
           product: await getProductBySku({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
             sku: decodeURIComponent(productMatch[1] ?? "")
           })
@@ -480,7 +541,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "DELETE" && productMatch) {
         const sku = decodeURIComponent(productMatch[1] ?? "");
         const result = await deleteProductBySku({
-          fixturesDir,
+          fixturesDir: requestContext.fixturesDir,
+          databaseHandle: requestContext.databaseHandle,
+          workspaceId: requestContext.workspaceId,
           sku
         });
         await auditLog.append({
@@ -496,7 +559,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && importProductAssetsMatch) {
         return jsonResponse(
           await importProductReferenceAssets({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
             sku: decodeURIComponent(importProductAssetsMatch[1] ?? "")
           })
@@ -506,7 +569,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && uploadProductAssetsMatch) {
         return jsonResponse(
           await uploadProductReferenceImages({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
             sku: decodeURIComponent(uploadProductAssetsMatch[1] ?? ""),
             input: (await request.json()) as UploadProductReferenceImagesRequest
@@ -517,7 +580,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "DELETE" && deleteProductAssetMatch) {
         return jsonResponse(
           await deleteProductReferenceImage({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
             sku: decodeURIComponent(deleteProductAssetMatch[1] ?? ""),
             index: Number(deleteProductAssetMatch[2])
@@ -528,9 +591,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "POST" && generateProductAssetsMatch) {
         return jsonResponse(
           await generateProductReferenceImages({
-            fixturesDir,
+            fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
-            providerKeyStore,
+            providerKeyStore: requestContext.providerKeyStore,
             fetchImpl: options.fetchImpl,
             sku: decodeURIComponent(generateProductAssetsMatch[1] ?? ""),
             input: (await request.json()) as GenerateProductReferenceImagesRequest
@@ -539,7 +602,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "GET" && url.pathname === "/api/reports") {
         return jsonResponse({
-          reports: await listReports(outputsDir, {
+          reports: await listReports(requestContext.outputsDir, {
             productSku: queryValue(url, "productSku"),
             provider: queryValue(url, "provider"),
             status: queryValue(url, "status"),
@@ -548,13 +611,18 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         });
       }
       if (request.method === "GET" && url.pathname === "/api/job-ledger") {
-        return jsonResponse(await buildJobLedger(outputsDir, {
+        return jsonResponse(await buildWorkspaceJobLedger(requestContext, {
           reviewState: await reviewStore.read()
         }));
       }
       const deleteJobLedgerMatch = url.pathname.match(/^\/api\/job-ledger\/([^/]+)$/);
       if (request.method === "DELETE" && deleteJobLedgerMatch) {
-        const result = await deleteJobLedgerEntry(outputsDir, decodeURIComponent(deleteJobLedgerMatch[1] ?? ""));
+        const result = await deleteJobLedgerEntry(requestContext.outputsDir, decodeURIComponent(deleteJobLedgerMatch[1] ?? ""));
+        if (requestContext.databaseHandle) {
+          requestContext.databaseHandle.sqlite
+            .prepare("DELETE FROM video_jobs WHERE workspace_id = ? AND id = ?")
+            .run(requestContext.workspaceId, result.jobId);
+        }
         await auditLog.append({
           action: "video_history.deleted",
           target: result.jobId,
@@ -568,8 +636,8 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return csvResponse(
           await buildInternalValidationCsv({
             rootDir: dataDir,
-            fixturesDir,
-            outputsDir,
+            fixturesDir: requestContext.fixturesDir,
+            outputsDir: requestContext.outputsDir,
             reviewStore
           }),
           "haitu-internal-validation.csv"
@@ -579,9 +647,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(
           await topUpInternalValidationJobs({
             rootDir: dataDir,
-            fixturesDir,
-            outputsDir,
-            videoJobQueue
+            fixturesDir: requestContext.fixturesDir,
+            outputsDir: requestContext.outputsDir,
+            videoJobQueue: requestContext.videoJobQueue
           })
         );
       }
@@ -600,7 +668,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && url.pathname === "/api/video-assets") {
         return jsonResponse(await listVideoAssets({
           rootDir: dataDir,
-          outputsDir
+          outputsDir: requestContext.outputsDir
         }));
       }
       if (request.method === "GET" && url.pathname === "/api/storage-backup") {
@@ -649,13 +717,13 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(result);
       }
       if (request.method === "GET" && url.pathname === "/api/provider-config") {
-        return jsonResponse(await buildProviderConfig(providerKeyStore));
+        return jsonResponse(await buildProviderConfig(requestContext.providerKeyStore));
       }
       const providerKeyTestMatch = url.pathname.match(/^\/api\/provider-keys\/([^/]+)\/test$/);
       if (providerKeyTestMatch && request.method === "POST") {
         const provider = parseApiProviderId(decodeURIComponent(providerKeyTestMatch[1] ?? ""));
         return jsonResponse(await testProviderConfig(provider, {
-          providerKeyStore,
+          providerKeyStore: requestContext.providerKeyStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as ProviderConfigTestRequest
         }));
@@ -663,7 +731,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       const providerKeyMatch = url.pathname.match(/^\/api\/provider-keys\/([^/]+)$/);
       if (providerKeyMatch && request.method === "PUT") {
         const provider = parseApiProviderId(decodeURIComponent(providerKeyMatch[1] ?? ""));
-        const saved = await providerKeyStore.set(provider, (await request.json()) as ProviderKeyRequest);
+        const saved = await requestContext.providerKeyStore.set(provider, (await request.json()) as ProviderKeyRequest);
         await auditLog.append({
           action: "provider_key.saved",
           target: provider,
@@ -678,7 +746,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (providerKeyMatch && request.method === "DELETE") {
         const provider = parseApiProviderId(decodeURIComponent(providerKeyMatch[1] ?? ""));
-        const deleted = await providerKeyStore.delete(provider, url.searchParams.get("configId") ?? undefined);
+        const deleted = await requestContext.providerKeyStore.delete(provider, url.searchParams.get("configId") ?? undefined);
         await auditLog.append({
           action: "provider_key.deleted",
           target: provider,
@@ -790,9 +858,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const body = (await request.json()) as PreflightRequest;
         return jsonResponse({
           preflight: await runConsolePreflight(body, {
-            rootDir: dataDir,
-            outputsDir,
-            settingsStore
+          rootDir: dataDir,
+          outputsDir: requestContext.outputsDir,
+          settingsStore
           })
         });
       }
@@ -800,9 +868,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const body = (await request.json()) as MakeVideoRequest;
         const report = await runConsoleMakeVideo(body, {
           rootDir: dataDir,
-          outputsDir,
+          outputsDir: requestContext.outputsDir,
           settingsStore,
-          providerKeyStore,
+          providerKeyStore: requestContext.providerKeyStore,
           fetchImpl: options.fetchImpl
         });
         return jsonResponse({ report });
@@ -812,10 +880,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse({
           jobs: await enqueueBatchVideoJobs(body, {
             rootDir: dataDir,
-            outputsDir,
-            fixturesDir,
+            outputsDir: requestContext.outputsDir,
+            fixturesDir: requestContext.fixturesDir,
             settingsStore,
-            videoJobQueue
+            videoJobQueue: requestContext.videoJobQueue
           })
         });
       }
@@ -825,7 +893,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         await assertTemplateEnabled(body, settingsStore);
         await assertWithinVideoBudget(body, settingsStore);
         await assertWithinTestCredit(body, {
-          outputsDir,
+          outputsDir: requestContext.outputsDir,
           settingsStore
         });
         const settings = await settingsStore.read();
@@ -836,7 +904,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           rootDir: dataDir
         });
         return jsonResponse({
-          job: await videoJobQueue.enqueue({
+          job: await requestContext.videoJobQueue.enqueue({
             productPath,
             outDirName: body.outDirName,
             provider: body.provider,
@@ -854,11 +922,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "GET" && url.pathname === "/api/video-jobs") {
         return jsonResponse({
-          jobs: await videoJobQueue.list()
+          jobs: await requestContext.videoJobQueue.list()
         });
       }
       if (request.method === "GET" && url.pathname === "/api/video-jobs/groups") {
-        const ledger = await buildJobLedger(outputsDir, {
+        const ledger = await buildWorkspaceJobLedger(requestContext, {
           reviewState: await reviewStore.read()
         });
         return jsonResponse({
@@ -869,7 +937,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       const videoJobCancelMatch = url.pathname.match(/^\/api\/video-jobs\/([^/]+)\/cancel$/);
       if (request.method === "POST" && videoJobCancelMatch) {
         const jobId = decodeURIComponent(videoJobCancelMatch[1] ?? "");
-        const job = await videoJobQueue.cancel(jobId);
+        const job = await requestContext.videoJobQueue.cancel(jobId);
         await auditLog.append({
           action: "video_job.cancelled",
           target: job.id,
@@ -889,11 +957,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         await assertRetryVideoJobAllowed({
           jobId,
           confirmPaid: body.confirmPaid,
-          videoJobQueue,
+          videoJobQueue: requestContext.videoJobQueue,
           settingsStore,
-          outputsDir
+          outputsDir: requestContext.outputsDir
         });
-        const job = await videoJobQueue.retry(jobId, {
+        const job = await requestContext.videoJobQueue.retry(jobId, {
           confirmPaid: body.confirmPaid === true
         });
         await auditLog.append({
@@ -913,13 +981,13 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       const videoJobMatch = url.pathname.match(/^\/api\/video-jobs\/([^/]+)$/);
       if (request.method === "GET" && videoJobMatch) {
         return jsonResponse({
-          job: await videoJobQueue.get(decodeURIComponent(videoJobMatch[1] ?? ""))
+          job: await requestContext.videoJobQueue.get(decodeURIComponent(videoJobMatch[1] ?? ""))
         });
       }
       if (request.method === "GET" && url.pathname === "/api/provider-tasks") {
         return jsonResponse({
           usage: await listProviderTasks(url, {
-            providerKeyStore,
+            providerKeyStore: defaultProviderKeyStore,
             fetchImpl: options.fetchImpl
           })
         });
@@ -930,14 +998,14 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         if (request.method === "GET" && !url.pathname.endsWith("/cancel")) {
           return jsonResponse({
             task: await getProviderTask(taskId, {
-              providerKeyStore,
+              providerKeyStore: defaultProviderKeyStore,
               fetchImpl: options.fetchImpl
             })
           });
         }
         if (request.method === "POST" && url.pathname.endsWith("/cancel")) {
           await cancelQueuedProviderTask(taskId, {
-            providerKeyStore,
+            providerKeyStore: defaultProviderKeyStore,
             fetchImpl: options.fetchImpl
           });
           return jsonResponse({
@@ -945,20 +1013,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             taskId
           });
         }
-      }
-      if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console")) {
-        return new Response(request.method === "HEAD" ? undefined : await readConsoleIndex(consoleDistDir), {
-          headers: { "content-type": "text/html; charset=utf-8" }
-        });
-      }
-      if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/assets/")) {
-        return await consoleAssetResponse(url.pathname, {
-          consoleDistDir,
-          head: request.method === "HEAD"
-        });
-      }
-      if (request.method === "GET" && url.pathname.startsWith("/static/")) {
-        return staticResponse(url.pathname.slice("/static/".length));
       }
       if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/media") {
         return await mediaResponse(url.searchParams.get("path"), {
@@ -1047,10 +1101,110 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         close: () =>
           new Promise<void>((resolveClose, reject) =>
             server.close((error) => (error ? reject(error) : resolveClose()))
-          )
+          ).finally(() => {
+            if (databaseHandle) {
+              closeDatabase(databaseHandle);
+            }
+          })
       };
     }
   };
+}
+
+function createDatabaseHandle(dataDir: string): DatabaseHandle {
+  resolveDatabaseSecretKey(process.env);
+  const handle = openDatabase({ dataDir, env: process.env });
+  runMigrations(handle);
+  ensureDefaultWorkspace(handle);
+  return handle;
+}
+
+function retentionWorkspaceIds(databaseHandle: DatabaseHandle): string[] {
+  const rows = databaseHandle.sqlite.prepare(`
+    SELECT id
+    FROM workspaces
+    ORDER BY id ASC
+  `).all() as Array<{ id: string }>;
+  return rows.map((row) => row.id);
+}
+
+async function createRequestContext(input: {
+  request: Request;
+  dataDir: string;
+  rootDir: string;
+  databaseHandle: DatabaseHandle;
+  authStore: ConsoleAuthStore;
+  defaultProviderKeyStore: ProviderKeyStore;
+  defaultVideoJobQueue: LocalVideoJobQueue;
+  settingsStore: FileConsoleSettingsStore;
+  fetchImpl?: typeof fetch;
+  runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+}): Promise<ConsoleRequestContext> {
+  const resolved = await input.authStore.resolveCurrentWorkspace(input.request);
+  const workspacePaths = getWorkspacePaths(input.dataDir, resolved.workspaceId);
+  const providerKeyStore = createProviderKeyStore({
+    databaseHandle: input.databaseHandle,
+    workspaceId: resolved.workspaceId,
+    legacyFilePath: workspacePaths.providerKeysFile
+  });
+  return {
+    workspaceId: resolved.workspaceId,
+    databaseHandle: input.databaseHandle,
+    workspacePaths,
+    fixturesDir: workspacePaths.productsDir,
+    outputsDir: workspacePaths.jobsDir,
+    providerKeyStore,
+    videoJobQueue: new LocalVideoJobQueue({
+      rootDir: input.rootDir,
+      outputsDir: workspacePaths.jobsDir,
+      workspaceId: resolved.workspaceId,
+      settingsStore: input.settingsStore,
+      fetchImpl: input.fetchImpl,
+      runMakeVideoPipeline: createConfiguredMakeVideoPipeline({
+        providerKeyStore,
+        runMakeVideoPipeline: input.runMakeVideoPipeline
+      }),
+      databaseHandle: input.databaseHandle
+    })
+  };
+}
+
+function createConfiguredMakeVideoPipeline(input: {
+  providerKeyStore: ProviderKeyStore;
+  runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+}): LocalVideoJobQueueOptions["runMakeVideoPipeline"] {
+  return async (pipelineInput) => {
+    const config = await selectedVideoProviderConfig(input.providerKeyStore, pipelineInput.providerName);
+    const runPipeline = input.runMakeVideoPipeline ?? runMakeVideoPipeline;
+    return runPipeline({
+      ...pipelineInput,
+      apiKey: config.apiKey,
+      providerBaseUrl: config.baseUrl,
+      providerModel: pipelineInput.providerModel ?? config.model
+    });
+  };
+}
+
+function createProviderKeyStore(input: {
+  databaseHandle: DatabaseHandle;
+  workspaceId: string;
+  legacyFilePath: string;
+}): ProviderKeyStore {
+  const store = new SqliteProviderKeyStore({
+    handle: input.databaseHandle,
+    secretKey: resolveDatabaseSecretKey(process.env),
+    workspaceId: input.workspaceId,
+    legacyFilePath: input.legacyFilePath
+  });
+  store.migrateLegacyFile();
+  return store;
+}
+
+async function buildWorkspaceJobLedger(
+  context: ConsoleRequestContext,
+  options: Parameters<typeof buildJobLedger>[1] = {}
+) {
+  return buildJobLedger(context.outputsDir, options);
 }
 
 async function runConsoleMakeVideo(
@@ -1059,7 +1213,7 @@ async function runConsoleMakeVideo(
     rootDir: string;
     outputsDir: string;
     settingsStore: FileConsoleSettingsStore;
-    providerKeyStore: FileProviderKeyStore;
+    providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
   }
 ): Promise<MakeVideoReport> {
@@ -1400,7 +1554,7 @@ async function runConsolePreflight(
 async function getProviderTask(
   taskId: string,
   options: {
-    providerKeyStore: FileProviderKeyStore;
+    providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
   }
 ) {
@@ -1415,7 +1569,7 @@ async function getProviderTask(
 async function listProviderTasks(
   url: URL,
   options: {
-    providerKeyStore: FileProviderKeyStore;
+    providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
   }
 ) {
@@ -1438,7 +1592,7 @@ function providerUsageListRequestFromUrl(url: URL): ListUsageTasksRequest {
   };
 }
 
-async function buildProviderConfig(providerKeyStore: FileProviderKeyStore): Promise<ProviderConfigLedger> {
+async function buildProviderConfig(providerKeyStore: ProviderKeyStore): Promise<ProviderConfigLedger> {
   const textStoredConfigs = await providerKeyStore.listConfigs("openai-compatible-text");
   const imageStoredConfigs = await providerKeyStore.listConfigs("openai-compatible-image");
   const videoStoredConfigs = await providerKeyStore.listConfigs("volcengine-seedance");
@@ -1454,7 +1608,7 @@ async function buildProviderConfig(providerKeyStore: FileProviderKeyStore): Prom
 async function testProviderConfig(
   provider: ApiProviderId,
   options: {
-    providerKeyStore: FileProviderKeyStore;
+    providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
     input: ProviderConfigTestRequest;
   }
@@ -1535,7 +1689,7 @@ function withProviderConfigTestTimeout(fetchImpl: typeof fetch | undefined): typ
 
 async function effectiveProviderConfigForTest(
   provider: ApiProviderId,
-  providerKeyStore: FileProviderKeyStore,
+  providerKeyStore: ProviderKeyStore,
   input: ProviderConfigTestRequest
 ): Promise<ProviderStoredConfig> {
   const saved = normalizeText(input.configId) ? await providerKeyStore.getConfig(provider) : {};
@@ -1708,7 +1862,7 @@ function clampInteger(value: number, min: number, max: number): number {
 }
 
 async function selectedVideoProviderConfig(
-  providerKeyStore: FileProviderKeyStore,
+  providerKeyStore: ProviderKeyStore,
   provider: VideoProviderName
 ): Promise<{
   apiKey?: string;
@@ -1760,7 +1914,7 @@ function taskIdsFromQuery(url: URL): string[] | undefined {
 async function cancelQueuedProviderTask(
   taskId: string,
   options: {
-    providerKeyStore: FileProviderKeyStore;
+    providerKeyStore: ProviderKeyStore;
     fetchImpl?: typeof fetch;
   }
 ): Promise<void> {
@@ -2119,7 +2273,14 @@ function csvCell(value: string): string {
   return value;
 }
 
-async function listProducts(fixturesDir: string, rootDir: string): Promise<
+async function listProducts(
+  fixturesDir: string,
+  rootDir: string,
+  options: {
+    databaseHandle?: DatabaseHandle;
+    workspaceId?: string;
+  } = {}
+): Promise<
   Array<{
     path: string;
     sku: string;
@@ -2129,7 +2290,9 @@ async function listProducts(fixturesDir: string, rootDir: string): Promise<
     paidReadiness: ReturnType<typeof buildPaidGenerationReadiness>;
   }>
 > {
-  const files = await listProductFiles(fixturesDir);
+  const files = options.databaseHandle
+    ? listProductFilesFromDatabase(options.databaseHandle, options.workspaceId ?? DEFAULT_WORKSPACE_ID)
+    : await listProductFiles(fixturesDir);
   const products = new Map<string, {
     path: string;
     sku: string;
@@ -2139,19 +2302,32 @@ async function listProducts(fixturesDir: string, rootDir: string): Promise<
     paidReadiness: ReturnType<typeof buildPaidGenerationReadiness>;
   }>();
   for (const file of files) {
-    const product = parseProductFacts(JSON.parse(await readFile(file, "utf8")));
-    const referenceImageStatuses = await describeReferenceImages(product.reference_images, {
-      productFilePath: file,
-      rootDir
-    });
+    const product = await readProductFactsForList(file, options.databaseHandle);
+    const referenceImageStatuses = product.fileAvailable
+      ? await describeReferenceImages(product.reference_images, {
+        productFilePath: file,
+        rootDir
+      })
+      : [];
     const assetSummary = summarizeReferenceImages(referenceImageStatuses);
     const summary = {
       path: file,
       sku: product.sku,
       title_ja: product.title_ja,
       referenceImageCount: product.reference_images.length,
-      importQuality: summarizeProductListQuality(product),
-      paidReadiness: buildPaidGenerationReadiness(product, assetSummary)
+      importQuality: product.fileAvailable
+        ? summarizeProductListQuality(product)
+        : {
+          ready: false,
+          score: 0,
+          summary: "商品文件缺失",
+          missingFields: ["商品文件"],
+          verifiedFacts: [],
+          warnings: ["SQLite 索引存在，但 product.json 缺失"]
+        },
+      paidReadiness: product.fileAvailable
+        ? buildPaidGenerationReadiness(product, assetSummary)
+        : missingProductFileReadiness()
     };
     const existing = products.get(product.sku);
     if (!existing || productSummaryRank(summary) > productSummaryRank(existing)) {
@@ -2171,6 +2347,113 @@ function productSummaryRank(product: {
     (product.importQuality?.score ?? 0) +
     (product.paidReadiness?.readyForPaidGeneration ? 10 : 0)
   );
+}
+
+function listProductFilesFromDatabase(handle: DatabaseHandle, workspaceId: string): string[] {
+  const rows = handle.sqlite.prepare(`
+    SELECT product_json_path
+    FROM products
+    WHERE workspace_id = ?
+    ORDER BY sku ASC
+  `).all(workspaceId) as Array<{ product_json_path: string }>;
+  return rows.map((row) => row.product_json_path);
+}
+
+async function readProductFactsForList(
+  productFilePath: string,
+  handle?: DatabaseHandle
+): Promise<ReturnType<typeof parseProductFacts> & { fileAvailable: boolean }> {
+  try {
+    return {
+      ...parseProductFacts(JSON.parse(await readFile(productFilePath, "utf8"))),
+      fileAvailable: true
+    };
+  } catch (error) {
+    if (!handle || !isMissingFileError(error)) {
+      throw error;
+    }
+    const row = handle.sqlite.prepare(`
+      SELECT sku, title
+      FROM products
+      WHERE product_json_path = ?
+    `).get(productFilePath) as { sku: string; title: string | null } | undefined;
+    if (!row) {
+      throw error;
+    }
+    return {
+      sku: row.sku,
+      title_ja: row.title ?? row.sku,
+      category: "商品文件缺失",
+      materials: ["商品文件缺失"],
+      dimensions: "商品文件缺失",
+      verified_selling_points: ["商品文件缺失"],
+      usage_scenes: ["商品文件缺失"],
+      forbidden_claims: ["商品文件缺失"],
+      reference_images: [],
+      fileAvailable: false
+    };
+  }
+}
+
+function missingProductFileReadiness(): ReturnType<typeof buildPaidGenerationReadiness> {
+  return {
+    readyForPaidGeneration: false,
+    blockingReasons: ["商品文件缺失"],
+    warnings: ["SQLite 索引存在，但 product.json 缺失"]
+  };
+}
+
+function upsertProductIndex(
+  handle: DatabaseHandle,
+  input: {
+    workspaceId: string;
+    sku: string;
+    title: string;
+    productJsonPath: string;
+  }
+): void {
+  const now = new Date().toISOString();
+  handle.sqlite.prepare(`
+    INSERT INTO products (id, workspace_id, sku, title, product_json_path, created_at, updated_at)
+    VALUES (@id, @workspaceId, @sku, @title, @productJsonPath, @now, @now)
+    ON CONFLICT(workspace_id, sku) DO UPDATE SET
+      title = excluded.title,
+      product_json_path = excluded.product_json_path,
+      updated_at = excluded.updated_at
+  `).run({
+    id: randomUUID(),
+    workspaceId: input.workspaceId,
+    sku: input.sku,
+    title: input.title,
+    productJsonPath: input.productJsonPath,
+    now
+  });
+}
+
+function productFileBySkuFromDatabase(
+  handle: DatabaseHandle,
+  workspaceId: string,
+  sku: string
+): string | undefined {
+  const row = handle.sqlite.prepare(`
+    SELECT product_json_path
+    FROM products
+    WHERE workspace_id = ? AND sku = ?
+  `).get(workspaceId, sku) as { product_json_path: string } | undefined;
+  return row?.product_json_path;
+}
+
+function productIdBySkuFromDatabase(
+  handle: DatabaseHandle,
+  workspaceId: string,
+  sku: string
+): string | undefined {
+  const row = handle.sqlite.prepare(`
+    SELECT id
+    FROM products
+    WHERE workspace_id = ? AND sku = ?
+  `).get(workspaceId, sku) as { id: string } | undefined;
+  return row?.id;
 }
 
 async function getProductBySku(input: {
@@ -2213,6 +2496,8 @@ async function getProductBySku(input: {
 async function saveProductFactPackage(input: {
   fixturesDir: string;
   rootDir: string;
+  workspaceId?: string;
+  databaseHandle?: DatabaseHandle;
   input: unknown;
 }): Promise<Awaited<ReturnType<typeof getProductBySku>>> {
   const product = parseProductFacts(input.input);
@@ -2220,8 +2505,16 @@ async function saveProductFactPackage(input: {
   await mkdir(dirname(productPath), { recursive: true });
   await writeFile(productPath, JSON.stringify({
     ...product,
-    workspaceId: DEFAULT_WORKSPACE_ID
+    workspaceId: input.workspaceId ?? DEFAULT_WORKSPACE_ID
   }, null, 2), "utf8");
+  if (input.databaseHandle) {
+    upsertProductIndex(input.databaseHandle, {
+      workspaceId: input.workspaceId ?? DEFAULT_WORKSPACE_ID,
+      sku: product.sku,
+      title: product.title_ja,
+      productJsonPath: productPath
+    });
+  }
   return getProductBySku({
     fixturesDir: input.fixturesDir,
     rootDir: input.rootDir,
@@ -2231,10 +2524,21 @@ async function saveProductFactPackage(input: {
 
 async function deleteProductBySku(input: {
   fixturesDir: string;
+  databaseHandle?: DatabaseHandle;
+  workspaceId?: string;
   sku: string;
 }): Promise<{ deleted: true; sku: string; path: string }> {
-  const productPath = await findProductFileBySku(input.fixturesDir, input.sku);
+  const productPath = input.databaseHandle
+    ? productFileBySkuFromDatabase(input.databaseHandle, input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.sku)
+    : await findProductFileBySku(input.fixturesDir, input.sku);
+  if (!productPath) {
+    throw new Error(`Product not found: ${input.sku}`);
+  }
   await rm(dirname(productPath), { recursive: true, force: true });
+  if (input.databaseHandle) {
+    input.databaseHandle.sqlite.prepare("DELETE FROM products WHERE workspace_id = ? AND sku = ?")
+      .run(input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.sku);
+  }
   return {
     deleted: true,
     sku: input.sku,
@@ -2251,7 +2555,7 @@ function buildImportedProductPreview(input: ImportProductPreviewRequest): Import
 }
 
 async function buildAiImportedProductPreview(input: {
-  providerKeyStore: FileProviderKeyStore;
+  providerKeyStore: ProviderKeyStore;
   fetchImpl?: typeof fetch;
   input: ImportProductPreviewRequest;
 }): Promise<ImportedProductPreview> {
@@ -2288,6 +2592,8 @@ async function buildAiImportedProductPreview(input: {
 async function importProductFromText(input: {
   fixturesDir: string;
   rootDir: string;
+  workspaceId?: string;
+  databaseHandle?: DatabaseHandle;
   input: ImportProductPreviewRequest;
 }): Promise<{ product: Awaited<ReturnType<typeof getProductBySku>>; notes: string[] }> {
   const preview = buildImportedProductPreview(input.input);
@@ -2295,6 +2601,8 @@ async function importProductFromText(input: {
     product: await saveProductFactPackage({
       fixturesDir: input.fixturesDir,
       rootDir: input.rootDir,
+      workspaceId: input.workspaceId,
+      databaseHandle: input.databaseHandle,
       input: preview.product
     }),
     notes: preview.notes
@@ -2305,7 +2613,7 @@ async function buildAiStoryboardDraft(input: {
   sku: string;
   fixturesDir: string;
   rootDir: string;
-  providerKeyStore: FileProviderKeyStore;
+  providerKeyStore: ProviderKeyStore;
   fetchImpl?: typeof fetch;
   input: StoryboardDraftRequest;
 }): Promise<{ scriptLines: string[]; storyboardLines: string[]; storyboardCnLines: string[]; notes: string[] }> {
@@ -2383,14 +2691,25 @@ async function buildAiStoryboardDraft(input: {
 
 async function listProductStoryboards(input: {
   fixturesDir: string;
+  databaseHandle?: DatabaseHandle;
+  workspaceId?: string;
   sku: string;
 }): Promise<StoryboardRecord[]> {
+  if (input.databaseHandle) {
+    return listProductStoryboardsFromDatabase(
+      input.databaseHandle,
+      input.workspaceId ?? DEFAULT_WORKSPACE_ID,
+      input.sku
+    );
+  }
   const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
   return readProductStoryboards(productFilePath);
 }
 
 async function createProductStoryboard(input: {
   fixturesDir: string;
+  databaseHandle?: DatabaseHandle;
+  workspaceId?: string;
   sku: string;
   input: StoryboardHistoryRequest;
 }): Promise<StoryboardRecord> {
@@ -2404,14 +2723,46 @@ async function createProductStoryboard(input: {
     script: normalizeStoryboardScript(input.input.script)
   };
   await writeProductStoryboards(productFilePath, [record, ...storyboards]);
+  if (input.databaseHandle) {
+    upsertStoryboardIndex(input.databaseHandle, input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.sku, record);
+  }
   return record;
 }
 
 async function deleteProductStoryboard(input: {
   fixturesDir: string;
+  databaseHandle?: DatabaseHandle;
+  workspaceId?: string;
   sku: string;
   id: string;
 }): Promise<{ deleted: true; id: string }> {
+  if (input.databaseHandle) {
+    const productFilePath = productFileBySkuFromDatabase(input.databaseHandle, input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.sku);
+    if (!productFilePath) {
+      throw new Error(`Product not found: ${input.sku}`);
+    }
+    input.databaseHandle.sqlite.prepare(`
+      DELETE FROM storyboards
+      WHERE id = ? AND workspace_id = ? AND product_id = (
+        SELECT id FROM products WHERE workspace_id = ? AND sku = ?
+      )
+    `).run(input.id, input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.workspaceId ?? DEFAULT_WORKSPACE_ID, input.sku);
+    try {
+      const storyboards = await readProductStoryboards(productFilePath);
+      await writeProductStoryboards(
+        productFilePath,
+        storyboards.filter((record) => record.id !== input.id)
+      );
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+    }
+    return {
+      deleted: true,
+      id: input.id
+    };
+  }
   const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
   const storyboards = await readProductStoryboards(productFilePath);
   await writeProductStoryboards(
@@ -2422,6 +2773,67 @@ async function deleteProductStoryboard(input: {
     deleted: true,
     id: input.id
   };
+}
+
+function listProductStoryboardsFromDatabase(
+  handle: DatabaseHandle,
+  workspaceId: string,
+  sku: string
+): StoryboardRecord[] {
+  const productId = productIdBySkuFromDatabase(handle, workspaceId, sku);
+  if (!productId) {
+    throw new Error(`Product not found: ${sku}`);
+  }
+  const rows = handle.sqlite.prepare(`
+    SELECT id, created_at, style, duration_seconds, script
+    FROM storyboards
+    WHERE workspace_id = ? AND product_id = ?
+    ORDER BY created_at DESC
+  `).all(workspaceId, productId) as Array<{
+    id: string;
+    created_at: string;
+    style: ScriptTemplate;
+    duration_seconds: number;
+    script: string;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    style: row.style,
+    duration: row.duration_seconds,
+    script: row.script
+  }));
+}
+
+function upsertStoryboardIndex(
+  handle: DatabaseHandle,
+  workspaceId: string,
+  sku: string,
+  record: StoryboardRecord
+): void {
+  const productId = productIdBySkuFromDatabase(handle, workspaceId, sku);
+  if (!productId) {
+    throw new Error(`Product not found: ${sku}`);
+  }
+  handle.sqlite.prepare(`
+    INSERT INTO storyboards (id, workspace_id, product_id, style, duration_seconds, script, created_at)
+    VALUES (@id, @workspaceId, @productId, @style, @durationSeconds, @script, @createdAt)
+    ON CONFLICT(id) DO UPDATE SET
+      workspace_id = excluded.workspace_id,
+      product_id = excluded.product_id,
+      style = excluded.style,
+      duration_seconds = excluded.duration_seconds,
+      script = excluded.script,
+      created_at = excluded.created_at
+  `).run({
+    id: record.id,
+    workspaceId,
+    productId,
+    style: record.style,
+    durationSeconds: record.duration,
+    script: record.script,
+    createdAt: record.createdAt
+  });
 }
 
 async function readProductStoryboards(productFilePath: string): Promise<StoryboardRecord[]> {
@@ -2486,7 +2898,7 @@ function normalizeStoryboardScript(value: unknown): string {
   return script;
 }
 
-async function createTextModelProvider(providerKeyStore: FileProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleTextProvider> {
+async function createTextModelProvider(providerKeyStore: ProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleTextProvider> {
   const config = await providerKeyStore.getConfig("openai-compatible-text");
   return new OpenAiCompatibleTextProvider({
     apiKey: resolveTextModelApiKey({
@@ -2498,7 +2910,7 @@ async function createTextModelProvider(providerKeyStore: FileProviderKeyStore, f
   });
 }
 
-async function createImageModelProvider(providerKeyStore: FileProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleImageProvider> {
+async function createImageModelProvider(providerKeyStore: ProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleImageProvider> {
   const config = await providerKeyStore.getConfig("openai-compatible-image");
   return new OpenAiCompatibleImageProvider({
     apiKey: resolveImageModelApiKey({
@@ -2612,6 +3024,8 @@ type ProductImportBatchResult =
 async function importProductsBatchFromText(input: {
   fixturesDir: string;
   rootDir: string;
+  workspaceId?: string;
+  databaseHandle?: DatabaseHandle;
   input: ImportProductsBatchRequest;
 }): Promise<{
   summary: {
@@ -2631,6 +3045,8 @@ async function importProductsBatchFromText(input: {
       const imported = await importProductFromText({
         fixturesDir: input.fixturesDir,
         rootDir: input.rootDir,
+        workspaceId: input.workspaceId,
+        databaseHandle: input.databaseHandle,
         input: { text: block }
       });
       results.push({
@@ -2794,7 +3210,7 @@ async function generateProductReferenceImages(input: {
   fixturesDir: string;
   rootDir: string;
   sku: string;
-  providerKeyStore: FileProviderKeyStore;
+  providerKeyStore: ProviderKeyStore;
   fetchImpl?: typeof fetch;
   input: GenerateProductReferenceImagesRequest;
 }): Promise<{

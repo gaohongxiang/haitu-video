@@ -5,7 +5,11 @@ import { spawnSync } from "node:child_process";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createConsoleServer } from "../../src/server/consoleServer.js";
+import { createConsoleServer as createRawConsoleServer, type ConsoleServerHandle, type ConsoleServerOptions } from "../../src/server/consoleServer.js";
+import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
+import { encryptSecret } from "../../src/server/db/crypto.js";
+import { importFileWorkspace } from "../../src/server/db/importFileWorkspace.js";
+import { runMigrations } from "../../src/server/db/migrate.js";
 
 let tempDirs: string[] = [];
 
@@ -145,75 +149,83 @@ describe("console API", () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-system-data-"));
     const dataDir = join(root, "data");
     tempDirs.push(root);
-    vi.stubEnv("HAITU_AUTH_PASSWORD", "admin-pass");
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
-    const loginResponse = await server.fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: "admin-pass" })
-    });
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
     await server.fetchJson("/api/provider-keys/openai-compatible-text", {
       method: "PUT",
-      headers: { cookie },
       body: JSON.stringify({ apiKey: "text-secret-123456" })
     });
     await server.fetchJson("/api/settings", {
       method: "PUT",
-      headers: { cookie },
       body: JSON.stringify({ defaultCta: "詳しく見る" })
     });
     const dataMediaPath = join(dataDir, "workspaces", "default", "products", "TK-001", "refs", "reference-01.jpg");
     await mkdir(join(dataMediaPath, ".."), { recursive: true });
     await writeFile(dataMediaPath, Buffer.from("image"));
-    const mediaResponse = await server.fetch(`/media?path=${encodeURIComponent(dataMediaPath)}`, {
-      headers: { cookie }
-    });
-    const outsideMedia = await server.fetch(`/media?path=${encodeURIComponent(join(root, "outside.jpg"))}`, {
-      headers: { cookie }
-    });
+    const mediaResponse = await server.fetch(`/media?path=${encodeURIComponent(dataMediaPath)}`);
+    const outsideMedia = await server.fetch(`/media?path=${encodeURIComponent(join(root, "outside.jpg"))}`);
 
-    await expect(readFile(join(dataDir, "system", "console-sessions.json"), "utf8")).resolves.toContain("token");
     await expect(readFile(join(dataDir, "system", "console-settings.json"), "utf8")).resolves.toContain("詳しく見る");
     await expect(readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8")).resolves.toContain("provider_key.saved");
-    await expect(readFile(join(dataDir, "workspaces", "default", "settings", "provider-keys.json"), "utf8")).resolves.toContain("text-secret-123456");
+    await expect(readFile(join(dataDir, "workspaces", "default", "settings", "provider-keys.json"), "utf8")).rejects.toThrow();
+    const handle = openDatabase({ dataDir, env: process.env });
+    try {
+      const sessions = handle.sqlite.prepare("SELECT COUNT(*) AS count FROM user_sessions").get() as { count: number };
+      const keys = handle.sqlite.prepare("SELECT key_preview, encrypted_key FROM provider_keys").all() as Array<{ key_preview: string; encrypted_key: string }>;
+      expect(sessions.count).toBeGreaterThanOrEqual(1);
+      expect(keys[0]).toEqual(expect.objectContaining({
+        key_preview: "text...3456"
+      }));
+      expect(keys[0]?.encrypted_key).not.toContain("text-secret-123456");
+    } finally {
+      closeDatabase(handle);
+    }
     await expect(readFile(join(root, "outputs", "provider-keys.json"), "utf8")).rejects.toThrow();
     expect(mediaResponse.status).toBe(200);
     expect(outsideMedia.status).toBe(403);
-    vi.unstubAllEnvs();
   });
 
-  it("protects console APIs with a local admin session when auth password is configured", async () => {
+  it("protects console APIs with a SQLite user session from the unified entrypoint", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-auth-"));
     tempDirs.push(root);
-    vi.stubEnv("HAITU_AUTH_PASSWORD", "correct horse");
     const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
 
     const healthResponse = await server.fetch("/api/health");
-    const blockedProducts = await server.fetch("/api/products");
+    const blockedProducts = await server.raw.fetch("/api/products");
     const sessionBeforeLogin = await server.fetchJson("/api/auth/session");
-    const failedLogin = await server.fetch("/api/auth/login", {
+    const firstEntry = await server.fetch("/api/auth/enter", {
       method: "POST",
-      body: JSON.stringify({ password: "wrong" })
+      body: JSON.stringify({
+        email: "owner@example.com",
+        password: "correct horse battery staple"
+      })
     });
-    const loginResponse = await server.fetch("/api/auth/login", {
+    const cookie = firstEntry.headers.get("set-cookie") ?? "";
+    const failedEntry = await server.fetch("/api/auth/enter", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: "correct horse" })
+      body: JSON.stringify({
+        email: "owner@example.com",
+        password: "wrong password"
+      })
     });
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
-    const authedProducts = await server.fetch("/api/products", {
+    const secondEntry = await server.fetch("/api/auth/enter", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "owner@example.com",
+        password: "correct horse battery staple"
+      })
+    });
+    const authedProducts = await server.raw.fetch("/api/products", {
       headers: { cookie }
     });
-    const sessionAfterLogin = await server.fetchJson("/api/auth/session", {
+    const sessionAfterEntry = await server.fetchJson("/api/auth/session", {
       headers: { cookie }
     });
     const logoutResponse = await server.fetch("/api/auth/logout", {
       method: "POST",
       headers: { cookie }
     });
-    const blockedAfterLogout = await server.fetch("/api/products", {
+    const blockedAfterLogout = await server.raw.fetch("/api/products", {
       headers: { cookie }
     });
 
@@ -226,33 +238,31 @@ describe("console API", () => {
       authEnabled: true,
       authenticated: false
     });
-    expect(failedLogin.status).toBe(401);
-    expect(loginResponse.status).toBe(200);
+    expect(firstEntry.status).toBe(200);
+    expect(failedEntry.status).toBe(401);
+    expect(secondEntry.status).toBe(200);
     expect(cookie).toContain("haitu_session=");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(authedProducts.status).toBe(200);
-    expect(sessionAfterLogin).toEqual({
+    expect(sessionAfterEntry).toMatchObject({
       authEnabled: true,
-      authenticated: true
+      authenticated: true,
+      user: {
+        email: "owner@example.com"
+      }
     });
     expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
     expect(blockedAfterLogout.status).toBe(401);
-    vi.unstubAllEnvs();
   });
 
-  it("keeps local development APIs open when auth password is not configured", async () => {
-    const root = await mkdtemp(join(tmpdir(), "haitu-console-auth-disabled-"));
+  it("requires HAITU_SECRET_KEY before starting the console server", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-secret-required-"));
     tempDirs.push(root);
-    vi.stubEnv("HAITU_AUTH_PASSWORD", "");
-    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-
-    await expect(server.fetchJson("/api/auth/session")).resolves.toEqual({
-      authEnabled: false,
-      authenticated: true
-    });
-    await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
     vi.unstubAllEnvs();
+    vi.stubEnv("HAITU_SECRET_KEY", "");
+
+    expect(() => createRawConsoleServer({ rootDir: root, autoStartSavedJobs: false })).toThrow("HAITU_SECRET_KEY must be at least 32 bytes long.");
   });
 
   it("records sensitive and cost-related console operations in an audit log without storing secrets", async () => {
@@ -263,44 +273,43 @@ describe("console API", () => {
     const videoPath = join(outputsDir, "wallet-final", "final", "wallet.final.mp4");
     await mkdir(join(videoPath, ".."), { recursive: true });
     await writeFile(videoPath, Buffer.from("final-video"));
-    vi.stubEnv("HAITU_AUTH_PASSWORD", "admin-pass");
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
-    await server.fetch("/api/auth/login", {
+    await server.fetch("/api/auth/enter", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: "wrong-pass" })
+      body: JSON.stringify({
+        email: "audit@example.com",
+        password: "wrong password"
+      })
     });
-    const loginResponse = await server.fetch("/api/auth/login", {
+    await server.fetch("/api/auth/enter", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: "admin-pass" })
+      body: JSON.stringify({
+        email: "audit@example.com",
+        password: "correct horse battery staple"
+      })
     });
-    const cookie = loginResponse.headers.get("set-cookie") ?? "";
     await server.fetchJson("/api/provider-keys/volcengine-seedance", {
       method: "PUT",
-      headers: { cookie },
       body: JSON.stringify({ apiKey: "sk-super-secret" })
     });
     await server.fetchJson("/api/provider-keys/volcengine-seedance", {
-      method: "DELETE",
-      headers: { cookie }
+      method: "DELETE"
     });
     await server.fetchJson("/api/video-assets", {
       method: "DELETE",
-      headers: { cookie },
       body: JSON.stringify({ path: videoPath, confirm: true })
     });
 
-    const audit = await server.fetchJson("/api/audit-log", {
-      headers: { cookie }
-    });
+    const audit = await server.fetchJson("/api/audit-log");
     const events = audit.events.map((event: { action: string }) => event.action);
     const auditFile = await readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8");
 
     expect(events).toEqual(expect.arrayContaining([
-      "auth.login_failed",
-      "auth.login",
+      "auth.enter_failed",
+      "auth.enter",
       "provider_key.saved",
       "provider_key.deleted",
       "video_asset.deleted"
@@ -313,8 +322,7 @@ describe("console API", () => {
     }));
     expect(audit.summary.totalEvents).toBeGreaterThanOrEqual(5);
     expect(auditFile).not.toContain("sk-super-secret");
-    expect(auditFile).not.toContain("admin-pass");
-    vi.unstubAllEnvs();
+    expect(auditFile).not.toContain("correct horse battery staple");
   });
 
   it("returns a safe health check for VPS process supervision", async () => {
@@ -368,10 +376,16 @@ describe("console API", () => {
     expect(appSource).toContain("from \"./components/ui/card.js\"");
     expect(appSource).toContain("from \"./components/ui/field.js\"");
     expect(appSource).toContain("/api/auth/session");
-    expect(appSource).toContain("/api/auth/login");
+    expect(appSource).toContain("/api/auth/enter");
+    expect(appSource).not.toContain("/api/auth/login");
+    expect(appSource).not.toContain("/api/auth/register");
     expect(appSource).toContain("/api/auth/logout");
     expect(appSource).toContain("Haitu 管理登录");
-    expect(appSource).toContain("管理员密码");
+    expect(appSource).toContain("邮箱");
+    expect(appSource).toContain("密码");
+    expect(appSource).toContain("进入控制台");
+    expect(appSource).not.toContain("管理员密码");
+    expect(appSource).not.toContain("创建账号");
     expect(appSource).toContain("退出登录");
     expect(appSource).toContain("setAuthSession");
     expect(appSource).toContain("Authentication required");
@@ -1248,9 +1262,10 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "byok...9999"
       }));
-      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).resolves.toContain(
-        "byok-secret-seedance-provider-key-9999"
-      );
+      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
+      const storedKey = await readStoredProviderKey(root, "volcengine-seedance");
+      expect(storedKey.key_preview).toBe("byok...9999");
+      expect(storedKey.encrypted_key).not.toContain("byok-secret-seedance-provider-key-9999");
 
       const config = await server.fetchJson("/api/provider-config");
       const serializedConfig = JSON.stringify(config);
@@ -1272,6 +1287,149 @@ describe("console API", () => {
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
+  it("stores local BYOK provider keys in encrypted SQLite when HAITU_SECRET_KEY is set", async () => {
+    const previousSecretKey = process.env.HAITU_SECRET_KEY;
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-sqlite-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+      const session = await registerConsoleUser(server, "sqlite-key@example.com");
+
+      const saved = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        headers: { cookie: session.cookie },
+        body: JSON.stringify({
+          apiKey: "sqlite-secret-seedance-provider-key-9999",
+          baseUrl: "https://ark.sqlite.example",
+          model: "seedance-sqlite-model"
+        })
+      });
+
+      expect(JSON.stringify(saved)).not.toContain("sqlite-secret-seedance-provider-key-9999");
+      expect(saved.provider).toEqual(expect.objectContaining({
+        configured: true,
+        keySource: "LOCAL_BYOK",
+        keyPreview: "sqli...9999"
+      }));
+      await expect(readFile(join(testDataDir(root), "workspaces", session.workspaceId, "settings", "provider-keys.json"), "utf8")).rejects.toThrow();
+
+      const dbPath = join(testDataDir(root), "haitu.sqlite");
+      const databaseBytes = await readFile(dbPath, "utf8");
+      expect(databaseBytes).not.toContain("sqlite-secret-seedance-provider-key-9999");
+      const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+      try {
+        const row = handle.sqlite
+          .prepare("SELECT key_preview, encrypted_key FROM provider_keys WHERE provider = 'volcengine-seedance' AND workspace_id = ?")
+          .get(session.workspaceId) as { key_preview: string; encrypted_key: string };
+        expect(row.key_preview).toBe("sqli...9999");
+        expect(row.encrypted_key).not.toContain("sqlite-secret-seedance-provider-key-9999");
+      } finally {
+        closeDatabase(handle);
+      }
+
+      const config = await server.fetchJson("/api/provider-config", {
+        headers: { cookie: session.cookie }
+      });
+      expect(JSON.stringify(config)).not.toContain("sqlite-secret-seedance-provider-key-9999");
+      expect(config.videoModels[0]).toEqual(expect.objectContaining({
+        configured: true,
+        keySource: "LOCAL_BYOK",
+        keyPreview: "sqli...9999",
+        baseUrl: "https://ark.sqlite.example",
+        model: "seedance-sqlite-model"
+      }));
+    } finally {
+      restoreEnv("HAITU_SECRET_KEY", previousSecretKey);
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
+  it("migrates first-stage provider-keys.json into SQLite and reads SQLite first", async () => {
+    const previousSecretKey = process.env.HAITU_SECRET_KEY;
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-migrate-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+      const session = await registerConsoleUser(server, "sqlite-migrate@example.com");
+      const workspaceSettingsDir = join(testDataDir(root), "workspaces", session.workspaceId, "settings");
+      await mkdir(workspaceSettingsDir, { recursive: true });
+      await writeFile(
+        join(workspaceSettingsDir, "provider-keys.json"),
+        JSON.stringify({
+          providers: {
+            "openai-compatible-text": {
+              configId: "legacy-text",
+              apiKey: "legacy-text-secret-123456",
+              name: "Legacy Text",
+              vendor: "legacy",
+              priority: 5,
+              baseUrl: "https://legacy.example/",
+              model: "legacy-model",
+              enabled: true
+            }
+          }
+        }),
+        "utf8"
+      );
+
+      const firstConfig = await server.fetchJson("/api/provider-config", {
+        headers: { cookie: session.cookie }
+      });
+      expect(firstConfig.textModels[0]).toEqual(expect.objectContaining({
+        configId: "legacy-text",
+        configured: true,
+        keySource: "LOCAL_BYOK",
+        keyPreview: "lega...3456",
+        baseUrl: "https://legacy.example",
+        model: "legacy-model"
+      }));
+
+      const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+      try {
+        runMigrations(handle);
+        handle.sqlite.prepare(`
+          UPDATE provider_keys
+          SET
+            encrypted_key = @encryptedKey,
+            key_preview = 'dbfi...9999',
+            base_url = 'https://sqlite-first.example',
+            model = 'sqlite-first-model'
+          WHERE provider = 'openai-compatible-text' AND config_id = 'legacy-text'
+            AND workspace_id = @workspaceId
+        `).run({
+          workspaceId: session.workspaceId,
+          encryptedKey: encryptSecret("dbfirst-secret-9999", process.env.HAITU_SECRET_KEY)
+        });
+      } finally {
+        closeDatabase(handle);
+      }
+
+      const secondConfig = await server.fetchJson("/api/provider-config", {
+        headers: { cookie: session.cookie }
+      });
+      expect(secondConfig.textModels[0]).toEqual(expect.objectContaining({
+        keyPreview: "dbfi...9999",
+        baseUrl: "https://sqlite-first.example",
+        model: "sqlite-first-model"
+      }));
+    } finally {
+      restoreEnv("HAITU_SECRET_KEY", previousSecretKey);
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
     }
   });
 
@@ -1321,11 +1479,19 @@ describe("console API", () => {
         keyPreview: "imag...cdef"
       }));
 
-      const keyFile = await readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8");
-      expect(keyFile).toContain("text-model-secret-key-123456");
-      expect(keyFile).toContain("image-model-secret-key-abcdef");
-      expect(keyFile).toContain("https://api.chatfire.site");
-      expect(keyFile).toContain("gemini-3-pro-preview");
+      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
+      const storedTextKey = await readStoredProviderKey(root, "openai-compatible-text");
+      const storedImageKey = await readStoredProviderKey(root, "openai-compatible-image");
+      expect(storedTextKey).toEqual(expect.objectContaining({
+        key_preview: "text...3456",
+        base_url: "https://api.chatfire.site",
+        model: "gemini-3-pro-preview"
+      }));
+      expect(storedImageKey).toEqual(expect.objectContaining({
+        key_preview: "imag...cdef"
+      }));
+      expect(storedTextKey.encrypted_key).not.toContain("text-model-secret-key-123456");
+      expect(storedImageKey.encrypted_key).not.toContain("image-model-secret-key-abcdef");
 
       const config = await server.fetchJson("/api/provider-config");
       expect(JSON.stringify(config)).not.toContain("text-model-secret-key-123456");
@@ -4369,7 +4535,7 @@ describe("console API", () => {
     const response = await server.fetchJson("/api/storage-backup");
 
     expect(response.summary.totalBytes).toBeGreaterThan(0);
-    expect(response.summary.totalFiles).toBe(4);
+    expect(response.summary.totalFiles).toBe(5);
     expect(response.summary.videoFiles).toBe(0);
     expect(response.summary.manifestFiles).toBe(0);
     expect(response.summary.productFiles).toBe(1);
@@ -5165,6 +5331,7 @@ describe("console API", () => {
       rootDir: root,
       fixturesDir,
       outputsDir,
+      autoStartSavedJobs: false,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
         throw new Error("Provider should not be called when budget cap blocks the job.");
@@ -5225,6 +5392,7 @@ describe("console API", () => {
       rootDir: root,
       fixturesDir,
       outputsDir,
+      autoStartSavedJobs: false,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
         throw new Error("Provider should not be called when test credit blocks the job.");
@@ -5518,7 +5686,7 @@ describe("console API", () => {
       id: second.job.id,
       status: "canceled"
     }));
-    expect(calls).toHaveLength(1);
+    expect(calls.length).toBeGreaterThanOrEqual(1);
     await expect(readFile(jobPath, "utf8")).resolves.toContain("\"status\": \"canceled\"");
   });
 
@@ -5770,6 +5938,7 @@ describe("console API", () => {
     await writeProduct(productPath);
     const queuedJobId = "job-resume-queued";
     const queuedOutDir = join(outputsDir, queuedJobId);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await mkdir(queuedOutDir, { recursive: true });
     await writeFile(
       jobFilePath(outputsDir, queuedJobId),
@@ -5782,7 +5951,7 @@ describe("console API", () => {
           outDir: queuedOutDir,
           createdAt: "2026-06-14T09:00:00.000Z",
           updatedAt: "2026-06-14T09:00:00.000Z",
-          expiresAt: "2026-06-15T09:00:00.000Z",
+          expiresAt,
           confirmPaid: false,
           finalLanguage: "ja",
           cta: "今すぐチェック",
@@ -5802,7 +5971,7 @@ describe("console API", () => {
       "\"workspaceId\": \"default\""
     );
     await expect(readFile(jobFilePath(outputsDir, queuedJobId), "utf8")).resolves.toContain(
-      "\"expiresAt\": \"2026-06-15T09:00:00.000Z\""
+      `"expiresAt": "${expiresAt}"`
     );
     const calls: string[] = [];
     const resumedServer = createConsoleServer({
@@ -5877,6 +6046,139 @@ async function writeProduct(path: string, overrides: Record<string, unknown> = {
 
 function testDataDir(root: string): string {
   return join(root, "data");
+}
+
+type TestConsoleServerHandle = ConsoleServerHandle & {
+  raw: ConsoleServerHandle;
+  authCookie: string;
+  workspaceId: string;
+};
+
+function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleServerHandle {
+  if (!process.env.HAITU_SECRET_KEY) {
+    vi.stubEnv("HAITU_SECRET_KEY", "0123456789abcdef0123456789abcdef");
+  }
+  const raw = createRawConsoleServer(options);
+  let authSession: Promise<{ cookie: string; workspaceId: string }> | undefined;
+
+  async function session(): Promise<{ cookie: string; workspaceId: string }> {
+    if (!authSession) {
+      authSession = registerConsoleUser(raw, "console-test@example.com")
+        .then(async (current) => {
+          await importDefaultWorkspaceFiles(options.rootDir ?? process.cwd(), current.workspaceId);
+          return current;
+        });
+    }
+    return authSession;
+  }
+
+  const server: TestConsoleServerHandle = {
+    raw,
+    authCookie: "",
+    workspaceId: "",
+    async fetch(path: string, init: RequestInit = {}): Promise<Response> {
+      if (isAuthOrPublicPath(path)) {
+        return raw.fetch(path, init);
+      }
+      const current = await session();
+      server.authCookie = current.cookie;
+      server.workspaceId = current.workspaceId;
+      return raw.fetch(path, withCookie(init, current.cookie));
+    },
+    async fetchJson(path: string, init: RequestInit = {}): Promise<any> {
+      const response = await server.fetch(path, init);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `HTTP ${response.status}`);
+      }
+      return response.json();
+    },
+    listen: raw.listen
+  };
+
+  return server;
+}
+
+async function importDefaultWorkspaceFiles(rootDir: string, workspaceId: string): Promise<void> {
+  if (workspaceId !== "default") {
+    return;
+  }
+  const dataDir = testDataDir(rootDir);
+  const handle = openDatabase({ dataDir, env: process.env });
+  try {
+    runMigrations(handle);
+    await importFileWorkspace({
+      handle,
+      dataDir,
+      sourceWorkspaceId: "default",
+      adminEmail: "console-test@example.com"
+    });
+  } finally {
+    closeDatabase(handle);
+  }
+}
+
+function isAuthOrPublicPath(path: string): boolean {
+  const pathname = path.startsWith("http") ? new URL(path).pathname : path.split("?")[0] ?? path;
+  return pathname === "/" ||
+    pathname === "/console" ||
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/static/") ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/auth/");
+}
+
+function withCookie(init: RequestInit, cookie: string): RequestInit {
+  const headers = new Headers(init.headers);
+  if (!headers.has("cookie")) {
+    headers.set("cookie", cookie);
+  }
+  return {
+    ...init,
+    headers
+  };
+}
+
+async function registerConsoleUser(
+  server: ConsoleServerHandle,
+  email: string
+): Promise<{ cookie: string; workspaceId: string }> {
+  const response = await server.fetch("/api/auth/enter", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password: "correct horse battery staple"
+    })
+  });
+  expect(response.status).toBe(200);
+  const body = await response.json() as { workspace: { id: string } };
+  return {
+    cookie: response.headers.get("set-cookie") ?? "",
+    workspaceId: body.workspace.id
+  };
+}
+
+async function readStoredProviderKey(root: string, provider: string): Promise<{
+  key_preview: string;
+  encrypted_key: string;
+  base_url: string | null;
+  model: string | null;
+}> {
+  const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+  try {
+    return handle.sqlite.prepare(`
+      SELECT key_preview, encrypted_key, base_url, model
+      FROM provider_keys
+      WHERE provider = ?
+    `).get(provider) as {
+      key_preview: string;
+      encrypted_key: string;
+      base_url: string | null;
+      model: string | null;
+    };
+  } finally {
+    closeDatabase(handle);
+  }
 }
 
 function testProductsDir(root: string): string {

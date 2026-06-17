@@ -123,6 +123,13 @@ export async function buildJobLedger(
   options: BuildJobLedgerOptions = {}
 ): Promise<JobLedger> {
   const reportPaths = await listNamedFiles(outputsDir, "make-video-report.json");
+  return buildJobLedgerFromReports(reportPaths, options);
+}
+
+export async function buildJobLedgerFromReports(
+  reportPaths: string[],
+  options: BuildJobLedgerOptions = {}
+): Promise<JobLedger> {
   const jobs = [];
   for (const reportPath of reportPaths) {
     const report = JSON.parse(await readFile(reportPath, "utf8")) as Partial<MakeVideoReport>;

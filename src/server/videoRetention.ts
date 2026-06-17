@@ -2,6 +2,7 @@ import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 import { DEFAULT_WORKSPACE_ID, getWorkspacePaths } from "./storagePaths.js";
+import type { DatabaseHandle } from "./db/client.js";
 
 export interface VideoRetentionResult {
   scannedJobs: number;
@@ -13,6 +14,7 @@ export interface VideoRetentionResult {
 export async function cleanupExpiredVideos(input: {
   dataDir: string;
   workspaceId?: string;
+  databaseHandle?: DatabaseHandle;
   now?: Date;
   onDeleteError?: (error: unknown, filePath: string) => void | Promise<void>;
 }): Promise<VideoRetentionResult> {
@@ -49,6 +51,11 @@ export async function cleanupExpiredVideos(input: {
     const deleted = await deleteVideoFiles(jobDir, input.onDeleteError);
     result.deletedFiles += deleted.deletedFiles;
     result.failedDeletes += deleted.failedDeletes;
+    markDatabaseAssetsDeleted(input.databaseHandle, {
+      workspaceId: workspace.workspaceId,
+      jobId: String(job.id ?? entry.name),
+      deletedAt: now.toISOString()
+    });
     await writeFile(jobFile, JSON.stringify({
       ...job,
       expired: true,
@@ -56,6 +63,30 @@ export async function cleanupExpiredVideos(input: {
     }, null, 2), "utf8");
   }
   return result;
+}
+
+function markDatabaseAssetsDeleted(
+  handle: DatabaseHandle | undefined,
+  input: {
+    workspaceId: string;
+    jobId: string;
+    deletedAt: string;
+  }
+): void {
+  if (!handle) {
+    return;
+  }
+  handle.sqlite.prepare(`
+    UPDATE video_assets
+    SET status = 'deleted',
+        deleted_at = @deletedAt
+    WHERE workspace_id = @workspaceId AND job_id = @jobId AND deleted_at IS NULL
+  `).run(input);
+  handle.sqlite.prepare(`
+    UPDATE video_jobs
+    SET status = 'expired'
+    WHERE workspace_id = @workspaceId AND id = @jobId
+  `).run(input);
 }
 
 async function readJobFile(path: string): Promise<Record<string, unknown> | undefined> {

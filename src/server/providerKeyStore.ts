@@ -45,11 +45,19 @@ export interface ProviderStoredConfig {
   updatedAt?: string;
 }
 
+export interface ProviderKeyStore {
+  get(provider: ApiProviderId): Promise<string | undefined>;
+  getConfig(provider: ApiProviderId): Promise<ProviderStoredConfig>;
+  listConfigs(provider: ApiProviderId): Promise<ProviderStoredConfig[]>;
+  set(provider: ApiProviderId, input: string | ProviderModelConfigInput): Promise<ProviderKeyStatus>;
+  delete(provider: ApiProviderId, configId?: string): Promise<ProviderKeyStatus>;
+}
+
 interface ProviderKeyFile {
   providers?: Record<string, ProviderStoredConfig | ProviderStoredConfig[]>;
 }
 
-export class FileProviderKeyStore {
+export class FileProviderKeyStore implements ProviderKeyStore {
   constructor(private readonly path: string) {}
 
   async get(provider: ApiProviderId): Promise<string | undefined> {

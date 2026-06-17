@@ -1,6 +1,6 @@
 # VPS 无 Docker 部署
 
-这份步骤用于第一阶段把 Haitu console 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。这一版不使用 Docker，不安装 SQLite/PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
+这份步骤用于把 Haitu console 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。第二阶段使用本机 SQLite 保存用户、工作区、权限、索引和 API 管理配置；图片、视频、字幕、manifest 和 report 等大文件仍保存在 `HAITU_DATA_DIR` 文件系统里。不使用 Docker/PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
 
 ## 适用范围
 
@@ -31,11 +31,14 @@ sudo chown -R haitu:haitu /var/lib/haitu-video
 /var/lib/haitu-video/workspaces/default/jobs/
 /var/lib/haitu-video/workspaces/default/settings/
 /var/lib/haitu-video/backups/
+/var/lib/haitu-video/haitu.sqlite
+/var/lib/haitu-video/haitu.sqlite-wal
+/var/lib/haitu-video/haitu.sqlite-shm
 ```
 
 更新代码前后都不能删除 `/var/lib/haitu-video`。迁移服务器时复制 `/var/lib/haitu-video` 即可，不要只复制代码仓库。
 
-操作审计日志会写入 `/var/lib/haitu-video/system/audit-log.jsonl`。这个文件包含操作轨迹，不包含 API key 或密码明文，也应随数据目录一起备份。
+第二阶段默认 SQLite 文件是 `/var/lib/haitu-video/haitu.sqlite`，也可以用 `HAITU_DB_PATH` 覆盖。SQLite 会开启 WAL，所以同目录下的 `haitu.sqlite-wal` 和 `haitu.sqlite-shm` 也属于运行时数据库文件。操作审计日志会进入 SQLite；第一阶段保留的 `/var/lib/haitu-video/system/audit-log.jsonl` 仍可随数据目录备份。API Key 迁入 SQLite 后使用 `HAITU_SECRET_KEY` 加密保存，接口只返回 `keyPreview`。
 
 ## 首次部署
 
@@ -63,12 +66,20 @@ sudo nano /etc/haitu-video.env
 HAITU_HOST=127.0.0.1
 HAITU_PORT=4173
 HAITU_DATA_DIR=/var/lib/haitu-video
-HAITU_AUTH_PASSWORD=change-this-to-a-long-random-password
+HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
+HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes
 SEEDANCE_RESOLUTION=480p
 SEEDANCE_WATERMARK=false
 ```
 
-`HAITU_AUTH_PASSWORD` 会开启单管理员登录保护。VPS 挂到 `haitu.online` 前必须设置；只有本地开发时才可以留空。真实 API key 只放在 `/etc/haitu-video.env` 或控制台 BYOK 设置里，不写进仓库。
+`HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。真实 API key 只放在 `/etc/haitu-video.env` 或控制台 API 管理设置里，不写进仓库。
+
+初始化或升级 SQLite 表结构：
+
+```bash
+cd /opt/haitu-video
+npm run db:migrate
+```
 
 ## systemd 服务
 
@@ -156,12 +167,15 @@ curl -s https://haitu.online/api/health
 服务器备份命令：
 
 ```bash
+sudo -u haitu sqlite3 /var/lib/haitu-video/haitu.sqlite 'PRAGMA wal_checkpoint(TRUNCATE);'
 sudo tar -czf /var/backups/haitu-video-$(date +%Y%m%d).tar.gz \
   -C /var/lib haitu-video \
   --exclude='haitu-video/backups' \
   --exclude='haitu-video/workspaces/*/jobs/*/raw' \
   --exclude='haitu-video/workspaces/*/jobs/*/final'
 ```
+
+如果在线备份时不能先停服务，必须先执行 checkpoint 或使用 SQLite backup API，避免只备份 `haitu.sqlite` 而漏掉 WAL 里的新数据。恢复时把 `haitu.sqlite`、必要的 `haitu.sqlite-wal`/`haitu.sqlite-shm` 和文件数据一起恢复到 `/var/lib/haitu-video`，并确认属主仍是 `haitu:haitu`。
 
 如果需要排查问题，可以保留任务元数据：`job.json`、`make-video-report.json`。不要把代码目录混进长期数据备份，也不要备份套备份。
 
@@ -170,6 +184,7 @@ sudo tar -czf /var/backups/haitu-video-$(date +%Y%m%d).tar.gz \
 ```bash
 cd /opt/haitu-video
 npm ci
+npm run db:migrate
 npm run deploy:check
 sudo systemctl restart haitu-video
 curl -s http://127.0.0.1:4173/api/health
@@ -177,8 +192,9 @@ curl -s http://127.0.0.1:4173/api/health
 
 ## 运维注意
 
-- 不要删除 `/var/lib/haitu-video`，里面包含商品、参考图、分镜历史、配置、审计日志和任务元数据。
+- 不要删除 `/var/lib/haitu-video`，里面包含 SQLite 数据库、商品、参考图、分镜历史、配置、审计日志和任务元数据。
 - `/var/lib/haitu-video/workspaces/default` 是第一阶段默认工作区，第二阶段 SQLite 和用户系统会把它映射成数据库里的默认工作区。
+- SQLite 只保存关系数据、索引、权限和文件路径；视频、图片、字幕和报告仍在文件系统。
 - 视频大文件只保留 24 小时，过期后会自动删除，用户应尽快下载。
 - 先保持单机本地存储；第二阶段优先迁入 SQLite；后续托管规模变大后再评估 PostgreSQL、Cloudflare R2/S3 和对象存储。
 - 付费视频生成仍需要 `confirmPaid` 或 UI 里的确认动作。

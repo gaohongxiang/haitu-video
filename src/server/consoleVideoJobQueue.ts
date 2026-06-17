@@ -6,6 +6,7 @@ import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/vi
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { DatabaseHandle } from "./db/client.js";
 
 export interface VideoJobRequest {
   productPath: string;
@@ -67,6 +68,7 @@ export interface LocalVideoJobQueueOptions {
   fetchImpl?: typeof fetch;
   now?: () => Date;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
+  databaseHandle?: DatabaseHandle;
 }
 
 export class LocalVideoJobQueue {
@@ -280,6 +282,7 @@ export class LocalVideoJobQueue {
     const tempPath = `${path}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
     await writeFile(tempPath, JSON.stringify(record, null, 2), "utf8");
     await rename(tempPath, path);
+    this.upsertDatabaseJob(record);
   }
 
   private nextId(createdAt: string): string {
@@ -341,6 +344,108 @@ export class LocalVideoJobQueue {
         reportUrl: record.reportUrl ?? mediaUrl(record.reportPath)
       };
     }
+  }
+
+  private upsertDatabaseJob(record: VideoJobRecord): void {
+    const handle = this.options.databaseHandle;
+    if (!handle) {
+      return;
+    }
+    handle.sqlite.prepare(`
+      INSERT INTO video_jobs (
+        id,
+        workspace_id,
+        product_id,
+        status,
+        model,
+        language,
+        duration_seconds,
+        output_count,
+        job_dir,
+        created_at,
+        completed_at,
+        expires_at
+      ) VALUES (
+        @id,
+        @workspaceId,
+        (SELECT id FROM products WHERE workspace_id = @workspaceId AND product_json_path = @productPath),
+        @status,
+        @model,
+        @language,
+        @durationSeconds,
+        @outputCount,
+        @jobDir,
+        @createdAt,
+        @completedAt,
+        @expiresAt
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        workspace_id = excluded.workspace_id,
+        product_id = excluded.product_id,
+        status = excluded.status,
+        model = excluded.model,
+        language = excluded.language,
+        duration_seconds = excluded.duration_seconds,
+        output_count = excluded.output_count,
+        job_dir = excluded.job_dir,
+        completed_at = excluded.completed_at,
+        expires_at = excluded.expires_at
+    `).run({
+      id: record.id,
+      workspaceId: record.workspaceId ?? this.options.workspaceId ?? "default",
+      status: record.status,
+      model: record.providerModel ?? record.provider ?? null,
+      language: record.finalLanguage ?? null,
+      durationSeconds: record.durationSeconds ?? null,
+      outputCount: record.finalOutputPath ? 1 : 0,
+      jobDir: record.outDir,
+      productPath: record.productPath,
+      createdAt: record.createdAt,
+      completedAt: record.completedAt ?? null,
+      expiresAt: record.expiresAt ?? null
+    });
+    this.upsertDatabaseAsset(record, record.rawOutputPath, "raw");
+    this.upsertDatabaseAsset(record, record.finalOutputPath, "final");
+  }
+
+  private upsertDatabaseAsset(record: VideoJobRecord, storagePath: string | undefined, kind: "raw" | "final"): void {
+    const handle = this.options.databaseHandle;
+    if (!handle || !storagePath) {
+      return;
+    }
+    handle.sqlite.prepare(`
+      INSERT INTO video_assets (
+        id,
+        workspace_id,
+        job_id,
+        status,
+        storage_provider,
+        storage_path,
+        expires_at
+      ) VALUES (
+        @id,
+        @workspaceId,
+        @jobId,
+        @status,
+        'file',
+        @storagePath,
+        @expiresAt
+      )
+      ON CONFLICT(id) DO UPDATE SET
+        workspace_id = excluded.workspace_id,
+        job_id = excluded.job_id,
+        status = excluded.status,
+        storage_path = excluded.storage_path,
+        expires_at = excluded.expires_at,
+        deleted_at = NULL
+    `).run({
+      id: `${record.id}:${kind}`,
+      workspaceId: record.workspaceId ?? this.options.workspaceId ?? "default",
+      jobId: record.id,
+      status: record.status === "completed" ? "available" : record.status,
+      storagePath,
+      expiresAt: record.expiresAt ?? null
+    });
   }
 }
 

@@ -65,6 +65,14 @@ type StoryboardDraftSource = "default" | "ai" | "manual";
 interface AuthSession {
   authEnabled: boolean;
   authenticated: boolean;
+  user?: {
+    email?: string;
+  };
+  workspace?: {
+    id: string;
+    name?: string;
+    role?: string;
+  };
 }
 
 interface ProductSummary {
@@ -821,6 +829,7 @@ function restoreProductStudioSku(availableProducts: ProductSummary[]): string {
 
 export function App() {
   const [authSession, setAuthSession] = useState<AuthSession>({ authEnabled: false, authenticated: true });
+  const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authStatus, setAuthStatus] = useState("正在检查登录状态...");
   const [products, setProducts] = useState<ProductSummary[]>([]);
@@ -1023,7 +1032,7 @@ export function App() {
       if (session.authenticated) {
         await refreshConsole({ applySettings: true });
       } else {
-        setAuthStatus("请输入管理员密码后进入控制台。");
+        setAuthStatus("");
       }
     } catch (error) {
       showError(error);
@@ -1036,12 +1045,14 @@ export function App() {
     event.preventDefault();
     setIsBusy(true);
     try {
-      const session = await postJson<AuthSession>("/api/auth/login", {
+      const session = await postJson<AuthSession>("/api/auth/enter", {
+        email: authEmail.trim() || undefined,
         password: authPassword
       });
       setAuthSession(session);
+      setAuthEmail("");
       setAuthPassword("");
-      setAuthStatus("登录成功，正在载入控制台。");
+      setAuthStatus("正在载入控制台。");
       await refreshConsole({ applySettings: true });
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : String(error));
@@ -1055,6 +1066,7 @@ export function App() {
     try {
       const session = await postJson<AuthSession>("/api/auth/logout", {});
       setAuthSession(session);
+      setAuthEmail("");
       setAuthPassword("");
       setAuthStatus("已退出登录。");
     } catch (error) {
@@ -2146,7 +2158,7 @@ export function App() {
     const message = errorMessage(error);
     if (message === "Authentication required") {
       setAuthSession({ authEnabled: true, authenticated: false });
-      setAuthStatus("登录已过期，请重新输入管理员密码。");
+      setAuthStatus("登录已过期，请重新输入邮箱和密码。");
       return;
     }
     setStatusText(message);
@@ -2278,6 +2290,8 @@ export function App() {
   if (authSession.authEnabled && !authSession.authenticated) {
     return (
       <LoginScreen
+        email={authEmail}
+        setEmail={setAuthEmail}
         password={authPassword}
         setPassword={setAuthPassword}
         status={authStatus}
@@ -2471,12 +2485,16 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
 }
 
 function LoginScreen({
+  email,
+  setEmail,
   password,
   setPassword,
   status,
   isBusy,
   onLogin
 }: {
+  email: string;
+  setEmail: (value: string) => void;
   password: string;
   setPassword: (value: string) => void;
   status: string;
@@ -2494,23 +2512,34 @@ function LoginScreen({
           </div>
         </div>
         <form className="grid gap-4" onSubmit={onLogin}>
-          <Field label="管理员密码">
+          <Field label="邮箱">
             <Input
               autoFocus
+              autoComplete="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="请输入邮箱"
+            />
+          </Field>
+          <Field label="密码">
+            <Input
               autoComplete="current-password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="输入服务器环境变量中的密码"
+              placeholder="请输入密码"
             />
           </Field>
-          <Button variant="primary" type="submit" disabled={isBusy || !password.trim()}>
+          <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !password.trim()}>
             <KeyRound size={15} />
-            登录控制台
+            进入控制台
           </Button>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 text-xs font-semibold leading-5 text-[var(--muted)]">
-            {status || "请输入管理员密码。"}
-          </div>
+          {status ? (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 text-xs font-semibold leading-5 text-[var(--muted)]">
+              {status}
+            </div>
+          ) : null}
         </form>
       </Card>
     </main>

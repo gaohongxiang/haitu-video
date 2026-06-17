@@ -33,7 +33,8 @@ describe("no-Docker VPS deployment package", () => {
     expect(envExample).toContain("HAITU_HOST=127.0.0.1");
     expect(envExample).toContain("HAITU_PORT=4173");
     expect(envExample).toContain("HAITU_DATA_DIR=/var/lib/haitu-video");
-    expect(envExample).toContain("HAITU_AUTH_PASSWORD=");
+    expect(envExample).toContain("HAITU_SECRET_KEY=replace-with-at-least-32-random-bytes");
+    expect(envExample).not.toContain("HAITU_AUTH_PASSWORD");
     expect(envExample).toContain("SEEDANCE_RESOLUTION=480p");
     expect(envExample).not.toContain("your-modelark-api-key");
 
@@ -56,8 +57,10 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("Cloudflare Pages");
     expect(guide).toContain("Cloudflare Stream");
     expect(guide).toContain("Cloudflare R2");
-    expect(guide).toContain("HAITU_AUTH_PASSWORD=change-this-to-a-long-random-password");
-    expect(guide).toContain("单管理员登录保护");
+    expect(guide).toContain("HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes");
+    expect(guide).toContain("SQLite 用户账号体系");
+    expect(guide).not.toContain("HAITU_AUTH_PASSWORD");
+    expect(guide).not.toContain("单管理员登录保护");
     expect(guide).toContain("/api/health");
     expect(guide).toContain("/api/storage-backup");
     expect(guide).toContain("/api/backups");
