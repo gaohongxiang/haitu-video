@@ -755,7 +755,7 @@ const defaultVideoTemplate: TemplateName = "scene";
 const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
   mock: {
     provider: "mock",
-    label: "本地模拟",
+    label: "内部任务",
     confirmPaid: false
   },
   "seedance-2-fast": {
@@ -2568,8 +2568,8 @@ export function App() {
             <KpiGrid
               items={[
                 { label: "商品", value: formatNumber(products.length), hint: "可创作商品", icon: Package, tone: "blue" },
-	                { label: "生成记录", value: formatNumber(ledger?.summary.totalJobs), hint: `${formatNumber(ledger?.summary.completedJobs)} 完成`, icon: Clapperboard, tone: "green" },
-                { label: "付费任务", value: formatNumber(ledger?.summary.paidJobs), hint: `${formatNumber(ledger?.summary.mockJobs)} 本地模拟`, icon: CircleDollarSign, tone: "orange" },
+                { label: "生成记录", value: formatNumber(ledger?.summary.totalJobs), hint: `${formatNumber(ledger?.summary.completedJobs)} 完成`, icon: Clapperboard, tone: "green" },
+                { label: "付费任务", value: formatNumber(ledger?.summary.paidJobs), hint: `${formatNumber(ledger?.summary.mockJobs)} 内部任务`, icon: CircleDollarSign, tone: "orange" },
                 { label: "总 Token", value: formatNumber(ledger?.summary.totalTokens), hint: `¥${money(ledger?.summary.estimatedCostCny)}`, icon: Gauge, tone: "violet" },
                 { label: "最终视频", value: formatNumber(ledger?.summary.finalVideos), hint: "可下载视频", icon: FileVideo, tone: "rose" },
                 { label: "复用 raw", value: formatNumber(ledger?.summary.reusedRawManifests), hint: "省一次生成", icon: Database, tone: "cyan" }
@@ -6536,7 +6536,7 @@ function FeeSummaryPanel({ ledger, reports }: { ledger?: Ledger; reports: Report
       <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 text-xs sm:grid-cols-2 lg:grid-cols-5">
         <MetricInline label="生成次数" value={formatNumber(totalJobs)} />
         <MetricInline label="付费生成" value={formatNumber(paidJobs)} />
-        <MetricInline label="本地模拟" value={formatNumber(mockJobs)} />
+        <MetricInline label="内部任务" value={formatNumber(mockJobs)} />
         <MetricInline label="估算费用" value={`¥${money(estimatedCostCny)}`} />
         <MetricInline label="最终视频" value={formatNumber(finalVideos)} />
       </div>
@@ -6552,7 +6552,7 @@ function FeeSummaryPanel({ ledger, reports }: { ledger?: Ledger; reports: Report
               <th className="border-b border-[var(--border)] px-3 py-2 font-black">商品</th>
               <th className="border-b border-[var(--border)] px-3 py-2 font-black">生成次数</th>
               <th className="border-b border-[var(--border)] px-3 py-2 font-black">付费生成</th>
-              <th className="border-b border-[var(--border)] px-3 py-2 font-black">本地模拟</th>
+              <th className="border-b border-[var(--border)] px-3 py-2 font-black">内部任务</th>
               <th className="border-b border-[var(--border)] px-3 py-2 font-black">最终视频</th>
               <th className="border-b border-[var(--border)] px-3 py-2 font-black">估算费用</th>
             </tr>
@@ -7157,7 +7157,7 @@ function toneClass(tone: "blue" | "green" | "orange" | "violet" | "rose" | "cyan
 }
 
 function providerLabel(value?: string): string {
-  if (value === "mock") return "本地模拟";
+  if (value === "mock") return "内部任务";
   if (value === "volcengine-seedance" || value === "seedance") return "seedance2.0 fast";
   return value || "-";
 }
@@ -7167,7 +7167,7 @@ function videoModelChoiceLabel(value: VideoModelChoice): string {
 }
 
 function videoModelLabel(provider?: string, model?: string): string {
-  if (provider === "mock") return "本地模拟";
+  if (provider === "mock") return "内部任务";
   if (model === "doubao-seedance-1-5-pro-251215") return "seedance1.5 pro";
   if (model === "doubao-seedance-2-0-260128") return "seedance2.0";
   if (model === "doubao-seedance-2-0-fast-260128") return "seedance2.0 fast";

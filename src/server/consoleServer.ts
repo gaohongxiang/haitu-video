@@ -2396,7 +2396,7 @@ function internalValidationGapText(input: {
 }
 
 function providerDisplayName(value?: string): string {
-  if (value === "mock") return "本地模拟";
+  if (value === "mock") return "内部任务";
   if (value === "volcengine-seedance" || value === "seedance") return "火山引擎 Seedance";
   return value ?? "";
 }

@@ -592,6 +592,7 @@ describe("console API", () => {
     expect(appShell).not.toContain("mock 免费");
     expect(appShell).not.toContain("付费通道");
     expect(appShell).not.toContain("本地模拟");
+    expect(appSource).not.toContain("本地模拟");
     expect(appShell).not.toContain("<TopPill");
     expect(appShell).not.toContain("BadgeJapaneseYen");
     expect(appShell).not.toContain("min-[900px]:grid-cols-[246px_minmax(0,1fr)]");
@@ -4356,7 +4357,7 @@ describe("console API", () => {
     expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
     expect(response.headers.get("content-disposition")).toBe('attachment; filename="haitu-internal-validation.csv"');
     expect(csv.split("\n")[0]).toBe("商品SKU,商品标题,参考图数量,版本数,任务ID,生成通道,任务状态,时长秒,审核结论,评分,人工备注,Token,估算成本CNY,最终视频,缺口提示");
-    expect(csv).toContain("WALLET-BLACK-001,カード収納ミニ財布,3,1,wallet-v1,本地模拟,已完成,8,可发布,5,发布候选,1000,0.04,是,补 2 个版本");
+    expect(csv).toContain("WALLET-BLACK-001,カード収納ミニ財布,3,1,wallet-v1,内部任务,已完成,8,可发布,5,发布候选,1000,0.04,是,补 2 个版本");
     expect(csv).toContain("BOX-001,折りたたみ収納ボックス,1,0,,,,,,,,0,0,否,补 2 张参考图 / 补 3 个版本");
   });
 
