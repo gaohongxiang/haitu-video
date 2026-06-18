@@ -1153,6 +1153,7 @@ describe("console API", () => {
     expect(videoHistorySource).toContain("videoLabel(index)");
     expect(videoHistorySource).toContain("hasPlayableVideo(job)");
     expect(videoHistorySource).toContain("creativeVersionFailureReason(job)");
+    expect(videoHistorySource).toContain("playableVideo ? videoExpiryLabel(job) : creativeVersionDisplayStatus(job)");
     expect(appSource).toContain('if (value === "failed") return "生成失败";');
     expect(appSource).toContain("formatDeletionTime");
     expect(appSource).toContain("将于");

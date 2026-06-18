@@ -4468,6 +4468,7 @@ function VideoHistoryPanel({
             const playableVideo = hasPlayableVideo(job);
             const retryJob = job.status === "failed" ? job.videoJob : undefined;
             const failureReason = creativeVersionFailureReason(job);
+            const lifecycleLabel = failureReason || (playableVideo ? videoExpiryLabel(job) : creativeVersionDisplayStatus(job));
             return (
               <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
@@ -4479,7 +4480,7 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {failureReason || videoExpiryLabel(job)}
+                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {lifecycleLabel}
                   </div>
                   <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
                 </div>
