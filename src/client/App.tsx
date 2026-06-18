@@ -2013,15 +2013,6 @@ export function App() {
     if (!ensureVideoModelConfigured()) {
       throw new Error("请先配置视频模型，再生成视频。");
     }
-    const readiness = referenceReadiness(product);
-    if (!readiness.ready) {
-      setStatusText(`${product.title_ja}: ${readiness.label}`);
-      throw new Error(readiness.label);
-    }
-    if (!product.importQuality?.ready) {
-      setStatusText("商品资料还没整理完整。");
-      throw new Error("商品资料还没整理完整。");
-    }
     const selectedVideoModel = videoModelConfigs[videoModelChoice];
     const videoGenerationOptions: ProductVideoGenerationOptions = options ?? {
       provider: selectedVideoModel.provider,
@@ -3687,8 +3678,7 @@ function ProductCreationComposer({
   const storyboardProductReady = Boolean(selectedProduct || importText.trim());
   const generationReadiness = productGenerationReadiness({
     selectedProduct,
-    importText,
-    pendingImageCount: Math.max(pendingImageFiles.length, draftReferenceImages.length)
+    importText
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoButtonClass = cn(
@@ -3932,6 +3922,7 @@ function ProductCreationComposer({
               pendingImages={pendingReferenceImageStatuses}
               onImportAssets={onImportAssets}
               onGenerateReferenceImages={onGenerateReferenceImages}
+              onToast={onToast}
               onPreviewReferenceImage={setPreviewReferenceIndex}
               onPendingPreview={(index) => setPreviewReferenceIndex(index)}
               onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
@@ -4130,6 +4121,7 @@ function ProductComposerReferenceTray({
   pendingImages,
   onImportAssets,
   onGenerateReferenceImages,
+  onToast,
   onPreviewReferenceImage,
   onPendingPreview,
   onDeleteReferenceImage,
@@ -4143,6 +4135,7 @@ function ProductComposerReferenceTray({
   pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onToast: ConsoleToastFn;
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
@@ -4214,12 +4207,23 @@ function ProductComposerReferenceTray({
           }}
         />
       </label>
-      {product ? (
-        <Button className="w-full justify-center" size="sm" variant="soft" onClick={() => void onGenerateReferenceImages(product.sku)}>
-          <Sparkles size={13} />
-          AI 生成参考图
-        </Button>
-      ) : null}
+      <Button
+        className={cn("w-full justify-center", !product && "opacity-55")}
+        size="sm"
+        variant="soft"
+        aria-disabled={!product}
+        title={product ? "AI 生成参考图" : "先整理资料包后可生成参考图"}
+        onClick={() => {
+          if (!product) {
+            onToast("请先整理资料包，再生成参考图。");
+            return;
+          }
+          void onGenerateReferenceImages(product.sku);
+        }}
+      >
+        <Sparkles size={13} />
+        AI 生成参考图
+      </Button>
       {images.length > 0 || visibleDraftImages.length > 0 ? (
         <div className="reference-image-list grid max-h-[250px] gap-1.5 overflow-auto pr-1">
           {(images.length > 0 ? images : visibleDraftImages).map((image, index) => (
@@ -5125,29 +5129,16 @@ function productReferenceCount(product?: ProductSummary | ProductDetail): number
 
 function productGenerationReadiness({
   selectedProduct,
-  importText,
-  pendingImageCount
+  importText
 }: {
   selectedProduct?: ProductDetail;
   importText: string;
-  pendingImageCount: number;
 }): { ready: boolean; label: string } {
-  const targetImageCount = 3;
   if (selectedProduct) {
-    if (!selectedProduct.importQuality?.ready) {
-      return { ready: false, label: "请先补齐商品资料并整理资料包。" };
-    }
-    const imageCount = productReferenceCount(selectedProduct);
-    if (imageCount < targetImageCount) {
-      return { ready: false, label: `参考图至少 ${targetImageCount} 张，还差 ${targetImageCount - imageCount} 张。` };
-    }
-    return { ready: true, label: "参数已完整。" };
+    return { ready: true, label: "资料已保存，可生成视频。" };
   }
   if (!importText.trim()) {
     return { ready: false, label: "请先填写商品资料。" };
-  }
-  if (pendingImageCount < targetImageCount) {
-    return { ready: false, label: `参考图至少 ${targetImageCount} 张，还差 ${targetImageCount - pendingImageCount} 张。` };
   }
   return { ready: true, label: "将先整理资料包，再生成视频。" };
 }
@@ -5165,10 +5156,7 @@ function productFactsStatusLabel({
     }
     return "未填资料";
   }
-  if (selectedProduct.importQuality?.ready) {
-    return "已整理资料包";
-  }
-  return "资料待补";
+  return "已整理资料包";
 }
 
 function productAutoSaveStatusLabel(status: ProductAutoSaveStatus): string {
@@ -7448,37 +7436,8 @@ function formatStudioAutoRefreshStatus(transitions: CompletedVideoJobTransitions
   ].join("\n");
 }
 
-function referenceReadiness(product: ProductSummary): { ready: boolean; label: string } {
-  const target = 3;
-  const count = product.referenceImageCount ?? 0;
-  const missing = Math.max(0, target - count);
-  if (missing === 0) {
-    const label = count === target ? `参考图 ${count}/${target} · 可生成视频` : `参考图 ${count} 张 · 可生成视频`;
-    return { ready: true, label };
-  }
-  if (missing === 2) {
-    return { ready: false, label: "参考图 1/3 · 补 2 张参考图后可生成视频" };
-  }
-  return { ready: false, label: `参考图 ${count}/${target} · 补 ${missing} 张参考图后可生成视频` };
-}
-
 function productLibraryStatus(product: ProductSummary): { label: string; detail: string; tone: "ok" | "warn" } {
   const referenceImageCount = product.referenceImageCount ?? 0;
-  const missingImages = Math.max(0, 3 - referenceImageCount);
-  if (!product.importQuality?.ready) {
-    return {
-      label: "资料待补",
-      detail: `参考图 ${referenceImageCount} 张`,
-      tone: "warn"
-    };
-  }
-  if (missingImages > 0) {
-    return {
-      label: "需补参考图",
-      detail: `还差 ${missingImages} 张`,
-      tone: "warn"
-    };
-  }
   return {
     label: "可生成视频",
     detail: `参考图 ${referenceImageCount} 张`,

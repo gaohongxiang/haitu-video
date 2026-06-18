@@ -4671,23 +4671,19 @@ function buildPaidGenerationReadiness(
     warnings.push(`${assetSummary.outsideProjectRoot} 张参考图在项目目录外，请先导入资产。`);
   }
   if (assetSummary.previewable === 0 && assetSummary.remote === 0) {
-    blockingReasons.push("没有可用参考图");
-    warnings.push("付费生成会被拦截，请先上传真实商品参考图。");
+    warnings.push("没有可用参考图，视频外观可能不稳定。");
   }
   if (product.materials.length === 0 || product.materials.some((item) => item.includes("未确认"))) {
-    blockingReasons.push("材质未确认");
     warnings.push("请补充材质，避免脚本描述商品手感或面料时编造。");
   }
   if (!product.dimensions.trim() || product.dimensions.includes("未确认")) {
-    blockingReasons.push("尺寸/重量未确认");
     warnings.push("请补充尺寸/重量，避免脚本编造大小、容量或便携性。");
   }
   if (
     product.verified_selling_points.length === 0 ||
     product.verified_selling_points.some((item) => item.includes("待确认") || item.includes("未确认"))
   ) {
-    blockingReasons.push("已验证卖点未确认");
-    warnings.push("请补充已验证卖点，否则付费生成前无法确认脚本事实边界。");
+    warnings.push("请补充已验证卖点，避免脚本事实边界过宽。");
   }
   return {
     readyForPaidGeneration: blockingReasons.length === 0,

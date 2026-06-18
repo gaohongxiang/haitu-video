@@ -680,7 +680,6 @@ describe("console API", () => {
     expect(appSource).toContain("整理后的商品资料");
     expect(appSource).toContain("资料是否够用");
     expect(appSource).toContain("可生成视频");
-    expect(appSource).toContain("资料待补");
     expect(appSource).toContain("缺失信息");
     expect(appSource).toContain("不可用卖点");
     expect(appSource).toContain("quality");
@@ -761,9 +760,9 @@ describe("console API", () => {
     expect(productLibraryHome).not.toContain("参考图 {referenceImageCount} 张");
     const productLibraryStatusSource = appSource.slice(appSource.indexOf("function productLibraryStatus"), appSource.indexOf("function videoAssetKindTone"));
     expect(productLibraryStatusSource).toContain("可生成视频");
-    expect(productLibraryStatusSource).toContain("需补参考图");
-    expect(productLibraryStatusSource).toContain("资料待补");
-    expect(productLibraryStatusSource).toContain("还差");
+    expect(productLibraryStatusSource).not.toContain("需补参考图");
+    expect(productLibraryStatusSource).not.toContain("资料待补");
+    expect(productLibraryStatusSource).not.toContain("还差");
     expect(productLibraryStatusSource).not.toContain("可创作");
     expect(productLibraryStatusSource).not.toContain("待补图");
     expect(productLibraryHome).not.toContain("事实 ");
@@ -941,9 +940,11 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("storyboardStatusLabel(storyboardDraftSource)");
     expect(appSource).toContain('return "原始资料"');
     expect(appSource).toContain('return "已整理资料包"');
+    expect(appSource).not.toContain('return "资料待补"');
     expect(appSource).toContain('return "默认分镜"');
     expect(appSource).toContain('return "AI 生成分镜"');
     expect(appSource).toContain('return "手动分镜"');
+    expect(appSource).toContain('return { ready: true, label: "资料已保存，可生成视频。" };');
     expect(appSource).toContain('return { ready: true, label: "将先整理资料包，再生成视频。" };');
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
@@ -1046,6 +1047,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("添加图片");
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
+    expect(creationComposerSource).toContain("aria-disabled={!product}");
+    expect(creationComposerSource).toContain("请先整理资料包，再生成参考图。");
     expect(creationComposerSource).toContain("AI 整理资料包");
     expect(creationComposerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
     expect(creationComposerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
@@ -2214,6 +2217,8 @@ describe("console API", () => {
     expect(composerSource).toContain("添加图片");
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
+    expect(composerSource).toContain("aria-disabled={!product}");
+    expect(composerSource).toContain("请先整理资料包，再生成参考图。");
     expect(composerSource).toContain("AI 整理资料包");
     expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
     expect(composerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
@@ -3365,9 +3370,15 @@ describe("console API", () => {
           summary: expect.stringContaining("缺少")
         }),
         paidReadiness: {
-          readyForPaidGeneration: false,
-          blockingReasons: ["没有可用参考图", "材质未确认", "尺寸/重量未确认", "已验证卖点未确认"],
-          warnings: expect.arrayContaining(["付费生成会被拦截，请先上传真实商品参考图。"])
+          readyForPaidGeneration: true,
+          blockingReasons: [],
+          warnings: expect.arrayContaining([
+            "1 张参考图缺失。",
+            "没有可用参考图，视频外观可能不稳定。",
+            "请补充材质，避免脚本描述商品手感或面料时编造。",
+            "请补充尺寸/重量，避免脚本编造大小、容量或便携性。",
+            "请补充已验证卖点，避免脚本事实边界过宽。"
+          ])
         }
       }),
       expect.objectContaining({
@@ -3790,7 +3801,7 @@ describe("console API", () => {
     }));
   });
 
-  it("includes paid generation readiness blockers in preflight", async () => {
+  it("includes paid generation readiness warnings in preflight", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-preflight-readiness-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -3814,15 +3825,11 @@ describe("console API", () => {
     });
 
     expect(response.preflight.readiness).toEqual({
-      readyForPaidGeneration: false,
-      blockingReasons: [
-        "没有可用参考图",
-        "材质未确认",
-        "尺寸/重量未确认"
-      ],
+      readyForPaidGeneration: true,
+      blockingReasons: [],
       warnings: [
         "1 张参考图缺失。",
-        "付费生成会被拦截，请先上传真实商品参考图。",
+        "没有可用参考图，视频外观可能不稳定。",
         "请补充材质，避免脚本描述商品手感或面料时编造。",
         "请补充尺寸/重量，避免脚本编造大小、容量或便携性。"
       ]
@@ -6485,7 +6492,7 @@ describe("console API", () => {
     await waitForJobStatus(server, second.job.id, "completed");
   });
 
-  it("rejects paid video jobs before enqueue when product reference images are not usable", async () => {
+  it("queues paid video jobs even when reference images are missing", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-readiness-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6501,11 +6508,49 @@ describe("console API", () => {
       outputsDir,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when product readiness blocks the job.");
+        await writeFileReport(join(input.outDir, "make-video-report.json"), {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        });
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
 
-    const response = await server.fetch("/api/video-jobs", {
+    const queued = await server.fetchJson("/api/video-jobs", {
       method: "POST",
       body: JSON.stringify({
         productPath,
@@ -6516,17 +6561,12 @@ describe("console API", () => {
         confirmPaid: true
       })
     });
-    const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error).toBe("付费生成前请先补齐商品资料: 没有可用参考图。");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    await waitForJobStatus(server, queued.job.id, "completed");
+    expect(calls).toEqual([queued.job.outDir]);
   });
 
-  it("rejects paid video jobs before enqueue when required product facts are unconfirmed", async () => {
+  it("queues paid video jobs when optional product facts are unconfirmed", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-fact-readiness-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6545,11 +6585,49 @@ describe("console API", () => {
       outputsDir,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when product facts block the job.");
+        await writeFileReport(join(input.outDir, "make-video-report.json"), {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        });
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
 
-    const response = await server.fetch("/api/video-jobs", {
+    const queued = await server.fetchJson("/api/video-jobs", {
       method: "POST",
       body: JSON.stringify({
         productPath,
@@ -6560,17 +6638,12 @@ describe("console API", () => {
         confirmPaid: true
       })
     });
-    const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error).toBe("付费生成前请先补齐商品资料: 材质未确认、尺寸/重量未确认。");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    await waitForJobStatus(server, queued.job.id, "completed");
+    expect(calls).toEqual([queued.job.outDir]);
   });
 
-  it("rejects paid batch video jobs before enqueue when product reference images are not usable", async () => {
+  it("queues paid batch video jobs even when reference images are missing", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-batch-readiness-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6586,11 +6659,49 @@ describe("console API", () => {
       outputsDir,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when product readiness blocks the batch.");
+        await writeFileReport(join(input.outDir, "make-video-report.json"), {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        });
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
 
-    const response = await server.fetch("/api/video-jobs/batch", {
+    const response = await server.fetchJson("/api/video-jobs/batch", {
       method: "POST",
       body: JSON.stringify({
         productPath,
@@ -6602,14 +6713,12 @@ describe("console API", () => {
         versions: 3
       })
     });
-    const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error).toBe("付费生成前请先补齐商品资料: 没有可用参考图。");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    expect(response.jobs).toHaveLength(3);
+    for (const job of response.jobs as Array<{ id: string }>) {
+      await waitForJobStatus(server, job.id, "completed");
+    }
+    expect(calls).toHaveLength(3);
   });
 
   it("cancels a queued local video job from the console API", async () => {
@@ -7288,6 +7397,17 @@ function sleep(ms: number): Promise<void> {
 async function writeFileReport(path: string, report: unknown): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });
   await writeFile(path, JSON.stringify(report, null, 2), "utf8");
+}
+
+async function configurePaidVideoModel(server: TestConsoleServerHandle): Promise<void> {
+  await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+    method: "PUT",
+    body: JSON.stringify({
+      apiKey: "paid-key",
+      baseUrl: "https://ark.example.test",
+      model: "doubao-seedance-2-0-fast-260128"
+    })
+  });
 }
 
 function jsonResponse(body: unknown): Response {
