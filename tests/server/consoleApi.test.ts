@@ -1106,6 +1106,9 @@ describe("console API", () => {
     expect(referenceFigureSource).toContain("absolute right-2 top-1/2");
     expect(referenceFigureSource).toContain("pointer-events-none");
     expect(referenceFigureSource).toContain("group-hover:pointer-events-auto");
+    expect(referenceFigureSource).toContain('title="删除参考图"');
+    expect(referenceFigureSource).not.toContain("canDelete");
+    expect(appSource).not.toContain("canDelete={images.length > 0}");
     expect(referencePreviewSource).toContain("onPrevious");
     expect(referencePreviewSource).toContain("onNext");
     expect(referencePreviewSource).toContain("touchStartXRef");

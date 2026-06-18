@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   draftReferenceImageStatuses,
   defaultProductDraft,
-  productComposerTextToDraft
+  productComposerTextToDraft,
+  removeDraftReferenceImage,
+  removeReferenceFromComposerText
 } from "../../src/client/productComposerText.js";
 
 describe("productComposerTextToDraft", () => {
@@ -38,4 +40,26 @@ describe("productComposerTextToDraft", () => {
     ]);
   });
 
+  it("removes a draft reference URL from the unsaved product draft", () => {
+    expect(removeDraftReferenceImage({
+      ...defaultProductDraft,
+      reference_images: [
+        "https://cdn.example.test/main.jpg",
+        "https://cdn.example.test/detail.jpg"
+      ].join("\n")
+    }, "https://cdn.example.test/main.jpg").reference_images).toBe("https://cdn.example.test/detail.jpg");
+  });
+
+  it("removes a parsed image URL from product text without rewriting the rest", () => {
+    const imageUrl = "https://cdn.example.test/main.jpg";
+
+    expect(removeReferenceFromComposerText([
+      "这是用户原始粘贴的商品资料",
+      imageUrl,
+      "材质看起来像 PU"
+    ].join("\n"), imageUrl)).toBe([
+      "这是用户原始粘贴的商品资料",
+      "材质看起来像 PU"
+    ].join("\n"));
+  });
 });

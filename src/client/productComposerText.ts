@@ -128,6 +128,22 @@ export function draftReferenceImageStatuses(draft: ProductDraft): DraftReference
   }));
 }
 
+export function removeDraftReferenceImage(draft: ProductDraft, reference: string): ProductDraft {
+  const nextReferences = splitLines(draft.reference_images).filter((item) => item !== reference);
+  return {
+    ...draft,
+    reference_images: nextReferences.join("\n")
+  };
+}
+
+export function removeReferenceFromComposerText(value: string, reference: string): string {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.includes(reference) ? line.replaceAll(reference, "").trim() : line)
+    .filter((line) => line.trim())
+    .join("\n");
+}
+
 function splitReferenceText(value: string): string[] {
   return value
     .split(/[,\n，]/)

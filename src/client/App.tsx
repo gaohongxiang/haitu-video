@@ -57,6 +57,8 @@ import {
   isStructuredProductComposerText,
   productComposerTextToDraft,
   productDraftToComposerText,
+  removeDraftReferenceImage,
+  removeReferenceFromComposerText,
   type ProductDraft
 } from "./productComposerText.js";
 import { cn } from "./lib/utils.js";
@@ -1834,9 +1836,17 @@ export function App() {
     return selectedProductRef.current;
   }
 
-  function updateProductComposerText(text: string) {
+  function updateProductComposerText(text: string, draftOverride?: ProductDraft) {
     setProductImportText(text);
     productImportTextRef.current = text;
+    if (draftOverride) {
+      setProductDraft(draftOverride);
+      productDraftRef.current = draftOverride;
+      setProductComposerSource("structured");
+      productComposerSourceRef.current = "structured";
+      scheduleProductFactsAutoSave();
+      return;
+    }
     if (isStructuredProductComposerText(text)) {
       const nextDraft = productComposerTextToDraft(text, productDraftRef.current);
       setProductDraft(nextDraft);
@@ -3427,7 +3437,7 @@ function ProductCreationWorkspace({
   videoJobs: VideoJob[];
   draft: ProductDraft;
   importText: string;
-  setImportText: (text: string) => void;
+  setImportText: (text: string, draftOverride?: ProductDraft) => void;
   pendingImageFiles: File[];
   setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
@@ -3598,7 +3608,7 @@ function ProductCreationComposer({
   loadError?: string;
   draft: ProductDraft;
   importText: string;
-  setImportText: (text: string) => void;
+  setImportText: (text: string, draftOverride?: ProductDraft) => void;
   pendingImageFiles: File[];
   setPendingImageFiles: Dispatch<SetStateAction<File[]>>;
   importNotes: string[];
@@ -3837,6 +3847,15 @@ function ProductCreationComposer({
   }
 
   async function handleDeleteReferenceImage(index: number) {
+    const draftImage = draftReferenceImages[index];
+    if (previewReferenceImages.length === 0 && draftImage) {
+      setImportText(
+        removeReferenceFromComposerText(importText, draftImage.original),
+        removeDraftReferenceImage(draft, draftImage.original)
+      );
+      setPreviewReferenceIndex(undefined);
+      return;
+    }
     if (!selectedProduct) return;
     await onDeleteReferenceImage(selectedProduct.sku, index);
     setPreviewReferenceIndex(undefined);
@@ -4212,7 +4231,6 @@ function ProductComposerReferenceTray({
               onImportAssets={onImportAssets}
               onPreview={() => onPreviewReferenceImage(index)}
               onDelete={onDeleteReferenceImage}
-              canDelete={images.length > 0}
             />
           ))}
         </div>
@@ -5234,8 +5252,7 @@ function ReferenceImageFigure({
   index,
   onImportAssets,
   onPreview,
-  onDelete,
-  canDelete = true
+  onDelete
 }: {
   image: ReferenceImageStatus;
   sku: string;
@@ -5243,7 +5260,6 @@ function ReferenceImageFigure({
   onImportAssets: (sku: string) => Promise<void>;
   onPreview: () => void;
   onDelete: (index: number) => void;
-  canDelete?: boolean;
 }) {
   const canPreview = Boolean(image.previewUrl);
   return (
@@ -5278,11 +5294,9 @@ function ReferenceImageFigure({
             <ImageIcon size={12} />
           </Button>
         ) : null}
-        {canDelete ? (
-          <Button className="h-8 w-8 p-0" size="icon" variant="danger" title="删除参考图" onClick={() => onDelete(index)}>
-            <X size={12} />
-          </Button>
-        ) : null}
+        <Button className="h-8 w-8 p-0" size="icon" variant="danger" title="删除参考图" onClick={() => onDelete(index)}>
+          <X size={12} />
+        </Button>
       </div>
     </figure>
   );
