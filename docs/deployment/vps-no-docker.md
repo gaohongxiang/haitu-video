@@ -198,6 +198,7 @@ npm run deploy:vps
 - `git reset --hard origin/main`
 - `git clean -fd`
 - `npm ci`
+- 读取 `/etc/haitu-video.env`
 - `npm run db:migrate`
 - `npm run deploy:check`
 - `sudo systemctl restart haitu-video`

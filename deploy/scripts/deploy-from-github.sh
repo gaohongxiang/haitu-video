@@ -6,9 +6,18 @@ REMOTE="${HAITU_DEPLOY_REMOTE:-origin}"
 SERVICE="${HAITU_DEPLOY_SERVICE:-haitu-video}"
 APP_USER="${HAITU_DEPLOY_USER:-haitu}"
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
+ENV_FILE="${HAITU_DEPLOY_ENV_FILE:-/etc/haitu-video.env}"
 HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"
 
 cd "$(dirname "$0")/../.."
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+  HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"
+fi
 
 run_app() {
   if [ "$(id -u)" -eq 0 ]; then

@@ -53,6 +53,8 @@ describe("no-Docker VPS deployment package", () => {
     expect(deployScript).toContain("run_app npm run deploy:check");
     expect(deployScript).toContain('SERVICE="${HAITU_DEPLOY_SERVICE:-haitu-video}"');
     expect(deployScript).toContain('APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"');
+    expect(deployScript).toContain('ENV_FILE="${HAITU_DEPLOY_ENV_FILE:-/etc/haitu-video.env}"');
+    expect(deployScript).toContain('source "$ENV_FILE"');
     expect(deployScript).toContain('sudo -u "$APP_USER" HOME="$APP_HOME" "$@"');
     expect(deployScript).toContain('systemctl restart "$SERVICE"');
     expect(deployScript).toContain('HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"');
