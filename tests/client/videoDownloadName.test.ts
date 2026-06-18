@@ -10,7 +10,7 @@ import {
 describe("video download file names", () => {
   it("uses a Chinese product name from source text and appends the generated time", () => {
     expect(videoDownloadFileName(
-      { id: "job-1", createdAt: "2026-06-18T09:21:00.000Z" },
+      { id: "job-1", createdAt: "2026-06-18T17:21:00" },
       {
         title_ja: "カード収納ミニ財布",
         source_text: "商品名：卡片收纳迷你钱包\n标题：カード収納ミニ財布"
@@ -20,7 +20,7 @@ describe("video download file names", () => {
 
   it("falls back to the product title and strips unsafe filename characters", () => {
     expect(videoDownloadFileName(
-      { id: "job-2", completedAt: "2026-06-18T10:05:00.000Z" },
+      { id: "job-2", completedAt: "2026-06-18T18:05:00" },
       { title_ja: "ミニ財布 / ブラック:限定版" }
     )).toBe("ミニ財布 ブラック 限定版_20260618_1805.mp4");
   });
@@ -32,7 +32,7 @@ describe("video download file names", () => {
 
   it("formats invalid or missing times with the current time", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-06-18T12:34:00.000Z"));
+    vi.setSystemTime(new Date(2026, 5, 18, 20, 34, 0));
     try {
       expect(formatDownloadTimestamp("not-a-date")).toBe("20260618_2034");
     } finally {
