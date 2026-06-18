@@ -812,6 +812,14 @@ describe("console API", () => {
       appSource.indexOf("function buildLatestCreativeJobs"),
       appSource.indexOf("function videoJobToCreativeVersion")
     );
+    const formatCreativeVersionTimeSource = appSource.slice(
+      appSource.indexOf("function formatCreativeVersionTime"),
+      appSource.indexOf("function creativeVersionSortTime")
+    );
+    const formatDeletionTimeSource = appSource.slice(
+      appSource.indexOf("function formatDeletionTime"),
+      appSource.indexOf("function removeLedgerJob")
+    );
     const queueProductVideoJobsSource = appSource.slice(
       appSource.indexOf("async function queueProductVideoJobs"),
       appSource.indexOf("async function importProductPreview")
@@ -1094,6 +1102,12 @@ describe("console API", () => {
     expect(appSource).toContain('if (value === "failed") return "生成失败";');
     expect(appSource).toContain("formatDeletionTime");
     expect(appSource).toContain("将于");
+    expect(appSource).toContain("function formatAbsoluteMinuteTime");
+    expect(formatCreativeVersionTimeSource).toContain("formatAbsoluteMinuteTime(job.createdAt)");
+    expect(formatCreativeVersionTimeSource).not.toContain('"刚刚"');
+    expect(formatDeletionTimeSource).toContain("formatAbsoluteMinuteTime(value)");
+    expect(formatDeletionTimeSource).not.toContain("今天");
+    expect(formatDeletionTimeSource).not.toContain("明天");
     expect(appSource).not.toContain("剩余 ${remainingHours} 小时");
     expect(videoHistorySource).toContain("预览视频");
     expect(videoHistorySource).toContain("下载视频");

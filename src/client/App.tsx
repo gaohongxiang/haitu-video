@@ -7263,26 +7263,15 @@ function videoExpiryLabel(job: { expiresAt?: string; expired?: boolean }): strin
 }
 
 function formatDeletionTime(value: number): string {
+  return formatAbsoluteMinuteTime(value);
+}
+
+function formatAbsoluteMinuteTime(value: string | number): string {
   const date = new Date(value);
-  const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  const sameDay =
-    sameYear &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  const tomorrowDate = new Date(now);
-  tomorrowDate.setDate(now.getDate() + 1);
-  const tomorrow =
-    sameYear &&
-    date.getMonth() === tomorrowDate.getMonth() &&
-    date.getDate() === tomorrowDate.getDate();
-  const time = date.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-  if (sameDay) return `今天 ${time}`;
-  if (tomorrow) return `明天 ${time}`;
+  if (Number.isNaN(date.getTime())) return String(value);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
   return date.toLocaleString("zh-CN", {
+    ...(sameYear ? {} : { year: "numeric" as const }),
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -7391,14 +7380,7 @@ function formatCreativeVersionTime(job: CreativeVersionItem): string {
   if (!job.createdAt) return "生成时间未知";
   const date = new Date(job.createdAt);
   if (Number.isNaN(date.getTime())) return "生成时间未知";
-  const diffMs = Date.now() - date.getTime();
-  if (diffMs >= 0 && diffMs < 60_000) return "刚刚";
-  return date.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  return formatAbsoluteMinuteTime(job.createdAt);
 }
 
 function creativeVersionSortTime(job: CreativeVersionItem): number {
