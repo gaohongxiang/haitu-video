@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  draftReferenceImageStatuses,
   defaultProductDraft,
   productComposerTextToDraft
 } from "../../src/client/productComposerText.js";
@@ -20,4 +21,21 @@ describe("productComposerTextToDraft", () => {
 
     expect(draft.reference_images).toBe(imageUrl);
   });
+
+  it("turns draft image URLs into previewable reference statuses before saving", () => {
+    const imageUrl = "https://cdn.example.test/reference.webp?token=1";
+
+    expect(draftReferenceImageStatuses({
+      ...defaultProductDraft,
+      reference_images: imageUrl
+    })).toEqual([
+      {
+        original: imageUrl,
+        resolvedPath: imageUrl,
+        previewUrl: imageUrl,
+        status: "remote"
+      }
+    ]);
+  });
+
 });

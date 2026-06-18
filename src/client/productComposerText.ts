@@ -11,6 +11,13 @@ export interface ProductDraft {
   source_text: string;
 }
 
+export interface DraftReferenceImageStatus {
+  original: string;
+  resolvedPath: string;
+  previewUrl: string | null;
+  status: "previewable" | "missing" | "outside-project-root" | "remote";
+}
+
 export const defaultProductDraft: ProductDraft = {
   sku: "",
   title_ja: "",
@@ -66,9 +73,11 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
     "画像": "reference_images"
   };
 
+  let hasReferenceInput = false;
   for (const rawLine of value.split(/\r?\n/)) {
     const imageUrls = extractImageUrls(rawLine);
     if (imageUrls.length > 0) {
+      hasReferenceInput = true;
       buckets.reference_images = [...(buckets.reference_images ?? []), ...imageUrls];
       if (currentKey === "reference_images") {
         continue;
@@ -79,6 +88,9 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
     if (match) {
       currentKey = labelToKey[match[1] ?? ""];
       if (currentKey) {
+        if (currentKey === "reference_images") {
+          hasReferenceInput = true;
+        }
         buckets[currentKey] = splitReferenceText(match[2] ?? "");
       }
       continue;
@@ -89,10 +101,9 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
     }
   }
 
-  const referenceImages = uniqueLines([
-    ...splitLines(fallback.reference_images),
-    ...(buckets.reference_images ?? []).flatMap(splitReferenceText)
-  ]).join("\n");
+  const referenceImages = hasReferenceInput
+    ? uniqueLines((buckets.reference_images ?? []).flatMap(splitReferenceText)).join("\n")
+    : fallback.reference_images;
   const bucketText = (key: keyof ProductDraft) => buckets[key]?.join("\n").trim();
   return {
     ...fallback,
@@ -108,6 +119,15 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
   };
 }
 
+export function draftReferenceImageStatuses(draft: ProductDraft): DraftReferenceImageStatus[] {
+  return splitLines(draft.reference_images).map((reference) => ({
+    original: reference,
+    resolvedPath: reference,
+    previewUrl: isRemoteReference(reference) ? reference : null,
+    status: isRemoteReference(reference) ? "remote" : "missing"
+  }));
+}
+
 function splitReferenceText(value: string): string[] {
   return value
     .split(/[,\n，]/)
@@ -119,6 +139,10 @@ function extractImageUrls(value: string): string[] {
   return Array.from(value.matchAll(/https?:\/\/[^\s"'<>，,；;）)]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>，,；;）)]*)?/gi)).map(
     (match) => match[0]
   );
+}
+
+function isRemoteReference(reference: string): boolean {
+  return reference.startsWith("http://") || reference.startsWith("https://") || reference.startsWith("data:image/");
 }
 
 function splitLines(value: string): string[] {

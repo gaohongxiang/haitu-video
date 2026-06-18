@@ -53,6 +53,7 @@ import {
 } from "./videoJobRefresh.js";
 import {
   defaultProductDraft,
+  draftReferenceImageStatuses,
   isStructuredProductComposerText,
   productComposerTextToDraft,
   productDraftToComposerText,
@@ -3644,6 +3645,10 @@ function ProductCreationComposer({
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
   const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
+  const draftReferenceImages = useMemo<ReferenceImageStatus[]>(
+    () => draftReferenceImageStatuses(draft),
+    [draft.reference_images]
+  );
   const pendingReferenceImageStatuses = useMemo<ReferenceImageStatus[]>(
     () => pendingImageFiles.map((file, index) => ({
       original: file.name || `待上传图片 ${index + 1}`,
@@ -3653,7 +3658,9 @@ function ProductCreationComposer({
     })),
     [pendingImageFiles]
   );
-  const previewableReferenceImages = selectedProduct ? previewReferenceImages : pendingReferenceImageStatuses;
+  const previewableReferenceImages = selectedProduct
+    ? previewReferenceImages.length > 0 ? previewReferenceImages : draftReferenceImages
+    : draftReferenceImages.length > 0 ? draftReferenceImages : pendingReferenceImageStatuses;
   const videoModelConfig = videoModelConfigs[videoModelChoice];
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
@@ -3671,7 +3678,7 @@ function ProductCreationComposer({
   const generationReadiness = productGenerationReadiness({
     selectedProduct,
     importText,
-    pendingImageCount: pendingImageFiles.length
+    pendingImageCount: Math.max(pendingImageFiles.length, draftReferenceImages.length)
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoButtonClass = cn(
@@ -3684,7 +3691,7 @@ function ProductCreationComposer({
   );
   const generateVideoSummary = [
     productFactsStatusLabel({ selectedProduct, importText }),
-    selectedProduct ? `参考图 ${productReferenceCount(selectedProduct)} 张` : pendingImageFiles.length > 0 ? `待上传 ${pendingImageFiles.length} 张` : "参考图 0 张",
+    `参考图 ${previewableReferenceImages.length} 张`,
     storyboardStatusLabel(storyboardDraftSource),
     templateLabel(template),
     formatDuration(duration),
@@ -3902,6 +3909,7 @@ function ProductCreationComposer({
               className="h-full"
               product={selectedProduct}
               pendingFiles={pendingImageFiles}
+              draftImages={draftReferenceImages}
               pendingImages={pendingReferenceImageStatuses}
               onImportAssets={onImportAssets}
               onGenerateReferenceImages={onGenerateReferenceImages}
@@ -4099,6 +4107,7 @@ function ProductComposerReferenceTray({
   className,
   product,
   pendingFiles,
+  draftImages,
   pendingImages,
   onImportAssets,
   onGenerateReferenceImages,
@@ -4111,6 +4120,7 @@ function ProductComposerReferenceTray({
   className?: string;
   product?: ProductDetail;
   pendingFiles: File[];
+  draftImages: ReferenceImageStatus[];
   pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
@@ -4121,6 +4131,7 @@ function ProductComposerReferenceTray({
   onClearPendingFile: (index: number) => void;
 }) {
   const images = product?.reference_image_statuses ?? [];
+  const visibleDraftImages = images.length > 0 ? [] : draftImages;
   const [dragOver, setDragOver] = useState(false);
 
   function acceptReferenceFiles(files: FileList | File[] | null) {
@@ -4158,7 +4169,7 @@ function ProductComposerReferenceTray({
           <div className="text-sm font-black text-[#172033]">参考图</div>
           <div className="text-xs font-bold text-[#8b9bb3]">添加图片</div>
         </div>
-        <Badge>{product ? `${productReferenceCount(product)} 张` : `${pendingFiles.length} 张`}</Badge>
+        <Badge>{images.length > 0 ? `${images.length} 张` : visibleDraftImages.length > 0 ? `${visibleDraftImages.length} 张` : `${pendingFiles.length} 张`}</Badge>
       </div>
       <label
         className={cn(
@@ -4190,9 +4201,9 @@ function ProductComposerReferenceTray({
           AI 生成参考图
         </Button>
       ) : null}
-      {images.length > 0 ? (
+      {images.length > 0 || visibleDraftImages.length > 0 ? (
         <div className="reference-image-list grid max-h-[250px] gap-1.5 overflow-auto pr-1">
-          {images.map((image, index) => (
+          {(images.length > 0 ? images : visibleDraftImages).map((image, index) => (
             <ReferenceImageFigure
               key={`${image.original}-${index}`}
               image={image}
