@@ -1361,11 +1361,13 @@ describe("console API", () => {
     expect(appSource).toContain('method: "DELETE"');
     expect(appSource).toContain("maxEstimatedCostCnyPerVideo");
     expect(appSource).toContain("testCreditBalanceCny");
-    expect(appSource).toContain("额度状态");
+    expect(appSource).toContain("本次预计");
+    expect(appSource).toContain("历史估算");
+    expect(appSource).not.toContain("额度状态");
     expect(appSource).toContain("请先生成预检并勾选确认允许付费请求");
     expect(appSource).toContain("paidRunBlockedReason");
     expect(appSource).toContain("商品资料暂不可付费生成");
-    expect(appSource).toContain("剩余测试额度不足");
+    expect(appSource).not.toContain("剩余测试额度不足");
     expect(appSource).toContain("/api/provider-config");
     expect(appSource).toContain("ApiModelConfigPanel");
     expect(appSource).toContain("API Key");
@@ -3836,7 +3838,7 @@ describe("console API", () => {
     });
   });
 
-  it("shows remaining test credit in paid preflight estimates", async () => {
+  it("shows cost history in paid preflight estimates", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-credit-preflight-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6306,7 +6308,7 @@ describe("console API", () => {
     });
   });
 
-  it("rejects paid video jobs when remaining test credit is insufficient", async () => {
+  it("queues paid video jobs even when historical estimates exceed the configured cost reference", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-credit-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6333,12 +6335,49 @@ describe("console API", () => {
       rootDir: root,
       fixturesDir,
       outputsDir,
-      autoStartSavedJobs: false,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when test credit blocks the job.");
+        await writeFileReport(join(input.outDir, "make-video-report.json"), {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        });
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
     await server.fetchJson("/api/settings", {
       method: "PUT",
       body: JSON.stringify({
@@ -6347,7 +6386,7 @@ describe("console API", () => {
       })
     });
 
-    const response = await server.fetch("/api/video-jobs", {
+    const queued = await server.fetchJson("/api/video-jobs", {
       method: "POST",
       body: JSON.stringify({
         productPath,
@@ -6358,18 +6397,12 @@ describe("console API", () => {
         confirmPaid: true
       })
     });
-    const body = await response.json();
 
-    expect(response.status).toBe(402);
-    expect(body.error).toContain("exceeds remaining test credit");
-    expect(body.error).toContain("available ¥1.50");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    await waitForJobStatus(server, queued.job.id, "completed");
+    expect(calls).toEqual([queued.job.outDir]);
   });
 
-  it("rejects paid batch video jobs when the combined version cost exceeds remaining test credit", async () => {
+  it("queues paid batch video jobs even when combined estimates exceed the configured cost reference", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-batch-credit-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6384,9 +6417,47 @@ describe("console API", () => {
       outputsDir,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when combined batch credit blocks the job.");
+        await writeFileReport(join(input.outDir, "make-video-report.json"), {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        });
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
     await server.fetchJson("/api/settings", {
       method: "PUT",
       body: JSON.stringify({
@@ -6395,7 +6466,7 @@ describe("console API", () => {
       })
     });
 
-    const response = await server.fetch("/api/video-jobs/batch", {
+    const response = await server.fetchJson("/api/video-jobs/batch", {
       method: "POST",
       body: JSON.stringify({
         productPath,
@@ -6407,16 +6478,12 @@ describe("console API", () => {
         versions: 3
       })
     });
-    const body = await response.json();
 
-    expect(response.status).toBe(402);
-    expect(body.error).toContain("3 video versions");
-    expect(body.error).toContain("combined estimated cost ¥8.97");
-    expect(body.error).toContain("available ¥6.00");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    expect(response.jobs).toHaveLength(3);
+    for (const job of response.jobs as Array<{ id: string }>) {
+      await waitForJobStatus(server, job.id, "completed");
+    }
+    expect(calls).toHaveLength(3);
   });
 
   it("keeps video jobs for one workspace on a single request queue", async () => {

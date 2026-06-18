@@ -3318,14 +3318,9 @@ function PreflightPanel({ preflight, fresh }: { preflight?: Preflight; fresh: bo
         <MiniMetric label="期望 Token" value={formatNumber(preflight.estimatedTokens.expected)} hint={`${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`} />
         <MiniMetric label="时长" value={`${preflight.durationSeconds}s`} hint={preflight.aspectRatio} />
         <MiniMetric label="生成通道" value={providerLabel(preflight.provider)} hint={preflight.requiresPaidConfirmation ? "运行会扣费" : "无需付费确认"} />
-        <MiniMetric label="测试额度" value={`¥${money(preflight.credit.availableEstimatedCostCny)}`} hint={`总额 ¥${money(preflight.credit.testCreditBalanceCny)} / 已用 ¥${money(preflight.credit.usedEstimatedCostCny)}`} />
-        <MiniMetric label="额度状态" value={preflight.credit.enoughCredit ? "足够" : "不足"} hint={`本次约 ¥${money(preflight.credit.estimatedCostCny)}`} />
+        <MiniMetric label="本次预计" value={`¥${money(preflight.credit.estimatedCostCny)}`} hint="仅作成本参考，不会阻止生成" />
+        <MiniMetric label="历史估算" value={`¥${money(preflight.credit.usedEstimatedCostCny)}`} hint="已完成任务累计参考" />
       </div>
-      {!preflight.credit.enoughCredit ? (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-bold text-[var(--danger)]">
-          剩余测试额度不足，请提高测试额度或缩短时长后再运行付费任务。
-        </div>
-      ) : null}
       {preflight.paidProvider ? (
         <div className={cn(
           "mt-3 rounded-lg border p-3 text-xs font-bold leading-5",
@@ -7690,8 +7685,7 @@ function formatPreflightStatus(preflight: Preflight) {
     `生成通道: ${providerLabel(preflight.provider)}`,
     `时长: ${preflight.durationSeconds}s / ${preflight.aspectRatio}`,
     `预计成本: ¥${money(preflight.estimatedCostCny.expected)} (${formatNumber(preflight.estimatedTokens.expected)} tokens)`,
-    `测试额度: 总额 ¥${money(preflight.credit.testCreditBalanceCny)} / 已用 ¥${money(preflight.credit.usedEstimatedCostCny)} / 可用 ¥${money(preflight.credit.availableEstimatedCostCny)}`,
-    `额度状态: ${preflight.credit.enoughCredit ? "足够" : "不足"}`,
+    `历史估算: 已完成任务累计 ¥${money(preflight.credit.usedEstimatedCostCny)}`,
     `资料状态: ${preflight.readiness.readyForPaidGeneration ? "可付费生成" : `不可付费生成: ${preflight.readiness.blockingReasons.join("、")}`}`,
     "",
     "请检查成本、参考图、脚本和 prompt 后再决定是否运行。"
@@ -7718,9 +7712,6 @@ function paidRunBlockReason({
   if (!preflight.readiness.readyForPaidGeneration) {
     const reason = preflight.readiness.blockingReasons.join("、") || "请补齐商品资料和参考图";
     return `商品资料暂不可付费生成：${reason}`;
-  }
-  if (!preflight.credit.enoughCredit) {
-    return "剩余测试额度不足，请提高测试额度或缩短时长。";
   }
   if (!confirmPaid) {
     return "请先生成预检并勾选确认允许付费请求。";

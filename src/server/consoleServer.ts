@@ -972,10 +972,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         await assertVideoModelConfigured(requestContext.providerKeyStore, providerName);
         await assertTemplateEnabled(body, settingsStore);
         await assertWithinVideoBudget(body, settingsStore);
-        await assertWithinTestCredit(body, {
-          outputsDir: requestContext.outputsDir,
-          settingsStore
-        });
         await assertPaidProductReady({
           provider: providerName,
           productPath,
@@ -1037,8 +1033,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           confirmPaid: body.confirmPaid,
           videoJobQueue: requestContext.videoJobQueue,
           settingsStore,
-          providerKeyStore: requestContext.providerKeyStore,
-          outputsDir: requestContext.outputsDir
+          providerKeyStore: requestContext.providerKeyStore
         });
         const job = await requestContext.videoJobQueue.retry(jobId, {
           confirmPaid: body.confirmPaid === true
@@ -1130,9 +1125,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse({ error: message }, 422);
       }
       if (message.includes("exceeds budget cap")) {
-        return jsonResponse({ error: message }, 402);
-      }
-      if (message.includes("exceeds remaining test credit")) {
         return jsonResponse({ error: message }, 402);
       }
       if (message.includes("Selected final job must belong")) {
@@ -1361,10 +1353,6 @@ async function runConsoleMakeVideo(
   const settings = await options.settingsStore.read();
   await assertTemplateEnabled(body, options.settingsStore);
   await assertWithinVideoBudget(body, options.settingsStore);
-  await assertWithinTestCredit(body, {
-    outputsDir: options.outputsDir,
-    settingsStore: options.settingsStore
-  });
   const providerName = body.provider ?? settings.defaultProvider;
   await assertPaidProductReady({
     provider: providerName,
@@ -1450,10 +1438,6 @@ async function enqueueBatchVideoJobs(
   await assertVideoModelConfigured(options.providerKeyStore, providerName);
   await assertTemplateEnabled(body, options.settingsStore);
   await assertWithinVideoBudget(body, options.settingsStore);
-  await assertWithinBatchTestCredit(body, versions, {
-    outputsDir: options.outputsDir,
-    settingsStore: options.settingsStore
-  });
   await assertPaidProductReady({
     provider: providerName,
     productPath,
@@ -1506,7 +1490,6 @@ async function assertRetryVideoJobAllowed(input: {
   videoJobQueue: LocalVideoJobQueue;
   settingsStore: FileConsoleSettingsStore;
   providerKeyStore: ProviderKeyStore;
-  outputsDir: string;
 }): Promise<void> {
   const record = await input.videoJobQueue.get(input.jobId);
   if (record.provider && record.provider !== "mock" && input.confirmPaid !== true) {
@@ -1525,10 +1508,6 @@ async function assertRetryVideoJobAllowed(input: {
     reuseManifest: record.reuseManifest
   };
   await assertWithinVideoBudget(body, input.settingsStore);
-  await assertWithinTestCredit(body, {
-    outputsDir: input.outputsDir,
-    settingsStore: input.settingsStore
-  });
 }
 
 async function assertWithinVideoBudget(
@@ -1547,56 +1526,6 @@ async function assertWithinVideoBudget(
   if (estimatedCostCny > settings.maxEstimatedCostCnyPerVideo) {
     throw new Error(
       `Estimated video cost ¥${estimatedCostCny.toFixed(2)} exceeds budget cap ¥${settings.maxEstimatedCostCnyPerVideo.toFixed(2)}. Raise maxEstimatedCostCnyPerVideo after preflight if you want to proceed.`
-    );
-  }
-}
-
-async function assertWithinTestCredit(
-  body: MakeVideoRequest,
-  options: {
-    outputsDir: string;
-    settingsStore: FileConsoleSettingsStore;
-  }
-): Promise<void> {
-  const settings = await options.settingsStore.read();
-  const provider = body.provider ?? settings.defaultProvider;
-  if (provider === "mock" || settings.testCreditBalanceCny <= 0) {
-    return;
-  }
-  const estimatedCostCny = estimateVideoCostCny(body.duration ?? settings.defaultDurationSeconds);
-  const credit = await summarizeTestCredit(options.outputsDir, {
-    testCreditBalanceCny: settings.testCreditBalanceCny,
-    estimatedCostCny
-  });
-  if (!credit.enoughCredit) {
-    throw new Error(
-      `Estimated video cost ¥${estimatedCostCny.toFixed(2)} exceeds remaining test credit: available ¥${credit.availableEstimatedCostCny.toFixed(2)} (balance ¥${credit.testCreditBalanceCny.toFixed(2)}, used ¥${credit.usedEstimatedCostCny.toFixed(2)}).`
-    );
-  }
-}
-
-async function assertWithinBatchTestCredit(
-  body: MakeVideoRequest,
-  versions: number,
-  options: {
-    outputsDir: string;
-    settingsStore: FileConsoleSettingsStore;
-  }
-): Promise<void> {
-  const settings = await options.settingsStore.read();
-  const provider = body.provider ?? settings.defaultProvider;
-  if (provider === "mock" || settings.testCreditBalanceCny <= 0) {
-    return;
-  }
-  const singleEstimatedCostCny = estimateVideoCostCny(body.duration ?? settings.defaultDurationSeconds);
-  const combinedEstimatedCostCny = Math.round(singleEstimatedCostCny * versions * 100) / 100;
-  const credit = await summarizeTestCredit(options.outputsDir, {
-    testCreditBalanceCny: settings.testCreditBalanceCny,
-    estimatedCostCny: combinedEstimatedCostCny
-  });
-  if (!credit.enoughCredit) {
-    throw new Error(
-      `Estimated batch cost for ${versions} video versions has combined estimated cost ¥${combinedEstimatedCostCny.toFixed(2)}, which exceeds remaining test credit: available ¥${credit.availableEstimatedCostCny.toFixed(2)} (balance ¥${credit.testCreditBalanceCny.toFixed(2)}, used ¥${credit.usedEstimatedCostCny.toFixed(2)}).`
     );
   }
 }
