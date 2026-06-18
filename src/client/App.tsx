@@ -7191,13 +7191,8 @@ function videoLabel(index: number): string {
 
 function formatHistoryTime(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "刚刚";
-  return date.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  if (Number.isNaN(date.getTime())) return value;
+  return formatAbsoluteMinuteTime(value);
 }
 
 function historyPreview(value: string): string {

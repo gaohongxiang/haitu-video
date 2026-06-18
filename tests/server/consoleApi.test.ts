@@ -1103,6 +1103,7 @@ describe("console API", () => {
     expect(appSource).toContain("formatDeletionTime");
     expect(appSource).toContain("将于");
     expect(appSource).toContain("function formatAbsoluteMinuteTime");
+    expect(appSource).not.toContain('return "刚刚"');
     expect(formatCreativeVersionTimeSource).toContain("formatAbsoluteMinuteTime(job.createdAt)");
     expect(formatCreativeVersionTimeSource).not.toContain('"刚刚"');
     expect(formatDeletionTimeSource).toContain("formatAbsoluteMinuteTime(value)");
