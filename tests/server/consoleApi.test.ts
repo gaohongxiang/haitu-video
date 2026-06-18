@@ -871,6 +871,10 @@ describe("console API", () => {
       appSource.indexOf("async function queueProductVideoJobs"),
       appSource.indexOf("async function importProductPreview")
     );
+    const retryVideoJobSource = appSource.slice(
+      appSource.indexOf("async function retryVideoJob"),
+      appSource.indexOf("async function createBackupArchive")
+    );
     expect(videoCase).toContain("onOrganizeProductPackage={organizeProductPackage}");
     expect(videoCase).toContain("onStartNewProduct={startNewVideoProduct}");
     expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
@@ -1167,6 +1171,7 @@ describe("console API", () => {
     expect(appSource).not.toContain("剩余 ${remainingHours} 小时");
     expect(videoHistorySource).toContain("预览视频");
     expect(videoHistorySource).toContain("下载视频");
+    expect(videoHistorySource).toContain("download={videoDownloadFileName(job, productDownloadContext)}");
     expect(videoHistorySource).not.toContain("设为最终");
     expect(videoHistorySource).not.toContain("已设最终");
     expect(appSource).not.toContain("selectFinalVersion");
@@ -1192,6 +1197,7 @@ describe("console API", () => {
     expect(organizeProductPackageWrapperSource).not.toContain("请先填写商品资料，或选择一个已有商品。");
     expect(appSource).toContain("detectCompletedVideoJobTransitions");
     expect(appSource).toContain("refreshSelectedProductForStudio");
+    expect(appSource).toContain("restoreProductStudioSku(productsResponse.products, currentStudioSku)");
     expect(appSource).toContain("当前商品创作已刷新");
     expect(appSource).toContain("selectedProductGroup");
     expect(appSource).toContain("/video-jobs");
@@ -1253,6 +1259,10 @@ describe("console API", () => {
     expect(appSource).toContain("/retry");
     expect(appSource).toContain("重试任务");
     expect(appSource).toContain("retryVideoJob");
+    expect(retryVideoJobSource).toContain("mergeVideoJobs([response.job], current)");
+    expect(retryVideoJobSource).not.toContain("await refreshConsole()");
+    expect(appSource).toContain("重试会重新提交原任务，可能再次扣费。");
+    expect(appSource).toContain("videoDownloadFileName(job, videoJobDownloadProductContext(job, products))");
     expect(appSource).toContain("任务结果");
     expect(appSource).toContain("打开成片");
     expect(appSource).toContain("下载成片");
@@ -7086,7 +7096,7 @@ describe("console API", () => {
     });
     let completedRetry;
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      completedRetry = await server.fetchJson(`/api/video-jobs/${retried.job.id}`);
+      completedRetry = await server.fetchJson(`/api/video-jobs/${first.job.id}`);
       if (completedRetry.job.status === "completed") {
         break;
       }
@@ -7099,23 +7109,23 @@ describe("console API", () => {
       error: "temporary provider failure"
     }));
     expect(retried.job).toEqual(expect.objectContaining({
-      id: expect.stringMatching(/^job-/),
+      id: first.job.id,
       status: "queued",
       provider: "mock",
       durationSeconds: 8,
       template: "scene",
       confirmPaid: false
     }));
-    expect(retried.job.id).not.toBe(first.job.id);
-    expect(retried.job.outDir).toBe(join(outputsDir, `retry-${first.job.id}`));
+    expect(retried.job.error).toBeUndefined();
+    expect(retried.job.outDir).toBe(join(outputsDir, "box-video"));
     expect(completedRetry.job).toEqual(expect.objectContaining({
-      id: retried.job.id,
+      id: first.job.id,
       status: "completed",
       productSku: "TK-001"
     }));
     expect(calls).toEqual([
       join(outputsDir, "box-video"),
-      join(outputsDir, `retry-${first.job.id}`)
+      join(outputsDir, "box-video")
     ]);
   });
 

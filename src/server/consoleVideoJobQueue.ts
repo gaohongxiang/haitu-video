@@ -154,20 +154,30 @@ export class LocalVideoJobQueue {
     if (record.status !== "failed") {
       throw new Error(`Can retry only failed local video jobs. Job ${id} is ${record.status}.`);
     }
-    return this.enqueue({
-      productPath: record.productPath,
-      outDirName: `retry-${record.id}`,
-      provider: record.provider,
-      providerModel: record.providerModel,
-      duration: record.durationSeconds,
-      template: record.template,
-      finalLanguage: record.finalLanguage,
-      cta: record.cta,
-      scriptLines: record.scriptLines,
-      storyboardLines: record.storyboardLines,
+    const retried = await this.update(record, {
+      status: "queued",
       confirmPaid: options.confirmPaid ?? false,
-      reuseManifest: record.reuseManifest
+      reportPath: undefined,
+      reportUrl: undefined,
+      rawOutputPath: undefined,
+      rawOutputUrl: undefined,
+      finalOutputPath: undefined,
+      finalVideoUrl: undefined,
+      finalManifestPath: undefined,
+      finalManifestUrl: undefined,
+      subtitlePath: undefined,
+      subtitleUrl: undefined,
+      hashtags: undefined,
+      totalTokens: undefined,
+      estimatedCostCny: undefined,
+      error: undefined,
+      errorDetails: undefined,
+      startedAt: undefined,
+      completedAt: undefined,
+      expiresAt: this.expiresAtIso(this.nowIso())
     });
+    this.chain = this.chain.then(() => this.run(retried.id)).catch(() => undefined);
+    return retried;
   }
 
   async list(): Promise<VideoJobRecord[]> {

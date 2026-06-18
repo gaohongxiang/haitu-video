@@ -398,7 +398,7 @@ describe("LocalVideoJobQueue", () => {
     );
   });
 
-  it("retries a failed job by creating a new queued job with the same request settings", async () => {
+  it("retries a failed job in place with the same request settings", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-retry-"));
     tempDirs.push(root);
     const fixturesDir = join(root, "fixtures", "products");
@@ -443,7 +443,7 @@ describe("LocalVideoJobQueue", () => {
       error: "temporary provider failure"
     }));
     expect(retried).toEqual(expect.objectContaining({
-      id: "job-20260607090000000-002",
+      id: failedSource.id,
       status: "queued",
       productPath,
       provider: "mock",
@@ -453,15 +453,16 @@ describe("LocalVideoJobQueue", () => {
       confirmPaid: false,
       reuseManifest
     }));
-    expect(retried.outDir).toBe(join(outputsDir, "retry-job-20260607090000000-001"));
+    expect(retried.error).toBeUndefined();
+    expect(retried.outDir).toBe(join(outputsDir, "wallet-ad"));
     expect(completedRetry).toEqual(expect.objectContaining({
-      id: retried.id,
+      id: failedSource.id,
       status: "completed",
       productSku: "TK-001"
     }));
     expect(attempts).toEqual([
       join(outputsDir, "wallet-ad"),
-      join(outputsDir, "retry-job-20260607090000000-001")
+      join(outputsDir, "wallet-ad")
     ]);
   });
 

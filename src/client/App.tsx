@@ -52,6 +52,7 @@ import {
   isActiveVideoJobStatus,
   type CompletedVideoJobTransitions
 } from "./videoJobRefresh.js";
+import { videoDownloadFileName, type VideoDownloadProductContext } from "./videoDownloadName.js";
 import {
   defaultProductDraft,
   draftReferenceImageStatuses,
@@ -847,8 +848,10 @@ function isTemplateName(value: unknown): value is TemplateName {
   return typeof value === "string" && storyboardTemplateNames.includes(value as TemplateName);
 }
 
-function restoreProductStudioSku(availableProducts: ProductSummary[]): string {
+function restoreProductStudioSku(availableProducts: ProductSummary[], preferredSku?: string): string {
   if (availableProducts.length === 0 || typeof window === "undefined") return "";
+  const preferred = preferredSku?.trim();
+  if (preferred && availableProducts.some((product) => product.sku === preferred)) return preferred;
   const urlSku = productStudioProductSkuFromUrl(window.location.href);
   if (urlSku && availableProducts.some((product) => product.sku === urlSku)) return urlSku;
   return availableProducts[0]?.sku ?? "";
@@ -1342,7 +1345,8 @@ export function App() {
       setSettings(settingsResponse.settings);
       setVideoJobs(videoJobsResponse.jobs);
       videoJobsRef.current = videoJobsResponse.jobs;
-      const restoredStudioSku = activeSection === "video" ? restoreProductStudioSku(productsResponse.products) : "";
+      const currentStudioSku = selectedProductRef.current?.sku ?? selectedProductSkuRef.current;
+      const restoredStudioSku = activeSection === "video" ? restoreProductStudioSku(productsResponse.products, currentStudioSku) : "";
       const restoredStudioProduct = productsResponse.products.find((product) => product.sku === restoredStudioSku);
       const nextProductPath = restoredStudioProduct?.path ?? (productPath && productsResponse.products.some((product) => product.path === productPath) ? productPath : "");
       setProductPath(nextProductPath);
@@ -2441,7 +2445,7 @@ export function App() {
       const confirmed = await requestConfirmAction({
         title: "重试这个付费生成任务？",
         message: `${videoModelLabel(job.provider, job.providerModel)} / ${formatDuration(job.durationSeconds)}`,
-        details: ["重试会重新创建生成任务，可能再次扣费。"],
+        details: ["重试会重新提交原任务，可能再次扣费。"],
         confirmLabel: "确认重试",
         tone: "paid"
       });
@@ -2459,8 +2463,12 @@ export function App() {
           confirmPaid: paidRetry
         }
       );
-      setStatusText(`已重试任务: ${job.id} -> ${response.job.id}`);
-      await refreshConsole();
+      setVideoJobs((current) => mergeVideoJobs([response.job], current));
+      videoJobsRef.current = mergeVideoJobs([response.job], videoJobsRef.current);
+      setStatusText(`已重试任务: ${response.job.id}`);
+      if (activeSection === "video") {
+        await refreshSelectedProductForStudio();
+      }
     } catch (error) {
       showError(error);
     } finally {
@@ -2633,7 +2641,7 @@ export function App() {
       case "ledger":
         return (
           <section className="grid gap-4" aria-label="任务记录">
-            <VideoJobsPanel jobs={videoJobs} onCancel={cancelVideoJob} onRetry={retryVideoJob} />
+            <VideoJobsPanel jobs={videoJobs} products={products} onCancel={cancelVideoJob} onRetry={retryVideoJob} />
             <VideoAssetsPanel assets={videoAssets} onDelete={deleteVideoAsset} isBusy={isBusy} />
           </section>
         );
@@ -4001,6 +4009,9 @@ function ProductCreationComposer({
 
       <VideoHistoryPanel
         jobs={latestCreativeJobs}
+        product={selectedProduct}
+        draft={draft}
+        importText={importText}
         onPreview={setPreviewJob}
         onDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
@@ -4009,6 +4020,9 @@ function ProductCreationComposer({
 
       <VideoPreviewDialog
         job={previewJob}
+        product={selectedProduct}
+        draft={draft}
+        importText={importText}
         index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === previewJob?.id))}
         onClose={() => setPreviewJob(undefined)}
         onRequestDelete={setDeleteTarget}
@@ -4441,17 +4455,24 @@ function StoryboardComposerPanel({
 
 function VideoHistoryPanel({
   jobs,
+  product,
+  draft,
+  importText,
   onPreview,
   onDelete,
   onRetryVideoJob,
   onToast
 }: {
   jobs: CreativeVersionItem[];
+  product?: ProductDetail;
+  draft: ProductDraft;
+  importText: string;
   onPreview: (job: CreativeVersionItem) => void;
   onDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
+  const productDownloadContext = videoDownloadProductContext(product, draft, importText);
   return (
     <section className="grid gap-3 border-t border-[#e5ecf6] bg-[#fbfdff] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4493,7 +4514,7 @@ function VideoHistoryPanel({
                   ) : null}
                   {playableVideo && job.finalVideoUrl ? (
                     <Button asChild className="w-fit" size="sm">
-                      <a href={job.finalVideoUrl} download>
+                      <a href={job.finalVideoUrl} download={videoDownloadFileName(job, productDownloadContext)}>
                         <Download size={13} />
                         下载视频
                       </a>
@@ -4864,6 +4885,9 @@ function DeleteCreativeVersionDialog({
 
 function VideoPreviewDialog({
   job,
+  product,
+  draft,
+  importText,
   index,
   onClose,
   onRequestDelete,
@@ -4871,6 +4895,9 @@ function VideoPreviewDialog({
   onToast
 }: {
   job?: CreativeVersionItem;
+  product?: ProductDetail;
+  draft: ProductDraft;
+  importText: string;
   index: number;
   onClose: () => void;
   onRequestDelete: (job: CreativeVersionItem) => void;
@@ -4896,6 +4923,7 @@ function VideoPreviewDialog({
   const previewTitle = videoLabel(index);
   const statusText = creativeVersionDisplayStatus(job);
   const failureReason = creativeVersionFailureReason(job);
+  const downloadFileName = videoDownloadFileName(job, videoDownloadProductContext(product, draft, importText));
 
   return (
     <div
@@ -4971,7 +4999,7 @@ function VideoPreviewDialog({
             ) : null}
             {job.finalVideoUrl ? (
               <Button asChild className="w-fit" size="sm">
-                <a href={job.finalVideoUrl} download>
+                <a href={job.finalVideoUrl} download={downloadFileName}>
                   <Download size={13} />
                   下载视频
                 </a>
@@ -6181,10 +6209,12 @@ function ApiModelConfigDialog({
 
 function VideoJobsPanel({
   jobs,
+  products,
   onCancel,
   onRetry
 }: {
   jobs: VideoJob[];
+  products: ProductSummary[];
   onCancel: (jobId: string) => Promise<void>;
   onRetry: (job: VideoJob) => Promise<void>;
 }) {
@@ -6230,7 +6260,7 @@ function VideoJobsPanel({
                   <PackageLink href={job.finalVideoUrl} label="打开成片" />
                   {job.finalVideoUrl ? (
                     <Button asChild size="sm">
-                      <a href={job.finalVideoUrl} download>
+                      <a href={job.finalVideoUrl} download={videoDownloadFileName(job, videoJobDownloadProductContext(job, products))}>
                         <Download size={13} />
                         下载成片
                       </a>
@@ -7417,6 +7447,25 @@ function ledgerJobToCreativeVersion(job: LedgerJob): CreativeVersionItem {
     expired: job.expired,
     hashtags: job.contentReview.hashtags,
     source: "ledger"
+  };
+}
+
+function videoDownloadProductContext(product: ProductDetail | undefined, draft: ProductDraft, importText: string): VideoDownloadProductContext {
+  return {
+    title: product?.title_ja || draft.title_ja,
+    title_ja: product?.title_ja || draft.title_ja,
+    sku: product?.sku || draft.sku,
+    sourceText: importText || product?.source_text || draft.source_text,
+    source_text: product?.source_text || draft.source_text || importText
+  };
+}
+
+function videoJobDownloadProductContext(job: VideoJob, products: ProductSummary[]): VideoDownloadProductContext {
+  const product = products.find((item) => item.sku === job.productSku || item.path === job.productPath);
+  return {
+    title: product?.title_ja,
+    title_ja: product?.title_ja,
+    sku: job.productSku
   };
 }
 
