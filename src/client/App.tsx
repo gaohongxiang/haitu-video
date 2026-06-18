@@ -6230,7 +6230,7 @@ function VideoJobsPanel({
             <article
               key={job.id}
               className={cn(
-                "grid gap-3 rounded-lg border bg-white p-3 text-xs xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(240px,1.05fr)_auto] xl:items-start",
+                "grid gap-3 rounded-lg border bg-white p-3 text-xs xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)] xl:items-start",
                 job.status === "failed" ? "border-red-200 bg-red-50/40" : job.status === "canceled" ? "border-slate-200 bg-slate-50" : "border-[var(--border)]"
               )}
             >
@@ -6267,23 +6267,21 @@ function VideoJobsPanel({
                     </Button>
                   ) : null}
                   <PackageLink href={job.reportUrl} label="查看报告" />
+                  {job.status === "queued" ? (
+                    <Button size="sm" variant="danger" onClick={() => void onCancel(job.id)}>
+                      <StopCircle size={13} />
+                      取消排队
+                    </Button>
+                  ) : null}
+                  {job.status === "failed" ? (
+                    <Button size="sm" onClick={() => void onRetry(job)}>
+                      <RefreshCcw size={13} />
+                      重试任务
+                    </Button>
+                  ) : null}
                 </div>
                 {!job.finalVideoUrl && !job.reportUrl ? (
-                  <div className="text-[11px] font-semibold text-[var(--muted)]">{job.status === "completed" ? "暂无成片入口" : "任务完成后显示成片和报告"}</div>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-start justify-end gap-2">
-                {job.status === "queued" ? (
-                  <Button size="sm" variant="danger" onClick={() => void onCancel(job.id)}>
-                    <StopCircle size={13} />
-                    取消排队
-                  </Button>
-                ) : null}
-                {job.status === "failed" ? (
-                  <Button size="sm" onClick={() => void onRetry(job)}>
-                    <RefreshCcw size={13} />
-                    重试任务
-                  </Button>
+                  <div className="text-[11px] font-semibold text-[var(--muted)]">{videoJobResultHint(job)}</div>
                 ) : null}
               </div>
             </article>
@@ -6294,6 +6292,13 @@ function VideoJobsPanel({
       )}
     </Card>
   );
+}
+
+function videoJobResultHint(job: VideoJob): string {
+  if (job.status === "completed") return "暂无成片入口";
+  if (job.status === "failed") return "任务失败，可直接重试原任务";
+  if (job.status === "canceled") return "任务已取消";
+  return "任务完成后显示成片和报告";
 }
 
 function AuditLogPanel({ auditLog }: { auditLog?: AuditLogLedger }) {

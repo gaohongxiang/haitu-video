@@ -1267,6 +1267,10 @@ describe("console API", () => {
     expect(appSource).toContain("打开成片");
     expect(appSource).toContain("下载成片");
     expect(appSource).toContain("查看报告");
+    expect(appSource).toContain("任务失败，可直接重试原任务");
+    const videoJobsPanelSource = appSource.slice(appSource.indexOf("function VideoJobsPanel"), appSource.indexOf("function videoJobResultHint"));
+    expect(videoJobsPanelSource).toContain("xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)]");
+    expect(videoJobsPanelSource).not.toContain("_auto");
     expect(appSource).toContain("estimatedCostCny");
     expect(appSource).toContain("模型分布");
     expect(appSource).toContain("Token / 成本趋势");
