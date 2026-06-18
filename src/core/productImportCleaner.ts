@@ -243,7 +243,10 @@ function firstLikelyTitleLine(lines: string[]): string | undefined {
     if (nonTitleLabelPattern.test(line)) {
       return false;
     }
-    return /[\u3040-\u30ff\u3400-\u9fff]/.test(line) && line.length <= 80;
+    if (/https?:\/\//i.test(line)) {
+      return false;
+    }
+    return /[\u3040-\u30ff\u3400-\u9fff]/.test(line) && line.length <= 220;
   });
 }
 
@@ -299,7 +302,7 @@ function collectImageReferences(lines: string[], explicitImages: string | undefi
     const match = line.match(/^(?:主图|主圖|画像\d*|图片\d*|圖片\d*|参考图\d*|参考圖片\d*)\s*[:：]?\s*(.+)$/i);
     return match?.[1] ? splitImportedImageList(match[1]) ?? [] : [];
   });
-  candidates.push(...lines.flatMap(extractImageUrls));
+  candidates.push(...extractImageUrls(lines.join("\n")));
   if (candidates.length === 0 && explicitImages) {
     candidates.push(...(splitImportedImageList(explicitImages) ?? []));
   }
@@ -307,9 +310,67 @@ function collectImageReferences(lines: string[], explicitImages: string | undefi
 }
 
 function extractImageUrls(value: string): string[] {
-  return Array.from(value.matchAll(/https?:\/\/[^\s"'<>，,；;）)]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>，,；;）)]*)?/gi)).map(
-    (match) => match[0]
-  );
+  const urls: string[] = [];
+  const starts = Array.from(value.matchAll(/https?:\/\//gi)).map((match) => match.index ?? 0);
+  for (const start of starts) {
+    const candidate = readPossiblyWrappedImageUrl(value, start);
+    if (candidate) {
+      urls.push(candidate);
+    }
+  }
+  return uniqueNonEmpty(urls);
+}
+
+function readPossiblyWrappedImageUrl(value: string, start: number): string | undefined {
+  let candidate = "";
+  let sawImageExtension = false;
+  let sawQuery = false;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (!char || /["'<>，,；;）)]/.test(char)) {
+      break;
+    }
+    if (/\s/.test(char)) {
+      const rest = value.slice(index);
+      const nextNonWhitespace = rest.match(/\S/);
+      if (!nextNonWhitespace) {
+        break;
+      }
+      const nextIndex = index + nextNonWhitespace.index!;
+      const next = value[nextIndex];
+      const nextText = value.slice(nextIndex);
+      if (/^https?:\/\//i.test(nextText)) {
+        break;
+      }
+      const nextToken = nextText.split(/\s+/)[0] ?? "";
+      if (!sawImageExtension || next === "?" || (sawQuery && isLikelyWrappedUrlQueryContinuation(nextToken))) {
+        continue;
+      }
+      break;
+    }
+    candidate += char;
+    if (/\.(?:jpe?g|png|webp|gif|avif)$/i.test(candidate.split("?")[0] ?? "")) {
+      sawImageExtension = true;
+    }
+    if (sawImageExtension && char === "?") {
+      sawQuery = true;
+    }
+  }
+  const trimmed = candidate.replace(/[.。]+$/, "");
+  return /\.(?:jpe?g|png|webp|gif|avif)(?:\?|$)/i.test(trimmed) ? trimmed : undefined;
+}
+
+function isLikelyWrappedUrlQueryContinuation(value: string): boolean {
+  if (!value || /[:：]/.test(value)) {
+    return false;
+  }
+  if (/^[&?][A-Za-z0-9_%=&./:-]+$/.test(value)) {
+    return true;
+  }
+  if (/^[a-f0-9]{1,32}$/i.test(value)) {
+    return true;
+  }
+  return /^[a-z0-9_%./-]{1,24}$/.test(value);
 }
 
 function splitImportedList(value: string | undefined): string[] | undefined {

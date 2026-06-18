@@ -2737,30 +2737,54 @@ async function buildAiImportedProductPreview(input: {
     throw new Error("Product import requires source text.");
   }
   const provider = await createTextModelProvider(input.providerKeyStore, input.fetchImpl);
-  const rawProduct = await provider.generateJson<unknown>({
-    system: [
-      "你是电商商品资料整理助手。",
-      "只输出 JSON object，不要 markdown。",
-      "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
-      "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
-      "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
-      "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
-      "价格、店铺名、物流信息不要写入商品资料。"
-    ].join("\n"),
-    user: [
-      "请整理这段商品资料：",
-      text
-    ].join("\n\n")
-  });
-  const product = parseProductFacts(normalizeAiProductFacts(rawProduct, text));
-  return {
-    product,
-    notes: ["文本模型已整理商品资料。"],
-    quality: buildProductImportQuality({
+  try {
+    const rawProduct = await provider.generateJson<unknown>({
+      system: [
+        "你是电商商品资料整理助手。",
+        "只输出 JSON object，不要 markdown。",
+        "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
+        "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
+        "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
+        "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
+        "价格、店铺名、物流信息不要写入商品资料。"
+      ].join("\n"),
+      user: [
+        "请整理这段商品资料：",
+        text
+      ].join("\n\n")
+    });
+    const product = parseProductFacts(normalizeAiProductFacts(rawProduct, text));
+    return {
       product,
-      riskyClaims: product.forbidden_claims
-    })
-  };
+      notes: ["文本模型已整理商品资料。"],
+      quality: buildProductImportQuality({
+        product,
+        riskyClaims: product.forbidden_claims
+      })
+    };
+  } catch (error) {
+    if (!shouldFallbackToLocalProductImport(error)) {
+      throw error;
+    }
+    const fallback = buildImportedProductPreview({ text });
+    return {
+      ...fallback,
+      notes: [
+        "AI 整理返回格式异常，已改用本地规则整理资料。",
+        ...fallback.notes
+      ]
+    };
+  }
+}
+
+function shouldFallbackToLocalProductImport(error: unknown): boolean {
+  if (error instanceof ZodError) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("文本模型返回内容不是 JSON") ||
+    message.includes("Unexpected token") ||
+    message.includes("Unexpected end of JSON input");
 }
 
 function normalizeAiProductFacts(input: unknown, sourceText: string): unknown {

@@ -89,6 +89,20 @@ describe("cleanImportedProductText", () => {
     expect(preview.product.reference_images).toEqual([imageUrl]);
   });
 
+  it("keeps long untitled ecommerce text and wrapped bare image URLs", () => {
+    const imageOne = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
+    const imageTwo = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/914766b76fe743fba14a93d4f2419356~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
+    const wrappedImageOne = imageOne.replace("2739998086", "27399980\n86");
+    const preview = cleanImportedProductText([
+      "ショルダーバッグ レディース 財布 お財布 ショルダー お財布ポシェット お財布ショルダー ポシェット フェイクレザー ペットボトルがインる 長財布 バッグ お財布バッグ 大きい人 小さいさめ 大きめ 大容量 レザー おお財布機能付き 斜めめめ掛けけ 斜めがけ 軽量 軽い",
+      wrappedImageOne,
+      imageTwo
+    ].join("\n"));
+
+    expect(preview.product.title_ja).toContain("ショルダーバッグ レディース 財布");
+    expect(preview.product.reference_images).toEqual([imageOne, imageTwo]);
+  });
+
   it("returns a structured quality report for missing facts and blocked claims", () => {
     const preview = cleanImportedProductText([
       "商品ID 9988",
