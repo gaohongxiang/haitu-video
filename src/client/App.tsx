@@ -4212,6 +4212,7 @@ function ProductComposerReferenceTray({
               onImportAssets={onImportAssets}
               onPreview={() => onPreviewReferenceImage(index)}
               onDelete={onDeleteReferenceImage}
+              canDelete={images.length > 0}
             />
           ))}
         </div>
@@ -5233,7 +5234,8 @@ function ReferenceImageFigure({
   index,
   onImportAssets,
   onPreview,
-  onDelete
+  onDelete,
+  canDelete = true
 }: {
   image: ReferenceImageStatus;
   sku: string;
@@ -5241,6 +5243,7 @@ function ReferenceImageFigure({
   onImportAssets: (sku: string) => Promise<void>;
   onPreview: () => void;
   onDelete: (index: number) => void;
+  canDelete?: boolean;
 }) {
   const canPreview = Boolean(image.previewUrl);
   return (
@@ -5275,9 +5278,11 @@ function ReferenceImageFigure({
             <ImageIcon size={12} />
           </Button>
         ) : null}
-        <Button className="h-8 w-8 p-0" size="icon" variant="danger" title="删除参考图" onClick={() => onDelete(index)}>
-          <X size={12} />
-        </Button>
+        {canDelete ? (
+          <Button className="h-8 w-8 p-0" size="icon" variant="danger" title="删除参考图" onClick={() => onDelete(index)}>
+            <X size={12} />
+          </Button>
+        ) : null}
       </div>
     </figure>
   );
