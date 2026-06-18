@@ -51,6 +51,13 @@ import {
   isActiveVideoJobStatus,
   type CompletedVideoJobTransitions
 } from "./videoJobRefresh.js";
+import {
+  defaultProductDraft,
+  isStructuredProductComposerText,
+  productComposerTextToDraft,
+  productDraftToComposerText,
+  type ProductDraft
+} from "./productComposerText.js";
 import { cn } from "./lib/utils.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
@@ -638,19 +645,6 @@ interface QcSummaryLedger {
   items: QcSummaryItem[];
 }
 
-interface ProductDraft {
-  sku: string;
-  title_ja: string;
-  category: string;
-  materials: string;
-  dimensions: string;
-  verified_selling_points: string;
-  usage_scenes: string;
-  forbidden_claims: string;
-  reference_images: string;
-  source_text: string;
-}
-
 interface ModelConfigDraft {
   configId?: string;
   name: string;
@@ -732,19 +726,6 @@ const defaultSettings: SettingsState = {
   testCreditBalanceCny: 0,
   forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],
   exaggerationRules: ["商品资料未确认的销量、排名、功效、耐荷重、防水、UV 数值不得出现在脚本和字幕里。"]
-};
-
-const defaultProductDraft: ProductDraft = {
-  sku: "",
-  title_ja: "",
-  category: "",
-  materials: "",
-  dimensions: "",
-  verified_selling_points: "",
-  usage_scenes: "",
-  forbidden_claims: "",
-  reference_images: "",
-  source_text: ""
 };
 
 const videoModelOptions: VideoModelChoice[] = ["seedance-2-fast", "seedance-2", "seedance-1-5-pro"];
@@ -7770,70 +7751,6 @@ function productDraftToFacts(draft: ProductDraft) {
     forbidden_claims: splitLines(draft.forbidden_claims),
     reference_images: splitLines(draft.reference_images),
     source_text: draft.source_text.trim() || undefined
-  };
-}
-
-function productDraftToComposerText(draft: ProductDraft): string {
-  const sections = [
-    ["标题", draft.title_ja],
-    ["分类", draft.category],
-    ["材质", draft.materials],
-    ["尺寸/重量", draft.dimensions],
-    ["卖点", draft.verified_selling_points],
-    ["使用场景", draft.usage_scenes],
-    ["不可用卖点", draft.forbidden_claims]
-  ] as const;
-  return sections
-    .map(([label, value]) => `${label}：${value.trim()}`)
-    .filter((line) => !line.endsWith("："))
-    .join("\n\n");
-}
-
-function isStructuredProductComposerText(value: string): boolean {
-  return /(^|\n)\s*(标题|分类|材质|尺寸\/重量|卖点|使用场景|不可用卖点)\s*[：:]/.test(value);
-}
-
-function productComposerTextToDraft(value: string, fallback: ProductDraft): ProductDraft {
-  if (!isStructuredProductComposerText(value)) {
-    return fallback;
-  }
-  const buckets: Partial<Record<keyof ProductDraft, string[]>> = {};
-  let currentKey: keyof ProductDraft | undefined;
-  const labelToKey: Record<string, keyof ProductDraft> = {
-    "标题": "title_ja",
-    "分类": "category",
-    "材质": "materials",
-    "尺寸/重量": "dimensions",
-    "卖点": "verified_selling_points",
-    "使用场景": "usage_scenes",
-    "不可用卖点": "forbidden_claims"
-  };
-
-  for (const rawLine of value.split(/\r?\n/)) {
-    const match = rawLine.match(/^\s*(标题|分类|材质|尺寸\/重量|卖点|使用场景|不可用卖点)\s*[：:]\s*(.*)$/);
-    if (match) {
-      currentKey = labelToKey[match[1] ?? ""];
-      if (currentKey) {
-        buckets[currentKey] = match[2]?.trim() ? [match[2].trim()] : [];
-      }
-      continue;
-    }
-    if (currentKey && rawLine.trim()) {
-      buckets[currentKey] = [...(buckets[currentKey] ?? []), rawLine.trim()];
-    }
-  }
-
-  const bucketText = (key: keyof ProductDraft) => buckets[key]?.join("\n").trim();
-  return {
-    ...fallback,
-    title_ja: bucketText("title_ja") ?? fallback.title_ja,
-    category: bucketText("category") ?? fallback.category,
-    materials: bucketText("materials") ?? fallback.materials,
-    dimensions: bucketText("dimensions") ?? fallback.dimensions,
-    verified_selling_points: bucketText("verified_selling_points") ?? fallback.verified_selling_points,
-    usage_scenes: bucketText("usage_scenes") ?? fallback.usage_scenes,
-    forbidden_claims: bucketText("forbidden_claims") ?? fallback.forbidden_claims,
-    source_text: fallback.source_text
   };
 }
 

@@ -120,6 +120,54 @@ describe("console API", () => {
     }));
   });
 
+  it("downloads remote reference image URLs when saving product facts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-remote-reference-save-"));
+    tempDirs.push(root);
+    const dataDir = join(root, "data");
+    const imageUrl = "https://cdn.example.test/products/arm-cover.jpeg?token=abc";
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === imageUrl) {
+        return new Response(Buffer.from("remote-image-bytes"), {
+          headers: {
+            "content-type": "image/jpeg"
+          }
+        });
+      }
+      return new Response(JSON.stringify({ unexpected: true }), {
+        status: 404,
+        headers: { "content-type": "application/json" }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, dataDir, fetchImpl, autoStartSavedJobs: false });
+
+    const response = await server.fetchJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: "REMOTE-REF-001",
+        title_ja: "接触冷感アームカバー",
+        category: "アームカバー",
+        materials: ["ポリエステル"],
+        dimensions: "約52cm",
+        verified_selling_points: ["通気性のある生地"],
+        usage_scenes: ["通勤"],
+        forbidden_claims: [],
+        reference_images: [imageUrl]
+      })
+    });
+
+    const refFile = join(dataDir, "workspaces", "default", "products", "REMOTE-REF-001", "refs", "reference-01.jpg");
+    const productFile = join(dataDir, "workspaces", "default", "products", "REMOTE-REF-001", "product.json");
+    const stored = JSON.parse(await readFile(productFile, "utf8"));
+    expect(fetchImpl).toHaveBeenCalledWith(imageUrl);
+    expect(response.product.reference_images).toEqual(["refs/reference-01.jpg"]);
+    expect(response.product.reference_image_statuses[0]).toEqual(expect.objectContaining({
+      previewUrl: `/media?path=${encodeURIComponent(refFile)}`,
+      status: "previewable"
+    }));
+    expect(stored.reference_images).toEqual(["refs/reference-01.jpg"]);
+    await expect(readFile(refFile, "utf8")).resolves.toBe("remote-image-bytes");
+  });
+
   it("persists storyboard history in the selected product directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-storyboards-"));
     const dataDir = join(root, "data");
@@ -1021,7 +1069,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("成片语言");
     expect(creationComposerSource).toContain("生成模型");
     expect(creationComposerSource).toContain("CompactChoiceDropdown");
-    expect(appSource).toContain("function productDraftToComposerText");
+    expect(appSource).toContain('from "./productComposerText.js"');
     expect(creationComposerSource).toContain("handleGenerateVideo");
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct), {");
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
@@ -2181,7 +2229,7 @@ describe("console API", () => {
     expect(composerSource).toContain("生成模型");
     expect(composerSource).toContain("生成视频");
     expect(composerSource).toContain("CompactChoiceDropdown");
-    expect(appSource).toContain("function productDraftToComposerText");
+    expect(appSource).toContain('from "./productComposerText.js"');
     expect(composerSource).toContain("storyboard-history-dropdown");
     expect(composerSource).not.toContain("补充要点");
     expect(composerSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
@@ -2800,7 +2848,17 @@ describe("console API", () => {
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
     const imageUrl = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
-    const server = createConsoleServer({ rootDir: root, fixturesDir });
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === imageUrl) {
+        return new Response(Buffer.from("remote-image-bytes"), {
+          headers: {
+            "content-type": "image/jpeg"
+          }
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
 
     const response = await server.fetchJson("/api/products/import", {
       method: "POST",
@@ -2818,8 +2876,14 @@ describe("console API", () => {
     });
 
     const productPath = testProductPath(fixturesDir, "DXM-172397240576223361");
-    expect(response.product.reference_images).toEqual([imageUrl]);
-    await expect(readFile(productPath, "utf8")).resolves.toContain(imageUrl);
+    const refFile = join(dirname(productPath), "refs", "reference-01.jpg");
+    expect(response.product.reference_images).toEqual(["refs/reference-01.jpg"]);
+    expect(response.product.reference_image_statuses[0]).toEqual(expect.objectContaining({
+      previewUrl: `/media?path=${encodeURIComponent(refFile)}`,
+      status: "previewable"
+    }));
+    await expect(readFile(productPath, "utf8")).resolves.toContain("refs/reference-01.jpg");
+    await expect(readFile(refFile, "utf8")).resolves.toBe("remote-image-bytes");
   });
 
   it("imports multiple pasted product blocks and reports per-item errors", async () => {

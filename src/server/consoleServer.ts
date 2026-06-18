@@ -179,6 +179,11 @@ interface StoryboardHistoryRequest {
   script?: unknown;
 }
 
+interface RemoteReferenceImportResult {
+  referenceImages: string[];
+  downloaded: ImportedProductAsset[];
+}
+
 interface StoryboardRecord {
   id: string;
   createdAt: string;
@@ -498,6 +503,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             rootDir: dataDir,
             workspaceId: requestContext.workspaceId,
             databaseHandle: requestContext.databaseHandle,
+            fetchImpl: options.fetchImpl,
             input: await request.json()
           })
         });
@@ -519,6 +525,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             rootDir: dataDir,
             workspaceId: requestContext.workspaceId,
             databaseHandle: requestContext.databaseHandle,
+            fetchImpl: options.fetchImpl,
             input: (await request.json()) as ImportProductPreviewRequest
           })
         );
@@ -530,6 +537,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             rootDir: dataDir,
             workspaceId: requestContext.workspaceId,
             databaseHandle: requestContext.databaseHandle,
+            fetchImpl: options.fetchImpl,
             input: (await request.json()) as ImportProductsBatchRequest
           })
         );
@@ -2649,13 +2657,20 @@ async function saveProductFactPackage(input: {
   rootDir: string;
   workspaceId?: string;
   databaseHandle?: DatabaseHandle;
+  fetchImpl?: typeof fetch;
   input: unknown;
 }): Promise<Awaited<ReturnType<typeof getProductBySku>>> {
   const product = parseProductFacts(input.input);
   const productPath = join(input.fixturesDir, sanitizePathSegment(product.sku), "product.json");
   await mkdir(dirname(productPath), { recursive: true });
+  const importedReferences = await importRemoteReferenceImages({
+    productFilePath: productPath,
+    referenceImages: product.reference_images,
+    fetchImpl: input.fetchImpl
+  });
   await writeFile(productPath, JSON.stringify({
     ...product,
+    reference_images: importedReferences.referenceImages,
     workspaceId: input.workspaceId ?? DEFAULT_WORKSPACE_ID
   }, null, 2), "utf8");
   if (input.databaseHandle) {
@@ -2868,6 +2883,7 @@ async function importProductFromText(input: {
   rootDir: string;
   workspaceId?: string;
   databaseHandle?: DatabaseHandle;
+  fetchImpl?: typeof fetch;
   input: ImportProductPreviewRequest;
 }): Promise<{ product: Awaited<ReturnType<typeof getProductBySku>>; notes: string[] }> {
   const preview = buildImportedProductPreview(input.input);
@@ -2877,6 +2893,7 @@ async function importProductFromText(input: {
       rootDir: input.rootDir,
       workspaceId: input.workspaceId,
       databaseHandle: input.databaseHandle,
+      fetchImpl: input.fetchImpl,
       input: preview.product
     }),
     notes: preview.notes
@@ -3300,6 +3317,7 @@ async function importProductsBatchFromText(input: {
   rootDir: string;
   workspaceId?: string;
   databaseHandle?: DatabaseHandle;
+  fetchImpl?: typeof fetch;
   input: ImportProductsBatchRequest;
 }): Promise<{
   summary: {
@@ -3321,6 +3339,7 @@ async function importProductsBatchFromText(input: {
         rootDir: input.rootDir,
         workspaceId: input.workspaceId,
         databaseHandle: input.databaseHandle,
+        fetchImpl: input.fetchImpl,
         input: { text: block }
       });
       results.push({
@@ -3477,6 +3496,48 @@ async function uploadProductReferenceImages(input: {
       rootDir: input.rootDir,
       sku: input.sku
     })
+  };
+}
+
+async function importRemoteReferenceImages(input: {
+  productFilePath: string;
+  referenceImages: string[];
+  fetchImpl?: typeof fetch;
+}): Promise<RemoteReferenceImportResult> {
+  const fetchReference = input.fetchImpl ?? fetch;
+  const nextReferenceImages = withoutPlaceholderReferenceImages(input.referenceImages);
+  const downloaded: ImportedProductAsset[] = [];
+  for (const [index, reference] of nextReferenceImages.entries()) {
+    if (!isHttpReference(reference)) {
+      continue;
+    }
+    try {
+      const response = await fetchReference(reference);
+      if (!response.ok) {
+        continue;
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      const extension = imageExtensionFromRemoteReference(reference, contentType);
+      if (!extension) {
+        continue;
+      }
+      const targetPath = join(dirname(input.productFilePath), "refs", `reference-${String(index + 1).padStart(2, "0")}${extension}`);
+      await mkdir(dirname(targetPath), { recursive: true });
+      await writeFile(targetPath, Buffer.from(await response.arrayBuffer()));
+      const localReference = `refs/${basename(targetPath)}`;
+      nextReferenceImages[index] = localReference;
+      downloaded.push({
+        original: reference,
+        path: targetPath,
+        reference: localReference
+      });
+    } catch {
+      continue;
+    }
+  }
+  return {
+    referenceImages: nextReferenceImages,
+    downloaded
   };
 }
 
@@ -4512,6 +4573,10 @@ function isRemoteReference(reference: string): boolean {
   return reference.startsWith("http://") || reference.startsWith("https://") || reference.startsWith("data:image/");
 }
 
+function isHttpReference(reference: string): boolean {
+  return reference.startsWith("http://") || reference.startsWith("https://");
+}
+
 function normalizedImageExtension(path: string): string {
   const extension = extname(path).toLowerCase();
   return [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
@@ -4533,6 +4598,14 @@ function imageExtensionFromUpload(fileName: string, mimeType: string): string | 
     return ".jpg";
   }
   return [".jpg", ".png", ".webp"].includes(extension) ? extension : undefined;
+}
+
+function imageExtensionFromRemoteReference(reference: string, mimeType: string): string | undefined {
+  const fromMimeType = imageExtensionFromUpload("", mimeType);
+  if (fromMimeType) {
+    return fromMimeType;
+  }
+  return imageExtensionFromUpload(new URL(reference).pathname, "");
 }
 
 function summarizeReferenceImages(images: ProductImagePreview[]) {
