@@ -274,6 +274,7 @@ describe("buildJobLedger", () => {
         scriptVoiceover: "カードも小銭もすっきり入るミニ財布です。",
         subtitleLines: ["カードも小銭も", "すっきり収納", "今すぐチェック"],
         cta: "今すぐチェック",
+        hashtags: [],
         promptPreview: "Create a Japanese TikTok Shop product ad video. Keep the black wallet consistent with the reference image.",
         rawManifestUrl: `/media?path=${encodeURIComponent(rawManifestPath)}`,
         finalManifestUrl: `/media?path=${encodeURIComponent(finalManifestPath)}`,

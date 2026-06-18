@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ProductFacts } from "../core/productFacts.js";
+import { generateJapaneseHashtags } from "../core/japaneseHashtags.js";
 import { generateVideoPrompt } from "../core/promptGenerator.js";
 import {
   generateJapaneseAdScript,
@@ -19,6 +20,10 @@ export interface ProductJobManifest {
   product: {
     sku: string;
     title_ja: string;
+    category?: string;
+    materials?: string[];
+    verified_selling_points?: string[];
+    usage_scenes?: string[];
   };
   version: number;
   provider: {
@@ -35,6 +40,7 @@ export interface ProductJobManifest {
     provider: MoneyAmount;
     total: MoneyAmount;
   };
+  hashtags: string[];
   paths: {
     outputDir: string;
     manifest: string;
@@ -89,13 +95,21 @@ export async function runProductJob(input: {
     output: providerResult.output,
     targetDurationSeconds: durationSeconds
   });
+  const hashtags = generateJapaneseHashtags({
+    product: input.product,
+    script
+  });
   const manifestPath = join(outputDir, "manifest.json");
   const manifest: ProductJobManifest = {
     jobId,
     status: qc.result === "fail" ? "failed" : "completed",
     product: {
       sku: input.product.sku,
-      title_ja: input.product.title_ja
+      title_ja: input.product.title_ja,
+      category: input.product.category,
+      materials: input.product.materials,
+      verified_selling_points: input.product.verified_selling_points,
+      usage_scenes: input.product.usage_scenes
     },
     version: input.version,
     provider: {
@@ -112,6 +126,7 @@ export async function runProductJob(input: {
       provider: providerResult.cost,
       total: providerResult.cost
     },
+    hashtags,
     paths: {
       outputDir,
       manifest: manifestPath

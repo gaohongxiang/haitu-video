@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
+import { generateJapaneseHashtags, normalizeJapaneseHashtags, type HashtagSourceProduct, type HashtagSourceScript } from "../core/japaneseHashtags.js";
 import { buildJobLedger, type JobLedgerRow } from "./jobLedger.js";
 import type { ReviewState } from "./reviewStore.js";
 
@@ -13,6 +14,7 @@ export interface PublishPackageManifest {
   durationSeconds?: number;
   totalTokens: number;
   estimatedCostCny: number;
+  hashtags: string[];
   selectedFinalNote?: string;
   packageDir: string;
   manifestPath: string;
@@ -81,6 +83,7 @@ export async function createPublishPackage(
   const finalManifestPath = job.finalManifestPath
     ? await copyNamedFile(job.finalManifestPath, packageDir)
     : undefined;
+  const hashtags = await buildPublishPackageHashtags(job);
   const manifestPath = join(packageDir, "publish-package.json");
   const manifest: PublishPackageManifest = {
     type: "haitu_publish_package",
@@ -91,6 +94,7 @@ export async function createPublishPackage(
     durationSeconds: job.durationSeconds,
     totalTokens: job.totalTokens,
     estimatedCostCny: job.estimatedCostCny,
+    hashtags,
     selectedFinalNote: product.selectedFinalNote,
     packageDir,
     manifestPath,
@@ -188,6 +192,7 @@ function normalizePublishPackageManifest(
     durationSeconds: manifest.durationSeconds,
     totalTokens: manifest.totalTokens ?? 0,
     estimatedCostCny: manifest.estimatedCostCny ?? 0,
+    hashtags: normalizeJapaneseHashtags(manifest.hashtags),
     selectedFinalNote: manifest.selectedFinalNote,
     packageDir: dirname(manifestPath),
     manifestPath,
@@ -218,4 +223,31 @@ function roundCny(value: number): number {
 
 function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+}
+
+async function buildPublishPackageHashtags(job: JobLedgerRow): Promise<string[]> {
+  const fallback = normalizeJapaneseHashtags(job.contentReview.hashtags);
+  if (!job.rawManifestPath) {
+    return fallback;
+  }
+  try {
+    const manifest = JSON.parse(await readFile(job.rawManifestPath, "utf8")) as {
+      hashtags?: unknown;
+      product?: HashtagSourceProduct;
+      script?: HashtagSourceScript;
+    };
+    const existing = normalizeJapaneseHashtags(manifest.hashtags);
+    if (existing.length > 0) {
+      return existing;
+    }
+    if (manifest.product) {
+      return generateJapaneseHashtags({
+        product: manifest.product,
+        script: manifest.script
+      });
+    }
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }

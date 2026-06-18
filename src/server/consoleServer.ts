@@ -2226,6 +2226,7 @@ async function buildPublishPackagesCsv(outputsDir: string): Promise<string> {
       "字幕地址",
       "成品Manifest",
       "发布清单",
+      "日文标签",
       "人工备注",
       "创建时间"
     ],
@@ -2241,6 +2242,7 @@ async function buildPublishPackagesCsv(outputsDir: string): Promise<string> {
       item.fileUrls.subtitleUrl ?? "",
       item.fileUrls.finalManifestUrl ?? "",
       item.fileUrls.manifestUrl,
+      item.hashtags.join(" "),
       item.selectedFinalNote ?? "",
       item.createdAt
     ])

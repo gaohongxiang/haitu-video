@@ -48,6 +48,13 @@ describe("runProductJob", () => {
     expect(manifest.cost.total.amount).toBe(0);
     expect(manifest.qc.result).toBe("pass");
     expect(manifest.script.subtitleLines).toContain("今すぐチェック");
+    expect(manifest.hashtags).toEqual(expect.arrayContaining([
+      "#収納グッズ",
+      "#省スペース",
+      "#キッチン収納",
+      "#TikTokShop"
+    ]));
+    expect(manifest.hashtags.every((tag) => tag.startsWith("#"))).toBe(true);
     await expect(readFile(manifest.paths.manifest, "utf8")).resolves.toContain("\"status\": \"completed\"");
   });
 

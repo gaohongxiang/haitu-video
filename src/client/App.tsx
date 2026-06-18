@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   Clapperboard,
   ClipboardCheck,
+  Copy,
   Database,
   Download,
   ExternalLink,
@@ -265,6 +266,7 @@ interface JobContentReviewSnapshot {
   scriptVoiceover?: string;
   subtitleLines: string[];
   cta?: string;
+  hashtags: string[];
   promptPreview?: string;
   rawManifestUrl?: string;
   finalManifestUrl?: string;
@@ -337,6 +339,7 @@ interface VideoJob {
   finalManifestUrl?: string;
   subtitlePath?: string;
   subtitleUrl?: string;
+  hashtags?: string[];
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
@@ -366,6 +369,7 @@ interface CreativeVersionItem {
   createdAt?: string;
   expiresAt?: string;
   expired?: boolean;
+  hashtags?: string[];
   source: "video-job" | "ledger";
   videoJob?: VideoJob;
 }
@@ -4000,6 +4004,7 @@ function ProductCreationComposer({
         onPreview={setPreviewJob}
         onDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
+        onToast={onToast}
       />
 
       <VideoPreviewDialog
@@ -4008,6 +4013,7 @@ function ProductCreationComposer({
         onClose={() => setPreviewJob(undefined)}
         onRequestDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
+        onToast={onToast}
       />
       <DeleteCreativeVersionDialog
         job={deleteTarget}
@@ -4437,12 +4443,14 @@ function VideoHistoryPanel({
   jobs,
   onPreview,
   onDelete,
-  onRetryVideoJob
+  onRetryVideoJob,
+  onToast
 }: {
   jobs: CreativeVersionItem[];
   onPreview: (job: CreativeVersionItem) => void;
   onDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onToast: ConsoleToastFn;
 }) {
   return (
     <section className="grid gap-3 border-t border-[#e5ecf6] bg-[#fbfdff] p-5">
@@ -4473,6 +4481,7 @@ function VideoHistoryPanel({
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
                     {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {failureReason || videoExpiryLabel(job)}
                   </div>
+                  <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
                 </div>
                 <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
                   {playableVideo ? (
@@ -4857,13 +4866,15 @@ function VideoPreviewDialog({
   index,
   onClose,
   onRequestDelete,
-  onRetryVideoJob
+  onRetryVideoJob,
+  onToast
 }: {
   job?: CreativeVersionItem;
   index: number;
   onClose: () => void;
   onRequestDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onToast: ConsoleToastFn;
 }) {
   useEffect(() => {
     if (!job) return;
@@ -4910,6 +4921,7 @@ function VideoPreviewDialog({
             <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
               {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
             </div>
+            <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
           </div>
           <Button className="w-fit" size="sm" variant="ghost" onClick={onClose}>
             <X size={15} />
@@ -4977,6 +4989,26 @@ function VideoPreviewDialog({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function VideoHashtagChips({ hashtags, onToast }: { hashtags?: string[]; onToast: ConsoleToastFn }) {
+  const cleaned = normalizeDisplayHashtags(hashtags);
+  if (cleaned.length === 0) {
+    return null;
+  }
+  return (
+    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+      {cleaned.slice(0, 8).map((tag) => (
+        <span key={tag} className="rounded-full border border-[#dbe4f0] bg-[#f7f9fe] px-2 py-1 text-[11px] font-black text-[#36506f]">
+          {tag}
+        </span>
+      ))}
+      <Button className="h-7 w-fit px-2 text-[11px]" size="sm" variant="soft" onClick={() => void copyHashtags(cleaned, onToast)}>
+        <Copy size={12} />
+        复制标签
+      </Button>
     </div>
   );
 }
@@ -7305,6 +7337,34 @@ function mergeVideoJobs(nextJobs: VideoJob[], currentJobs: VideoJob[]): VideoJob
   return Array.from(byId.values()).sort((left, right) => videoJobSortTime(right) - videoJobSortTime(left));
 }
 
+async function copyHashtags(hashtags: string[], onToast: ConsoleToastFn): Promise<void> {
+  const text = normalizeDisplayHashtags(hashtags).join(" ");
+  if (!text) {
+    onToast("还没有可复制的标签。");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    onToast("日文标签已复制。", "ok");
+  } catch {
+    onToast(text, "neutral");
+  }
+}
+
+function normalizeDisplayHashtags(hashtags?: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of hashtags ?? []) {
+    const body = value.trim().replace(/^#+/, "").replace(/\s+/g, "");
+    if (!body) continue;
+    const tag = `#${body}`;
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    result.push(tag);
+  }
+  return result;
+}
+
 function buildLatestCreativeJobs(input: {
   actionProduct: ProductSummary;
   ledgerJobs: LedgerJob[];
@@ -7336,6 +7396,7 @@ function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
     createdAt: job.createdAt,
     expiresAt: job.expiresAt,
     expired: job.expired,
+    hashtags: job.hashtags,
     source: "video-job",
     videoJob: job
   };
@@ -7353,6 +7414,7 @@ function ledgerJobToCreativeVersion(job: LedgerJob): CreativeVersionItem {
     createdAt: createdAtFromReportPath(job.reportPath),
     expiresAt: job.expiresAt,
     expired: job.expired,
+    hashtags: job.contentReview.hashtags,
     source: "ledger"
   };
 }

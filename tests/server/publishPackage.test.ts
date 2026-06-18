@@ -25,7 +25,22 @@ describe("createPublishPackage", () => {
     const subtitlePath = join(runDir, "final", "wallet.ass");
     await mkdir(join(rawManifestPath, ".."), { recursive: true });
     await mkdir(join(finalVideoPath, ".."), { recursive: true });
-    await writeFile(rawManifestPath, JSON.stringify({ type: "raw" }), "utf8");
+    await writeFile(rawManifestPath, JSON.stringify({
+      type: "raw",
+      product: {
+        sku: "WALLET-BLACK-001",
+        title_ja: "カード収納ミニ財布",
+        category: "財布",
+        materials: ["PU"],
+        verified_selling_points: ["カード収納", "コンパクト"],
+        usage_scenes: ["通勤", "お出かけ"]
+      },
+      script: {
+        voiceover: "カード収納が便利なミニ財布。",
+        subtitleLines: ["カード収納。", "今すぐチェック"]
+      },
+      hashtags: ["財布", "#ミニ財布", "#便利グッズ"]
+    }), "utf8");
     await writeFile(finalManifestPath, JSON.stringify({ type: "final" }), "utf8");
     await writeFile(finalVideoPath, Buffer.from("video-bytes"));
     await writeFile(subtitlePath, "subtitle", "utf8");
@@ -89,6 +104,7 @@ describe("createPublishPackage", () => {
       durationSeconds: 8,
       totalTokens: 80770,
       estimatedCostCny: 2.99,
+      hashtags: ["#財布", "#ミニ財布", "#便利グッズ"],
       selectedFinalNote: "已人工审核",
       packageDir,
       manifestPath: join(packageDir, "publish-package.json"),
@@ -187,6 +203,7 @@ describe("createPublishPackage", () => {
       durationSeconds: 8,
       totalTokens: 0,
       estimatedCostCny: 0,
+      hashtags: [],
       packageDir: join(outputsDir, "publish-packages", "TK-001", "scene-v1"),
       manifestPath: "stale-path.json",
       createdAt: "2026-06-07T07:00:00.000Z",
@@ -204,6 +221,7 @@ describe("createPublishPackage", () => {
       durationSeconds: 8,
       totalTokens: 80770,
       estimatedCostCny: 2.99,
+      hashtags: ["#財布", "#ミニ財布"],
       packageDir: join(outputsDir, "publish-packages", "WALLET-BLACK-001", "paid-v1"),
       manifestPath: "stale-path.json",
       createdAt: "2026-06-07T08:00:00.000Z",
@@ -225,6 +243,7 @@ describe("createPublishPackage", () => {
     expect(ledger.packages.map((item) => item.jobId)).toEqual(["paid-v1", "scene-v1"]);
     expect(ledger.packages[0]).toEqual(expect.objectContaining({
       productSku: "WALLET-BLACK-001",
+      hashtags: ["#財布", "#ミニ財布"],
       manifestPath: join(outputsDir, "publish-packages", "WALLET-BLACK-001", "paid-v1", "publish-package.json")
     }));
   });

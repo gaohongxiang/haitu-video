@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { normalizeJapaneseHashtags } from "../core/japaneseHashtags.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
@@ -51,6 +52,7 @@ export interface VideoJobRecord {
   finalManifestUrl?: string;
   subtitlePath?: string;
   subtitleUrl?: string;
+  hashtags?: string[];
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
@@ -244,6 +246,7 @@ export class LocalVideoJobQueue {
         await this.removeGeneratedOutputs(record.outDir);
         return;
       }
+      const hashtags = await readHashtagsFromRawManifest(report.raw.manifestPath);
       await this.update(record, {
         status: "completed",
         productSku: report.productSku,
@@ -257,6 +260,7 @@ export class LocalVideoJobQueue {
         finalManifestUrl: report.final?.manifestPath ? mediaUrl(report.final.manifestPath) : undefined,
         subtitlePath: report.final?.subtitlePath,
         subtitleUrl: report.final?.subtitlePath ? mediaUrl(report.final.subtitlePath) : undefined,
+        hashtags,
         totalTokens: report.billing?.totalTokens ?? report.usage?.totalTokens,
         estimatedCostCny: report.billing?.estimatedCostCny,
         completedAt: this.nowIso()
@@ -368,6 +372,7 @@ export class LocalVideoJobQueue {
         finalManifestUrl: record.finalManifestUrl ?? (report.final?.manifestPath ? mediaUrl(report.final.manifestPath) : undefined),
         subtitlePath: record.subtitlePath ?? report.final?.subtitlePath,
         subtitleUrl: record.subtitleUrl ?? (report.final?.subtitlePath ? mediaUrl(report.final.subtitlePath) : undefined),
+        hashtags: record.hashtags ?? await readHashtagsFromRawManifest(report.raw?.manifestPath),
         totalTokens: record.totalTokens ?? report.billing?.totalTokens ?? report.usage?.totalTokens,
         estimatedCostCny: record.estimatedCostCny ?? report.billing?.estimatedCostCny
       };
@@ -493,6 +498,19 @@ function sanitizeLines(lines?: string[]): string[] | undefined {
 
 function mediaUrl(path: string): string {
   return `/media?path=${encodeURIComponent(path)}`;
+}
+
+async function readHashtagsFromRawManifest(manifestPath: string | undefined): Promise<string[] | undefined> {
+  if (!manifestPath) {
+    return undefined;
+  }
+  try {
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { hashtags?: unknown };
+    const hashtags = normalizeJapaneseHashtags(manifest.hashtags);
+    return hashtags.length > 0 ? hashtags : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function serializeJobError(error: unknown): VideoJobErrorDetails {

@@ -2250,6 +2250,10 @@ describe("console API", () => {
     expect(appSource).toContain('if (value === "failed") return "生成失败";');
     expect(composerSource).toContain("预览视频");
     expect(composerSource).toContain("下载视频");
+    expect(appSource).toContain("VideoHashtagChips");
+    expect(appSource).toContain("复制标签");
+    expect(appSource).toContain("日文标签已复制。");
+    expect(appSource).toContain("normalizeDisplayHashtags");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
     expect(composerSource).toContain("previewReferenceIndex");
     expect(composerSource).toContain("previewReferenceImages");
@@ -3898,7 +3902,22 @@ describe("console API", () => {
     const finalOutputPath = join(runDir, "final", "wallet.final.mp4");
     await mkdir(join(rawManifestPath, ".."), { recursive: true });
     await mkdir(join(finalOutputPath, ".."), { recursive: true });
-    await writeFile(rawManifestPath, JSON.stringify({ type: "raw" }), "utf8");
+    await writeFile(rawManifestPath, JSON.stringify({
+      type: "raw",
+      product: {
+        sku: "WALLET-BLACK-001",
+        title_ja: "カード収納ミニ財布",
+        category: "財布",
+        materials: ["PU"],
+        verified_selling_points: ["カード収納", "コンパクト"],
+        usage_scenes: ["通勤", "お出かけ"]
+      },
+      script: {
+        voiceover: "カード収納が便利なミニ財布。",
+        subtitleLines: ["カード収納。", "今すぐチェック"]
+      },
+      hashtags: ["財布", "#ミニ財布", "#便利グッズ"]
+    }), "utf8");
     await writeFile(rawOutputPath, Buffer.from("raw-video"));
     await writeFile(finalOutputPath, Buffer.from("final-video"));
     await writeFile(
@@ -4752,7 +4771,22 @@ describe("console API", () => {
     const subtitlePath = join(runDir, "final", "wallet.ass");
     await mkdir(join(rawManifestPath, ".."), { recursive: true });
     await mkdir(join(finalOutputPath, ".."), { recursive: true });
-    await writeFile(rawManifestPath, JSON.stringify({ type: "raw" }), "utf8");
+    await writeFile(rawManifestPath, JSON.stringify({
+      type: "raw",
+      product: {
+        sku: "WALLET-BLACK-001",
+        title_ja: "カード収納ミニ財布",
+        category: "財布",
+        materials: ["PU"],
+        verified_selling_points: ["カード収納", "コンパクト"],
+        usage_scenes: ["通勤", "お出かけ"]
+      },
+      script: {
+        voiceover: "カード収納が便利なミニ財布。",
+        subtitleLines: ["カード収納。", "今すぐチェック"]
+      },
+      hashtags: ["財布", "#ミニ財布", "#便利グッズ"]
+    }), "utf8");
     await writeFile(finalManifestPath, JSON.stringify({ type: "postprocessed_final" }), "utf8");
     await writeFile(finalOutputPath, Buffer.from("final-video"));
     await writeFile(subtitlePath, "[Script Info]\n", "utf8");
@@ -4822,6 +4856,7 @@ describe("console API", () => {
       durationSeconds: 8,
       totalTokens: 80770,
       estimatedCostCny: 2.99,
+      hashtags: ["#財布", "#ミニ財布", "#便利グッズ"],
       selectedFinalNote: "发布 TikTok",
       packageDir,
       manifestPath: packageManifestPath,
@@ -5022,6 +5057,7 @@ describe("console API", () => {
       durationSeconds: 8,
       totalTokens: 80770,
       estimatedCostCny: 2.99,
+      hashtags: ["#財布", "#ミニ財布"],
       packageDir,
       manifestPath: "old-manifest-path.json",
       createdAt: "2026-06-07T08:00:00.000Z",
@@ -5048,6 +5084,7 @@ describe("console API", () => {
         jobId: "wallet-final",
         provider: "volcengine-seedance",
         taskId: "cgt-wallet",
+        hashtags: ["#財布", "#ミニ財布"],
         manifestPath: join(packageDir, "publish-package.json"),
         fileUrls: {
           videoUrl: `/media?path=${encodeURIComponent(join(packageDir, "wallet.final.mp4"))}`,
@@ -5121,6 +5158,7 @@ describe("console API", () => {
       durationSeconds: 8,
       totalTokens: 80770,
       estimatedCostCny: 2.99,
+      hashtags: ["#財布", "#ミニ財布", "#便利グッズ"],
       selectedFinalNote: "发布 TikTok, 店铺客服可下载",
       packageDir,
       manifestPath: "old-manifest-path.json",
@@ -5141,13 +5179,14 @@ describe("console API", () => {
     expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
     expect(response.headers.get("content-disposition")).toBe('attachment; filename="haitu-publish-packages.csv"');
     expect(csv.split("\n")[0]).toBe(
-      "商品SKU,任务ID,生成通道,Task ID,时长秒,Token,估算成本CNY,视频地址,字幕地址,成品Manifest,发布清单,人工备注,创建时间"
+      "商品SKU,任务ID,生成通道,Task ID,时长秒,Token,估算成本CNY,视频地址,字幕地址,成品Manifest,发布清单,日文标签,人工备注,创建时间"
     );
     expect(csv).toContain("WALLET-BLACK-001,wallet-final,火山引擎 Seedance,cgt-wallet,8,80770,2.99");
     expect(csv).toContain(`/media?path=${encodeURIComponent(join(packageDir, "wallet.final.mp4"))}`);
     expect(csv).toContain(`/media?path=${encodeURIComponent(join(packageDir, "wallet.ass"))}`);
     expect(csv).toContain(`/media?path=${encodeURIComponent(join(packageDir, "final-manifest.json"))}`);
     expect(csv).toContain(`/media?path=${encodeURIComponent(join(packageDir, "publish-package.json"))}`);
+    expect(csv).toContain("#財布 #ミニ財布 #便利グッズ");
     expect(csv).toContain('"发布 TikTok, 店铺客服可下载"');
   });
 
@@ -6113,6 +6152,12 @@ describe("console API", () => {
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const latest = await server.fetchJson(`/api/video-jobs/${job.id}`);
         if (latest.job.status === "completed") {
+          expect(latest.job.hashtags).toEqual(expect.arrayContaining([
+            "#収納グッズ",
+            "#省スペース",
+            "#TikTokShop"
+          ]));
+          expect(latest.job.hashtags.every((tag: string) => tag.startsWith("#"))).toBe(true);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 5));

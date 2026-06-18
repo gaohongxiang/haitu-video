@@ -1,6 +1,7 @@
 import { readFile, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 
+import { normalizeJapaneseHashtags } from "../core/japaneseHashtags.js";
 import type { MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { ManualVersionReview, ReviewState } from "./reviewStore.js";
 
@@ -35,6 +36,7 @@ export interface JobContentReviewSnapshot {
   scriptVoiceover?: string;
   subtitleLines: string[];
   cta?: string;
+  hashtags: string[];
   promptPreview?: string;
   rawManifestUrl?: string;
   finalManifestUrl?: string;
@@ -239,6 +241,7 @@ async function buildContentReviewSnapshot(input: {
     return {
       available: false,
       subtitleLines: [],
+      hashtags: [],
       ...links,
       missingReason: "raw manifest 缺失，无法读取脚本和 prompt"
     };
@@ -250,6 +253,7 @@ async function buildContentReviewSnapshot(input: {
         subtitleLines?: unknown;
         cta?: unknown;
       };
+      hashtags?: unknown;
       prompt?: unknown;
     };
     const scriptVoiceover = asText(manifest.script?.voiceover);
@@ -263,6 +267,7 @@ async function buildContentReviewSnapshot(input: {
       scriptVoiceover,
       subtitleLines,
       cta,
+      hashtags: normalizeJapaneseHashtags(manifest.hashtags),
       promptPreview,
       ...links,
       missingReason: undefined
@@ -271,6 +276,7 @@ async function buildContentReviewSnapshot(input: {
     return {
       available: false,
       subtitleLines: [],
+      hashtags: [],
       ...links,
       missingReason: `raw manifest 无法读取: ${input.rawManifestPath}`
     };
