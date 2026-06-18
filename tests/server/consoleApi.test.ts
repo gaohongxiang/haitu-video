@@ -2545,6 +2545,67 @@ describe("console API", () => {
     }
   });
 
+  it("keeps bare image URLs from source text when the AI omits reference images", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-ai-bare-image-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const imageUrl = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "ARM-COVER-BARE-URL",
+                  title_ja: "接触冷感アームカバー",
+                  category: "アームカバー",
+                  materials: ["ポリエステル"],
+                  dimensions: "約52cm",
+                  verified_selling_points: ["指穴付き"],
+                  usage_scenes: ["通勤"],
+                  forbidden_claims: [],
+                  reference_images: []
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 512
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-model-secret-key-123456"
+        })
+      });
+
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: [
+            "商品タイトル 接触冷感アームカバー",
+            "素材 ポリエステル",
+            imageUrl
+          ].join("\n")
+        })
+      });
+
+      expect(response.product.reference_images).toEqual([imageUrl]);
+      expect(response.quality.verifiedFacts).toContain("参考图");
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
   it("uses the configured text model to draft storyboard lines for the selected product", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
@@ -2732,6 +2793,33 @@ describe("console API", () => {
         })
       ]
     });
+  });
+
+  it("imports bare image URLs from pasted product text into reference images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-product-import-bare-image-save-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const imageUrl = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products/import", {
+      method: "POST",
+      body: JSON.stringify({
+        text: [
+          "商品ID 172397240576223361",
+          "商品タイトル 接触冷感アームカバー 指穴付き ロング丈",
+          "カテゴリ：レディース > ファッション小物 > アームカバー",
+          "素材 ポリエステル",
+          "サイズ：長さ約52cm",
+          "・通気性のある生地",
+          imageUrl
+        ].join("\n")
+      })
+    });
+
+    const productPath = testProductPath(fixturesDir, "DXM-172397240576223361");
+    expect(response.product.reference_images).toEqual([imageUrl]);
+    await expect(readFile(productPath, "utf8")).resolves.toContain(imageUrl);
   });
 
   it("imports multiple pasted product blocks and reports per-item errors", async () => {

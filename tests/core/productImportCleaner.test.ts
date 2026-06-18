@@ -74,6 +74,21 @@ describe("cleanImportedProductText", () => {
     ]);
   });
 
+  it("extracts bare ecommerce image URLs from pasted product text", () => {
+    const imageUrl = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d&ps=933b5bde&shp=a3510d86&shcp=6ce186a1&idc=my&from=2739998086";
+    const preview = cleanImportedProductText([
+      "商品ID 172397240576223361",
+      "商品タイトル 接触冷感アームカバー 指穴付き ロング丈",
+      "カテゴリ スポーツ・アウトドア > スポーツ用スリーブ・サポーター",
+      "素材 ポリエステル",
+      "サイズ：長さ約52cm",
+      "・指先までカバーしやすい一体型デザイン",
+      imageUrl
+    ].join("\n"));
+
+    expect(preview.product.reference_images).toEqual([imageUrl]);
+  });
+
   it("returns a structured quality report for missing facts and blocked claims", () => {
     const preview = cleanImportedProductText([
       "商品ID 9988",

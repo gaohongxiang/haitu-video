@@ -299,10 +299,17 @@ function collectImageReferences(lines: string[], explicitImages: string | undefi
     const match = line.match(/^(?:主图|主圖|画像\d*|图片\d*|圖片\d*|参考图\d*|参考圖片\d*)\s*[:：]?\s*(.+)$/i);
     return match?.[1] ? splitImportedImageList(match[1]) ?? [] : [];
   });
+  candidates.push(...lines.flatMap(extractImageUrls));
   if (candidates.length === 0 && explicitImages) {
     candidates.push(...(splitImportedImageList(explicitImages) ?? []));
   }
   return uniqueNonEmpty(candidates);
+}
+
+function extractImageUrls(value: string): string[] {
+  return Array.from(value.matchAll(/https?:\/\/[^\s"'<>，,；;）)]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>，,；;）)]*)?/gi)).map(
+    (match) => match[0]
+  );
 }
 
 function splitImportedList(value: string | undefined): string[] | undefined {
