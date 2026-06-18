@@ -5,13 +5,14 @@ BRANCH="${HAITU_DEPLOY_BRANCH:-main}"
 REMOTE="${HAITU_DEPLOY_REMOTE:-origin}"
 SERVICE="${HAITU_DEPLOY_SERVICE:-haitu-video}"
 APP_USER="${HAITU_DEPLOY_USER:-haitu}"
+APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"
 
 cd "$(dirname "$0")/../.."
 
 run_app() {
   if [ "$(id -u)" -eq 0 ]; then
-    sudo -u "$APP_USER" -E "$@"
+    sudo -u "$APP_USER" HOME="$APP_HOME" "$@"
   else
     "$@"
   fi
