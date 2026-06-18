@@ -12,12 +12,14 @@ describe("no-Docker VPS deployment package", () => {
     const service = await readFile(join(root, "deploy", "systemd", "haitu-video.service"), "utf8");
     const caddy = await readFile(join(root, "deploy", "caddy", "Caddyfile"), "utf8");
     const envExample = await readFile(join(root, "deploy", "env", "haitu-video.env.example"), "utf8");
+    const deployScript = await readFile(join(root, "deploy", "scripts", "deploy-from-github.sh"), "utf8");
     const tunnel = await readFile(join(root, "deploy", "cloudflare", "tunnel-config.example.yml"), "utf8");
     const guide = await readFile(join(root, "docs", "deployment", "vps-no-docker.md"), "utf8");
 
     expect(packageJson.scripts["start:console"]).toBe("tsx src/cli/console.ts");
     expect(packageJson.scripts.start).toBe("npm run start:console");
     expect(packageJson.scripts["deploy:check"]).toBe("npm run typecheck && npm test && npm run build:console");
+    expect(packageJson.scripts["deploy:vps"]).toBe("ssh openclaw-ghxServer 'cd /opt/haitu-video && sudo ./deploy/scripts/deploy-from-github.sh'");
 
     expect(service).toContain("Description=Haitu Video Console");
     expect(service).toContain("WorkingDirectory=/opt/haitu-video");
@@ -40,6 +42,20 @@ describe("no-Docker VPS deployment package", () => {
     expect(envExample).not.toContain("HAITU_AUTH_PASSWORD");
     expect(envExample).toContain("SEEDANCE_RESOLUTION=480p");
     expect(envExample).not.toContain("your-modelark-api-key");
+
+    expect(deployScript).toContain('REMOTE="${HAITU_DEPLOY_REMOTE:-origin}"');
+    expect(deployScript).toContain('BRANCH="${HAITU_DEPLOY_BRANCH:-main}"');
+    expect(deployScript).toContain('run_app git fetch "$REMOTE" "$BRANCH"');
+    expect(deployScript).toContain("git reset --hard");
+    expect(deployScript).toContain("git clean -fd");
+    expect(deployScript).toContain("run_app npm ci");
+    expect(deployScript).toContain("run_app npm run db:migrate");
+    expect(deployScript).toContain("run_app npm run deploy:check");
+    expect(deployScript).toContain('SERVICE="${HAITU_DEPLOY_SERVICE:-haitu-video}"');
+    expect(deployScript).toContain('systemctl restart "$SERVICE"');
+    expect(deployScript).toContain('HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"');
+    expect(deployScript).toContain('curl -fsS "$HEALTH_URL"');
+    expect(deployScript).not.toContain("/var/lib/haitu-video");
 
     expect(tunnel).toContain("tunnel: <你的隧道编号>");
     expect(tunnel).toContain("credentials-file: /etc/cloudflared/<你的隧道编号>.json");
@@ -85,5 +101,8 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("systemctl");
     expect(guide).toContain("Caddy");
     expect(guide).toContain("备用");
+    expect(guide).toContain("GitHub 是生产代码来源");
+    expect(guide).toContain("npm run deploy:vps");
+    expect(guide).toContain("deploy/scripts/deploy-from-github.sh");
   });
 });

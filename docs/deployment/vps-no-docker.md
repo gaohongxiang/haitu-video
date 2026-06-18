@@ -186,8 +186,32 @@ sudo tar -czf /var/backups/haitu-video-$(date +%Y%m%d).tar.gz \
 
 ## 日常更新
 
+GitHub 是生产代码来源。推荐流程是本地开发并推送到 GitHub，然后让 VPS 从 GitHub 拉取代码部署：
+
+```bash
+npm run deploy:vps
+```
+
+这个命令会通过 SSH 执行 `/opt/haitu-video/deploy/scripts/deploy-from-github.sh`。脚本会在 VPS 上执行：
+
+- `git fetch origin main`
+- `git reset --hard origin/main`
+- `git clean -fd`
+- `npm ci`
+- `npm run db:migrate`
+- `npm run deploy:check`
+- `sudo systemctl restart haitu-video`
+- `curl -fsS http://127.0.0.1:4173/api/health`
+
+脚本只操作 `/opt/haitu-video` 代码目录；运行时数据继续保存在 `/var/lib/haitu-video`。
+
+手动执行等价流程：
+
 ```bash
 cd /opt/haitu-video
+git fetch origin main
+git reset --hard origin/main
+git clean -fd
 npm ci
 npm run db:migrate
 npm run deploy:check

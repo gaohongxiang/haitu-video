@@ -7,6 +7,7 @@
     "build:console": "vite build",
     "start": "npm run start:console",
     "start:console": "tsx src/cli/console.ts",
+    "deploy:vps": "ssh openclaw-ghxServer 'cd /opt/haitu-video && sudo ./deploy/scripts/deploy-from-github.sh'",
     "deploy:check": "npm run typecheck && npm test && npm run build:console",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
