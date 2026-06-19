@@ -1090,6 +1090,23 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           job
         });
       }
+      const videoJobRecoverDownloadMatch = url.pathname.match(/^\/api\/video-jobs\/([^/]+)\/recover-download$/);
+      if (request.method === "POST" && videoJobRecoverDownloadMatch) {
+        const jobId = decodeURIComponent(videoJobRecoverDownloadMatch[1] ?? "");
+        const job = await requestContext.videoJobQueue.recoverDownload(jobId);
+        await auditLog.append({
+          action: "video_job.download_recovered",
+          target: job.id,
+          metadata: {
+            productSku: job.productSku,
+            provider: job.provider,
+            providerTaskId: job.providerTaskId
+          }
+        });
+        return jsonResponse({
+          job
+        });
+      }
       const videoJobMatch = url.pathname.match(/^\/api\/video-jobs\/([^/]+)$/);
       if (request.method === "GET" && videoJobMatch) {
         return jsonResponse({
@@ -1143,6 +1160,9 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (message.includes("Can retry only failed local video jobs")) {
         return jsonResponse({ error: message }, 409);
+      }
+      if (message.includes("Can recover only video jobs")) {
+        return jsonResponse({ error: "这条任务没有可恢复的成片下载。只有视频已生成、但服务器下载失败的任务才能重新下载成片。" }, 409);
       }
       if (message.includes("Unknown provider key target") || message.includes("Provider API key is required")) {
         return jsonResponse({ error: message }, 422);

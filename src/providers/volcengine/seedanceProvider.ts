@@ -4,7 +4,9 @@ import { extname, isAbsolute, join, resolve } from "node:path";
 import { maxSeedanceReferenceImages } from "../../core/videoProviderErrors.js";
 import { defaultFinalVideoLanguage, providerScriptLanguageLabel } from "../../core/videoLanguage.js";
 import type {
+  MoneyAmount,
   ReferenceImageUrlResolver,
+  VideoOutput,
   VideoProvider,
   VideoProviderRequest,
   VideoProviderResult
@@ -67,6 +69,37 @@ interface ProviderErrorMetadata {
   providerModel: string;
   referenceImageCount: number;
   usedTemporaryAssetUrls: boolean;
+}
+
+export class SeedanceOutputDownloadError extends Error {
+  readonly providerTaskId: string;
+  readonly providerVideoUrl: string;
+  readonly output: VideoOutput;
+  readonly usage?: VideoProviderResult["usage"];
+  readonly cost: MoneyAmount;
+  readonly rawResponse: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    input: {
+      cause: unknown;
+      providerTaskId: string;
+      providerVideoUrl: string;
+      output: VideoOutput;
+      usage?: VideoProviderResult["usage"];
+      cost: MoneyAmount;
+      rawResponse: Record<string, unknown>;
+    }
+  ) {
+    super(message, { cause: input.cause });
+    this.name = "SeedanceOutputDownloadError";
+    this.providerTaskId = input.providerTaskId;
+    this.providerVideoUrl = input.providerVideoUrl;
+    this.output = input.output;
+    this.usage = input.usage;
+    this.cost = input.cost;
+    this.rawResponse = input.rawResponse;
+  }
 }
 
 export class VolcengineSeedanceProvider implements VideoProvider {
@@ -159,10 +192,37 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     }
 
     const outputPath = join(request.outputDir, `${request.jobId}.seedance.mp4`);
+    const output: VideoOutput = {
+      path: outputPath,
+      width: 1080,
+      height: 1920,
+      durationSeconds: request.durationSeconds,
+      mimeType: "video/mp4"
+    };
+    const usage = getUsage(completedTask);
+    const cost = {
+      amount: this.estimatedCostAmount ?? roundMoney(this.estimatedCostPerSecond * request.durationSeconds),
+      currency: this.estimatedCostCurrency
+    };
+    const rawResponse = {
+      createResponse,
+      completedTask
+    };
     try {
       await this.download(videoUrl, outputPath);
     } catch (error) {
-      throw annotateProviderError(error, {
+      throw annotateProviderError(new SeedanceOutputDownloadError(
+        "Volcengine Seedance video was generated but the output download failed.",
+        {
+          cause: error,
+          providerTaskId: taskId,
+          providerVideoUrl: videoUrl,
+          output,
+          usage,
+          cost,
+          rawResponse
+        }
+      ), {
         ...errorMetadata,
         providerPhase: "download-output"
       });
@@ -172,22 +232,10 @@ export class VolcengineSeedanceProvider implements VideoProvider {
       provider: "volcengine-seedance",
       model: this.model,
       providerTaskId: taskId,
-      output: {
-        path: outputPath,
-        width: 1080,
-        height: 1920,
-        durationSeconds: request.durationSeconds,
-        mimeType: "video/mp4"
-      },
-      usage: getUsage(completedTask),
-      cost: {
-        amount: this.estimatedCostAmount ?? roundMoney(this.estimatedCostPerSecond * request.durationSeconds),
-        currency: this.estimatedCostCurrency
-      },
-      rawResponse: {
-        createResponse,
-        completedTask
-      }
+      output,
+      usage,
+      cost,
+      rawResponse
     };
   }
 

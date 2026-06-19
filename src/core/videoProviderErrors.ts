@@ -46,7 +46,7 @@ export function readableVideoProviderError(input: ReadableVideoProviderErrorInpu
   }
 
   if (isSeedanceOutputDownloadFailure(diagnosticMessage, details)) {
-    return "视频已经生成，但服务器下载成片超时。请稍后重试；如果连续失败，可能是服务器到火山文件服务器的网络不稳定。";
+    return "视频已经生成，但服务器下载成片超时。请点击重新下载成片；如果连续失败，可能是服务器到视频文件服务器的网络不稳定。";
   }
 
   if (diagnosticMessage.includes("fetch failed") || diagnosticMessage.includes("Headers Timeout Error")) {

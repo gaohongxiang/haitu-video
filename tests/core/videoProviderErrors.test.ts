@@ -58,7 +58,7 @@ describe("readableVideoProviderError", () => {
       providerModel: "doubao-seedance-2-0-fast-260128"
     });
 
-    expect(error).toBe("视频已经生成，但服务器下载成片超时。请稍后重试；如果连续失败，可能是服务器到火山文件服务器的网络不稳定。");
+    expect(error).toBe("视频已经生成，但服务器下载成片超时。请点击重新下载成片；如果连续失败，可能是服务器到视频文件服务器的网络不稳定。");
     expect(error).not.toContain("参考图链接");
     expect(error).not.toContain("模型配置");
   });

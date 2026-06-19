@@ -1,13 +1,18 @@
 import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { normalizeJapaneseHashtags } from "../core/japaneseHashtags.js";
+import { generateJapaneseHashtags, normalizeJapaneseHashtags } from "../core/japaneseHashtags.js";
+import { parseProductFacts } from "../core/productFacts.js";
+import { generateVideoPrompt } from "../core/promptGenerator.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
+import { generateJapaneseAdScript } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
-import { readableVideoProviderError } from "../core/videoProviderErrors.js";
-import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import { maxSeedanceReferenceImages, readableVideoProviderError } from "../core/videoProviderErrors.js";
+import { estimateCny, runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import type { ProductJobManifest } from "../pipeline/runProductJob.js";
+import { runBasicQc } from "../qc/basicQc.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
-import type { ReferenceImageUrlResolver } from "../providers/types.js";
+import type { MoneyAmount, ReferenceImageUrlResolver, VideoOutput, VideoProviderResult } from "../providers/types.js";
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
 import type { DatabaseHandle } from "./db/client.js";
 
@@ -54,6 +59,10 @@ export interface VideoJobRecord {
   subtitlePath?: string;
   subtitleUrl?: string;
   hashtags?: string[];
+  providerTaskId?: string;
+  recoverableRawManifestPath?: string;
+  providerVideoUrl?: string;
+  canRecoverDownload?: boolean;
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
@@ -75,6 +84,9 @@ export interface VideoJobErrorDetails {
   providerModel?: string;
   referenceImageCount?: number;
   usedTemporaryAssetUrls?: boolean;
+  providerTaskId?: string;
+  providerVideoUrl?: string;
+  recoverableRawManifestPath?: string;
 }
 
 export interface LocalVideoJobQueueOptions {
@@ -169,6 +181,10 @@ export class LocalVideoJobQueue {
       subtitlePath: undefined,
       subtitleUrl: undefined,
       hashtags: undefined,
+      providerTaskId: undefined,
+      recoverableRawManifestPath: undefined,
+      providerVideoUrl: undefined,
+      canRecoverDownload: undefined,
       totalTokens: undefined,
       estimatedCostCny: undefined,
       error: undefined,
@@ -179,6 +195,34 @@ export class LocalVideoJobQueue {
     });
     this.chain = this.chain.then(() => this.run(retried.id)).catch(() => undefined);
     return retried;
+  }
+
+  async recoverDownload(id: string): Promise<VideoJobRecord> {
+    const record = await this.read(id);
+    if (!this.canRecoverDownload(record)) {
+      throw new Error(`Can recover only video jobs that already generated a provider video but failed while downloading. Job ${id} cannot be recovered.`);
+    }
+    const queued = await this.update(record, {
+      status: "queued",
+      confirmPaid: false,
+      reuseManifest: record.recoverableRawManifestPath,
+      rawOutputPath: undefined,
+      rawOutputUrl: undefined,
+      finalOutputPath: undefined,
+      finalVideoUrl: undefined,
+      finalManifestPath: undefined,
+      finalManifestUrl: undefined,
+      subtitlePath: undefined,
+      subtitleUrl: undefined,
+      canRecoverDownload: false,
+      error: undefined,
+      errorDetails: undefined,
+      startedAt: undefined,
+      completedAt: undefined,
+      expiresAt: this.expiresAtIso(this.nowIso())
+    });
+    this.chain = this.chain.then(() => this.run(queued.id)).catch(() => undefined);
+    return queued;
   }
 
   async list(): Promise<VideoJobRecord[]> {
@@ -274,6 +318,12 @@ export class LocalVideoJobQueue {
         hashtags,
         totalTokens: report.billing?.totalTokens ?? report.usage?.totalTokens,
         estimatedCostCny: report.billing?.estimatedCostCny,
+        providerTaskId: report.raw.taskId,
+        recoverableRawManifestPath: report.raw.manifestPath,
+        providerVideoUrl: undefined,
+        canRecoverDownload: false,
+        error: undefined,
+        errorDetails: undefined,
         completedAt: this.nowIso()
       });
     } catch (error) {
@@ -281,11 +331,35 @@ export class LocalVideoJobQueue {
         await this.removeGeneratedOutputs(record.outDir);
         return;
       }
-      const errorDetails = serializeJobError(error);
+      const errorDetails = {
+        ...serializeJobError(error),
+        ...(isDownloadRecoveryRun(record)
+          ? {
+              providerPhase: "download-output",
+              providerTaskId: record.providerTaskId,
+              recoverableRawManifestPath: record.reuseManifest
+            }
+          : {})
+      };
+      const recoverable = await this.persistRecoverableDownloadFailure(record, error, errorDetails);
+      const mergedErrorDetails = {
+        ...errorDetails,
+        providerTaskId: recoverable.providerTaskId ?? errorDetails.providerTaskId,
+        providerVideoUrl: recoverable.providerVideoUrl ?? errorDetails.providerVideoUrl,
+        recoverableRawManifestPath: recoverable.recoverableRawManifestPath ?? errorDetails.recoverableRawManifestPath
+      };
       await this.update(record, {
         status: "failed",
-        error: readableJobError(errorDetails),
-        errorDetails,
+        error: readableJobError(mergedErrorDetails),
+        errorDetails: mergedErrorDetails,
+        ...(isDownloadRecoveryRun(record)
+          ? {
+              providerTaskId: record.providerTaskId,
+              recoverableRawManifestPath: record.reuseManifest,
+              canRecoverDownload: true
+            }
+          : {}),
+        ...recoverable,
         completedAt: this.nowIso()
       });
     }
@@ -363,11 +437,14 @@ export class LocalVideoJobQueue {
   }
 
   private async hydrateResultFields(record: VideoJobRecord): Promise<VideoJobRecord> {
-    if (record.status !== "completed" || !record.reportPath) {
+    if (!record.reportPath) {
       return record;
     }
     if (record.reportUrl && (record.finalVideoUrl || record.rawOutputUrl)) {
-      return record;
+      return {
+        ...record,
+        canRecoverDownload: record.canRecoverDownload ?? this.canRecoverDownload(record)
+      };
     }
     try {
       const report = JSON.parse(await readFile(record.reportPath, "utf8")) as Partial<MakeVideoReport>;
@@ -385,14 +462,92 @@ export class LocalVideoJobQueue {
         subtitleUrl: record.subtitleUrl ?? (report.final?.subtitlePath ? mediaUrl(report.final.subtitlePath) : undefined),
         hashtags: record.hashtags ?? await readHashtagsFromRawManifest(report.raw?.manifestPath),
         totalTokens: record.totalTokens ?? report.billing?.totalTokens ?? report.usage?.totalTokens,
-        estimatedCostCny: record.estimatedCostCny ?? report.billing?.estimatedCostCny
+        estimatedCostCny: record.estimatedCostCny ?? report.billing?.estimatedCostCny,
+        providerTaskId: record.providerTaskId ?? report.raw?.taskId,
+        recoverableRawManifestPath: record.recoverableRawManifestPath ?? report.raw?.manifestPath,
+        canRecoverDownload: record.canRecoverDownload ?? this.canRecoverDownload({
+          ...record,
+          recoverableRawManifestPath: record.recoverableRawManifestPath ?? report.raw?.manifestPath
+        })
       };
     } catch {
       return {
         ...record,
-        reportUrl: record.reportUrl ?? mediaUrl(record.reportPath)
+        reportUrl: record.reportUrl ?? mediaUrl(record.reportPath),
+        canRecoverDownload: record.canRecoverDownload ?? this.canRecoverDownload(record)
       };
     }
+  }
+
+  private canRecoverDownload(record: Pick<VideoJobRecord, "status" | "provider" | "recoverableRawManifestPath" | "providerTaskId" | "errorDetails">): boolean {
+    return record.status === "failed" &&
+      record.provider === "volcengine-seedance" &&
+      record.errorDetails?.providerPhase === "download-output" &&
+      Boolean(record.recoverableRawManifestPath && record.providerTaskId);
+  }
+
+  private async persistRecoverableDownloadFailure(
+    record: VideoJobRecord,
+    error: unknown,
+    errorDetails: VideoJobErrorDetails
+  ): Promise<Partial<VideoJobRecord>> {
+    const partial = extractRecoverableDownloadFailure(error);
+    if (!partial || errorDetails.providerPhase !== "download-output") {
+      return {};
+    }
+    const product = parseProductFacts(JSON.parse(await readFile(record.productPath, "utf8")) as unknown);
+    const rawManifestPath = join(record.outDir, "raw", product.sku, "v1", "manifest.json");
+    const providerTaskId = partial.providerTaskId;
+    const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
+    const totalTokens = partial.usage?.totalTokens ?? partial.usage?.completionTokens;
+    const billing = totalTokens === undefined
+      ? undefined
+      : {
+          tokenPriceCnyPerMillion,
+          totalTokens,
+          estimatedCostCny: estimateCny(totalTokens, tokenPriceCnyPerMillion)
+        };
+    const rawManifest = await buildRecoverableRawManifest({
+      record,
+      product,
+      partial,
+      manifestPath: rawManifestPath
+    });
+    await mkdir(dirname(rawManifestPath), { recursive: true });
+    await writeFile(rawManifestPath, JSON.stringify(rawManifest, null, 2), "utf8");
+    const reportPath = join(record.outDir, "make-video-report.json");
+    const failedReport: MakeVideoReport = {
+      type: "haitu_make_video_report",
+      status: "failed" as MakeVideoReport["status"],
+      productSku: rawManifest.product.sku,
+      provider: record.provider ?? "volcengine-seedance",
+      durationSeconds: record.durationSeconds ?? partial.output.durationSeconds,
+      paidRequestConfirmed: record.confirmPaid,
+      raw: {
+        manifestPath: rawManifest.paths.manifest,
+        outputPath: rawManifest.output.path,
+        taskId: providerTaskId
+      },
+      usage: partial.usage,
+      billing,
+      totalCost: rawManifest.cost.total,
+      reusedRawManifest: false,
+      recoveredRawOutput: false,
+      reportPath
+    };
+    await mkdir(record.outDir, { recursive: true });
+    await writeFile(reportPath, JSON.stringify(failedReport, null, 2), "utf8");
+    return {
+      productSku: rawManifest.product.sku,
+      reportPath,
+      reportUrl: mediaUrl(reportPath),
+      providerTaskId,
+      recoverableRawManifestPath: rawManifest.paths.manifest,
+      providerVideoUrl: partial.providerVideoUrl,
+      canRecoverDownload: true,
+      totalTokens: billing?.totalTokens ?? partial.usage?.totalTokens ?? partial.usage?.completionTokens,
+      estimatedCostCny: billing?.estimatedCostCny
+    };
   }
 
   private upsertDatabaseJob(record: VideoJobRecord): void {
@@ -507,6 +662,142 @@ function sanitizeLines(lines?: string[]): string[] | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
+function isDownloadRecoveryRun(record: VideoJobRecord): boolean {
+  return record.confirmPaid === false &&
+    record.provider === "volcengine-seedance" &&
+    Boolean(record.reuseManifest && record.providerTaskId);
+}
+
+interface RecoverableDownloadFailure {
+  providerTaskId: string;
+  providerVideoUrl: string;
+  output: VideoOutput;
+  usage?: VideoProviderResult["usage"];
+  cost: MoneyAmount;
+  rawResponse: Record<string, unknown>;
+}
+
+function extractRecoverableDownloadFailure(error: unknown): RecoverableDownloadFailure | undefined {
+  const value = error as Partial<RecoverableDownloadFailure> | undefined;
+  if (
+    !value ||
+    typeof value.providerTaskId !== "string" ||
+    typeof value.providerVideoUrl !== "string" ||
+    !isVideoOutput(value.output) ||
+    !isMoneyAmount(value.cost) ||
+    !value.rawResponse ||
+    typeof value.rawResponse !== "object" ||
+    Array.isArray(value.rawResponse)
+  ) {
+    return undefined;
+  }
+  return {
+    providerTaskId: value.providerTaskId,
+    providerVideoUrl: value.providerVideoUrl,
+    output: value.output,
+    usage: value.usage,
+    cost: value.cost,
+    rawResponse: value.rawResponse
+  };
+}
+
+async function buildRecoverableRawManifest(input: {
+  record: VideoJobRecord;
+  product: ReturnType<typeof parseProductFacts>;
+  partial: RecoverableDownloadFailure;
+  manifestPath: string;
+}): Promise<ProductJobManifest> {
+  const durationSeconds = input.record.durationSeconds ?? input.partial.output.durationSeconds;
+  const template = input.record.template ?? "scene";
+  const finalLanguage = normalizeFinalVideoLanguage(input.record.finalLanguage);
+  const generationProduct = {
+    ...input.product,
+    reference_images: input.product.reference_images.slice(0, maxSeedanceReferenceImages)
+  };
+  const script = generateJapaneseAdScript(input.product, {
+    cta: input.record.cta ?? "今すぐチェック",
+    template,
+    scriptLines: input.record.scriptLines,
+    finalLanguage
+  });
+  const prompt = generateVideoPrompt(generationProduct, {
+    durationSeconds,
+    aspectRatio: "9:16",
+    template,
+    storyboardLines: input.record.storyboardLines,
+    finalLanguage
+  });
+  const jobId = `${input.product.sku}-v1`;
+  const qc = runBasicQc({
+    product: input.product,
+    script,
+    output: input.partial.output,
+    targetDurationSeconds: durationSeconds
+  });
+  const hashtags = generateJapaneseHashtags({
+    product: input.product,
+    script,
+    variantKey: jobId
+  });
+  return {
+    jobId,
+    status: "completed",
+    product: {
+      sku: input.product.sku,
+      title_ja: input.product.title_ja,
+      category: input.product.category,
+      materials: input.product.materials,
+      verified_selling_points: input.product.verified_selling_points,
+      usage_scenes: input.product.usage_scenes
+    },
+    version: 1,
+    provider: {
+      name: "volcengine-seedance",
+      model: input.record.providerModel ?? "volcengine-seedance",
+      taskId: input.partial.providerTaskId
+    },
+    script,
+    prompt,
+    output: input.partial.output,
+    usage: input.partial.usage,
+    qc,
+    cost: {
+      provider: input.partial.cost,
+      total: input.partial.cost
+    },
+    hashtags,
+    paths: {
+      outputDir: dirname(input.manifestPath),
+      manifest: input.manifestPath
+    }
+  };
+}
+
+function isVideoOutput(value: unknown): value is VideoOutput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const output = value as Partial<VideoOutput>;
+  return (
+    typeof output.path === "string" &&
+    typeof output.width === "number" &&
+    typeof output.height === "number" &&
+    typeof output.durationSeconds === "number" &&
+    output.mimeType === "video/mp4"
+  );
+}
+
+function isMoneyAmount(value: unknown): value is MoneyAmount {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const amount = value as Partial<MoneyAmount>;
+  return (
+    typeof amount.amount === "number" &&
+    (amount.currency === "USD" || amount.currency === "JPY" || amount.currency === "CNY")
+  );
+}
+
 function mediaUrl(path: string): string {
   return `/media?path=${encodeURIComponent(path)}`;
 }
@@ -537,6 +828,9 @@ function serializeJobError(error: unknown): VideoJobErrorDetails {
     providerModel?: unknown;
     referenceImageCount?: unknown;
     usedTemporaryAssetUrls?: unknown;
+    providerTaskId?: unknown;
+    providerVideoUrl?: unknown;
+    recoverableRawManifestPath?: unknown;
   };
   return {
     message: typeof err.message === "string" ? err.message : String(error),
@@ -547,7 +841,10 @@ function serializeJobError(error: unknown): VideoJobErrorDetails {
     providerName: typeof err.providerName === "string" ? err.providerName : undefined,
     providerModel: typeof err.providerModel === "string" ? err.providerModel : undefined,
     referenceImageCount: typeof err.referenceImageCount === "number" ? err.referenceImageCount : undefined,
-    usedTemporaryAssetUrls: typeof err.usedTemporaryAssetUrls === "boolean" ? err.usedTemporaryAssetUrls : undefined
+    usedTemporaryAssetUrls: typeof err.usedTemporaryAssetUrls === "boolean" ? err.usedTemporaryAssetUrls : undefined,
+    providerTaskId: typeof err.providerTaskId === "string" ? err.providerTaskId : undefined,
+    providerVideoUrl: typeof err.providerVideoUrl === "string" ? err.providerVideoUrl : undefined,
+    recoverableRawManifestPath: typeof err.recoverableRawManifestPath === "string" ? err.recoverableRawManifestPath : undefined
   };
 }
 

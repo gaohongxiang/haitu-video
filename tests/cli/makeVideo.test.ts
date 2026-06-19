@@ -322,6 +322,63 @@ describe("runMakeVideoCli", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it("recovers an existing provider task without requiring a fresh paid confirmation", async () => {
+    process.env.ARK_API_KEY = "from-env";
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-unpaid-"));
+    tempDirs.push(tempDir);
+    const productPath = join(tempDir, "product.json");
+    const outDir = join(tempDir, "outputs");
+    await writeProduct(productPath);
+    const existingDir = join(tempDir, "existing");
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(existingDir, { recursive: true }));
+    const missingVideo = join(existingDir, "missing.mp4");
+    const existingManifest = join(existingDir, "manifest.json");
+    await writeCompletedMp4Manifest(existingManifest, missingVideo);
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const value = String(url);
+      if (value.endsWith("/api/v3/contents/generations/tasks/task-existing")) {
+        return jsonResponse({
+          id: "task-existing",
+          status: "succeeded",
+          output: { video_url: "https://cdn.example.com/recovered-without-paid-confirm.mp4" }
+        });
+      }
+      if (value === "https://cdn.example.com/recovered-without-paid-confirm.mp4") {
+        return new Response(Buffer.from("recovered mp4"), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${value}`);
+    }) as unknown as typeof fetch;
+
+    const report = await runMakeVideoCli(
+      [
+        "--product",
+        productPath,
+        "--outDir",
+        outDir,
+        "--provider",
+        "volcengine-seedance",
+        "--confirmPaid",
+        "false",
+        "--reuseManifest",
+        existingManifest
+      ],
+      {
+        cwd: tempDir,
+        fetchImpl,
+        postprocessVideo: async () => ({
+          manifestPath: join(outDir, "final", "final-manifest.json"),
+          outputPath: join(outDir, "final", "final.mp4"),
+          subtitlePath: join(outDir, "final", "final.ass")
+        })
+      }
+    );
+
+    expect(report.recoveredRawOutput).toBe(true);
+    expect(report.paidRequestConfirmed).toBe(false);
+    expect(await readFile(missingVideo, "utf8")).toBe("recovered mp4");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("refuses paid providers unless explicitly confirmed", async () => {
     process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-paid-"));

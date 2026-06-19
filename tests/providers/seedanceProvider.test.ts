@@ -560,6 +560,67 @@ describe("SeedanceProvider", () => {
     await expect(readFile(result.output.path, "utf8")).resolves.toBe("retried video bytes");
   });
 
+  it("keeps task usage and video URL on completed-task download failures", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-download-failure-metadata-"));
+    tempDirs.push(outDir);
+    const downloadError = Object.assign(new Error("fetch failed"), {
+      cause: Object.assign(new Error("Connect Timeout Error"), {
+        code: "UND_ERR_CONNECT_TIMEOUT"
+      })
+    });
+    const fetchImpl: typeof fetch = async (url) => {
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "task-download-failed", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/task-download-failed")) {
+        return jsonResponse({
+          id: "task-download-failed",
+          status: "succeeded",
+          usage: { completion_tokens: 9000, total_tokens: 9000 },
+          output: { video_url: "https://cdn.example.com/failed-download.mp4" }
+        });
+      }
+      if (String(url) === "https://cdn.example.com/failed-download.mp4") {
+        throw downloadError;
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new SeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      downloadMaxAttempts: 1,
+      fetchImpl
+    });
+
+    await expect(
+      provider.generateVideo({
+        jobId: "job-1",
+        productSku: "TK-001",
+        prompt: "Create a product ad.",
+        script: "今すぐチェック",
+        durationSeconds: 10,
+        aspectRatio: "9:16",
+        outputDir: outDir
+      })
+    ).rejects.toMatchObject({
+      name: "SeedanceOutputDownloadError",
+      providerPhase: "download-output",
+      providerTaskId: "task-download-failed",
+      providerVideoUrl: "https://cdn.example.com/failed-download.mp4",
+      usage: {
+        completionTokens: 9000,
+        totalTokens: 9000
+      },
+      output: {
+        path: join(outDir, "job-1.seedance.mp4"),
+        mimeType: "video/mp4"
+      }
+    });
+  });
+
   it("throws before making a paid request when the API key is missing", async () => {
     const provider = new SeedanceProvider({
       apiKey: "",

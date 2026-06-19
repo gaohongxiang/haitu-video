@@ -406,6 +406,10 @@ interface VideoJob {
   subtitlePath?: string;
   subtitleUrl?: string;
   hashtags?: string[];
+  providerTaskId?: string;
+  recoverableRawManifestPath?: string;
+  providerVideoUrl?: string;
+  canRecoverDownload?: boolean;
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
@@ -428,6 +432,9 @@ interface VideoJobErrorDetails {
   providerModel?: string;
   referenceImageCount?: number;
   usedTemporaryAssetUrls?: boolean;
+  providerTaskId?: string;
+  providerVideoUrl?: string;
+  recoverableRawManifestPath?: string;
 }
 
 interface ProductVideoGenerationOptions {
@@ -2618,6 +2625,30 @@ export function App() {
     }
   }
 
+  async function recoverVideoJobDownload(job: VideoJob) {
+    if (!job.canRecoverDownload) {
+      setStatusText("这条任务没有可恢复的成片下载。");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      const response = await postJson<{ job: VideoJob }>(
+        `/api/video-jobs/${encodeURIComponent(job.id)}/recover-download`,
+        {}
+      );
+      setVideoJobs((current) => mergeVideoJobs([response.job], current));
+      videoJobsRef.current = mergeVideoJobs([response.job], videoJobsRef.current);
+      setStatusText("已开始重新下载成片，不会重新提交生成任务。");
+      if (activeSection === "video") {
+        await refreshSelectedProductForStudio();
+      }
+    } catch (error) {
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function createBackupArchive() {
     setIsBusy(true);
     try {
@@ -2734,6 +2765,7 @@ export function App() {
               onCancelVideoJob={cancelVideoJob}
               onDeleteLedgerVideo={deleteLedgerVideo}
               onRetryVideoJob={retryVideoJob}
+              onRecoverVideoJobDownload={recoverVideoJobDownload}
               onGenerateStoryboardDraft={generateStoryboardDraft}
               isGeneratingStoryboard={isGeneratingStoryboard}
               onImportAssets={importProductAssets}
@@ -2786,7 +2818,7 @@ export function App() {
       case "ledger":
         return (
           <section className="grid gap-4" aria-label="任务记录">
-            <VideoJobsPanel jobs={videoJobs} products={products} onCancel={cancelVideoJob} onRetry={retryVideoJob} />
+            <VideoJobsPanel jobs={videoJobs} products={products} onCancel={cancelVideoJob} onRetry={retryVideoJob} onRecoverDownload={recoverVideoJobDownload} />
             <VideoAssetsPanel assets={videoAssets} onDelete={deleteVideoAsset} isBusy={isBusy} />
           </section>
         );
@@ -3545,6 +3577,7 @@ function ProductCreationWorkspace({
   onCancelVideoJob,
   onDeleteLedgerVideo,
   onRetryVideoJob,
+  onRecoverVideoJobDownload,
   onGenerateStoryboardDraft,
   isGeneratingStoryboard,
   onImportAssets,
@@ -3597,6 +3630,7 @@ function ProductCreationWorkspace({
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
@@ -3673,6 +3707,7 @@ function ProductCreationWorkspace({
       onCancelVideoJob={onCancelVideoJob}
       onDeleteLedgerVideo={onDeleteLedgerVideo}
       onRetryVideoJob={onRetryVideoJob}
+      onRecoverVideoJobDownload={onRecoverVideoJobDownload}
       onGenerateStoryboardDraft={onGenerateStoryboardDraft}
       isGeneratingStoryboard={isGeneratingStoryboard}
       onImportAssets={onImportAssets}
@@ -3727,6 +3762,7 @@ function ProductCreationComposer({
   onCancelVideoJob,
   onDeleteLedgerVideo,
   onRetryVideoJob,
+  onRecoverVideoJobDownload,
   onGenerateStoryboardDraft,
   isGeneratingStoryboard,
   onImportAssets,
@@ -3777,6 +3813,7 @@ function ProductCreationComposer({
   onCancelVideoJob: (jobId: string) => Promise<void>;
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
@@ -4177,6 +4214,7 @@ function ProductCreationComposer({
         onPreview={setPreviewJob}
         onDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
+        onRecoverVideoJobDownload={onRecoverVideoJobDownload}
         onToast={onToast}
       />
 
@@ -4189,6 +4227,7 @@ function ProductCreationComposer({
         onClose={() => setPreviewJob(undefined)}
         onRequestDelete={setDeleteTarget}
         onRetryVideoJob={onRetryVideoJob}
+        onRecoverVideoJobDownload={onRecoverVideoJobDownload}
         onToast={onToast}
       />
       <DeleteCreativeVersionDialog
@@ -4641,6 +4680,7 @@ function VideoHistoryPanel({
   onPreview,
   onDelete,
   onRetryVideoJob,
+  onRecoverVideoJobDownload,
   onToast
 }: {
   jobs: CreativeVersionItem[];
@@ -4650,6 +4690,7 @@ function VideoHistoryPanel({
   onPreview: (job: CreativeVersionItem) => void;
   onDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
   const productDownloadContext = videoDownloadProductContext(product, draft, importText);
@@ -4667,7 +4708,8 @@ function VideoHistoryPanel({
           {jobs.map((job, index) => {
             const activeVersion = isActiveCreativeVersion(job);
             const playableVideo = hasPlayableVideo(job);
-            const retryJob = job.status === "failed" ? job.videoJob : undefined;
+            const recoverJob = job.status === "failed" && job.videoJob?.canRecoverDownload ? job.videoJob : undefined;
+            const retryJob = job.status === "failed" && !recoverJob ? job.videoJob : undefined;
             const lifecycleLabel = creativeVersionLifecycleHint(job);
             return (
               <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -4699,7 +4741,12 @@ function VideoHistoryPanel({
                       </a>
                     </Button>
                   ) : null}
-                  {retryJob ? (
+                  {recoverJob ? (
+                    <Button className="w-fit" size="sm" onClick={() => void onRecoverVideoJobDownload(recoverJob)}>
+                      <Download size={13} />
+                      重新下载成片
+                    </Button>
+                  ) : retryJob ? (
                     <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
                       <RefreshCcw size={13} />
                       重试
@@ -5071,6 +5118,7 @@ function VideoPreviewDialog({
   onClose,
   onRequestDelete,
   onRetryVideoJob,
+  onRecoverVideoJobDownload,
   onToast
 }: {
   job?: CreativeVersionItem;
@@ -5081,6 +5129,7 @@ function VideoPreviewDialog({
   onClose: () => void;
   onRequestDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
   useEffect(() => {
@@ -5098,7 +5147,8 @@ function VideoPreviewDialog({
 
   const activeVersion = isActiveCreativeVersion(job);
   const playableVideo = hasPlayableVideo(job);
-  const retryJob = job.status === "failed" ? job.videoJob : undefined;
+  const recoverJob = job.status === "failed" && job.videoJob?.canRecoverDownload ? job.videoJob : undefined;
+  const retryJob = job.status === "failed" && !recoverJob ? job.videoJob : undefined;
   const previewTitle = videoLabel(index);
   const statusText = creativeVersionDisplayStatus(job);
   const failureReason = creativeVersionFailureReason(job);
@@ -5158,7 +5208,7 @@ function VideoPreviewDialog({
                   <FileVideo className="h-7 w-7 text-[#8b9bb3]" />
                 )}
                 <div className="text-sm font-black text-[#172033]">
-                  {activeVersion ? "视频还在生成中" : job.status === "failed" ? "视频生成失败" : "暂无可播放视频文件"}
+                  {activeVersion ? "视频还在生成中" : recoverJob ? "成片下载失败" : job.status === "failed" ? "视频生成失败" : "暂无可播放视频文件"}
                 </div>
                 <div className="max-w-[520px] text-xs font-semibold leading-5 text-[#6c7890]">
                   {activeVersion
@@ -5170,7 +5220,12 @@ function VideoPreviewDialog({
           )}
 
           <div className="flex flex-wrap justify-end gap-2">
-            {retryJob ? (
+            {recoverJob ? (
+              <Button className="w-fit" size="sm" onClick={() => void onRecoverVideoJobDownload(recoverJob)}>
+                <Download size={13} />
+                重新下载成片
+              </Button>
+            ) : retryJob ? (
               <Button className="w-fit" size="sm" onClick={() => void onRetryVideoJob(retryJob)}>
                 <RefreshCcw size={13} />
                 重试
@@ -6671,12 +6726,14 @@ function VideoJobsPanel({
   jobs,
   products,
   onCancel,
-  onRetry
+  onRetry,
+  onRecoverDownload
 }: {
   jobs: VideoJob[];
   products: ProductSummary[];
   onCancel: (jobId: string) => Promise<void>;
   onRetry: (job: VideoJob) => Promise<void>;
+  onRecoverDownload: (job: VideoJob) => Promise<void>;
 }) {
   const activeCount = jobs.filter((job) => job.status === "queued" || job.status === "running").length;
   return (
@@ -6733,7 +6790,12 @@ function VideoJobsPanel({
                       取消排队
                     </Button>
                   ) : null}
-                  {job.status === "failed" ? (
+                  {job.status === "failed" && job.canRecoverDownload ? (
+                    <Button size="sm" onClick={() => void onRecoverDownload(job)}>
+                      <Download size={13} />
+                      重新下载成片
+                    </Button>
+                  ) : job.status === "failed" ? (
                     <Button size="sm" onClick={() => void onRetry(job)}>
                       <RefreshCcw size={13} />
                       重试任务
@@ -6756,6 +6818,7 @@ function VideoJobsPanel({
 
 function videoJobResultHint(job: VideoJob): string {
   if (job.status === "completed") return "暂无成片入口";
+  if (job.status === "failed" && job.canRecoverDownload) return "视频已生成，但服务器下载成片失败，可重新下载成片";
   if (job.status === "failed") return "任务失败，可直接重试原任务";
   if (job.status === "canceled") return "任务已取消";
   return "任务完成后显示成片和报告";

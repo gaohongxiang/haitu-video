@@ -879,6 +879,10 @@ describe("console API", () => {
     );
     const retryVideoJobSource = appSource.slice(
       appSource.indexOf("async function retryVideoJob"),
+      appSource.indexOf("async function recoverVideoJobDownload")
+    );
+    const recoverVideoJobDownloadSource = appSource.slice(
+      appSource.indexOf("async function recoverVideoJobDownload"),
       appSource.indexOf("async function createBackupArchive")
     );
     expect(videoCase).toContain("onOrganizeProductPackage={organizeProductPackage}");
@@ -1282,10 +1286,15 @@ describe("console API", () => {
     expect(staticConsoleJs).not.toContain("发布包");
     expect(appSource).toContain("取消排队");
     expect(appSource).toContain("/retry");
+    expect(appSource).toContain("/recover-download");
     expect(appSource).toContain("重试任务");
+    expect(appSource).toContain("重新下载成片");
     expect(appSource).toContain("retryVideoJob");
+    expect(appSource).toContain("recoverVideoJobDownload");
     expect(retryVideoJobSource).toContain("mergeVideoJobs([response.job], current)");
     expect(retryVideoJobSource).not.toContain("await refreshConsole()");
+    expect(recoverVideoJobDownloadSource).toContain("mergeVideoJobs([response.job], current)");
+    expect(recoverVideoJobDownloadSource).not.toContain("confirmPaid");
     expect(appSource).toContain("重试会重新提交原任务，可能再次扣费。");
     expect(appSource).toContain("videoDownloadFileName(job, videoJobDownloadProductContext(job, products))");
     expect(appSource).toContain("任务结果");
@@ -7490,6 +7499,165 @@ describe("console API", () => {
         })
       ]
     });
+  });
+
+  it("recovers a generated paid video download without requiring a paid retry confirmation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-recover-download-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const outputsDir = testJobsDir(root);
+    const productPath = testProductPath(fixturesDir, "box");
+    await writeProduct(productPath);
+    const failedJobId = "job-download-failed";
+    const failedOutDir = join(outputsDir, failedJobId);
+    const rawManifestPath = join(failedOutDir, "raw", "TK-001", "v1", "manifest.json");
+    await mkdir(join(rawManifestPath, ".."), { recursive: true });
+    await writeFile(
+      rawManifestPath,
+      JSON.stringify({
+        jobId: "TK-001-v1",
+        status: "completed",
+        product: { sku: "TK-001", title_ja: "折りたたみ収納ボックス" },
+        version: 1,
+        provider: {
+          name: "volcengine-seedance",
+          model: "doubao-seedance-2-0-fast-260128",
+          taskId: "task-generated"
+        },
+        script: {
+          voiceover: "折りたたみ可能。今すぐチェック",
+          subtitleLines: ["折りたたみ可能。", "今すぐチェック"],
+          cta: "今すぐチェック"
+        },
+        prompt: "Create video",
+        output: {
+          path: join(failedOutDir, "raw", "TK-001", "v1", "missing.mp4"),
+          width: 1080,
+          height: 1920,
+          durationSeconds: 10,
+          mimeType: "video/mp4"
+        },
+        usage: { completionTokens: 90000, totalTokens: 90000 },
+        qc: { result: "pass", checks: [] },
+        cost: {
+          provider: { amount: 8, currency: "CNY" },
+          total: { amount: 8, currency: "CNY" }
+        },
+        hashtags: [],
+        paths: {
+          outputDir: join(rawManifestPath, ".."),
+          manifest: rawManifestPath
+        }
+      }),
+      "utf8"
+    );
+    await writeFile(
+      jobFilePath(outputsDir, failedJobId),
+      JSON.stringify(
+        {
+          id: failedJobId,
+          status: "failed",
+          productPath,
+          productSku: "TK-001",
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          providerTaskId: "task-generated",
+          recoverableRawManifestPath: rawManifestPath,
+          canRecoverDownload: true,
+          durationSeconds: 10,
+          template: "scene",
+          cta: "今すぐチェック",
+          confirmPaid: true,
+          outDir: failedOutDir,
+          error: "视频已经生成，但服务器下载成片超时。",
+          errorDetails: {
+            message: "fetch failed",
+            providerPhase: "download-output"
+          },
+          createdAt: "2026-06-07T09:00:00.000Z",
+          updatedAt: "2026-06-07T09:01:00.000Z",
+          completedAt: "2026-06-07T09:01:00.000Z"
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+    const calls: Array<{ confirmPaid: boolean; reuseManifestPath?: string }> = [];
+    const server = createConsoleServer({
+      rootDir: root,
+      outputsDir,
+      runMakeVideoPipeline: async (input) => {
+        calls.push({
+          confirmPaid: input.confirmPaid,
+          reuseManifestPath: input.reuseManifestPath
+        });
+        const report = {
+          type: "haitu_make_video_report" as const,
+          status: "completed" as const,
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: input.reuseManifestPath ?? rawManifestPath,
+            outputPath: join(input.outDir, "raw", "TK-001", "v1", "recovered.mp4"),
+            taskId: "task-generated"
+          },
+          final: {
+            manifestPath: join(input.outDir, "final", "manifest.json"),
+            outputPath: join(input.outDir, "final", "final.mp4"),
+            subtitlePath: join(input.outDir, "final", "subtitles.srt")
+          },
+          billing: {
+            tokenPriceCnyPerMillion: 37,
+            totalTokens: 90000,
+            estimatedCostCny: 3.33
+          },
+          totalCost: {
+            amount: 8,
+            currency: "CNY" as const
+          },
+          reusedRawManifest: true,
+          recoveredRawOutput: true,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
+        await mkdir(join(report.reportPath, ".."), { recursive: true });
+        await writeFile(report.reportPath, JSON.stringify(report, null, 2), "utf8");
+        return report;
+      }
+    });
+
+    const recovering = await server.fetchJson(`/api/video-jobs/${failedJobId}/recover-download`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    let completed;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      completed = await server.fetchJson(`/api/video-jobs/${failedJobId}`);
+      if (completed.job.status === "completed") {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+    expect(recovering.job).toEqual(expect.objectContaining({
+      id: failedJobId,
+      status: "queued",
+      confirmPaid: false,
+      reuseManifest: rawManifestPath
+    }));
+    expect(completed.job).toEqual(expect.objectContaining({
+      id: failedJobId,
+      status: "completed",
+      finalVideoUrl: `/media?path=${encodeURIComponent(join(failedOutDir, "final", "final.mp4"))}`
+    }));
+    expect(calls).toEqual([
+      {
+        confirmPaid: false,
+        reuseManifestPath: rawManifestPath
+      }
+    ]);
   });
 
   it("auto-resumes saved queued video jobs when the console server starts", async () => {

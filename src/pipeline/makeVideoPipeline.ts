@@ -35,7 +35,7 @@ export interface MakeVideoPipelineInput {
 
 export interface MakeVideoReport {
   type: "haitu_make_video_report";
-  status: "completed";
+  status: "completed" | "failed";
   productSku: string;
   provider: VideoProviderName;
   durationSeconds: number;
@@ -63,12 +63,6 @@ export interface MakeVideoReport {
 }
 
 export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promise<MakeVideoReport> {
-  if (isPaidProvider(input.providerName) && !input.confirmPaid) {
-    throw new Error(
-      `Provider ${input.providerName} makes paid requests. Re-run with --confirmPaid true after checking duration and estimated cost.`
-    );
-  }
-
   await mkdir(input.outDir, { recursive: true });
   const rawProduct = JSON.parse(await readFile(input.productPath, "utf8")) as unknown;
   const product = parseProductFacts(rawProduct);
@@ -83,6 +77,11 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
   const existingManifest = input.forceRegenerate
     ? undefined
     : await readCompletedManifest(input.reuseManifestPath ?? existingManifestPath);
+  if (isPaidProvider(input.providerName) && !input.confirmPaid && !existingManifest) {
+    throw new Error(
+      `Provider ${input.providerName} makes paid requests. Re-run with --confirmPaid true after checking duration and estimated cost.`
+    );
+  }
   const rawManifest =
     existingManifest ??
     (await runProductJob({
@@ -195,7 +194,10 @@ async function recoverVolcengineOutput(input: {
   if (!videoUrl) {
     throw new Error(`Volcengine task ${input.taskId} did not include a recoverable video URL.`);
   }
-  const videoResponse = await input.fetchImpl(videoUrl);
+  const videoResponse = await fetchWithRetry(input.fetchImpl, videoUrl, {
+    timeoutMs: Number(process.env.SEEDANCE_DOWNLOAD_TIMEOUT_MS ?? 60000),
+    maxAttempts: Number(process.env.SEEDANCE_DOWNLOAD_MAX_ATTEMPTS ?? 3)
+  });
   if (!videoResponse.ok) {
     throw new Error(
       `Failed to download recovered provider video: ${videoResponse.status} ${videoResponse.statusText}`
@@ -203,6 +205,41 @@ async function recoverVolcengineOutput(input: {
   }
   await mkdir(dirname(input.outputPath), { recursive: true });
   await writeFile(input.outputPath, Buffer.from(await videoResponse.arrayBuffer()));
+}
+
+async function fetchWithRetry(
+  fetchImpl: typeof fetch,
+  url: string,
+  options: {
+    timeoutMs: number;
+    maxAttempts: number;
+  }
+): Promise<Response> {
+  let lastError: unknown;
+  const maxAttempts = Math.max(1, options.maxAttempts);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fetchWithTimeout(fetchImpl, url, options.timeoutMs);
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await sleep(1000 * attempt);
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function fetchWithTimeout(fetchImpl: typeof fetch, url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(url, {
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 interface VolcengineRecoveryTask {
@@ -251,6 +288,10 @@ function getContentVideoUrl(content: VolcengineRecoveryContent | undefined): str
     );
   }
   return content.video_url ?? (content.type === "video_url" ? content.url : undefined) ?? content.url;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isPaidProvider(providerName: VideoProviderName): boolean {
@@ -315,6 +356,6 @@ async function readCompletedManifest(manifestPath: string): Promise<ProductJobMa
   return manifest.status === "completed" ? manifest : undefined;
 }
 
-function estimateCny(tokens: number, tokenPriceCnyPerMillion: number): number {
+export function estimateCny(tokens: number, tokenPriceCnyPerMillion: number): number {
   return Math.round((tokens / 1_000_000) * tokenPriceCnyPerMillion * 100) / 100;
 }

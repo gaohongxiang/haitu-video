@@ -511,6 +511,119 @@ describe("LocalVideoJobQueue", () => {
     ]);
   });
 
+  it("records usage for generated videos that fail while downloading and recovers the download without a paid retry", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-download-recover-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const calls: Array<{ confirmPaid: boolean; reuseManifestPath?: string }> = [];
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-07T09:00:00.000Z"),
+      runMakeVideoPipeline: async (input) => {
+        calls.push({
+          confirmPaid: input.confirmPaid,
+          reuseManifestPath: input.reuseManifestPath
+        });
+        if (calls.length === 1) {
+          throw Object.assign(new Error("Volcengine Seedance video was generated but the output download failed."), {
+            providerPhase: "download-output",
+            providerName: "volcengine-seedance",
+            providerModel: "doubao-seedance-2-0-fast-260128",
+            providerTaskId: "task-generated",
+            providerVideoUrl: "https://cdn.example.com/generated.mp4",
+            output: {
+              path: join(input.outDir, "raw", "TK-001", "v1", "TK-001-v1.seedance.mp4"),
+              width: 1080,
+              height: 1920,
+              durationSeconds: input.durationSeconds,
+              mimeType: "video/mp4"
+            },
+            usage: {
+              completionTokens: 90000,
+              totalTokens: 90000
+            },
+            cost: {
+              amount: 8,
+              currency: "CNY"
+            },
+            rawResponse: {
+              completedTask: { id: "task-generated" }
+            },
+            cause: Object.assign(new Error("Connect Timeout Error"), {
+              code: "UND_ERR_CONNECT_TIMEOUT"
+            })
+          });
+        }
+        const report = makeReport(input);
+        await mkdir(join(report.reportPath, ".."), { recursive: true });
+        await writeFile(report.reportPath, JSON.stringify({
+          ...report,
+          reusedRawManifest: true,
+          recoveredRawOutput: true
+        }, null, 2), "utf8");
+        return {
+          ...report,
+          reusedRawManifest: true,
+          recoveredRawOutput: true
+        };
+      }
+    });
+
+    const queued = await queue.enqueue({
+      productPath,
+      provider: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      duration: 10,
+      template: "scene",
+      cta: "今すぐチェック",
+      confirmPaid: true
+    });
+    const failed = await queue.waitForIdle(queued.id);
+    const failedReport = JSON.parse(await readFile(join(outputsDir, failed.id, "make-video-report.json"), "utf8"));
+    const recovering = await queue.recoverDownload(failed.id);
+    const completed = await queue.waitForIdle(recovering.id);
+
+    expect(failed).toEqual(expect.objectContaining({
+      status: "failed",
+      productSku: "TK-001",
+      providerTaskId: "task-generated",
+      canRecoverDownload: true,
+      totalTokens: 90000,
+      estimatedCostCny: 3.33
+    }));
+    expect(failed.error).toContain("视频已经生成");
+    expect(failedReport).toEqual(expect.objectContaining({
+      status: "failed",
+      productSku: "TK-001",
+      billing: {
+        tokenPriceCnyPerMillion: 37,
+        totalTokens: 90000,
+        estimatedCostCny: 3.33
+      }
+    }));
+    expect(recovering).toEqual(expect.objectContaining({
+      status: "queued",
+      confirmPaid: false,
+      reuseManifest: failed.recoverableRawManifestPath
+    }));
+    expect(completed).toEqual(expect.objectContaining({
+      status: "completed",
+      productSku: "TK-001",
+      canRecoverDownload: false,
+      totalTokens: 324900,
+      estimatedCostCny: 12.02
+    }));
+    expect(calls).toEqual([
+      { confirmPaid: true, reuseManifestPath: undefined },
+      { confirmPaid: false, reuseManifestPath: failed.recoverableRawManifestPath }
+    ]);
+  });
+
   it("refuses to retry jobs that are not failed", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-retry-not-failed-"));
     tempDirs.push(root);
