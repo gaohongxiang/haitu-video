@@ -23,6 +23,8 @@ interface VolcengineSeedanceProviderOptions {
   estimatedCostCurrency?: "USD" | "JPY" | "CNY";
   fetchImpl?: typeof fetch;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
+  downloadTimeoutMs?: number;
+  downloadMaxAttempts?: number;
 }
 
 interface VolcengineSeedanceTaskResponse {
@@ -80,6 +82,8 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly estimatedCostCurrency: "USD" | "JPY" | "CNY";
   private readonly fetchImpl: typeof fetch;
   private readonly referenceImageUrlResolver?: ReferenceImageUrlResolver;
+  private readonly downloadTimeoutMs: number;
+  private readonly downloadMaxAttempts: number;
 
   constructor(options: VolcengineSeedanceProviderOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
@@ -105,6 +109,8 @@ export class VolcengineSeedanceProvider implements VideoProvider {
         "CNY");
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.referenceImageUrlResolver = options.referenceImageUrlResolver;
+    this.downloadTimeoutMs = options.downloadTimeoutMs ?? Number(process.env.SEEDANCE_DOWNLOAD_TIMEOUT_MS ?? 60000);
+    this.downloadMaxAttempts = options.downloadMaxAttempts ?? Number(process.env.SEEDANCE_DOWNLOAD_MAX_ATTEMPTS ?? 3);
   }
 
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
@@ -284,14 +290,38 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   }
 
   private async download(url: string, outputPath: string): Promise<void> {
-    const response = await this.fetchImpl(url);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to download Volcengine Seedance video: ${response.status} ${response.statusText}`
-      );
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= Math.max(1, this.downloadMaxAttempts); attempt += 1) {
+      try {
+        const response = await this.fetchWithTimeout(url, this.downloadTimeoutMs);
+        if (!response.ok) {
+          throw new Error(
+            `Failed to download Volcengine Seedance video: ${response.status} ${response.statusText}`
+          );
+        }
+        const bytes = Buffer.from(await response.arrayBuffer());
+        await writeFile(outputPath, bytes);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < Math.max(1, this.downloadMaxAttempts)) {
+          await sleep(1000 * attempt);
+        }
+      }
     }
-    const bytes = Buffer.from(await response.arrayBuffer());
-    await writeFile(outputPath, bytes);
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await this.fetchImpl(url, {
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
 

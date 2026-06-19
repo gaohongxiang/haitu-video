@@ -508,6 +508,58 @@ describe("SeedanceProvider", () => {
     await expect(readFile(result.output.path, "utf8")).resolves.toBe("official content object bytes");
   });
 
+  it("retries completed video downloads when the first attempt times out", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-download-retry-"));
+    tempDirs.push(outDir);
+    let downloadAttempts = 0;
+    const fetchImpl: typeof fetch = async (url) => {
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "task-download-retry", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/task-download-retry")) {
+        return jsonResponse({
+          id: "task-download-retry",
+          status: "succeeded",
+          output: { video_url: "https://cdn.example.com/retry-video.mp4" }
+        });
+      }
+      if (String(url) === "https://cdn.example.com/retry-video.mp4") {
+        downloadAttempts += 1;
+        if (downloadAttempts === 1) {
+          throw Object.assign(new Error("fetch failed"), {
+            cause: Object.assign(new Error("Connect Timeout Error"), {
+              code: "UND_ERR_CONNECT_TIMEOUT"
+            })
+          });
+        }
+        return new Response(Buffer.from("retried video bytes"), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new SeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      downloadMaxAttempts: 2,
+      fetchImpl
+    });
+
+    const result = await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "TK-001",
+      prompt: "Create a product ad.",
+      script: "今すぐチェック",
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      outputDir: outDir
+    });
+
+    expect(downloadAttempts).toBe(2);
+    await expect(readFile(result.output.path, "utf8")).resolves.toBe("retried video bytes");
+  });
+
   it("throws before making a paid request when the API key is missing", async () => {
     const provider = new SeedanceProvider({
       apiKey: "",

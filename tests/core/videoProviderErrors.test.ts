@@ -47,4 +47,19 @@ describe("readableVideoProviderError", () => {
     expect(error).not.toContain("模型：");
     expect(error).not.toContain("参考图：9 张");
   });
+
+  it("explains output download timeouts without blaming reference images", () => {
+    const error = readableVideoProviderError({
+      message: "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。",
+      rawMessage: "fetch failed",
+      causeMessage: "Connect Timeout Error (attempted address: ark-acg-cn-beijing.tos-cn-beijing.volces.com:443, timeout: 10000ms)",
+      causeCode: "UND_ERR_CONNECT_TIMEOUT",
+      providerPhase: "download-output",
+      providerModel: "doubao-seedance-2-0-fast-260128"
+    });
+
+    expect(error).toBe("视频已经生成，但服务器下载成片超时。请稍后重试；如果连续失败，可能是服务器到火山文件服务器的网络不稳定。");
+    expect(error).not.toContain("参考图链接");
+    expect(error).not.toContain("模型配置");
+  });
 });

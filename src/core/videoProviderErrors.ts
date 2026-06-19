@@ -1,6 +1,8 @@
 export interface ReadableVideoProviderErrorInput {
   message?: string;
   rawMessage?: string;
+  causeMessage?: string;
+  causeCode?: string;
   providerPhase?: string;
   providerName?: string;
   providerModel?: string;
@@ -41,6 +43,10 @@ export function readableVideoProviderError(input: ReadableVideoProviderErrorInpu
 
   if (diagnosticMessage.includes("Missing SEEDANCE_API_KEY") || diagnosticMessage.includes("Missing ARK_API_KEY")) {
     return "还没有配置视频模型 API Key。请先到 API 管理里配置 Seedance/火山视频模型密钥，再生成视频。";
+  }
+
+  if (isSeedanceOutputDownloadFailure(diagnosticMessage, details)) {
+    return "视频已经生成，但服务器下载成片超时。请稍后重试；如果连续失败，可能是服务器到火山文件服务器的网络不稳定。";
   }
 
   if (diagnosticMessage.includes("fetch failed") || diagnosticMessage.includes("Headers Timeout Error")) {
@@ -132,6 +138,17 @@ function extractSeedanceProviderError(message: string): { code?: string; message
 function isSeedanceReferenceImageDownloadFailure(message: string): boolean {
   const lower = message.toLowerCase();
   return lower.includes("image_url") && lower.includes("resource download failed");
+}
+
+function isSeedanceOutputDownloadFailure(message: string, details?: ReadableVideoProviderErrorInput): boolean {
+  if (details?.providerPhase !== "download-output") {
+    return false;
+  }
+  const diagnostic = [message, details.causeMessage ?? "", details.causeCode ?? ""].join(" ").toLowerCase();
+  return diagnostic.includes("fetch failed") ||
+    diagnostic.includes("timeout") ||
+    diagnostic.includes("und_err_connect_timeout") ||
+    diagnostic.includes("headers timeout");
 }
 
 function seedanceReferenceImageIndex(message: string): number | undefined {
