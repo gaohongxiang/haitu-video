@@ -49,7 +49,7 @@ export function productDraftToComposerText(draft: ProductDraft): string {
 }
 
 export function isStructuredProductComposerText(value: string): boolean {
-  return /(^|\n)\s*(标题|分类|材质|尺寸\/重量|卖点|使用场景|不可用卖点|参考图|图片|主图|画像)\s*[：:]/.test(value) ||
+  return /(^|\n)\s*(商品ID|商品名|商品名称|产品名称|标题|カテゴリ|分类|素材|材质|尺寸|尺寸\/重量|サイズ|规格选项|规格|卖点|商品説明|商品描述|描述|使用场景|不可用卖点|禁止|参考图|图片|主图|画像)\s*[：:]/.test(value) ||
     extractImageUrls(value).length > 0;
 }
 
@@ -59,19 +59,34 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
   }
   const buckets: Partial<Record<keyof ProductDraft, string[]>> = {};
   let currentKey: keyof ProductDraft | undefined;
+  const passthroughLabels = new Set(["规格选项", "规格", "商品説明", "商品描述", "描述"]);
   const labelToKey: Record<string, keyof ProductDraft> = {
+    "商品ID": "sku",
+    "商品名": "title_ja",
+    "商品名称": "title_ja",
+    "产品名称": "title_ja",
     "标题": "title_ja",
+    "カテゴリ": "category",
     "分类": "category",
+    "素材": "materials",
     "材质": "materials",
+    "尺寸": "dimensions",
     "尺寸/重量": "dimensions",
+    "サイズ": "dimensions",
     "卖点": "verified_selling_points",
     "使用场景": "usage_scenes",
     "不可用卖点": "forbidden_claims",
+    "禁止": "forbidden_claims",
     "参考图": "reference_images",
     "图片": "reference_images",
     "主图": "reference_images",
     "画像": "reference_images"
   };
+  const supportedLabels = [...Object.keys(labelToKey), ...passthroughLabels]
+    .map(escapeRegExp)
+    .sort((left, right) => right.length - left.length)
+    .join("|");
+  const labelPattern = new RegExp(`^\\s*(${supportedLabels})\\s*[：:]\\s*(.*)$`);
 
   let hasReferenceInput = false;
   for (const rawLine of value.split(/\r?\n/)) {
@@ -84,14 +99,21 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
       }
       continue;
     }
-    const match = rawLine.match(/^\s*(标题|分类|材质|尺寸\/重量|卖点|使用场景|不可用卖点|参考图|图片|主图|画像)\s*[：:]\s*(.*)$/);
+    const match = rawLine.match(labelPattern);
     if (match) {
+      if (passthroughLabels.has(match[1] ?? "")) {
+        currentKey = undefined;
+        continue;
+      }
       currentKey = labelToKey[match[1] ?? ""];
       if (currentKey) {
         if (currentKey === "reference_images") {
           hasReferenceInput = true;
         }
-        buckets[currentKey] = splitReferenceText(match[2] ?? "");
+        buckets[currentKey] = [
+          ...(buckets[currentKey] ?? []),
+          ...splitReferenceText(match[2] ?? "")
+        ];
       }
       continue;
     }
@@ -107,6 +129,7 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
   const bucketText = (key: keyof ProductDraft) => buckets[key]?.join("\n").trim();
   return {
     ...fallback,
+    sku: bucketText("sku") ?? fallback.sku,
     title_ja: bucketText("title_ja") ?? fallback.title_ja,
     category: bucketText("category") ?? fallback.category,
     materials: bucketText("materials") ?? fallback.materials,
@@ -117,6 +140,10 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
     reference_images: referenceImages || fallback.reference_images,
     source_text: fallback.source_text
   };
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function draftReferenceImageStatuses(draft: ProductDraft): DraftReferenceImageStatus[] {

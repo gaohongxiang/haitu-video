@@ -385,7 +385,13 @@ function buildPreviewRow(input: {
   rowIndex: number;
   existingSkus: Set<string>;
 }): ProductFileImportRow {
-  const sourceText = rowToSourceText(input.raw);
+  const sourceText = rowToSourceText({
+    ...input.raw,
+    ...(input.sourceRowNumbers.length > 1 ? {
+      "来源行": input.sourceRowNumbers.join("、"),
+      "SKU数": String(input.sourceRowNumbers.length)
+    } : {})
+  });
   const rowId = `row-${input.rowNumber}-${input.rowIndex + 1}`;
   try {
     const preview = cleanImportedProductText(sourceText);
@@ -479,8 +485,7 @@ function mergeProductRows(rows: ParsedTableRow[]): Record<string, string> {
   const imageReferences = uniqueNonEmpty(rows.flatMap((row) => collectRowImageReferences(row.raw)));
   const descriptions = uniqueNonEmpty(rows.flatMap((row) => allRawValues(row.raw, descriptionHeaderPatterns)));
   const sellingPoints = uniqueNonEmpty([
-    ...rows.flatMap((row) => allRawValues(row.raw, [/^(卖点|賣點|販売ポイント|特徴|特长|特長|selling\s*points?)$/i])),
-    variantValues.length > 1 ? `${variantValues.join("、")}のバリエーション` : ""
+    ...rows.flatMap((row) => allRawValues(row.raw, [/^(卖点|賣點|販売ポイント|特徴|特长|特長|selling\s*points?)$/i]))
   ]);
 
   const merged: Record<string, string> = {};

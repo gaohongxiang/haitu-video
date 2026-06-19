@@ -9,6 +9,33 @@ import {
 } from "../../src/client/productComposerText.js";
 
 describe("productComposerTextToDraft", () => {
+  it("understands parsed file-import labels when product text is filled from CSV or Excel", () => {
+    const firstImage = "https://cdn.example.test/sku-black.jpg";
+    const secondImage = "https://cdn.example.test/sku-khaki.jpg";
+
+    const draft = productComposerTextToDraft([
+      "商品ID：17359373939",
+      "商品名：UVカット 日よけアームカバー",
+      "カテゴリ：スポーツ・アウトドア",
+      "素材：ポリエステル",
+      "サイズ：重量 0.35kg",
+      "规格选项：ブラック、カーキ",
+      "商品説明：",
+      "腕まわりを日差しからカバーします。",
+      `图片：${firstImage}、${secondImage}`
+    ].join("\n"), defaultProductDraft);
+
+    expect(draft.title_ja).toBe("UVカット 日よけアームカバー");
+    expect(draft.category).toBe("スポーツ・アウトドア");
+    expect(draft.materials).toBe("ポリエステル");
+    expect(draft.dimensions).toBe("重量 0.35kg");
+    expect(draft.verified_selling_points).toBe("");
+    expect(draft.reference_images).toBe([
+      firstImage,
+      secondImage
+    ].join("\n"));
+  });
+
   it("extracts bare image URLs from pasted product text into reference images", () => {
     const imageUrl = "https://p16-oec-va.ibyteimg.com/tos-maliva-i-o3syd03w52-us/c5633a662f964e4889c530fd4fd4b263~tplv-o3syd03w52-origin-jpeg.jpeg?dr=15568&t=555f072d";
 

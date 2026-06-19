@@ -2279,7 +2279,11 @@ export function App() {
       return;
     }
     const nextDraft = productFactsToDraft(row.product);
-    updateProductComposerText(productDraftToComposerText(nextDraft), nextDraft);
+    const nextText = row.sourceText.trim() || productDraftToComposerText(nextDraft);
+    updateProductComposerText(nextText, {
+      ...nextDraft,
+      source_text: nextText
+    });
     setImportNotes(row.notes);
     setImportQuality(row.quality);
     setSelectedProduct(undefined);
@@ -2288,7 +2292,7 @@ export function App() {
     persistProductStudioSku("");
     setPreflight(undefined);
     setPreflightSignature("");
-    setStatusText(`已填入当前商品资料: ${row.product.title_ja}`);
+    setStatusText(`已把文件里的商品资料填入当前商品: ${row.product.title_ja}`);
   }
 
   async function commitProductFileImportRows(rows: ProductFileImportRow[], rowIds: string[]): Promise<ProductFileImportCommitResponse> {
@@ -4069,6 +4073,7 @@ function ProductCreationComposer({
               className="product-creation-picker min-w-0"
               products={products}
               selectedSku={selectedSku}
+              draftTitle={draft.title_ja}
               onSelectProduct={onSelectProduct}
               onAddProduct={onStartNewProduct}
               onDeleteProduct={onDeleteProduct}
@@ -5280,6 +5285,7 @@ function ProductCreationProductPicker({
   className,
   products,
   selectedSku,
+  draftTitle,
   onSelectProduct,
   onAddProduct,
   onDeleteProduct,
@@ -5288,6 +5294,7 @@ function ProductCreationProductPicker({
   className?: string;
   products: ProductSummary[];
   selectedSku: string;
+  draftTitle?: string;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onAddProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
@@ -5296,7 +5303,8 @@ function ProductCreationProductPicker({
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const productOptions = dedupeProductSummaries(products);
   const selectedProductOption = productOptions.find((product) => product.sku === selectedSku);
-  const selectedProductLabel = selectedProductOption ? selectedProductOption.title_ja : "新商品";
+  const draftProductTitle = draftTitle?.trim() ?? "";
+  const selectedProductLabel = draftProductTitle || (selectedProductOption ? selectedProductOption.title_ja : "新商品");
 
   const handleProductPickerSelect = (sku: string) => {
     if (sku === NEW_PRODUCT_SELECT_VALUE) {
@@ -5337,6 +5345,7 @@ function ProductCreationProductPicker({
         )}
         aria-haspopup="listbox"
         aria-expanded={productPickerOpen}
+        title={selectedProductLabel}
         onClick={() => setProductPickerOpen((open) => !open)}
       >
         <span className="min-w-0 truncate">{selectedProductLabel}</span>
@@ -5376,6 +5385,7 @@ function ProductCreationProductPicker({
           {productOptions.length > 0 ? (
             productOptions.map((option) => {
               const active = option.sku === selectedSku;
+              const optionTitle = active && draftProductTitle ? draftProductTitle : option.title_ja;
               return (
                 <div
                   key={option.sku}
@@ -5394,7 +5404,7 @@ function ProductCreationProductPicker({
                     <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
                       <CheckCircle2 size={14} />
                     </span>
-                    <span className="min-w-0 truncate">{option.title_ja}</span>
+                    <span className="min-w-0 truncate" title={optionTitle}>{optionTitle}</span>
                   </button>
                   <button
                     type="button"
@@ -5469,7 +5479,7 @@ function ProductFileImportDialog({
   const previewBadgeTone = preview && preview.summary.total === 0 ? "warn" : "ok";
   const previewSummaryText = preview
     ? preview.summary.total > 0
-      ? `检测到 ${preview.summary.total} 个商品。默认选择 1 个，勾选几个就导入几个。`
+      ? `检测到 ${preview.summary.total} 个商品。默认选择 1 个，单选会填入当前商品资料，勾选多个会保存到商品列表。`
       : diagnostics?.scannedRows
         ? `检测到 ${diagnostics.scannedRows} 行明细，0 个可导入商品。`
         : "没有检测到可导入商品。"
@@ -5552,7 +5562,7 @@ function ProductFileImportDialog({
             </span>
             <span className="text-sm font-black text-[#172033]">选择 CSV/Excel 文件</span>
             <span className="text-xs font-semibold leading-5 text-[#6c7890]">
-              解析后默认选择一个商品；勾选多个会一起导入到商品列表。
+              解析后默认选择一个商品；单选会把原始资料整理后填入商品资料框。
             </span>
             <input
               className="sr-only"
@@ -5610,7 +5620,7 @@ function ProductFileImportDialog({
                               />
                             </td>
                             <td className="whitespace-nowrap px-3 py-2"><Badge tone={fileImportRowTone(row.status)}>{fileImportRowLabel(row.status)}</Badge></td>
-                            <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2 font-black text-[#172033]">{row.product?.sku ?? "-"}</td>
+                            <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2 font-black text-[#172033]">{fileImportProductIdLabel(row)}</td>
                             <td className="max-w-[300px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[#172033]" title={row.product?.title_ja ?? row.error ?? ""}>{row.product?.title_ja ?? row.error ?? "-"}</td>
                             <td className="max-w-[130px] truncate whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{fileImportSourceRowsLabel(row)}</td>
                             <td className="whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{row.referenceImageCount} 张</td>
@@ -5689,6 +5699,14 @@ function fileImportSourceRowsLabel(row: ProductFileImportRow): string {
     return String(rows[0]);
   }
   return `${rows[0]}-${rows[rows.length - 1]} (${rows.length} 行)`;
+}
+
+function fileImportProductIdLabel(row: ProductFileImportRow): string {
+  const productId = Object.entries(row.raw).find(([header, value]) =>
+    /^(商品ID|商品id|产品ID|產品ID|产品id|產品id|全球产品ID|全球產品ID|product\s*id|global\s*product\s*id|id|ID)$/i.test(header.trim()) &&
+    value.trim()
+  )?.[1];
+  return productId?.trim() || row.product?.sku || "-";
 }
 
 function fileImportRowTone(status: ProductFileImportRowStatus): "neutral" | "ok" | "warn" | "danger" {

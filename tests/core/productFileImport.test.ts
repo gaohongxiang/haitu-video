@@ -106,6 +106,9 @@ describe("parseProductImportFile", () => {
       })
     ]);
     expect(preview.rows[0]?.sourceText).toContain("规格选项：ブラック、カーキ");
+    expect(preview.rows[0]?.sourceText).not.toContain("ブラック、カーキのバリエーション");
+    expect(preview.rows[0]?.sourceText).toContain("来源行：2、3");
+    expect(preview.rows[0]?.sourceText).toContain("SKU数：2");
     expect(preview.rows[0]?.product?.reference_images).toEqual([
       "https://cdn.example.test/sku-black.jpg",
       "https://cdn.example.test/main-arm.jpg",

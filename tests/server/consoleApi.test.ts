@@ -998,7 +998,8 @@ describe("console API", () => {
     expect(appSource).toContain("/api/products/import-file-commit");
     expect(productPickerSource).toContain("导入 CSV/Excel");
     expect(creationComposerSource).not.toContain("导入文件");
-    expect(appSource).toContain("默认选择 1 个，勾选几个就导入几个。");
+    expect(appSource).toContain("默认选择 1 个，单选会填入当前商品资料，勾选多个会保存到商品列表。");
+    expect(appSource).toContain("const nextText = row.sourceText.trim() || productDraftToComposerText(nextDraft);");
     expect(appSource).toContain("导入选中 ${batchIds.length} 个商品");
     expect(appSource).toContain("填入当前商品");
     expect(appSource).toContain("默认选 1 个");
@@ -1128,6 +1129,8 @@ describe("console API", () => {
     expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
     expect(productPickerSource).toContain("新商品");
     expect(productPickerSource).toContain("dedupeProductSummaries(products)");
+    expect(productPickerSource).toContain("draftTitle");
+    expect(productPickerSource).toContain("const selectedProductLabel = draftProductTitle ||");
     expect(productPickerSource).not.toContain("+ 新建商品");
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
