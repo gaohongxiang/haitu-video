@@ -446,6 +446,7 @@ interface CreativeVersionItem {
   hasFinalVideo: boolean;
   finalVideoUrl?: string;
   createdAt?: string;
+  completedAt?: string;
   expiresAt?: string;
   expired?: boolean;
   hashtags?: string[];
@@ -4667,8 +4668,7 @@ function VideoHistoryPanel({
             const activeVersion = isActiveCreativeVersion(job);
             const playableVideo = hasPlayableVideo(job);
             const retryJob = job.status === "failed" ? job.videoJob : undefined;
-            const failureReason = creativeVersionFailureReason(job);
-            const lifecycleLabel = failureReason || (playableVideo ? videoExpiryLabel(job) : creativeVersionDisplayStatus(job));
+            const lifecycleLabel = creativeVersionLifecycleHint(job);
             return (
               <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
@@ -4680,7 +4680,7 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-                    {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)} · {lifecycleLabel}
+                    {[...creativeVersionMetaParts(job), lifecycleLabel].filter(Boolean).join(" · ")}
                   </div>
                   <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
                 </div>
@@ -5046,7 +5046,7 @@ function DeleteCreativeVersionDialog({
         </div>
         <div className="rounded-[14px] border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#6c7890]">
           <div className="font-black text-[#172033]">{videoLabel(index)}</div>
-          <div>{videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}</div>
+          <div>{creativeVersionMetaParts(job).join(" · ")}</div>
         </div>
         <div className="flex justify-end gap-2">
           <Button className="w-fit" variant="ghost" disabled={isDeleting} onClick={onClose}>
@@ -5127,7 +5127,7 @@ function VideoPreviewDialog({
               </Badge>
             </div>
             <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
-              {videoModelLabel(job.provider, job.providerModel)} · {formatDuration(job.durationSeconds)} · {formatCreativeVersionTime(job)}
+              {creativeVersionMetaParts(job).join(" · ")}
             </div>
             <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
           </div>
@@ -7748,8 +7748,23 @@ function creativeVersionFailureReason(job: CreativeVersionItem): string {
   return readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails) || "生成失败，请检查视频模型配置后重试。";
 }
 
+function creativeVersionLifecycleHint(job: CreativeVersionItem): string {
+  const failureReason = creativeVersionFailureReason(job);
+  if (failureReason) return failureReason;
+  if (hasPlayableVideo(job)) return videoExpiryLabel(job);
+  return "";
+}
+
 function readableVideoJobError(message?: string, details?: VideoJobErrorDetails): string {
   return readableVideoProviderError(details ? { ...details, message: message ?? details.message, rawMessage: details.message } : message);
+}
+
+function creativeVersionMetaParts(job: CreativeVersionItem): string[] {
+  return [
+    videoModelLabel(job.provider, job.providerModel),
+    formatDuration(job.durationSeconds),
+    formatCreativeVersionTime(job)
+  ].filter((part) => part && part !== "-");
 }
 
 function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {
@@ -7878,6 +7893,7 @@ function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
     hasFinalVideo: hasPlayableVideo(job),
     finalVideoUrl: job.finalVideoUrl,
     createdAt: job.createdAt,
+    completedAt: job.completedAt,
     expiresAt: job.expiresAt,
     expired: job.expired,
     hashtags: job.hashtags,
@@ -7931,10 +7947,14 @@ function isActiveCreativeVersion(job: CreativeVersionItem): boolean {
 }
 
 function formatCreativeVersionTime(job: CreativeVersionItem): string {
-  if (!job.createdAt) return "生成时间未知";
-  const date = new Date(job.createdAt);
-  if (Number.isNaN(date.getTime())) return "生成时间未知";
-  return formatAbsoluteMinuteTime(job.createdAt);
+  if (job.status !== "completed" && job.status !== "succeeded" && !hasPlayableVideo(job)) {
+    return "";
+  }
+  const completedAt = job.completedAt ?? job.createdAt;
+  if (!completedAt) return "";
+  const date = new Date(completedAt);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatAbsoluteMinuteTime(completedAt);
 }
 
 function creativeVersionSortTime(job: CreativeVersionItem): number {
