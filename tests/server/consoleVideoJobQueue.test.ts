@@ -262,6 +262,51 @@ describe("LocalVideoJobQueue", () => {
     });
   });
 
+  it("stores a readable error when Seedance rejects too many reference images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-too-many-references-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "wallet.json");
+    await writeProduct(productPath);
+    const providerError =
+      'Volcengine Seedance API error 400: {"error":{"code":"InvalidParameter","message":"The parameter `content` specified in the request is not valid: expected at most 9 reference images but got 10 instead.","param":"content","type":"BadRequest"}}';
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-18T09:00:00.000Z"),
+      runMakeVideoPipeline: async () => {
+        throw Object.assign(new Error(providerError), {
+          providerPhase: "create-task",
+          providerName: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          referenceImageCount: 10,
+          usedTemporaryAssetUrls: true
+        });
+      }
+    });
+
+    const job = await queue.enqueue({
+      productPath,
+      provider: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      confirmPaid: true
+    });
+    const completed = await queue.waitForIdle(job.id);
+
+    expect(completed.status).toBe("failed");
+    expect(completed.error).toBe("参考图太多：Seedance 最多支持 9 张，本次有 10 张。生成时只使用前 9 张，请调整顺序或删除多余图片后重试。");
+    expect(completed.errorDetails).toMatchObject({
+      message: providerError,
+      providerPhase: "create-task",
+      providerName: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      referenceImageCount: 10,
+      usedTemporaryAssetUrls: true
+    });
+  });
+
   it("keeps job ids unique across queue instances sharing one jobs directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-unique-id-"));
     tempDirs.push(root);

@@ -703,7 +703,10 @@ describe("console API", () => {
     expect(appSource).toContain("window.clearTimeout(timeout)");
     expect(appSource).toContain("操作提示");
     expect(appSource).toContain("readableVideoJobError");
-    expect(appSource).toContain("参考图里可能包含真人、人脸或隐私信息");
+    const providerErrorSource = await readFile(join(import.meta.dirname, "../../src/core/videoProviderErrors.ts"), "utf8");
+    expect(appSource).toContain("readableVideoProviderError(message)");
+    expect(providerErrorSource).toContain("参考图太多：Seedance 最多支持");
+    expect(providerErrorSource).toContain("参考图里可能包含真人、人脸或隐私信息");
     expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
     expect(appSource).toContain("请先配置图片模型，再生成参考图。");
     expect(appSource).toContain("请先配置视频模型，再生成视频。");
@@ -3820,6 +3823,39 @@ describe("console API", () => {
       original: "main.jpg",
       status: "previewable"
     }));
+  });
+
+  it("warns and previews only the first nine Seedance reference images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-preflight-reference-limit-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(productPath, {
+      sku: "TK-REF-LIMIT",
+      title_ja: "ミニ財布",
+      reference_images: Array.from({ length: 10 }, (_, index) => `ref-${index + 1}.jpg`)
+    });
+    for (let index = 1; index <= 10; index += 1) {
+      await writeFile(productAssetPath(productPath, `ref-${index}.jpg`), Buffer.from(`image-${index}`));
+    }
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/preflight", {
+      method: "POST",
+      body: JSON.stringify({
+        productPath,
+        provider: "volcengine-seedance",
+        duration: 10,
+        template: "pain-point",
+        cta: "今すぐチェック"
+      })
+    });
+
+    expect(response.preflight.assetSummary.total).toBe(10);
+    expect(response.preflight.warnings).toContain("Seedance 最多支持 9 张参考图，本次会只使用前 9 张。");
+    expect(response.preflight.readiness.warnings).toContain("参考图超过 9 张，生成时只会使用前 9 张。");
+    expect(response.preflight.prompt).toContain("ref-9.jpg");
+    expect(response.preflight.prompt).not.toContain("ref-10.jpg");
   });
 
   it("includes paid generation readiness warnings in preflight", async () => {
@@ -7311,13 +7347,19 @@ function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleSer
   if (!process.env.HAITU_SECRET_KEY) {
     vi.stubEnv("HAITU_SECRET_KEY", "0123456789abcdef0123456789abcdef");
   }
+  vi.stubEnv("HAITU_AUTH_EMAIL_FROM", "");
+  vi.stubEnv("RESEND_API_KEY", "");
   const rootDir = options.rootDir ?? process.cwd();
   const dataDir = options.dataDir
     ? isAbsolute(options.dataDir)
       ? options.dataDir
       : join(rootDir, options.dataDir)
     : testDataDir(rootDir);
-  const raw = createRawConsoleServer(options);
+  const raw = createRawConsoleServer({
+    ...options,
+    rootDir,
+    dataDir
+  });
   let authSession: Promise<{ cookie: string; workspaceId: string }> | undefined;
 
   async function session(): Promise<{ cookie: string; workspaceId: string }> {
@@ -7435,19 +7477,30 @@ async function registerConsoleUser(
 
 async function latestEmailOtp(dataDir: string, email: string, type: "email-verification" | "forget-password"): Promise<string> {
   const outboxPath = join(dataDir, "system", "auth-email-outbox.jsonl");
-  const raw = await readFile(outboxPath, "utf8");
-  const rows = raw
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as { email: string; type: string; otp: string });
-  const found = rows
-    .reverse()
-    .find((row) => row.email === email && row.type === type);
-  if (!found) {
-    throw new Error(`No OTP found for ${email} (${type})`);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    try {
+      const raw = await readFile(outboxPath, "utf8");
+      const rows = raw
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { email: string; type: string; otp: string });
+      const found = rows
+        .reverse()
+        .find((row) => row.email === email && row.type === type);
+      if (found) {
+        return found.otp;
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        throw error;
+      }
+    }
+    await sleep(50);
   }
-  return found.otp;
+  throw new Error(`No OTP found for ${email} (${type})`);
 }
 
 async function readStoredProviderKey(root: string, provider: string): Promise<{

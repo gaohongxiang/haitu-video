@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createConsoleServer } from "../../src/server/consoleServer.js";
 import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
@@ -11,9 +11,18 @@ import type { MakeVideoReport } from "../../src/pipeline/makeVideoPipeline.js";
 
 const tempDirs: string[] = [];
 
+beforeEach(() => {
+  vi.stubEnv("HAITU_SECRET_KEY", "0123456789abcdef0123456789abcdef");
+  vi.stubEnv("HAITU_DATA_DIR", "");
+  vi.stubEnv("HAITU_DB_PATH", "");
+  vi.stubEnv("HAITU_AUTH_EMAIL_FROM", "");
+  vi.stubEnv("RESEND_API_KEY", "");
+  vi.stubEnv("BETTER_AUTH_URL", "");
+});
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-  restoreEnv("HAITU_SECRET_KEY", undefined);
+  vi.unstubAllEnvs();
 });
 
 describe("SQLite-backed user auth and workspace resolution", () => {
@@ -809,12 +818,4 @@ async function makeTempDir(): Promise<string> {
 
 function testDataDir(root: string): string {
   return join(root, "data");
-}
-
-function restoreEnv(name: string, value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[name];
-  } else {
-    process.env[name] = value;
-  }
 }

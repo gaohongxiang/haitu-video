@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { ProductFacts } from "../core/productFacts.js";
 import { generateJapaneseHashtags } from "../core/japaneseHashtags.js";
 import { generateVideoPrompt } from "../core/promptGenerator.js";
+import { maxSeedanceReferenceImages } from "../core/videoProviderErrors.js";
 import {
   generateJapaneseAdScript,
   type GeneratedScript,
@@ -71,7 +72,11 @@ export async function runProductJob(input: {
     scriptLines: input.scriptLines,
     finalLanguage
   });
-  const prompt = generateVideoPrompt(input.product, {
+  const generationProduct = {
+    ...input.product,
+    reference_images: input.product.reference_images.slice(0, maxSeedanceReferenceImages)
+  };
+  const prompt = generateVideoPrompt(generationProduct, {
     durationSeconds,
     aspectRatio: "9:16",
     template: input.template,
@@ -86,7 +91,7 @@ export async function runProductJob(input: {
     durationSeconds,
     aspectRatio: "9:16",
     outputDir,
-    referenceImages: input.product.reference_images,
+    referenceImages: generationProduct.reference_images,
     finalLanguage
   });
   const qc = runBasicQc({

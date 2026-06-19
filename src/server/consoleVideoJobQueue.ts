@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { normalizeJapaneseHashtags } from "../core/japaneseHashtags.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
+import { readableVideoProviderError } from "../core/videoProviderErrors.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
 import type { ReferenceImageUrlResolver } from "../providers/types.js";
@@ -551,15 +552,5 @@ function serializeJobError(error: unknown): VideoJobErrorDetails {
 }
 
 function readableJobError(details: VideoJobErrorDetails): string {
-  const message = details.message;
-  if (
-    message.includes("InputImageSensitiveContentDetected.PrivacyInformation") ||
-    message.includes("input image may contain real person")
-  ) {
-    return "参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。";
-  }
-  if (message.includes("fetch failed") && details.providerPhase === "create-task") {
-    return "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。";
-  }
-  return message;
+  return readableVideoProviderError(details);
 }

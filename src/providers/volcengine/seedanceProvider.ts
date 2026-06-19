@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, join, resolve } from "node:path";
 
+import { maxSeedanceReferenceImages } from "../../core/videoProviderErrors.js";
 import { defaultFinalVideoLanguage, providerScriptLanguageLabel } from "../../core/videoLanguage.js";
 import type {
   ReferenceImageUrlResolver,
@@ -193,7 +194,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
       }
     ];
 
-    for (const referenceImage of request.referenceImages ?? []) {
+    for (const referenceImage of (request.referenceImages ?? []).slice(0, maxSeedanceReferenceImages)) {
       content.push({
         type: "image_url",
         role: "reference_image",

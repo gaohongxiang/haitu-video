@@ -63,6 +63,7 @@ import {
   removeReferenceFromComposerText,
   type ProductDraft
 } from "./productComposerText.js";
+import { readableVideoProviderError } from "../core/videoProviderErrors.js";
 import { cn } from "./lib/utils.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
@@ -7289,19 +7290,7 @@ function creativeVersionFailureReason(job: CreativeVersionItem): string {
 }
 
 function readableVideoJobError(message?: string): string {
-  if (!message) {
-    return "";
-  }
-  if (
-    message.includes("InputImageSensitiveContentDetected.PrivacyInformation") ||
-    message.includes("input image may contain real person")
-  ) {
-    return "参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。";
-  }
-  if (message.includes("fetch failed")) {
-    return "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。";
-  }
-  return message;
+  return readableVideoProviderError(message);
 }
 
 function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {

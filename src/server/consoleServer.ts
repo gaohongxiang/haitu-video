@@ -21,6 +21,7 @@ import {
   videoTemplateDefinitions
 } from "../core/templateCatalog.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
+import { maxSeedanceReferenceImages } from "../core/videoProviderErrors.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { generateJapaneseAdScript } from "../core/scriptGenerator.js";
@@ -1575,7 +1576,7 @@ async function runConsolePreflight(
     ...product,
     reference_images: resolveReferenceImages(product.reference_images, {
       productFilePath: productPath
-    })
+    }).slice(0, maxSeedanceReferenceImages)
   };
   const script = generateJapaneseAdScript(product, {
     cta,
@@ -4575,6 +4576,9 @@ function summarizeReferenceImages(images: ProductImagePreview[]) {
 
 function buildPreflightWarnings(assetSummary: ReturnType<typeof summarizeReferenceImages>): string[] {
   const warnings: string[] = [];
+  if (assetSummary.total > maxSeedanceReferenceImages) {
+    warnings.push(`Seedance 最多支持 ${maxSeedanceReferenceImages} 张参考图，本次会只使用前 ${maxSeedanceReferenceImages} 张。`);
+  }
   if (assetSummary.missing > 0) {
     warnings.push(`${assetSummary.missing} reference image ${assetSummary.missing === 1 ? "is" : "are"} missing.`);
   }
@@ -4595,6 +4599,9 @@ function buildPaidGenerationReadiness(
 ) {
   const blockingReasons: string[] = [];
   const warnings: string[] = [];
+  if (assetSummary.total > maxSeedanceReferenceImages) {
+    warnings.push(`参考图超过 ${maxSeedanceReferenceImages} 张，生成时只会使用前 ${maxSeedanceReferenceImages} 张。`);
+  }
   if (assetSummary.missing > 0) {
     warnings.push(`${assetSummary.missing} 张参考图缺失。`);
   }

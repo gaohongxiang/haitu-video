@@ -192,6 +192,56 @@ describe("SeedanceProvider", () => {
     });
   });
 
+  it("limits Seedance reference images to the first nine accepted by the API", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-reference-limit-"));
+    tempDirs.push(outDir);
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "task-with-nine-references", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/task-with-nine-references")) {
+        return jsonResponse({
+          id: "task-with-nine-references",
+          status: "succeeded",
+          output: { video_url: "https://cdn.example.com/video.mp4" }
+        });
+      }
+      if (String(url) === "https://cdn.example.com/video.mp4") {
+        return new Response(Buffer.from("fake mp4 bytes"), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new SeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      fetchImpl
+    });
+
+    await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "TK-001",
+      prompt: "Create a product ad.",
+      script: "今すぐチェック",
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      outputDir: outDir,
+      referenceImages: Array.from({ length: 10 }, (_, index) => `https://assets.example.com/ref-${index + 1}.png`)
+    });
+
+    const createBody = JSON.parse(String(calls[0]?.init?.body)) as {
+      content: Array<{ type: string; role?: string; image_url?: { url: string } }>;
+    };
+    const referenceImages = createBody.content.filter((item) => item.role === "reference_image");
+    expect(referenceImages).toHaveLength(9);
+    expect(referenceImages.at(8)?.image_url?.url).toBe("https://assets.example.com/ref-9.png");
+    expect(referenceImages.some((item) => item.image_url?.url === "https://assets.example.com/ref-10.png")).toBe(false);
+  });
+
   it("uses the configured reference image URL resolver for local files", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-reference-resolver-"));
     tempDirs.push(outDir);

@@ -76,6 +76,36 @@ describe("runProductJob", () => {
     expect(manifest.qc.result).toBe("pass");
   });
 
+  it("uses only the first nine reference images in the generation prompt and provider request", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-reference-limit-"));
+    tempDirs.push(outDir);
+    let providerRequest: VideoProviderRequest | undefined;
+    const provider: VideoProvider = {
+      async generateVideo(request) {
+        providerRequest = request;
+        return new MockVideoProvider().generateVideo(request);
+      }
+    };
+
+    const manifest = await runProductJob({
+      product: {
+        ...product,
+        reference_images: Array.from({ length: 10 }, (_, index) => `ref-${index + 1}.jpg`)
+      },
+      version: 1,
+      outputRoot: outDir,
+      provider,
+      cta: "今すぐチェック",
+      template: "pain-point"
+    });
+
+    expect(providerRequest?.referenceImages).toHaveLength(9);
+    expect(providerRequest?.referenceImages?.at(8)).toBe("ref-9.jpg");
+    expect(providerRequest?.referenceImages).not.toContain("ref-10.jpg");
+    expect(manifest.prompt).toContain("ref-9.jpg");
+    expect(manifest.prompt).not.toContain("ref-10.jpg");
+  });
+
   it("accepts a longer duration when explicitly requested", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-duration-"));
     tempDirs.push(outDir);
