@@ -208,16 +208,29 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   }
 
   private async normalizeReferenceImage(reference: string): Promise<string> {
-    if (reference.startsWith("http://") || reference.startsWith("https://")) {
-      return reference;
-    }
     if (reference.startsWith("data:image/") || reference.startsWith("asset://")) {
       return reference;
     }
     if (this.referenceImageUrlResolver) {
       return this.referenceImageUrlResolver(reference);
     }
+    if (reference.startsWith("http://") || reference.startsWith("https://")) {
+      return this.inlineRemoteImage(reference);
+    }
     return normalizeImageReference(reference);
+  }
+
+  private async inlineRemoteImage(reference: string): Promise<string> {
+    const response = await this.fetchImpl(reference);
+    if (!response.ok) {
+      throw new Error(`Reference image could not be loaded before video generation: HTTP ${response.status}.`);
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      throw new Error("Reference image URL did not return an image before video generation.");
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType.split(";")[0]};base64,${bytes.toString("base64")}`;
   }
 
   private errorMetadata(request: VideoProviderRequest): ProviderErrorMetadata {

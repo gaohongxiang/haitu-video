@@ -704,7 +704,10 @@ describe("console API", () => {
     expect(appSource).toContain("操作提示");
     expect(appSource).toContain("readableVideoJobError");
     const providerErrorSource = await readFile(join(import.meta.dirname, "../../src/core/videoProviderErrors.ts"), "utf8");
-    expect(appSource).toContain("readableVideoProviderError(message)");
+    expect(appSource).toContain("errorDetails?: VideoJobErrorDetails");
+    expect(appSource).toContain("readableVideoJobError(job.error, job.errorDetails)");
+    expect(appSource).toContain("readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails)");
+    expect(appSource).toContain("rawMessage: details.message");
     expect(providerErrorSource).toContain("参考图太多：Seedance 最多支持");
     expect(providerErrorSource).toContain("参考图里可能包含真人、人脸或隐私信息");
     expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
@@ -986,6 +989,21 @@ describe("console API", () => {
     expect(appSource).toContain("重试这个付费生成任务？");
     expect(appSource).toContain("删除这个本地视频文件？");
     expect(creationComposerSource).toContain("product-reference-inline");
+    expect(appSource).toContain("ProductFileImportDialog");
+    expect(appSource).toContain("/api/products/import-file-preview");
+    expect(appSource).toContain("/api/products/import-file-commit");
+    expect(productPickerSource).toContain("导入 CSV/Excel");
+    expect(creationComposerSource).not.toContain("导入文件");
+    expect(appSource).toContain("默认选择 1 个，勾选几个就导入几个。");
+    expect(appSource).toContain("导入选中 ${batchIds.length} 个商品");
+    expect(appSource).toContain("填入当前商品");
+    expect(appSource).toContain("默认选 1 个");
+    expect(appSource).not.toContain("ProductFileImportMode");
+    expect(appSource).toContain('ready: "未导入"');
+    expect(appSource).toContain('duplicate: "已导入"');
+    expect(appSource).toContain('failed: "不可导入"');
+    expect(appSource).toContain("全选可导入商品");
+    expect(appSource).toContain("whitespace-nowrap");
     expect(creationComposerSource).toContain("acceptReferenceFiles");
     expect(creationComposerSource).toContain("isReferenceImageFile");
     expect(creationComposerSource).toContain("onDrop=");
@@ -3043,6 +3061,93 @@ describe("console API", () => {
     ]);
     await expect(readFile(testProductPath(fixturesDir, "DXM-172397240576223361"), "utf8")).resolves.toContain("接触冷感アームカバー");
     await expect(readFile(testProductPath(fixturesDir, "WALLET-BLACK-001"), "utf8")).resolves.toContain("ラウンドファスナー");
+  });
+
+  it("previews CSV product file imports and commits only selected rows", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-product-file-import-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const imageUrl = "https://cdn.example.test/arm-main.jpg";
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === imageUrl) {
+        return new Response(Buffer.from("remote-image-bytes"), {
+          headers: {
+            "content-type": "image/jpeg"
+          }
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      body: JSON.stringify({
+        sku: "WALLET-001",
+        title_ja: "既存財布",
+        category: "財布",
+        materials: ["PU"],
+        dimensions: "約11cm",
+        verified_selling_points: ["カードを整理しやすい"],
+        usage_scenes: ["買い物"],
+        forbidden_claims: [],
+        reference_images: []
+      })
+    });
+    const csv = [
+      "SKU,商品名,カテゴリ,素材,サイズ,卖点,使用场景,主图",
+      `ARM-001,接触冷感アームカバー,アームカバー,ポリエステル,約52cm,通気性のある生地,通勤,${imageUrl}`,
+      "WALLET-001,ラウンドファスナー ミニ財布,財布,PUレザー,約11x9x3cm,カードを整理しやすい,買い物,https://cdn.example.test/wallet.jpg"
+    ].join("\n");
+
+    const preview = await server.fetchJson("/api/products/import-file-preview", {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: "店小秘导出.csv",
+        mimeType: "text/csv",
+        base64: Buffer.from(csv, "utf8").toString("base64")
+      })
+    });
+
+    expect(preview.summary).toEqual({
+      total: 2,
+      ready: 1,
+      needsAi: 0,
+      needsInput: 0,
+      duplicateSku: 1,
+      failed: 0
+    });
+    expect(preview.rows.map((row: { status: string; product?: { sku: string } }) => [row.status, row.product?.sku])).toEqual([
+      ["ready", "ARM-001"],
+      ["duplicate", "WALLET-001"]
+    ]);
+
+    const committed = await server.fetchJson("/api/products/import-file-commit", {
+      method: "POST",
+      body: JSON.stringify({
+        rows: preview.rows,
+        rowIds: [preview.rows[0].rowId]
+      })
+    });
+
+    const armProductPath = testProductPath(fixturesDir, "ARM-001");
+    const refFile = join(dirname(armProductPath), "refs", "reference-01.jpg");
+    expect(committed.summary).toEqual({
+      requested: 1,
+      imported: 1,
+      failed: 0
+    });
+    expect(committed.results[0]).toEqual(expect.objectContaining({
+      rowId: preview.rows[0].rowId,
+      status: "imported",
+      product: expect.objectContaining({
+        sku: "ARM-001",
+        reference_images: ["refs/reference-01.jpg"]
+      })
+    }));
+    expect(fetchImpl).toHaveBeenCalledWith(imageUrl);
+    await expect(readFile(refFile, "utf8")).resolves.toBe("remote-image-bytes");
+    const products = await server.fetchJson("/api/products");
+    expect(products.products.map((product: { sku: string }) => product.sku)).toEqual(["ARM-001", "WALLET-001"]);
   });
 
   it("returns cleaning notes for messy ecommerce imports", async () => {
@@ -6015,6 +6120,171 @@ describe("console API", () => {
       expect(resolvedUrl).toMatch(/^https:\/\/haitu\.online\/api\/public-assets\/[A-Za-z0-9_-]+$/);
       expect(publicAssetResponse.status).toBe(200);
       await expect(publicAssetResponse.text()).resolves.toBe("main-image");
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("BETTER_AUTH_URL", previousBaseUrl);
+    }
+  });
+
+  it("does not provide localhost public asset URLs to queued paid video generation", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousBaseUrl = process.env.BETTER_AUTH_URL;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.BETTER_AUTH_URL = "http://127.0.0.1:4181";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-localhost-public-assets-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      let resolverWasProvided = true;
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          resolverWasProvided = Boolean(input.referenceImageUrlResolver);
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "TK-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 8,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "paid-key",
+          baseUrl: "https://ark.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+
+      const queued = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      await waitForJobStatus(server, queued.job.id, "completed");
+
+      expect(resolverWasProvided).toBe(false);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("BETTER_AUTH_URL", previousBaseUrl);
+    }
+  });
+
+  it("caches remote reference image URLs before queued paid video generation", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousBaseUrl = process.env.BETTER_AUTH_URL;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.BETTER_AUTH_URL = "https://haitu.online";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-remote-public-assets-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "remote-box");
+      const remoteImageUrl = "https://cdn.example.test/remote-reference.jpg?token=abc";
+      await writeProduct(productPath, {
+        sku: "REMOTE-BOX",
+        title_ja: "remote box",
+        reference_images: [remoteImageUrl]
+      });
+      const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url) === remoteImageUrl) {
+          return new Response(Buffer.from("remote-image-bytes"), {
+            headers: {
+              "content-type": "image/jpeg"
+            }
+          });
+        }
+        throw new Error(`Unexpected fetch: ${String(url)} ${init?.method ?? "GET"}`);
+      }) as unknown as typeof fetch;
+      let resolvedUrl = "";
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        fetchImpl,
+        runMakeVideoPipeline: async (input) => {
+          resolvedUrl = await input.referenceImageUrlResolver?.(remoteImageUrl) ?? "";
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "REMOTE-BOX",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 8,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "paid-key",
+          baseUrl: "https://ark.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+
+      const queued = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          providerModel: "doubao-seedance-2-0-fast-260128",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      await waitForJobStatus(server, queued.job.id, "completed");
+      const publicAssetResponse = await server.raw.fetch(new URL(resolvedUrl).pathname);
+
+      expect(fetchImpl).toHaveBeenCalledWith(remoteImageUrl);
+      expect(resolvedUrl).toMatch(/^https:\/\/haitu\.online\/api\/public-assets\/[A-Za-z0-9_-]+$/);
+      expect(publicAssetResponse.status).toBe(200);
+      await expect(publicAssetResponse.text()).resolves.toBe("remote-image-bytes");
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);

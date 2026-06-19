@@ -145,6 +145,13 @@ describe("SeedanceProvider", () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl: typeof fetch = async (url, init) => {
       calls.push({ url: String(url), init });
+      if (String(url) === "https://assets.example.com/main.png") {
+        return new Response(Buffer.from("main-reference"), {
+          headers: {
+            "content-type": "image/png"
+          }
+        });
+      }
       if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
         return jsonResponse({ id: "task-with-reference", status: "queued" });
       }
@@ -180,14 +187,15 @@ describe("SeedanceProvider", () => {
       referenceImages: ["https://assets.example.com/main.png"]
     });
 
-    const createBody = JSON.parse(String(calls[0]?.init?.body)) as {
+    const createCall = calls.find((call) => call.url.endsWith("/api/v3/contents/generations/tasks"));
+    const createBody = JSON.parse(String(createCall?.init?.body)) as {
       content: Array<{ type: string; role?: string; image_url?: { url: string } }>;
     };
     expect(createBody.content).toContainEqual({
       type: "image_url",
       role: "reference_image",
       image_url: {
-        url: "https://assets.example.com/main.png"
+        url: `data:image/png;base64,${Buffer.from("main-reference").toString("base64")}`
       }
     });
   });
@@ -198,6 +206,13 @@ describe("SeedanceProvider", () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchImpl: typeof fetch = async (url, init) => {
       calls.push({ url: String(url), init });
+      if (String(url).startsWith("https://assets.example.com/ref-")) {
+        return new Response(Buffer.from(`reference-${String(url).match(/ref-(\d+)/)?.[1] ?? "x"}`), {
+          headers: {
+            "content-type": "image/png"
+          }
+        });
+      }
       if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
         return jsonResponse({ id: "task-with-nine-references", status: "queued" });
       }
@@ -233,13 +248,14 @@ describe("SeedanceProvider", () => {
       referenceImages: Array.from({ length: 10 }, (_, index) => `https://assets.example.com/ref-${index + 1}.png`)
     });
 
-    const createBody = JSON.parse(String(calls[0]?.init?.body)) as {
+    const createCall = calls.find((call) => call.url.endsWith("/api/v3/contents/generations/tasks"));
+    const createBody = JSON.parse(String(createCall?.init?.body)) as {
       content: Array<{ type: string; role?: string; image_url?: { url: string } }>;
     };
     const referenceImages = createBody.content.filter((item) => item.role === "reference_image");
     expect(referenceImages).toHaveLength(9);
-    expect(referenceImages.at(8)?.image_url?.url).toBe("https://assets.example.com/ref-9.png");
-    expect(referenceImages.some((item) => item.image_url?.url === "https://assets.example.com/ref-10.png")).toBe(false);
+    expect(referenceImages.at(8)?.image_url?.url).toBe(`data:image/png;base64,${Buffer.from("reference-9").toString("base64")}`);
+    expect(calls.some((call) => call.url === "https://assets.example.com/ref-10.png")).toBe(false);
   });
 
   it("uses the configured reference image URL resolver for local files", async () => {
@@ -296,10 +312,9 @@ describe("SeedanceProvider", () => {
     expect(body.content[1]?.image_url?.url).toBe("https://haitu.online/api/public-assets/token-1");
   });
 
-  it("does not call the resolver for remote HTTPS reference images", async () => {
-    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-remote-reference-"));
+  it("inlines remote HTTPS reference images when no public URL resolver is configured", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-remote-inline-reference-"));
     tempDirs.push(outDir);
-    let resolverCalls = 0;
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     const provider = new SeedanceProvider({
       apiKey: "seedance-key",
@@ -307,9 +322,66 @@ describe("SeedanceProvider", () => {
       model: "doubao-seedance-2-0-fast-260128",
       pollIntervalMs: 1,
       maxPolls: 2,
-      referenceImageUrlResolver: async () => {
-        resolverCalls += 1;
-        return "https://haitu.online/api/public-assets/unused";
+      fetchImpl: (async (url, init) => {
+        fetchCalls.push({ url: String(url), init });
+        if (String(url) === "https://cdn.example.test/reference.png") {
+          return new Response(Buffer.from("remote-image"), {
+            headers: {
+              "content-type": "image/png"
+            }
+          });
+        }
+        if (String(url).endsWith("/api/v3/contents/generations/tasks") && init?.method === "POST") {
+          return jsonResponse({ id: "task-1", status: "queued" });
+        }
+        if (String(url).endsWith("/api/v3/contents/generations/tasks/task-1")) {
+          return jsonResponse({
+            id: "task-1",
+            status: "succeeded",
+            output: { video_url: "https://video.example.test/out.mp4" }
+          });
+        }
+        if (String(url) === "https://video.example.test/out.mp4") {
+          return new Response("video", { status: 200 });
+        }
+        throw new Error(`Unexpected URL: ${String(url)}`);
+      }) as typeof fetch
+    });
+
+    await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "sku-1",
+      prompt: "prompt",
+      script: "script",
+      durationSeconds: 10,
+      aspectRatio: "9:16",
+      outputDir: outDir,
+      referenceImages: ["https://cdn.example.test/reference.png"],
+      finalLanguage: "ja"
+    });
+
+    const createCall = fetchCalls.find((call) => call.url.endsWith("/api/v3/contents/generations/tasks"));
+    const body = JSON.parse(String(createCall?.init?.body)) as {
+      content: Array<{ type: string; image_url?: { url: string } }>;
+    };
+    expect(fetchCalls.some((call) => call.url === "https://cdn.example.test/reference.png")).toBe(true);
+    expect(body.content[1]?.image_url?.url).toBe(`data:image/png;base64,${Buffer.from("remote-image").toString("base64")}`);
+  });
+
+  it("uses the configured reference image URL resolver for remote HTTPS reference images", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-remote-reference-"));
+    tempDirs.push(outDir);
+    const resolverCalls: string[] = [];
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const provider = new SeedanceProvider({
+      apiKey: "seedance-key",
+      baseUrl: "https://ark.example.test",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      referenceImageUrlResolver: async (reference) => {
+        resolverCalls.push(reference);
+        return "https://haitu.online/api/public-assets/token-remote";
       },
       fetchImpl: (async (url, init) => {
         fetchCalls.push({ url: String(url), init });
@@ -346,8 +418,8 @@ describe("SeedanceProvider", () => {
     const body = JSON.parse(String(createCall?.init?.body)) as {
       content: Array<{ type: string; image_url?: { url: string } }>;
     };
-    expect(resolverCalls).toBe(0);
-    expect(body.content[1]?.image_url?.url).toBe("https://cdn.example.test/reference.png");
+    expect(resolverCalls).toEqual(["https://cdn.example.test/reference.png"]);
+    expect(body.content[1]?.image_url?.url).toBe("https://haitu.online/api/public-assets/token-remote");
   });
 
   it("annotates create task failures with provider debugging metadata", async () => {

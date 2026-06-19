@@ -238,7 +238,7 @@ function stripLeadingSeparators(value: string): string {
 }
 
 function firstLikelyTitleLine(lines: string[]): string | undefined {
-  const nonTitleLabelPattern = /^(店铺名|店鋪名|店铺|店鋪|店舗|販売価格|售价|价格|価格|カテゴリ|カテゴリー|分类|类目|category|素材|材质|サイズ|尺寸|カラー|颜色|主图|画像|图片|商品ID)(?:\s|[:：]|$)/i;
+  const nonTitleLabelPattern = /^(店铺名|店鋪名|店铺|店鋪|店舗|shop|販売価格|售价|价格|価格|price|カテゴリ|カテゴリー|分类|類目|类目|category|素材|材质|材質|材料|サイズ|尺寸|重量|カラー|颜色|色|主图|主圖|画像|图片|圖片|商品ID|产品ID|產品ID|使用场景|使用場景|シーン|场景|場景|usage|scene|卖点|賣點|販売ポイント|特徴|特长|特長|selling\s*points?|禁止|禁用|未确认|未確認|forbidden)(?:\s|[:：]|$)/i;
   return lines.find((line) => {
     if (nonTitleLabelPattern.test(line)) {
       return false;
@@ -306,7 +306,7 @@ function collectImageReferences(lines: string[], explicitImages: string | undefi
   if (candidates.length === 0 && explicitImages) {
     candidates.push(...(splitImportedImageList(explicitImages) ?? []));
   }
-  return uniqueNonEmpty(candidates);
+  return uniqueImageReferences(candidates);
 }
 
 function extractImageUrls(value: string): string[] {
@@ -327,7 +327,7 @@ function readPossiblyWrappedImageUrl(value: string, start: number): string | und
   let sawQuery = false;
   for (let index = start; index < value.length; index += 1) {
     const char = value[index];
-    if (!char || /["'<>，,；;）)]/.test(char)) {
+    if (!char || /["'<>、，,；;）)]/.test(char)) {
       break;
     }
     if (/\s/.test(char)) {
@@ -406,6 +406,40 @@ function makeSkuFromText(text: string): string {
 
 function uniqueNonEmpty(items: string[]): string[] {
   return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
+function uniqueImageReferences(items: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const item of items.map((value) => value.trim()).filter(Boolean)) {
+    const key = imageReferenceKey(item);
+    const existing = byKey.get(key);
+    if (!existing || imageReferenceScore(item) > imageReferenceScore(existing)) {
+      byKey.set(key, item);
+    }
+  }
+  return Array.from(byKey.values());
+}
+
+function imageReferenceKey(value: string): string {
+  try {
+    const url = new URL(value);
+    const tiktokImageId = url.pathname.match(/\/([^/?]+)~tplv-[^/?]+?\.(?:jpe?g|png|webp)/i)?.[1];
+    if (tiktokImageId) {
+      return `${url.host}/${tiktokImageId}`;
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/~tplv-[^/?]+(?=\.(?:jpe?g|png|webp))/i, "");
+  } catch {
+    return value.replace(/[?#].*$/, "");
+  }
+}
+
+function imageReferenceScore(value: string): number {
+  let score = 0;
+  if (/origin/i.test(value)) score += 10;
+  if (!/resize/i.test(value)) score += 2;
+  return score;
 }
 
 function escapeRegExp(value: string): string {

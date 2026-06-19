@@ -13,6 +13,7 @@ import {
   Database,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   FileArchive,
   FileVideo,
   Gauge,
@@ -182,6 +183,69 @@ interface ProductImportBatchResponse {
   >;
 }
 
+type ProductFileImportRowStatus = "ready" | "needs-ai" | "needs-input" | "duplicate" | "failed";
+type ProductFileImportDiagnosticsReason = "empty" | "sku-only" | "no-product-fields";
+
+interface ProductFileImportRow {
+  rowId: string;
+  rowNumber: number;
+  sourceRowNumbers: number[];
+  status: ProductFileImportRowStatus;
+  raw: Record<string, string>;
+  sourceText: string;
+  notes: string[];
+  warnings: string[];
+  duplicate: boolean;
+  referenceImageCount: number;
+  product?: ProductFactsResponse;
+  quality: ProductImportQuality;
+  error?: string;
+}
+
+interface ProductFileImportPreviewResponse {
+  fileName: string;
+  sheetName?: string;
+  summary: {
+    total: number;
+    ready: number;
+    needsAi: number;
+    needsInput: number;
+    duplicateSku: number;
+    failed: number;
+  };
+  diagnostics: {
+    scannedRows: number;
+    candidateRows: number;
+    skippedRows: number;
+    headers: string[];
+    reason?: ProductFileImportDiagnosticsReason;
+    message?: string;
+  };
+  rows: ProductFileImportRow[];
+}
+
+interface ProductFileImportCommitResponse {
+  summary: {
+    requested: number;
+    imported: number;
+    failed: number;
+  };
+  results: Array<
+    | {
+        rowId: string;
+        rowNumber: number;
+        status: "imported";
+        product: ProductDetail;
+      }
+    | {
+        rowId: string;
+        rowNumber: number;
+        status: "failed";
+        error: string;
+      }
+  >;
+}
+
 interface DeleteLedgerVideoResponse {
   deleted: true;
   jobId: string;
@@ -345,12 +409,25 @@ interface VideoJob {
   totalTokens?: number;
   estimatedCostCny?: number;
   error?: string;
+  errorDetails?: VideoJobErrorDetails;
   createdAt: string;
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
   expiresAt?: string;
   expired?: boolean;
+}
+
+interface VideoJobErrorDetails {
+  message: string;
+  name?: string;
+  causeMessage?: string;
+  causeCode?: string;
+  providerPhase?: string;
+  providerName?: string;
+  providerModel?: string;
+  referenceImageCount?: number;
+  usedTemporaryAssetUrls?: boolean;
 }
 
 interface ProductVideoGenerationOptions {
@@ -2170,6 +2247,69 @@ export function App() {
     }
   }
 
+  async function previewProductFileImport(file: File): Promise<ProductFileImportPreviewResponse> {
+    setIsBusy(true);
+    try {
+      const preview = await postJson<ProductFileImportPreviewResponse>("/api/products/import-file-preview", {
+        fileName: file.name,
+        mimeType: file.type,
+        base64: await fileToBase64(file)
+      });
+      setStatusText(`已解析 ${preview.summary.total} 个商品候选。`);
+      return preview;
+    } catch (error) {
+      showError(error);
+      throw error;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function fillCurrentProductFromFileRow(row: ProductFileImportRow): Promise<void> {
+    if (!row.product) {
+      setStatusText("请选择已解析出商品资料的行。");
+      return;
+    }
+    const nextDraft = productFactsToDraft(row.product);
+    updateProductComposerText(productDraftToComposerText(nextDraft), nextDraft);
+    setImportNotes(row.notes);
+    setImportQuality(row.quality);
+    setSelectedProduct(undefined);
+    selectedProductRef.current = undefined;
+    setProductPath("");
+    persistProductStudioSku("");
+    setPreflight(undefined);
+    setPreflightSignature("");
+    setStatusText(`已填入当前商品资料: ${row.product.title_ja}`);
+  }
+
+  async function commitProductFileImportRows(rows: ProductFileImportRow[], rowIds: string[]): Promise<ProductFileImportCommitResponse> {
+    setIsBusy(true);
+    try {
+      const response = await postJson<ProductFileImportCommitResponse>("/api/products/import-file-commit", {
+        rows,
+        rowIds
+      });
+      const importedProducts = response.results
+        .filter((result): result is Extract<ProductFileImportCommitResponse["results"][number], { status: "imported" }> => result.status === "imported")
+        .map((result) => result.product);
+      if (importedProducts.length > 0) {
+        setProducts((current) => dedupeProductSummaries([
+          ...importedProducts.map((product) => productActionSummary(product)),
+          ...current
+        ]));
+      }
+      setStatusText(`文件导入完成: 成功 ${response.summary.imported}/${response.summary.requested}，失败 ${response.summary.failed}`);
+      await refreshConsole();
+      return response;
+    } catch (error) {
+      showError(error);
+      throw error;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function generateStoryboardDraft(product = selectedProduct) {
     if (!product) {
       setStatusText("请先选择商品。");
@@ -2635,6 +2775,9 @@ export function App() {
               storyboardHistory={storyboardHistory}
               onApplyStoryboardHistory={applyStoryboardHistory}
               onDeleteStoryboardHistory={deleteStoryboardHistory}
+              onPreviewProductFileImport={previewProductFileImport}
+              onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
+              onCommitProductFileImportRows={commitProductFileImportRows}
               onToast={showConsoleToast}
             />
           </section>
@@ -3425,6 +3568,9 @@ function ProductCreationWorkspace({
   storyboardHistory,
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
+  onPreviewProductFileImport,
+  onFillCurrentProductFromFileRow,
+  onCommitProductFileImportRows,
   onToast
 }: {
   products: ProductSummary[];
@@ -3474,6 +3620,9 @@ function ProductCreationWorkspace({
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onPreviewProductFileImport: (file: File) => Promise<ProductFileImportPreviewResponse>;
+  onFillCurrentProductFromFileRow: (row: ProductFileImportRow) => Promise<void>;
+  onCommitProductFileImportRows: (rows: ProductFileImportRow[], rowIds: string[]) => Promise<ProductFileImportCommitResponse>;
   onToast: ConsoleToastFn;
 }) {
   const selectedSummary = selectedProduct ? products.find((product) => product.sku === selectedProduct.sku) : undefined;
@@ -3547,6 +3696,9 @@ function ProductCreationWorkspace({
       storyboardHistory={selectedProductStoryboardHistory}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
       onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+      onPreviewProductFileImport={onPreviewProductFileImport}
+      onFillCurrentProductFromFileRow={onFillCurrentProductFromFileRow}
+      onCommitProductFileImportRows={onCommitProductFileImportRows}
       onToast={onToast}
     />
   );
@@ -3598,6 +3750,9 @@ function ProductCreationComposer({
   storyboardHistory,
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
+  onPreviewProductFileImport,
+  onFillCurrentProductFromFileRow,
+  onCommitProductFileImportRows,
   onToast
 }: {
   products: ProductSummary[];
@@ -3645,6 +3800,9 @@ function ProductCreationComposer({
   storyboardHistory: StoryboardHistoryRecord[];
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onPreviewProductFileImport: (file: File) => Promise<ProductFileImportPreviewResponse>;
+  onFillCurrentProductFromFileRow: (row: ProductFileImportRow) => Promise<void>;
+  onCommitProductFileImportRows: (rows: ProductFileImportRow[], rowIds: string[]) => Promise<ProductFileImportCommitResponse>;
   onToast: ConsoleToastFn;
 }) {
   const [isPacking, setIsPacking] = useState(false);
@@ -3652,6 +3810,7 @@ function ProductCreationComposer({
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
+  const [fileImportOpen, setFileImportOpen] = useState(false);
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
   const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
   const draftReferenceImages = useMemo<ReferenceImageStatus[]>(
@@ -3875,6 +4034,7 @@ function ProductCreationComposer({
               onSelectProduct={onSelectProduct}
               onAddProduct={onStartNewProduct}
               onDeleteProduct={onDeleteProduct}
+              onImportFile={() => setFileImportOpen(true)}
             />
             <CompactChoiceDropdown
               label="视频风格"
@@ -4041,6 +4201,24 @@ function ProductCreationComposer({
         index={previewReferenceIndex}
         onIndexChange={setPreviewReferenceIndex}
         onClose={() => setPreviewReferenceIndex(undefined)}
+      />
+      <ProductFileImportDialog
+        open={fileImportOpen}
+        onClose={() => setFileImportOpen(false)}
+        onPreviewFile={onPreviewProductFileImport}
+        onFillCurrentProduct={async (row) => {
+          await onFillCurrentProductFromFileRow(row);
+          setFileImportOpen(false);
+        }}
+        onCommitRows={async (rows, rowIds) => {
+          const response = await onCommitProductFileImportRows(rows, rowIds);
+          const firstImported = response.results.find((result): result is Extract<ProductFileImportCommitResponse["results"][number], { status: "imported" }> => result.status === "imported")?.product;
+          if (response.summary.imported === 1 && firstImported) {
+            await onSelectProduct(productActionSummary(firstImported));
+          }
+          setFileImportOpen(false);
+        }}
+        onToast={onToast}
       />
     </section>
   );
@@ -5049,7 +5227,8 @@ function ProductCreationProductPicker({
   selectedSku,
   onSelectProduct,
   onAddProduct,
-  onDeleteProduct
+  onDeleteProduct,
+  onImportFile
 }: {
   className?: string;
   products: ProductSummary[];
@@ -5057,6 +5236,7 @@ function ProductCreationProductPicker({
   onSelectProduct: (product: ProductSummary) => Promise<void>;
   onAddProduct: () => void;
   onDeleteProduct: (sku: string) => Promise<void>;
+  onImportFile: () => void;
 }) {
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const productOptions = dedupeProductSummaries(products);
@@ -5125,6 +5305,19 @@ function ProductCreationProductPicker({
             <Plus size={13} />
             <span>新商品</span>
           </button>
+          <button
+            type="button"
+            role="option"
+            aria-selected={false}
+            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[#4f5f76] transition hover:bg-[#f3f6fb] hover:text-[#172033]"
+            onClick={() => {
+              setProductPickerOpen(false);
+              onImportFile();
+            }}
+          >
+            <FileSpreadsheet size={13} />
+            <span>导入 CSV/Excel</span>
+          </button>
           {productOptions.length > 0 ? (
             productOptions.map((option) => {
               const active = option.sku === selectedSku;
@@ -5173,6 +5366,237 @@ function ProductCreationProductPicker({
   );
 }
 
+function ProductFileImportDialog({
+  open,
+  onClose,
+  onPreviewFile,
+  onFillCurrentProduct,
+  onCommitRows,
+  onToast
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPreviewFile: (file: File) => Promise<ProductFileImportPreviewResponse>;
+  onFillCurrentProduct: (row: ProductFileImportRow) => Promise<void>;
+  onCommitRows: (rows: ProductFileImportRow[], rowIds: string[]) => Promise<void>;
+  onToast: ConsoleToastFn;
+}) {
+  const [preview, setPreview] = useState<ProductFileImportPreviewResponse | undefined>();
+  const [checkedRowIds, setCheckedRowIds] = useState<string[]>([]);
+  const [isWorking, setIsWorking] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setPreview(undefined);
+      setCheckedRowIds([]);
+      setIsWorking(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const rows = preview?.rows ?? [];
+  const selectableRows = rows.filter((row) => fileImportCanSelect(row));
+  const batchIds = checkedRowIds.filter((rowId) => selectableRows.some((row) => row.rowId === rowId));
+  const allSelectableChecked = selectableRows.length > 0 && selectableRows.every((row) => batchIds.includes(row.rowId));
+  const someSelectableChecked = batchIds.length > 0 && !allSelectableChecked;
+  const selectedRows = selectableRows.filter((row) => batchIds.includes(row.rowId));
+  const selectedSingleRow = selectedRows.length === 1 ? selectedRows[0] : undefined;
+  const title = "导入商品资料";
+  const diagnostics = preview?.diagnostics;
+  const previewBadgeLabel = preview
+    ? preview.summary.total > 0
+      ? `${preview.summary.total} 个商品`
+      : diagnostics?.scannedRows
+        ? `${diagnostics.scannedRows} 行明细`
+        : "0 个商品"
+    : "";
+  const previewBadgeTone = preview && preview.summary.total === 0 ? "warn" : "ok";
+  const previewSummaryText = preview
+    ? preview.summary.total > 0
+      ? `检测到 ${preview.summary.total} 个商品。默认选择 1 个，勾选几个就导入几个。`
+      : diagnostics?.scannedRows
+        ? `检测到 ${diagnostics.scannedRows} 行明细，0 个可导入商品。`
+        : "没有检测到可导入商品。"
+    : "";
+
+  async function handleFileChange(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!isProductImportFile(file)) {
+      onToast("只支持 CSV、XLSX、XLS 文件。");
+      return;
+    }
+    setIsWorking(true);
+    try {
+      const nextPreview = await onPreviewFile(file);
+      setPreview(nextPreview);
+      const firstSelectable = nextPreview.rows.find((row) => fileImportCanSelect(row));
+      setCheckedRowIds(firstSelectable ? [firstSelectable.rowId] : []);
+    } catch (error) {
+      onToast(errorMessage(error));
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  async function importSelectedRows() {
+    if (!preview || batchIds.length === 0) return;
+    setIsWorking(true);
+    try {
+      if (selectedSingleRow) {
+        await onFillCurrentProduct(selectedSingleRow);
+      } else {
+        await onCommitRows(preview.rows, batchIds);
+      }
+    } finally {
+      setIsWorking(false);
+    }
+  }
+
+  function toggleRow(rowId: string) {
+    setCheckedRowIds((current) => current.includes(rowId)
+      ? current.filter((item) => item !== rowId)
+      : [...current, rowId]);
+  }
+
+  function toggleAllRows() {
+    setCheckedRowIds(allSelectableChecked ? [] : selectableRows.map((row) => row.rowId));
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-[rgba(23,32,51,.42)] p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isWorking) {
+          onClose();
+        }
+      }}
+    >
+      <section className="grid max-h-[min(780px,calc(100vh-32px))] w-full max-w-[960px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.26)]">
+        <div className="flex min-w-0 items-start justify-between gap-3 border-b border-[#e5ecf6] bg-[#fbfdff] px-5 py-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{batchIds.length > 1 ? `已选 ${batchIds.length} 个` : "默认选 1 个"}</Badge>
+              {preview ? <Badge tone={previewBadgeTone}>{previewBadgeLabel}</Badge> : null}
+            </div>
+            <h3 className="m-0 mt-2 text-[20px] font-black text-[#172033]">{title}</h3>
+          </div>
+          <Button size="icon" variant="ghost" aria-label="关闭弹窗" disabled={isWorking} onClick={onClose}>
+            <X size={14} />
+          </Button>
+        </div>
+
+        <div className="grid gap-4 overflow-auto p-5">
+          <label className="grid cursor-pointer gap-2 rounded-[14px] border border-dashed border-[color-mix(in_srgb,var(--accent)_42%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-4 text-center transition hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
+            <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-white text-[var(--accent)] shadow-[0_10px_22px_rgba(30,42,68,.08)]">
+              <FileSpreadsheet size={18} />
+            </span>
+            <span className="text-sm font-black text-[#172033]">选择 CSV/Excel 文件</span>
+            <span className="text-xs font-semibold leading-5 text-[#6c7890]">
+              解析后默认选择一个商品；勾选多个会一起导入到商品列表。
+            </span>
+            <input
+              className="sr-only"
+              type="file"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={isWorking}
+              onChange={(event) => void handleFileChange(event.target.files)}
+            />
+          </label>
+
+          {preview ? (
+            <div className="grid gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2 text-xs font-bold text-[#6c7890]">
+                <span>{previewSummaryText}</span>
+                <span>可保存 {preview.summary.ready} · 建议整理 {preview.summary.needsAi} · 重复商品 {preview.summary.duplicateSku} · 失败 {preview.summary.failed}</span>
+              </div>
+              {rows.length > 0 ? (
+                <div className="max-h-[360px] overflow-auto rounded-xl border border-[#dbe4f0]">
+                  <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+                    <thead className="sticky top-0 bg-white shadow-[0_1px_0_#e5ecf6]">
+                      <tr className="text-[#6c7890]">
+                        <th className="w-14 whitespace-nowrap px-3 py-2 font-black">
+                          <input
+                            type="checkbox"
+                            aria-label="全选可导入商品"
+                            checked={allSelectableChecked}
+                            ref={(input) => {
+                              if (input) input.indeterminate = someSelectableChecked;
+                            }}
+                            disabled={isWorking || selectableRows.length === 0}
+                            onChange={toggleAllRows}
+                          />
+                        </th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">状态</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">商品ID</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">商品标题</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">来源行</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">图片</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">完整度</th>
+                        <th className="whitespace-nowrap px-3 py-2 font-black">缺失项</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e5ecf6]">
+                      {rows.map((row) => {
+                        const disabled = !fileImportCanSelect(row);
+                        const active = checkedRowIds.includes(row.rowId);
+                        return (
+                          <tr key={row.rowId} className={cn(active ? "bg-[color-mix(in_srgb,var(--accent)_8%,white)]" : "bg-white", disabled && "opacity-60")}>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={checkedRowIds.includes(row.rowId)}
+                                disabled={disabled}
+                                onChange={() => toggleRow(row.rowId)}
+                              />
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2"><Badge tone={fileImportRowTone(row.status)}>{fileImportRowLabel(row.status)}</Badge></td>
+                            <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2 font-black text-[#172033]">{row.product?.sku ?? "-"}</td>
+                            <td className="max-w-[300px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[#172033]" title={row.product?.title_ja ?? row.error ?? ""}>{row.product?.title_ja ?? row.error ?? "-"}</td>
+                            <td className="max-w-[130px] truncate whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{fileImportSourceRowsLabel(row)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{row.referenceImageCount} 张</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{row.quality.score}/100</td>
+                            <td className="max-w-[240px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[#6c7890]" title={row.quality.missingFields.join("、")}>{row.quality.missingFields.join("、") || "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="grid gap-2 rounded-xl border border-[#f3d7a4] bg-[#fffaf0] px-4 py-3 text-sm font-semibold leading-6 text-[#80611d]">
+                  <div>
+                    {diagnostics?.message ?? "没有识别到可导入的商品资料。请确认导出文件包含商品标题、产品 ID、描述或图片字段；仅 SKU 明细文件不能作为商品资料导入。"}
+                  </div>
+                  {diagnostics?.headers.length ? (
+                    <div className="text-xs leading-5 text-[#9a7420]">
+                      已读取表头：{diagnostics.headers.slice(0, 8).join("、")}{diagnostics.headers.length > 8 ? "…" : ""}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[#e5ecf6] bg-white px-5 py-4">
+          <Button className="w-fit" variant="ghost" disabled={isWorking} onClick={onClose}>
+            取消
+          </Button>
+          <Button className="w-fit" variant="primary" disabled={isWorking || batchIds.length === 0} onClick={() => void importSelectedRows()}>
+            <FileSpreadsheet size={13} />
+            {batchIds.length > 1 ? `导入选中 ${batchIds.length} 个商品` : "填入当前商品"}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function productReferenceCount(product?: ProductSummary | ProductDetail): number {
   if (!product) return 0;
   if ("reference_image_statuses" in product && product.reference_image_statuses) {
@@ -5182,6 +5606,41 @@ function productReferenceCount(product?: ProductSummary | ProductDetail): number
     return product.reference_images.length;
   }
   return product.referenceImageCount ?? 0;
+}
+
+function isProductImportFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".csv") || name.endsWith(".xlsx") || name.endsWith(".xls");
+}
+
+function fileImportRowLabel(status: ProductFileImportRowStatus): string {
+  const labels: Record<ProductFileImportRowStatus, string> = {
+    ready: "未导入",
+    "needs-ai": "未导入",
+    "needs-input": "不可导入",
+    duplicate: "已导入",
+    failed: "不可导入"
+  };
+  return labels[status];
+}
+
+function fileImportCanSelect(row: ProductFileImportRow): boolean {
+  return Boolean(row.product) && row.status !== "failed" && row.status !== "needs-input" && row.status !== "duplicate";
+}
+
+function fileImportSourceRowsLabel(row: ProductFileImportRow): string {
+  const rows = row.sourceRowNumbers?.length ? row.sourceRowNumbers : [row.rowNumber];
+  if (rows.length === 1) {
+    return String(rows[0]);
+  }
+  return `${rows[0]}-${rows[rows.length - 1]} (${rows.length} 行)`;
+}
+
+function fileImportRowTone(status: ProductFileImportRowStatus): "neutral" | "ok" | "warn" | "danger" {
+  if (status === "ready") return "ok";
+  if (status === "failed" || status === "needs-input") return "danger";
+  if (status === "needs-ai" || status === "duplicate") return "warn";
+  return "neutral";
 }
 
 function productGenerationReadiness({
@@ -6253,7 +6712,7 @@ function VideoJobsPanel({
                 <MetricLine label="更新" value={formatDateTime(job.updatedAt)} />
                 <MetricLine label="Tokens" value={formatNumber(job.totalTokens)} />
                 <MetricLine label="估算成本" value={job.estimatedCostCny === undefined ? "-" : `¥${money(job.estimatedCostCny)}`} />
-                {job.error ? <MetricLine label="错误" value={readableVideoJobError(job.error)} /> : null}
+                {job.error ? <MetricLine label="错误" value={readableVideoJobError(job.error, job.errorDetails)} /> : null}
               </div>
               <div className="grid min-w-0 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-2">
                 <div className="text-[11px] font-black text-[var(--muted)]">任务结果</div>
@@ -7286,11 +7745,11 @@ function creativeVersionFailureReason(job: CreativeVersionItem): string {
   if (job.status !== "failed") {
     return "";
   }
-  return readableVideoJobError(job.videoJob?.error) || "生成失败，请检查视频模型配置后重试。";
+  return readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails) || "生成失败，请检查视频模型配置后重试。";
 }
 
-function readableVideoJobError(message?: string): string {
-  return readableVideoProviderError(message);
+function readableVideoJobError(message?: string, details?: VideoJobErrorDetails): string {
+  return readableVideoProviderError(details ? { ...details, message: message ?? details.message, rawMessage: details.message } : message);
 }
 
 function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {

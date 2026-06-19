@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { access, copyFile, mkdir, readFile, readdir, rm, stat, unlink, writeFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
@@ -12,6 +12,11 @@ import {
   riskyClaimPatterns,
   type ImportedProductPreview
 } from "../core/productImportCleaner.js";
+import {
+  parseProductImportFile,
+  selectedFileImportRows,
+  type ProductFileImportRow
+} from "../core/productFileImport.js";
 import { parseProductFacts } from "../core/productFacts.js";
 import { generateVideoPrompt } from "../core/promptGenerator.js";
 import {
@@ -197,6 +202,17 @@ interface ImportProductsBatchRequest {
   text?: string;
 }
 
+interface ImportProductFilePreviewRequest {
+  fileName?: string;
+  mimeType?: string;
+  base64?: string;
+}
+
+interface ImportProductFileCommitRequest {
+  rows?: ProductFileImportRow[];
+  rowIds?: string[];
+}
+
 interface DeleteVideoAssetRequest {
   path?: string;
   confirm?: boolean;
@@ -329,7 +345,8 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     dataDir,
     workspaceId: DEFAULT_WORKSPACE_ID,
     publicBaseUrl,
-    publicAssetTokenStore
+    publicAssetTokenStore,
+    fetchImpl: options.fetchImpl
   });
   const videoJobQueue = new LocalVideoJobQueue({
     rootDir,
@@ -540,6 +557,26 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             databaseHandle: requestContext.databaseHandle,
             fetchImpl: options.fetchImpl,
             input: (await request.json()) as ImportProductsBatchRequest
+          })
+        );
+      }
+      if (request.method === "POST" && url.pathname === "/api/products/import-file-preview") {
+        return jsonResponse(
+          await buildProductFileImportPreview({
+            fixturesDir: requestContext.fixturesDir,
+            input: (await request.json()) as ImportProductFilePreviewRequest
+          })
+        );
+      }
+      if (request.method === "POST" && url.pathname === "/api/products/import-file-commit") {
+        return jsonResponse(
+          await commitProductFileImportRows({
+            fixturesDir: requestContext.fixturesDir,
+            rootDir: dataDir,
+            workspaceId: requestContext.workspaceId,
+            databaseHandle: requestContext.databaseHandle,
+            fetchImpl: options.fetchImpl,
+            input: (await request.json()) as ImportProductFileCommitRequest
           })
         );
       }
@@ -1230,7 +1267,8 @@ async function createRequestContext(input: {
     dataDir: input.dataDir,
     workspaceId: resolved.workspaceId,
     publicBaseUrl: input.publicBaseUrl,
-    publicAssetTokenStore: input.publicAssetTokenStore
+    publicAssetTokenStore: input.publicAssetTokenStore,
+    fetchImpl: input.fetchImpl
   });
   return {
     workspaceId: resolved.workspaceId,
@@ -2854,6 +2892,116 @@ async function importProductFromText(input: {
     }),
     notes: preview.notes
   };
+}
+
+async function buildProductFileImportPreview(input: {
+  fixturesDir: string;
+  input: ImportProductFilePreviewRequest;
+}) {
+  const fileName = String(input.input.fileName ?? "").trim();
+  const base64 = String(input.input.base64 ?? "").trim();
+  if (!fileName || !base64) {
+    throw new Error("Product file import requires fileName and base64.");
+  }
+  const existingSkus = await existingProductSkus(input.fixturesDir);
+  return await parseProductImportFile({
+    fileName,
+    mimeType: input.input.mimeType,
+    bytes: Buffer.from(base64, "base64"),
+    existingSkus
+  });
+}
+
+async function commitProductFileImportRows(input: {
+  fixturesDir: string;
+  rootDir: string;
+  workspaceId?: string;
+  databaseHandle?: DatabaseHandle;
+  fetchImpl?: typeof fetch;
+  input: ImportProductFileCommitRequest;
+}): Promise<{
+  summary: {
+    requested: number;
+    imported: number;
+    failed: number;
+  };
+  results: Array<{
+    rowId: string;
+    rowNumber: number;
+    status: "imported" | "failed";
+    product?: Awaited<ReturnType<typeof saveProductFactPackage>>;
+    error?: string;
+  }>;
+}> {
+  const rows = Array.isArray(input.input.rows) ? input.input.rows : [];
+  const rowIds = Array.isArray(input.input.rowIds) ? input.input.rowIds.map((rowId) => String(rowId)) : [];
+  if (rows.length === 0 || rowIds.length === 0) {
+    throw new Error("Product file commit requires rows and rowIds.");
+  }
+  const selectedRows = selectedFileImportRows(rows, rowIds);
+  const results: Array<{
+    rowId: string;
+    rowNumber: number;
+    status: "imported" | "failed";
+    product?: Awaited<ReturnType<typeof saveProductFactPackage>>;
+    error?: string;
+  }> = [];
+  for (const row of selectedRows) {
+    if (!row.product) {
+      results.push({
+        rowId: row.rowId,
+        rowNumber: row.rowNumber,
+        status: "failed",
+        error: "Selected row does not include parsed product facts."
+      });
+      continue;
+    }
+    try {
+      const product = await saveProductFactPackage({
+        fixturesDir: input.fixturesDir,
+        rootDir: input.rootDir,
+        workspaceId: input.workspaceId,
+        databaseHandle: input.databaseHandle,
+        fetchImpl: input.fetchImpl,
+        input: row.product
+      });
+      results.push({
+        rowId: row.rowId,
+        rowNumber: row.rowNumber,
+        status: "imported",
+        product
+      });
+    } catch (error) {
+      results.push({
+        rowId: row.rowId,
+        rowNumber: row.rowNumber,
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  return {
+    summary: {
+      requested: rowIds.length,
+      imported: results.filter((result) => result.status === "imported").length,
+      failed: results.filter((result) => result.status === "failed").length
+    },
+    results
+  };
+}
+
+async function existingProductSkus(fixturesDir: string): Promise<string[]> {
+  const files = await listProductFiles(fixturesDir);
+  const skus: string[] = [];
+  for (const file of files) {
+    try {
+      const product = parseProductFacts(JSON.parse(await readFile(file, "utf8")));
+      skus.push(product.sku);
+    } catch {
+      // Ignore malformed legacy product files while previewing imports.
+    }
+  }
+  return skus;
 }
 
 async function buildAiStoryboardDraft(input: {
@@ -4502,12 +4650,20 @@ function createReferenceImageUrlResolver(input: {
   workspaceId: string;
   publicBaseUrl?: string;
   publicAssetTokenStore: PublicAssetTokenStore;
+  fetchImpl?: typeof fetch;
 }): ReferenceImageUrlResolver | undefined {
-  if (!input.publicBaseUrl) {
+  if (!input.publicBaseUrl || isLocalPublicBaseUrl(input.publicBaseUrl)) {
     return undefined;
   }
   return async (reference) => {
-    const filePath = localReferencePathForPublicAsset(input.dataDir, reference);
+    const filePath = isHttpReference(reference)
+      ? await cacheRemoteReferenceForPublicAsset({
+          dataDir: input.dataDir,
+          workspaceId: input.workspaceId,
+          reference,
+          fetchImpl: input.fetchImpl
+        })
+      : localReferencePathForPublicAsset(input.dataDir, reference);
     const token = input.publicAssetTokenStore.create({
       filePath,
       mimeType: mimeTypeForAssetPath(filePath),
@@ -4516,6 +4672,48 @@ function createReferenceImageUrlResolver(input: {
     });
     return joinPublicUrl(input.publicBaseUrl ?? "", token.urlPath);
   };
+}
+
+function isLocalPublicBaseUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1" || hostname === "[::1]";
+  } catch {
+    return true;
+  }
+}
+
+async function cacheRemoteReferenceForPublicAsset(input: {
+  dataDir: string;
+  workspaceId: string;
+  reference: string;
+  fetchImpl?: typeof fetch;
+}): Promise<string> {
+  const fetchReference = input.fetchImpl ?? fetch;
+  const response = await fetchReference(input.reference);
+  if (!response.ok) {
+    throw new Error("参考图地址无法访问。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  const extension = imageExtensionFromRemoteReference(input.reference, contentType);
+  if (!extension) {
+    throw new Error("参考图地址返回的不是可用图片。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
+  }
+  const hash = createHash("sha256").update(input.reference).digest("hex").slice(0, 24);
+  const targetPath = resolve(
+    input.dataDir,
+    "workspaces",
+    sanitizePathSegment(input.workspaceId),
+    "system",
+    "public-reference-cache",
+    `${hash}${extension}`
+  );
+  if (!isPathInsideRoot(input.dataDir, targetPath)) {
+    throw new Error("Reference image cache path must stay inside data root.");
+  }
+  await mkdir(dirname(targetPath), { recursive: true });
+  await writeFile(targetPath, Buffer.from(await response.arrayBuffer()));
+  return targetPath;
 }
 
 function isPathInsideRoot(rootDir: string, path: string): boolean {
