@@ -106,6 +106,35 @@ describe("runProductJob", () => {
     expect(manifest.prompt).not.toContain("ref-10.jpg");
   });
 
+  it("keeps product core hashtags stable while varying discovery tags by video version", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-hashtag-rotation-"));
+    tempDirs.push(outDir);
+
+    const first = await runProductJob({
+      product,
+      version: 1,
+      outputRoot: outDir,
+      provider: new MockVideoProvider(),
+      cta: "今すぐチェック",
+      template: "pain-point"
+    });
+    const second = await runProductJob({
+      product,
+      version: 2,
+      outputRoot: outDir,
+      provider: new MockVideoProvider(),
+      cta: "今すぐチェック",
+      template: "pain-point"
+    });
+
+    expect(first.hashtags).toEqual(expect.arrayContaining(["#TikTokShop"]));
+    expect(second.hashtags).toEqual(expect.arrayContaining(["#TikTokShop"]));
+    expect(first.hashtags.slice(0, 5)).toEqual(second.hashtags.slice(0, 5));
+    expect(first.hashtags.slice(5)).not.toEqual(second.hashtags.slice(5));
+    expect(first.hashtags.every((tag) => tag.startsWith("#"))).toBe(true);
+    expect(second.hashtags.every((tag) => tag.startsWith("#"))).toBe(true);
+  });
+
   it("accepts a longer duration when explicitly requested", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-duration-"));
     tempDirs.push(outDir);

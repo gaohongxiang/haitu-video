@@ -102,7 +102,8 @@ export async function runProductJob(input: {
   });
   const hashtags = generateJapaneseHashtags({
     product: input.product,
-    script
+    script,
+    variantKey: jobId
   });
   const manifestPath = join(outputDir, "manifest.json");
   const manifest: ProductJobManifest = {

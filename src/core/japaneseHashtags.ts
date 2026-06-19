@@ -19,8 +19,10 @@ export function generateJapaneseHashtags(input: {
   product: ProductFacts | HashtagSourceProduct;
   script?: HashtagSourceScript;
   limit?: number;
+  variantKey?: string;
 }): string[] {
   const product = input.product;
+  const limit = input.limit ?? 8;
   const haystack = [
     product.title_ja,
     product.category,
@@ -39,7 +41,26 @@ export function generateJapaneseHashtags(input: {
     "#便利グッズ",
     "#暮らしのアイデア"
   ];
-  return uniqueHashtags(candidates).slice(0, input.limit ?? 8);
+  const base = uniqueHashtags(candidates);
+  if (!input.variantKey) {
+    return base.slice(0, limit);
+  }
+
+  const core = uniqueHashtags([
+    ...base.slice(0, Math.min(4, limit)),
+    "#TikTokShop"
+  ]).slice(0, limit);
+  const discovery = uniqueHashtags([
+    ...base.slice(core.length),
+    "#便利アイテム",
+    "#買ってよかった",
+    "#日用品おすすめ",
+    "#暮らしを整える",
+    "#省スペース術",
+    "#おすすめ商品",
+    "#生活雑貨"
+  ]);
+  return uniqueHashtags([...core, ...rotateHashtags(discovery, input.variantKey)]).slice(0, limit);
 }
 
 export function normalizeJapaneseHashtags(values: unknown, fallback: string[] = []): string[] {
@@ -107,6 +128,23 @@ function uniqueHashtags(values: string[]): string[] {
     tags.push(tag);
   }
   return tags;
+}
+
+function rotateHashtags(values: string[], key: string): string[] {
+  const tags = uniqueHashtags(values);
+  if (tags.length <= 1) {
+    return tags;
+  }
+  const offset = stableHash(key) % tags.length;
+  return [...tags.slice(offset), ...tags.slice(0, offset)];
+}
+
+function stableHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
 
 function normalizeHashtag(value: string): string {
