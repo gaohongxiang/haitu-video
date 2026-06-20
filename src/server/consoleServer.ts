@@ -165,6 +165,10 @@ interface UploadProductReferenceImagesRequest {
   }>;
 }
 
+interface ReorderProductReferenceImagesRequest {
+  referenceImages?: unknown;
+}
+
 interface GenerateProductReferenceImagesRequest {
   count?: number;
   prompt?: string;
@@ -691,6 +695,17 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             rootDir: dataDir,
             sku: decodeURIComponent(uploadProductAssetsMatch[1] ?? ""),
             input: (await request.json()) as UploadProductReferenceImagesRequest
+          })
+        );
+      }
+      const reorderProductAssetsMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/reference-images\/order$/);
+      if (request.method === "PUT" && reorderProductAssetsMatch) {
+        return jsonResponse(
+          await reorderProductReferenceImages({
+            fixturesDir: requestContext.fixturesDir,
+            rootDir: dataDir,
+            sku: decodeURIComponent(reorderProductAssetsMatch[1] ?? ""),
+            input: (await request.json()) as ReorderProductReferenceImagesRequest
           })
         );
       }
@@ -3774,6 +3789,68 @@ async function deleteProductReferenceImage(input: {
       sku: input.sku
     })
   };
+}
+
+async function reorderProductReferenceImages(input: {
+  fixturesDir: string;
+  rootDir: string;
+  sku: string;
+  input: ReorderProductReferenceImagesRequest;
+}): Promise<{
+  product: Awaited<ReturnType<typeof getProductBySku>>;
+}> {
+  const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
+  const rawProduct = JSON.parse(await readFile(productFilePath, "utf8")) as Record<string, unknown>;
+  const product = parseProductFacts(rawProduct);
+  const referenceImages = input.input.referenceImages;
+  if (!Array.isArray(referenceImages) || !referenceImages.every((item) => typeof item === "string")) {
+    throw new Error("Reference image order requires referenceImages.");
+  }
+  const nextReferenceImages = referenceImages.map((item) => item.trim()).filter(Boolean);
+  if (!sameReferenceImageSet(product.reference_images, nextReferenceImages)) {
+    throw new Error("Reference image order must include the same images.");
+  }
+  await writeFile(
+    productFilePath,
+    JSON.stringify(
+      {
+        ...rawProduct,
+        reference_images: nextReferenceImages
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
+  return {
+    product: await getProductBySku({
+      fixturesDir: input.fixturesDir,
+      rootDir: input.rootDir,
+      sku: input.sku
+    })
+  };
+}
+
+function sameReferenceImageSet(current: string[], next: string[]): boolean {
+  if (current.length !== next.length) {
+    return false;
+  }
+  const counts = new Map<string, number>();
+  for (const reference of current) {
+    counts.set(reference, (counts.get(reference) ?? 0) + 1);
+  }
+  for (const reference of next) {
+    const count = counts.get(reference) ?? 0;
+    if (count <= 0) {
+      return false;
+    }
+    if (count === 1) {
+      counts.delete(reference);
+    } else {
+      counts.set(reference, count - 1);
+    }
+  }
+  return counts.size === 0;
 }
 
 async function findProductFileBySku(fixturesDir: string, sku: string): Promise<string> {

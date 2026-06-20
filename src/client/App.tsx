@@ -2486,6 +2486,27 @@ export function App() {
     }
   }
 
+  async function reorderProductReferenceImages(sku: string, referenceImages: string[]): Promise<ProductDetail | undefined> {
+    if (!sku || referenceImages.length === 0) {
+      return undefined;
+    }
+    setIsBusy(true);
+    try {
+      const response = await putJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(sku)}/reference-images/order`, {
+        referenceImages
+      });
+      await applyProductToCreationComposerWithStoryboards(response.product);
+      setStatusText("已调整参考图顺序。");
+      await refreshConsole();
+      return response.product;
+    } catch (error) {
+      showError(error);
+      throw error;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function generateProductReferenceImages(sku: string) {
     if (!sku) {
       return;
@@ -2777,6 +2798,7 @@ export function App() {
               onUploadImages={uploadProductReferenceImages}
               onGenerateReferenceImages={generateProductReferenceImages}
               onDeleteReferenceImage={deleteProductReferenceImage}
+              onReorderReferenceImage={reorderProductReferenceImages}
               videoModelChoice={videoModelChoice}
               onVideoModelChoiceChange={(nextVideoModelChoice) => {
                 setVideoModelChoice(nextVideoModelChoice);
@@ -3584,6 +3606,7 @@ function ProductCreationWorkspace({
   onUploadImages,
   onGenerateReferenceImages,
   onDeleteReferenceImage,
+  onReorderReferenceImage,
   videoModelChoice,
   onVideoModelChoiceChange,
   duration,
@@ -3637,6 +3660,7 @@ function ProductCreationWorkspace({
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
+  onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   videoModelChoice: VideoModelChoice;
   onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
@@ -3714,6 +3738,7 @@ function ProductCreationWorkspace({
       onUploadImages={onUploadImages}
       onGenerateReferenceImages={onGenerateReferenceImages}
       onDeleteReferenceImage={onDeleteReferenceImage}
+      onReorderReferenceImage={onReorderReferenceImage}
       videoModelChoice={videoModelChoice}
       onVideoModelChoiceChange={onVideoModelChoiceChange}
       duration={duration}
@@ -3769,6 +3794,7 @@ function ProductCreationComposer({
   onUploadImages,
   onGenerateReferenceImages,
   onDeleteReferenceImage,
+  onReorderReferenceImage,
   videoModelChoice,
   onVideoModelChoiceChange,
   duration,
@@ -3820,6 +3846,7 @@ function ProductCreationComposer({
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
+  onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   videoModelChoice: VideoModelChoice;
   onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
   duration: number;
@@ -4056,6 +4083,32 @@ function ProductCreationComposer({
     setPreviewReferenceIndex(undefined);
   }
 
+  async function handleReorderReferenceImage(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    if (selectedProduct && previewReferenceImages.length > 0) {
+      const nextReferences = moveArrayItem(previewReferenceImages.map((image) => image.original), fromIndex, toIndex);
+      await onReorderReferenceImage(selectedProduct.sku, nextReferences);
+      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+      return;
+    }
+    if (draftReferenceImages.length > 0) {
+      const nextReferences = moveArrayItem(draftReferenceImages.map((image) => image.original), fromIndex, toIndex);
+      setImportText(
+        updateComposerReferenceOrder(importText, nextReferences),
+        {
+          ...draft,
+          reference_images: nextReferences.join("\n")
+        }
+      );
+      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+      return;
+    }
+    if (pendingImageFiles.length > 0) {
+      setPendingImageFiles((current) => moveArrayItem(current, fromIndex, toIndex));
+      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+    }
+  }
+
   return (
     <section
       id="视频创作"
@@ -4133,6 +4186,7 @@ function ProductCreationComposer({
               onPreviewReferenceImage={setPreviewReferenceIndex}
               onPendingPreview={(index) => setPreviewReferenceIndex(index)}
               onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
+              onReorderReferenceImage={(fromIndex, toIndex) => void handleReorderReferenceImage(fromIndex, toIndex)}
               onFilesChange={handleReferenceFiles}
               onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
             />
@@ -4360,6 +4414,7 @@ function ProductComposerReferenceTray({
   onPreviewReferenceImage,
   onPendingPreview,
   onDeleteReferenceImage,
+  onReorderReferenceImage,
   onFilesChange,
   onClearPendingFile
 }: {
@@ -4374,12 +4429,15 @@ function ProductComposerReferenceTray({
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
+  onReorderReferenceImage: (fromIndex: number, toIndex: number) => void;
   onFilesChange: (files: FileList | File[] | null) => void;
   onClearPendingFile: (index: number) => void;
 }) {
   const images = product?.reference_image_statuses ?? [];
   const visibleDraftImages = images.length > 0 ? [] : draftImages;
   const [dragOver, setDragOver] = useState(false);
+  const [draggedReferenceIndex, setDraggedReferenceIndex] = useState<number | undefined>();
+  const [dragOverReferenceIndex, setDragOverReferenceIndex] = useState<number | undefined>();
 
   function acceptReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
@@ -4467,9 +4525,24 @@ function ProductComposerReferenceTray({
               image={image}
               sku={product?.sku ?? ""}
               index={index}
+              dragging={draggedReferenceIndex === index}
+              dragOver={dragOverReferenceIndex === index && draggedReferenceIndex !== index}
               onImportAssets={onImportAssets}
               onPreview={() => onPreviewReferenceImage(index)}
               onDelete={onDeleteReferenceImage}
+              onReorder={onReorderReferenceImage}
+              onDragStateChange={(dragIndex, overIndex) => {
+                if (dragIndex === null) {
+                  setDraggedReferenceIndex(undefined);
+                } else if (dragIndex !== undefined) {
+                  setDraggedReferenceIndex(dragIndex);
+                }
+                if (overIndex === null) {
+                  setDragOverReferenceIndex(undefined);
+                } else if (overIndex !== undefined) {
+                  setDragOverReferenceIndex(overIndex);
+                }
+              }}
             />
           ))}
         </div>
@@ -4478,8 +4551,45 @@ function ProductComposerReferenceTray({
           {pendingImages.map((image, index) => {
             const file = pendingFiles[index];
             const fileName = file?.name ?? image.original;
+            const dragging = draggedReferenceIndex === index;
+            const over = dragOverReferenceIndex === index && draggedReferenceIndex !== index;
             return (
-              <div key={`${fileName}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] pr-11 shadow-[0_8px_18px_rgba(96,64,43,.04)]">
+              <div
+                key={`${fileName}-${index}`}
+                className={cn(
+                  "relative grid min-h-16 min-w-0 cursor-grab grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] pr-11 shadow-[0_8px_18px_rgba(96,64,43,.04)] transition active:cursor-grabbing",
+                  dragging && "opacity-55",
+                  over && "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
+                )}
+                draggable={pendingImages.length > 1}
+                title="拖动参考图调整顺序"
+                onDragStart={(event) => {
+                  event.stopPropagation();
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", String(index));
+                  setDraggedReferenceIndex(index);
+                }}
+                onDragOver={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverReferenceIndex(index);
+                }}
+                onDrop={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+                  if (Number.isInteger(fromIndex)) {
+                    onReorderReferenceImage(fromIndex, index);
+                  }
+                  setDraggedReferenceIndex(undefined);
+                  setDragOverReferenceIndex(undefined);
+                }}
+                onDragEnd={() => {
+                  setDraggedReferenceIndex(undefined);
+                  setDragOverReferenceIndex(undefined);
+                }}
+              >
                 <button
                   className="h-16 w-[72px] overflow-hidden bg-[var(--panel2)]"
                   type="button"
@@ -5825,7 +5935,11 @@ function ReferenceImageFigure({
   index,
   onImportAssets,
   onPreview,
-  onDelete
+  onDelete,
+  dragging,
+  dragOver,
+  onReorder,
+  onDragStateChange
 }: {
   image: ReferenceImageStatus;
   sku: string;
@@ -5833,10 +5947,44 @@ function ReferenceImageFigure({
   onImportAssets: (sku: string) => Promise<void>;
   onPreview: () => void;
   onDelete: (index: number) => void;
+  dragging: boolean;
+  dragOver: boolean;
+  onReorder: (fromIndex: number, toIndex: number) => void;
+  onDragStateChange: (dragIndex?: number | null, overIndex?: number | null) => void;
 }) {
   const canPreview = Boolean(image.previewUrl);
   return (
-    <figure className="group relative grid grid-cols-[72px_minmax(0,1fr)] m-0 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
+    <figure
+      className={cn(
+        "group relative grid grid-cols-[72px_minmax(0,1fr)] m-0 cursor-grab items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] active:cursor-grabbing",
+        dragging && "opacity-55",
+        dragOver && "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
+      )}
+      draggable={true}
+      title="拖动参考图调整顺序"
+      onDragStart={(event) => {
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", String(index));
+        onDragStateChange(index, null);
+      }}
+      onDragOver={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        onDragStateChange(undefined, index);
+      }}
+      onDrop={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+        if (Number.isInteger(fromIndex) && fromIndex >= 0) {
+          onReorder(fromIndex, index);
+        }
+        onDragStateChange(null, null);
+      }}
+      onDragEnd={() => onDragStateChange(null, null)}
+    >
       <button
         type="button"
         className="overflow-hidden rounded-[9px] border border-[var(--border)] bg-[var(--panel2)]"
@@ -8546,6 +8694,58 @@ function splitLines(value: string) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= items.length ||
+    toIndex >= items.length
+  ) {
+    return items;
+  }
+  const next = [...items];
+  const [movedItem] = next.splice(fromIndex, 1);
+  if (movedItem === undefined) {
+    return items;
+  }
+  next.splice(toIndex, 0, movedItem);
+  return next;
+}
+
+function indexAfterMove(index: number, fromIndex: number, toIndex: number): number {
+  if (fromIndex === toIndex) return index;
+  if (index === fromIndex) return toIndex;
+  if (fromIndex < toIndex && index > fromIndex && index <= toIndex) return index - 1;
+  if (fromIndex > toIndex && index >= toIndex && index < fromIndex) return index + 1;
+  return index;
+}
+
+function updateComposerReferenceOrder(value: string, referenceImages: string[]): string {
+  const references = referenceImages.map((item) => item.trim()).filter(Boolean);
+  const referenceBlock = references.length > 0 ? references.join("\n") : "";
+  const lines = value.split(/\r?\n/);
+  const referenceLabelPattern = /^\s*(参考图|图片|主图|画像)\s*[：:]/;
+  const sectionLabelPattern = /^\s*(标题|分类|材质|尺寸|尺寸\/重量|卖点|使用场景|不可用卖点|禁止|商品ID|商品名|商品名称|产品名称|カテゴリ|素材|サイズ|规格选项|规格|商品説明|商品描述|描述|参考图|图片|主图|画像)\s*[：:]/;
+  const referenceStart = lines.findIndex((line) => referenceLabelPattern.test(line));
+  if (referenceStart < 0) {
+    const trimmed = value.trim();
+    const suffix = `参考图：${referenceBlock}`;
+    return trimmed ? `${trimmed}\n\n${suffix}` : suffix;
+  }
+  const labelMatch = lines[referenceStart]?.match(/^\s*([^：:]+)\s*[：:]/);
+  const label = labelMatch?.[1]?.trim() || "参考图";
+  const nextSectionOffset = lines
+    .slice(referenceStart + 1)
+    .findIndex((line) => sectionLabelPattern.test(line));
+  const referenceEnd = nextSectionOffset >= 0 ? referenceStart + 1 + nextSectionOffset : lines.length;
+  return [
+    ...lines.slice(0, referenceStart),
+    `${label}：${referenceBlock}`,
+    ...lines.slice(referenceEnd)
+  ].join("\n").trim();
 }
 
 function splitDraftLines(value: string): string[] | undefined {

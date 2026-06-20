@@ -1086,6 +1086,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("添加图片");
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
+    expect(creationComposerSource).toContain("onReorderReferenceImage");
+    expect(appSource).toContain("/reference-images/order");
     expect(creationComposerSource).toContain("aria-disabled={!product}");
     expect(creationComposerSource).toContain("请先整理资料包，再生成参考图。");
     expect(creationComposerSource).toContain("AI 整理资料包");
@@ -1144,6 +1146,9 @@ describe("console API", () => {
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
     expect(referenceFigureSource).toContain("reference-image-actions");
+    expect(referenceFigureSource).toContain("draggable");
+    expect(referenceFigureSource).toContain("拖动参考图");
+    expect(referenceFigureSource).toContain("onReorder");
     expect(referenceFigureSource).toContain("group-hover:opacity-100");
     expect(referenceFigureSource).toContain("relative grid grid-cols-[72px_minmax(0,1fr)]");
     expect(referenceFigureSource).not.toContain("grid-cols-[72px_minmax(0,1fr)_auto]");
@@ -3772,6 +3777,27 @@ describe("console API", () => {
     await expect(stat(assetPath)).resolves.toEqual(expect.objectContaining({
       size: "uploaded-wallet-image".length
     }));
+  });
+
+  it("reorders product reference images in the product file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-reorder-reference-images-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(productPath, {
+      reference_images: ["main.jpg", "detail.jpg", "use.jpg"]
+    });
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products/TK-001/reference-images/order", {
+      method: "PUT",
+      body: JSON.stringify({
+        referenceImages: ["use.jpg", "main.jpg", "detail.jpg"]
+      })
+    });
+
+    expect(response.product.reference_images).toEqual(["use.jpg", "main.jpg", "detail.jpg"]);
+    await expect(readFile(productPath, "utf8")).resolves.toContain('"reference_images": [\n    "use.jpg",\n    "main.jpg",\n    "detail.jpg"\n  ]');
   });
 
   it("uses the highest priority enabled image model config to generate product reference images", async () => {
