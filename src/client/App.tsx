@@ -2889,14 +2889,14 @@ export function App() {
       >
         <button
           type="button"
-          className="app-sidebar-toggle group absolute inset-y-0 right-[-8px] z-30 hidden w-4 cursor-pointer bg-transparent text-[var(--muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none min-[900px]:flex min-[900px]:items-center min-[900px]:justify-center"
+          className="app-sidebar-toggle group absolute inset-y-0 right-[-10px] z-30 hidden w-5 cursor-pointer bg-transparent text-[var(--muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none min-[900px]:flex min-[900px]:items-center min-[900px]:justify-center"
           aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
-          <span className="app-sidebar-collapse-edge pointer-events-none grid h-12 w-4 place-items-center">
-            <span className="app-sidebar-collapse-thumb grid h-10 w-4 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_8px_20px_rgba(96,64,43,.10)]">
-              {sidebarCollapsed ? <ChevronRight size={13} strokeWidth={2.4} /> : <ChevronLeft size={13} strokeWidth={2.4} />}
+          <span className="app-sidebar-collapse-edge pointer-events-none grid h-24 w-5 place-items-center">
+            <span className="app-sidebar-collapse-thumb grid h-20 w-5 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_10px_24px_rgba(96,64,43,.12)]">
+              {sidebarCollapsed ? <ChevronRight size={15} strokeWidth={2.4} /> : <ChevronLeft size={15} strokeWidth={2.4} />}
             </span>
           </span>
         </button>

@@ -625,7 +625,9 @@ describe("console API", () => {
     expect(appSource).toContain("app-sidebar-toggle");
     expect(appSource).toContain("app-sidebar-collapse-edge");
     expect(appSource).toContain("app-sidebar-collapse-thumb");
-    expect(appSource).toContain("absolute inset-y-0 right-[-8px]");
+    expect(appSource).toContain("absolute inset-y-0 right-[-10px]");
+    expect(appSource).toContain("app-sidebar-collapse-edge pointer-events-none grid h-24 w-5");
+    expect(appSource).toContain("app-sidebar-collapse-thumb grid h-20 w-5");
     expect(appSource).not.toContain("right-[-17px]");
     expect(appSource).not.toContain("top-5");
     expect(appSource).not.toContain("h-[34px] w-[34px] rounded-full");
