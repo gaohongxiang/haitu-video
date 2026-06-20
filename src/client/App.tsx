@@ -2895,7 +2895,7 @@ export function App() {
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
           <span className="app-sidebar-collapse-edge pointer-events-none grid h-40 w-5 place-items-center">
-            <span className="app-sidebar-collapse-thumb grid h-36 w-3 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_10px_24px_rgba(96,64,43,.12)]">
+            <span className="app-sidebar-collapse-thumb grid h-36 w-3.5 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_10px_24px_rgba(96,64,43,.12)]">
               {sidebarCollapsed ? <ChevronRight size={13} strokeWidth={2.4} /> : <ChevronLeft size={13} strokeWidth={2.4} />}
             </span>
           </span>
