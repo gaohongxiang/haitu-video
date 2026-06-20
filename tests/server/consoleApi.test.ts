@@ -493,12 +493,15 @@ describe("console API", () => {
       "utf8"
     );
     await writeFile(join(consoleDistDir, "assets", "index-test.js"), "console.log('react shell');", "utf8");
+    await writeFile(join(consoleDistDir, "favicon.svg"), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>', "utf8");
     const server = createConsoleServer({ rootDir: root, consoleDistDir });
 
     const htmlResponse = await server.fetch("/");
     const jsResponse = await server.fetch("/assets/index-test.js");
+    const faviconResponse = await server.raw.fetch("/favicon.svg");
     const html = await htmlResponse.text();
     const js = await jsResponse.text();
+    const favicon = await faviconResponse.text();
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
     const stylesSource = await readFile(join(process.cwd(), "src", "client", "styles.css"), "utf8");
     const staticConsoleHtml = await readFile(join(process.cwd(), "src", "server", "static", "console.html"), "utf8");
@@ -509,6 +512,9 @@ describe("console API", () => {
     expect(html).toContain('id="root"');
     expect(jsResponse.status).toBe(200);
     expect(js).toContain("react shell");
+    expect(faviconResponse.status).toBe(200);
+    expect(faviconResponse.headers.get("content-type")).toBe("image/svg+xml");
+    expect(favicon).toContain("<svg");
     expect(appSource).toContain("from \"lucide-react\"");
     expect(appSource).toContain("echarts-for-react");
     expect(appSource).toContain("from \"./components/ui/button.js\"");
@@ -7867,6 +7873,7 @@ function isAuthOrPublicPath(path: string): boolean {
   const pathname = path.startsWith("http") ? new URL(path).pathname : path.split("?")[0] ?? path;
   return pathname === "/" ||
     pathname === "/console" ||
+    pathname === "/favicon.svg" ||
     pathname.startsWith("/assets/") ||
     pathname.startsWith("/static/") ||
     pathname === "/api/health" ||

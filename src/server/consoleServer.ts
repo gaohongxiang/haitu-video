@@ -482,6 +482,12 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           headers: { "content-type": "text/html; charset=utf-8" }
         });
       }
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/favicon.svg") {
+        return await consoleAssetResponse(url.pathname, {
+          consoleDistDir,
+          head: request.method === "HEAD"
+        });
+      }
       if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/assets/")) {
         return await consoleAssetResponse(url.pathname, {
           consoleDistDir,

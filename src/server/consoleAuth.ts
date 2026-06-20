@@ -62,6 +62,9 @@ export function isPublicConsoleRoute(request: Request): boolean {
   if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console")) {
     return true;
   }
+  if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/favicon.svg") {
+    return true;
+  }
   if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/assets/")) {
     return true;
   }
