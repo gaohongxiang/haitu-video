@@ -20,7 +20,6 @@ const els = {
   template: document.querySelector("#template"),
   cta: document.querySelector("#cta"),
   reuseManifest: document.querySelector("#reuse-manifest"),
-  confirmPaid: document.querySelector("#confirm-paid"),
   preflight: document.querySelector("#preflight"),
   form: document.querySelector("#make-form"),
   status: document.querySelector("#status"),
@@ -113,12 +112,7 @@ async function runPipeline() {
   }
   const paid = isPaidProvider(els.provider.value);
   if (paid && (!state.lastPreflight || state.preflightSignature !== currentPreflightSignature())) {
-    showError(new Error("请先生成预检并勾选确认允许付费请求。"));
-    highlightPaidSafety();
-    return;
-  }
-  if (paid && !els.confirmPaid.checked) {
-    showError(new Error("请先生成预检并勾选确认允许付费请求。"));
+    showError(new Error("请先生成预检，确认商品资料和参考图可用于真实模型调用。"));
     highlightPaidSafety();
     return;
   }
@@ -131,7 +125,7 @@ async function runPipeline() {
     duration: Number(els.duration.value),
     template: els.template.value,
     cta: els.cta.value,
-    confirmPaid: els.confirmPaid.checked,
+    confirmPaid: paid,
     reuseManifest: els.reuseManifest.value.trim() || undefined
   });
   els.status.textContent = formatReport(response.report);
@@ -465,7 +459,7 @@ function uniqueOptionValues(values) {
 
 function updateMode() {
   const paid = isPaidProvider(els.provider.value);
-  els.modePill.textContent = paid ? "付费需确认" : "无需付费确认";
+  els.modePill.textContent = paid ? "真实模型调用" : "内部任务";
   els.modePill.style.color = paid ? "var(--accent-2)" : "var(--accent)";
   els.paidSafety.classList.toggle("active", paid);
 }
@@ -546,7 +540,7 @@ function formatPreflight(preflight) {
     `商品: ${preflight.productSku} / ${preflight.title_ja}`,
     `Provider: ${preflight.provider}`,
     `时长: ${preflight.durationSeconds}s / ${preflight.aspectRatio}`,
-    `付费确认: ${preflight.requiresPaidConfirmation ? "需要" : "不需要"}`,
+    `调用类型: ${preflight.paidProvider ? "真实模型" : "内部任务"}`,
     `估算 tokens: ${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)} / 期望 ${formatNumber(preflight.estimatedTokens.expected)}`,
     `估算成本: ¥${Number(preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.estimatedCostCny.high).toFixed(2)} / 期望 ¥${Number(preflight.estimatedCostCny.expected).toFixed(2)}`,
     `参考图: ${preflight.assetSummary.previewable}/${preflight.assetSummary.total} 可预览, ${preflight.assetSummary.missing} 缺失, ${preflight.assetSummary.outsideProjectRoot} 项目外`,
@@ -564,13 +558,13 @@ function formatPreflight(preflight) {
 }
 
 function renderPreflight(preflight) {
-  els.preflightState.textContent = preflight.requiresPaidConfirmation ? "付费预检" : "免费预检";
-  els.preflightState.style.color = preflight.requiresPaidConfirmation ? "var(--accent-2)" : "var(--accent)";
+  els.preflightState.textContent = preflight.paidProvider ? "真实模型预检" : "内部任务预检";
+  els.preflightState.style.color = preflight.paidProvider ? "var(--accent-2)" : "var(--accent)";
   els.preflightCost.innerHTML = [
     ["期望成本", `¥${Number(preflight.estimatedCostCny.expected).toFixed(2)}`, `区间 ¥${Number(preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.estimatedCostCny.high).toFixed(2)}`],
     ["期望 Token", formatNumber(preflight.estimatedTokens.expected), `${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`],
     ["时长", `${preflight.durationSeconds}s`, preflight.aspectRatio],
-    ["Provider", preflight.provider, preflight.requiresPaidConfirmation ? "运行会扣费" : "无需付费确认"]
+    ["Provider", preflight.provider, preflight.paidProvider ? "真实模型调用" : "内部任务"]
   ]
     .map(
       ([label, value, subtext]) => `

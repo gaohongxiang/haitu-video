@@ -441,7 +441,6 @@ interface VideoJobErrorDetails {
 interface ProductVideoGenerationOptions {
   provider: ProviderName;
   providerModel?: string;
-  confirmPaid: boolean;
 }
 
 interface CreativeVersionItem {
@@ -828,29 +827,25 @@ const defaultVideoDurationSeconds = 10;
 const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast";
 const defaultVideoTemplate: TemplateName = "scene";
 
-const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string; confirmPaid: boolean }> = {
+const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string }> = {
   mock: {
     provider: "mock",
-    label: "内部任务",
-    confirmPaid: false
+    label: "内部任务"
   },
   "seedance-2-fast": {
     provider: "volcengine-seedance",
     model: "doubao-seedance-2-0-fast-260128",
-    label: "seedance2.0 fast",
-    confirmPaid: true
+    label: "seedance2.0 fast"
   },
   "seedance-2": {
     provider: "volcengine-seedance",
     model: "doubao-seedance-2-0-260128",
-    label: "seedance2.0",
-    confirmPaid: true
+    label: "seedance2.0"
   },
   "seedance-1-5-pro": {
     provider: "volcengine-seedance",
     model: "doubao-seedance-1-5-pro-251215",
-    label: "seedance1.5 pro",
-    confirmPaid: true
+    label: "seedance1.5 pro"
   }
 };
 
@@ -974,7 +969,6 @@ export function App() {
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
   const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>([]);
   const [reuseManifest, setReuseManifest] = useState("");
-  const [confirmPaid, setConfirmPaid] = useState(false);
   const [preflight, setPreflight] = useState<Preflight | undefined>();
   const [preflightSignature, setPreflightSignature] = useState("");
   const [statusText, setStatusText] = useState("等待操作");
@@ -1032,7 +1026,6 @@ export function App() {
   const productAutoSaveInFlightRef = useRef<Promise<ProductDetail | undefined> | undefined>(undefined);
 
   const selectedVideoModelConfig = videoModelConfigs[videoModelChoice];
-  const paidProvider = selectedVideoModelConfig.provider !== "mock";
   const enabledTemplateOptions = settings.enabledTemplates;
   const currentSignature = JSON.stringify({ productPath, provider: selectedVideoModelConfig.provider, providerModel: selectedVideoModelConfig.model, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
   const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
@@ -1040,12 +1033,6 @@ export function App() {
   const batchEstimatedCostCny = freshPreflight
     ? roundMoney((freshPreflight.estimatedCostCny.expected || 0) * safeVersionCount)
     : undefined;
-  const paidRunBlockedReason = paidRunBlockReason({
-    paidProvider,
-    freshPreflight: Boolean(freshPreflight),
-    preflight,
-    confirmPaid
-  });
   const selectedProductSummary = products.find((product) => product.path === productPath);
   const selectedProductGroup = selectedProduct
     ? ledger?.products.find((group) => group.productSku === selectedProduct.sku)
@@ -1472,7 +1459,6 @@ export function App() {
     setTemplate(defaultVideoTemplate);
     setFinalLanguage(nextSettings.defaultLanguage);
     setCta(nextSettings.defaultCta);
-    setConfirmPaid(false);
     setPreflight(undefined);
     setPreflightSignature("");
   }
@@ -1556,10 +1542,6 @@ export function App() {
     event.preventDefault();
     if (!selectedProductSummary) {
       setStatusText("请选择商品");
-      return;
-    }
-    if (paidRunBlockedReason) {
-      setStatusText(paidRunBlockedReason);
       return;
     }
     if (!ensureVideoModelConfigured()) {
@@ -1989,7 +1971,6 @@ export function App() {
     setProductPath(product.path);
     setPreflight(undefined);
     setPreflightSignature("");
-    setConfirmPaid(false);
     setProductStudioLoadError("");
     setActiveSection("video");
     setIsBusy(true);
@@ -2111,8 +2092,7 @@ export function App() {
     const selectedVideoModel = videoModelConfigs[videoModelChoice];
     const videoGenerationOptions: ProductVideoGenerationOptions = options ?? {
       provider: selectedVideoModel.provider,
-      providerModel: selectedVideoModel.model,
-      confirmPaid: selectedVideoModel.confirmPaid
+      providerModel: selectedVideoModel.model
     };
     const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
     const selectedVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
@@ -2130,7 +2110,7 @@ export function App() {
         finalLanguage,
         cta,
         storyboardLines: splitDraftLines(studioStoryboardDraft),
-        confirmPaid: videoGenerationOptions.confirmPaid,
+        confirmPaid: videoGenerationOptions.provider !== "mock",
         versions: selectedVersionCount
       });
       setVideoJobs((current) => mergeVideoJobs(response.jobs, current));
@@ -3528,7 +3508,7 @@ function PreflightPanel({ preflight, fresh }: { preflight?: Preflight; fresh: bo
         <MiniMetric label="期望成本" value={`¥${money(preflight.estimatedCostCny.expected)}`} hint={`区间 ¥${money(preflight.estimatedCostCny.low)} - ¥${money(preflight.estimatedCostCny.high)}`} />
         <MiniMetric label="期望 Token" value={formatNumber(preflight.estimatedTokens.expected)} hint={`${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`} />
         <MiniMetric label="时长" value={`${preflight.durationSeconds}s`} hint={preflight.aspectRatio} />
-        <MiniMetric label="生成通道" value={providerLabel(preflight.provider)} hint={preflight.requiresPaidConfirmation ? "运行会扣费" : "无需付费确认"} />
+        <MiniMetric label="生成通道" value={providerLabel(preflight.provider)} hint={preflight.paidProvider ? "真实模型调用" : "内部任务"} />
         <MiniMetric label="本次预计" value={`¥${money(preflight.credit.estimatedCostCny)}`} hint="仅作成本参考，不会阻止生成" />
         <MiniMetric label="历史估算" value={`¥${money(preflight.credit.usedEstimatedCostCny)}`} hint="已完成任务累计参考" />
       </div>
@@ -3999,8 +3979,7 @@ function ProductCreationComposer({
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct), {
         provider: videoModelConfig.provider,
-        providerModel: videoModelConfig.model,
-        confirmPaid: videoModelConfig.confirmPaid
+        providerModel: videoModelConfig.model
       });
       onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok");
     } catch (error) {
@@ -6924,7 +6903,7 @@ function VideoJobsPanel({
                 <MetricLine label="生成通道" value={providerLabel(job.provider)} />
                 <MetricLine label="时长" value={formatDuration(job.durationSeconds)} />
                 <MetricLine label="视频类型" value={templateLabel(job.template)} />
-                <MetricLine label="付费确认" value={job.confirmPaid ? "是" : "否"} />
+                <MetricLine label="调用类型" value={job.confirmPaid ? "真实模型" : "内部任务"} />
               </div>
               <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-x-2 gap-y-1">
                 <MetricLine label="创建" value={formatDateTime(job.createdAt)} />
@@ -8517,33 +8496,6 @@ function formatPreflightStatus(preflight: Preflight) {
     "",
     "请检查成本、参考图、脚本和 prompt 后再决定是否运行。"
   ].join("\n");
-}
-
-function paidRunBlockReason({
-  paidProvider,
-  freshPreflight,
-  preflight,
-  confirmPaid
-}: {
-  paidProvider: boolean;
-  freshPreflight: boolean;
-  preflight?: Preflight;
-  confirmPaid: boolean;
-}) {
-  if (!paidProvider) {
-    return "";
-  }
-  if (!freshPreflight || !preflight) {
-    return "请先生成预检并勾选确认允许付费请求。";
-  }
-  if (!preflight.readiness.readyForPaidGeneration) {
-    const reason = preflight.readiness.blockingReasons.join("、") || "请补齐商品资料和参考图";
-    return `商品资料暂不可付费生成：${reason}`;
-  }
-  if (!confirmPaid) {
-    return "请先生成预检并勾选确认允许付费请求。";
-  }
-  return "";
 }
 
 function productDraftToFacts(draft: ProductDraft) {

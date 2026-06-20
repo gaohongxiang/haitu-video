@@ -984,7 +984,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("videoModelChoice");
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
-    expect(creationComposerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).not.toContain("已填分镜");
     expect(creationComposerSource).not.toContain("自动分镜");
     expect(creationComposerSource).not.toContain("允许使用付费模型生成当前商品视频");
@@ -1118,7 +1118,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct), {");
     expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
-    expect(creationComposerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
     expect(creationComposerSource).toContain("previewReferenceIndex");
     expect(creationComposerSource).toContain("previewReferenceImages");
@@ -1430,8 +1430,8 @@ describe("console API", () => {
     expect(appSource).toContain("本次预计");
     expect(appSource).toContain("历史估算");
     expect(appSource).not.toContain("额度状态");
-    expect(appSource).toContain("请先生成预检并勾选确认允许付费请求");
-    expect(appSource).toContain("paidRunBlockedReason");
+    expect(appSource).not.toContain("请先生成预检并勾选确认允许付费请求");
+    expect(appSource).not.toContain("paidRunBlockedReason");
     expect(appSource).toContain("商品资料暂不可付费生成");
     expect(appSource).not.toContain("剩余测试额度不足");
     expect(appSource).toContain("/api/provider-config");
@@ -2231,7 +2231,7 @@ describe("console API", () => {
     expect(composerSource).toContain("videoModelChoice");
     expect(composerSource).toContain("provider: videoModelConfig.provider");
     expect(composerSource).toContain("providerModel: videoModelConfig.model");
-    expect(composerSource).toContain("confirmPaid: videoModelConfig.confirmPaid");
+    expect(composerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(composerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(composerSource).not.toContain("creation-parameter-dock");
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
@@ -6680,7 +6680,7 @@ describe("console API", () => {
     });
   });
 
-  it("rejects paid video jobs when estimated cost exceeds the configured budget cap", async () => {
+  it("queues paid video jobs when estimated cost exceeds the legacy local budget reference", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-budget-"));
     tempDirs.push(root);
     const fixturesDir = testProductsDir(root);
@@ -6695,9 +6695,28 @@ describe("console API", () => {
       autoStartSavedJobs: false,
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
-        throw new Error("Provider should not be called when budget cap blocks the job.");
+        return {
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "TK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          totalCost: {
+            amount: 0,
+            currency: "USD"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        };
       }
     });
+    await configurePaidVideoModel(server);
     await server.fetchJson("/api/settings", {
       method: "PUT",
       body: JSON.stringify({
@@ -6718,12 +6737,14 @@ describe("console API", () => {
     });
     const body = await response.json();
 
-    expect(response.status).toBe(402);
-    expect(body.error).toContain("exceeds budget cap");
-    expect(calls).toEqual([]);
-    await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
-      jobs: []
-    });
+    expect(response.status).toBe(200);
+    expect(body.job).toEqual(expect.objectContaining({
+      provider: "volcengine-seedance",
+      status: "queued",
+      confirmPaid: true
+    }));
+    await waitForJobStatus(server, body.job.id, "completed");
+    expect(calls).toEqual([body.job.outDir]);
   });
 
   it("queues paid video jobs even when historical estimates exceed the configured cost reference", async () => {

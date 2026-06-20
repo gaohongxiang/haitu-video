@@ -1030,7 +1030,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const providerName = body.provider ?? settings.defaultProvider;
         await assertVideoModelConfigured(requestContext.providerKeyStore, providerName);
         await assertTemplateEnabled(body, settingsStore);
-        await assertWithinVideoBudget(body, settingsStore);
         await assertPaidProductReady({
           provider: providerName,
           productPath,
@@ -1091,7 +1090,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           jobId,
           confirmPaid: body.confirmPaid,
           videoJobQueue: requestContext.videoJobQueue,
-          settingsStore,
           providerKeyStore: requestContext.providerKeyStore
         });
         const job = await requestContext.videoJobQueue.retry(jobId, {
@@ -1202,9 +1200,6 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (message.includes("Reference image index")) {
         return jsonResponse({ error: message }, 422);
-      }
-      if (message.includes("exceeds budget cap")) {
-        return jsonResponse({ error: message }, 402);
       }
       if (message.includes("Selected final job must belong")) {
         return jsonResponse({ error: message }, 422);
@@ -1432,7 +1427,6 @@ async function runConsoleMakeVideo(
   const outDirName = sanitizePathSegment(body.outDirName ?? `console-${Date.now()}`);
   const settings = await options.settingsStore.read();
   await assertTemplateEnabled(body, options.settingsStore);
-  await assertWithinVideoBudget(body, options.settingsStore);
   const providerName = body.provider ?? settings.defaultProvider;
   await assertPaidProductReady({
     provider: providerName,
@@ -1517,7 +1511,6 @@ async function enqueueBatchVideoJobs(
   const providerName = body.provider ?? settings.defaultProvider;
   await assertVideoModelConfigured(options.providerKeyStore, providerName);
   await assertTemplateEnabled(body, options.settingsStore);
-  await assertWithinVideoBudget(body, options.settingsStore);
   await assertPaidProductReady({
     provider: providerName,
     productPath,
@@ -1568,7 +1561,6 @@ async function assertRetryVideoJobAllowed(input: {
   jobId: string;
   confirmPaid?: boolean;
   videoJobQueue: LocalVideoJobQueue;
-  settingsStore: FileConsoleSettingsStore;
   providerKeyStore: ProviderKeyStore;
 }): Promise<void> {
   const record = await input.videoJobQueue.get(input.jobId);
@@ -1576,38 +1568,6 @@ async function assertRetryVideoJobAllowed(input: {
     throw new Error("Retrying a paid video job requires confirmPaid: true.");
   }
   await assertVideoModelConfigured(input.providerKeyStore, record.provider);
-  const body: MakeVideoRequest = {
-    productPath: record.productPath,
-    provider: record.provider,
-    duration: record.durationSeconds,
-    template: record.template,
-    cta: record.cta,
-    scriptLines: sanitizeLines(record.scriptLines),
-    storyboardLines: sanitizeLines(record.storyboardLines),
-    confirmPaid: input.confirmPaid === true,
-    reuseManifest: record.reuseManifest
-  };
-  await assertWithinVideoBudget(body, input.settingsStore);
-}
-
-async function assertWithinVideoBudget(
-  body: MakeVideoRequest,
-  settingsStore: FileConsoleSettingsStore
-): Promise<void> {
-  const settings = await settingsStore.read();
-  const provider = body.provider ?? settings.defaultProvider;
-  if (provider === "mock") {
-    return;
-  }
-  const durationSeconds = body.duration ?? settings.defaultDurationSeconds;
-  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
-  const estimatedTokens = estimateVideoTokens(durationSeconds);
-  const estimatedCostCny = estimateCny(estimatedTokens.expected, tokenPriceCnyPerMillion);
-  if (estimatedCostCny > settings.maxEstimatedCostCnyPerVideo) {
-    throw new Error(
-      `Estimated video cost ¥${estimatedCostCny.toFixed(2)} exceeds budget cap ¥${settings.maxEstimatedCostCnyPerVideo.toFixed(2)}. Raise maxEstimatedCostCnyPerVideo after preflight if you want to proceed.`
-    );
-  }
 }
 
 async function assertPaidProductReady(input: {

@@ -50,7 +50,7 @@
           <form id="make-form" class="panel control-panel">
             <div class="panel-head">
               <h2>新建视频任务</h2>
-              <span id="mode-pill" class="pill">付费需确认</span>
+              <span id="mode-pill" class="pill">真实模型调用</span>
             </div>
 
             <label>
@@ -93,14 +93,9 @@
               <input id="reuse-manifest" placeholder="data/workspaces/default/jobs/.../raw/.../manifest.json" />
             </label>
 
-            <label class="check">
-              <input id="confirm-paid" type="checkbox" />
-              <span>确认允许付费请求</span>
-            </label>
-
             <div id="paid-safety" class="safety-note">
-              <strong>付费安全</strong>
-              <span>付费 Provider 运行前必须先生成预检，并手动勾选确认允许付费请求。</span>
+              <strong>模型调用</strong>
+              <span>真实 Provider 会直接调用大模型接口；API 余额或额度问题由模型服务返回。</span>
             </div>
 
             <div class="form-actions">
