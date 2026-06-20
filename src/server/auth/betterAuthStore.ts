@@ -8,6 +8,7 @@ import type {
   ConsoleAuthPasswordResetInput,
   ConsoleAuthPasswordResetRequestInput,
   ConsoleAuthSessionStatus,
+  ConsoleAdminContext,
   ConsoleAuthStore,
   ConsoleAuthVerifyEmailInput,
   ConsoleWorkspaceContext
@@ -25,6 +26,13 @@ interface AuthUserRow {
 interface WorkspaceRow {
   id: string;
   name: string;
+  role: string;
+}
+
+interface PlatformUserRow {
+  id: string;
+  email: string;
+  display_name: string | null;
   role: string;
 }
 
@@ -174,6 +182,18 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     return undefined;
   }
 
+  async requireAdmin(request: Request): Promise<Response | undefined> {
+    const session = await this.getBetterAuthSession(request);
+    if (!session) {
+      return jsonResponse({ error: "Authentication required" }, 401);
+    }
+    const user = this.findPlatformUser(session.user.id);
+    if (user?.role !== "admin") {
+      return jsonResponse({ error: "Admin access required" }, 403);
+    }
+    return undefined;
+  }
+
   async resolveCurrentWorkspace(request: Request): Promise<ConsoleWorkspaceContext> {
     const session = await this.getBetterAuthSession(request);
     if (!session) {
@@ -186,6 +206,22 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     return {
       userId: session.user.id,
       workspaceId: workspace.id
+    };
+  }
+
+  async resolveAdminUser(request: Request): Promise<ConsoleAdminContext> {
+    const session = await this.getBetterAuthSession(request);
+    if (!session) {
+      throw new Error("Authentication required");
+    }
+    const user = this.findPlatformUser(session.user.id);
+    if (user?.role !== "admin") {
+      throw new Error("Admin access required");
+    }
+    return {
+      userId: user.id,
+      email: user.email,
+      role: "admin"
     };
   }
 
@@ -364,21 +400,34 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     `).get(email) as AuthUserRow | undefined;
   }
 
+  private findPlatformUser(userId: string): PlatformUserRow | undefined {
+    return this.input.handle.sqlite.prepare(`
+      SELECT id, email, display_name, role
+      FROM users
+      WHERE id = ?
+    `).get(userId) as PlatformUserRow | undefined;
+  }
+
   private ensureWorkspaceForVerifiedUser(user: { id: string; email: string }): void {
     const now = this.now().toISOString();
     const ensure = this.input.handle.sqlite.transaction(() => {
       const workspaceId = this.nextWorkspaceId(user.id);
       this.input.handle.sqlite.prepare(`
         INSERT INTO users (id, email, password_hash, display_name, role, created_at, updated_at)
-        VALUES (@id, @email, NULL, @displayName, 'user', @now, @now)
+        VALUES (@id, @email, NULL, @displayName, @role, @now, @now)
         ON CONFLICT(id) DO UPDATE SET
           email = excluded.email,
           display_name = excluded.display_name,
+          role = CASE
+            WHEN excluded.role = 'admin' THEN 'admin'
+            ELSE users.role
+          END,
           updated_at = excluded.updated_at
       `).run({
         id: user.id,
         email: user.email,
         displayName: user.email,
+        role: this.isConfiguredAdminEmail(user.email) ? "admin" : "user",
         now
       });
       this.input.handle.sqlite.prepare(`
@@ -465,6 +514,11 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
 
   private now(): Date {
     return (this.input.now ?? (() => new Date()))();
+  }
+
+  private isConfiguredAdminEmail(email: string): boolean {
+    const configured = this.env.HAITU_ADMIN_EMAIL?.trim().toLowerCase();
+    return Boolean(configured && email.trim().toLowerCase() === configured);
   }
 }
 

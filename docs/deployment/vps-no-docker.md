@@ -68,6 +68,7 @@ HAITU_PORT=4173
 HAITU_DATA_DIR=/var/lib/haitu-video
 HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
 HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes
+HAITU_ADMIN_EMAIL=you@haitu.online
 BETTER_AUTH_URL=https://haitu.online
 HAITU_AUTH_EMAIL_FROM=login@haitu.online
 RESEND_API_KEY=
@@ -78,6 +79,8 @@ SEEDANCE_WATERMARK=false
 `HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。真实 API key 只放在 `/etc/haitu-video.env` 或控制台 API 管理设置里，不写进仓库。
 
 账号注册和忘记密码使用邮箱验证码。配置 `RESEND_API_KEY` 和 `HAITU_AUTH_EMAIL_FROM` 后会发送真实邮件；未配置时验证码会写入 `/var/lib/haitu-video/system/auth-email-outbox.jsonl`，只适合本地调试。
+
+`HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin` 查看项目方后台。第一版后台只给项目方查看全站用户增长、活跃和用户列表，不开放普通用户访问。
 
 初始化或升级 SQLite 表结构：
 

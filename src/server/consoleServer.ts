@@ -79,6 +79,7 @@ import {
 } from "./providerKeyStore.js";
 import { cleanupExpiredVideos } from "./videoRetention.js";
 import { BetterAuthConsoleAuthStore } from "./auth/betterAuthStore.js";
+import { buildAdminOverview } from "./adminDashboard.js";
 import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
@@ -469,6 +470,13 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         });
         return response;
       }
+      if (request.method === "GET" && url.pathname === "/api/admin/overview") {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        return jsonResponse(buildAdminOverview(databaseHandle, options.now?.() ?? new Date()));
+      }
       const publicAssetMatch = url.pathname.match(/^\/api\/public-assets\/([A-Za-z0-9_-]+)$/);
       if (publicAssetMatch && (request.method === "GET" || request.method === "HEAD")) {
         return publicAssetResponse(publicAssetTokenStore, publicAssetMatch[1] ?? "", {
@@ -481,7 +489,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           return authResponse;
         }
       }
-      if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console")) {
+      if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console" || url.pathname === "/admin")) {
         return new Response(request.method === "HEAD" ? undefined : await readConsoleIndex(consoleDistDir), {
           headers: { "content-type": "text/html; charset=utf-8" }
         });

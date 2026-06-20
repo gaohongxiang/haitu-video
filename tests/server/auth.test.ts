@@ -223,6 +223,151 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(body).toContain("Haitu");
   });
 
+  it("serves the admin shell before SQLite login so the project owner can sign in", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+
+    const response = await server.fetch("/admin");
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(body).toContain("Haitu");
+  });
+
+  it("exposes global user growth and activity only to project admins", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const adminCookie = await registerUser(root, server, "owner@example.com");
+    const userCookie = await registerUser(root, server, "customer@example.com");
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    try {
+      handle.sqlite
+        .prepare("UPDATE users SET role = 'admin', updated_at = @now WHERE email = @email")
+        .run({
+          email: "owner@example.com",
+          now: new Date().toISOString()
+        });
+    } finally {
+      closeDatabase(handle);
+    }
+
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      headers: { cookie: adminCookie },
+      body: JSON.stringify(productFacts("OWNER-001", "项目方商品"))
+    });
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      headers: { cookie: userCookie },
+      body: JSON.stringify(productFacts("CUSTOMER-001", "用户商品"))
+    });
+
+    const unauthenticated = await server.fetch("/api/admin/overview");
+    const nonAdmin = await server.fetch("/api/admin/overview", {
+      headers: { cookie: userCookie }
+    });
+    const admin = await server.fetchJson("/api/admin/overview", {
+      headers: { cookie: adminCookie }
+    }) as {
+      metrics: {
+        totalUsers: number;
+        verifiedUsers: number;
+        newUsersToday: number;
+        newUsers7d: number;
+        activeUsers7d: number;
+        totalWorkspaces: number;
+        totalProducts: number;
+        totalVideoJobs: number;
+      };
+      growth: Array<{ date: string; registrations: number }>;
+      activity: Array<{ date: string; activeUsers: number; events: number }>;
+      users: Array<{
+        email: string;
+        role: string;
+        emailVerified: boolean;
+        workspaceCount: number;
+        productCount: number;
+        videoJobCount: number;
+        createdAt: string;
+        lastActiveAt?: string;
+      }>;
+    };
+
+    expect(unauthenticated.status).toBe(401);
+    expect(nonAdmin.status).toBe(403);
+    expect(admin.metrics).toEqual(expect.objectContaining({
+      totalUsers: 2,
+      verifiedUsers: 2,
+      newUsersToday: 2,
+      newUsers7d: 2,
+      activeUsers7d: 2,
+      totalProducts: 2,
+      totalVideoJobs: 0
+    }));
+    expect(admin.metrics.totalWorkspaces).toBeGreaterThanOrEqual(2);
+    expect(admin.growth).toHaveLength(30);
+    expect(admin.activity).toHaveLength(30);
+    expect(admin.growth.at(-1)).toEqual(expect.objectContaining({
+      date: new Date().toISOString().slice(0, 10),
+      registrations: 2
+    }));
+    expect(admin.users.map((user) => user.email).sort()).toEqual(["customer@example.com", "owner@example.com"]);
+    expect(admin.users.find((user) => user.email === "owner@example.com")).toEqual(expect.objectContaining({
+      role: "admin",
+      emailVerified: true,
+      workspaceCount: 1,
+      productCount: 1,
+      videoJobCount: 0
+    }));
+    expect(admin.users.find((user) => user.email === "customer@example.com")).toEqual(expect.objectContaining({
+      role: "user",
+      emailVerified: true,
+      workspaceCount: 1,
+      productCount: 1,
+      videoJobCount: 0
+    }));
+  });
+
+  it("allows the configured project owner email to access admin overview", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    process.env.HAITU_ADMIN_EMAIL = "owner@example.com";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const ownerCookie = await registerUser(root, server, "owner@example.com");
+    const customerCookie = await registerUser(root, server, "customer@example.com");
+
+    const owner = await server.fetch("/api/admin/overview", {
+      headers: { cookie: ownerCookie }
+    });
+    const customer = await server.fetch("/api/admin/overview", {
+      headers: { cookie: customerCookie }
+    });
+
+    expect(owner.status).toBe(200);
+    expect(customer.status).toBe(403);
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    try {
+      const row = handle.sqlite
+        .prepare("SELECT role FROM users WHERE email = ?")
+        .get("owner@example.com") as { role: string };
+      expect(row.role).toBe("admin");
+    } finally {
+      closeDatabase(handle);
+    }
+  });
+
   it("resolves API storage from the logged-in user's workspace", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";

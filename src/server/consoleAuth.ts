@@ -2,7 +2,9 @@ export interface ConsoleAuthStore {
   authEnabled(): boolean;
   sessionStatus(request: Request): Promise<ConsoleAuthSessionStatus>;
   requireAuth(request: Request): Promise<Response | undefined>;
+  requireAdmin(request: Request): Promise<Response | undefined>;
   resolveCurrentWorkspace(request: Request): Promise<ConsoleWorkspaceContext>;
+  resolveAdminUser(request: Request): Promise<ConsoleAdminContext>;
   enter(input: ConsoleAuthLoginInput): Promise<Response>;
   verifyEmail(input: ConsoleAuthVerifyEmailInput): Promise<Response>;
   requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput): Promise<Response>;
@@ -29,6 +31,12 @@ export interface ConsoleAuthSessionStatus {
 export interface ConsoleWorkspaceContext {
   userId: string;
   workspaceId: string;
+}
+
+export interface ConsoleAdminContext {
+  userId: string;
+  email: string;
+  role: "admin";
 }
 
 export interface ConsoleAuthLoginInput {
@@ -59,7 +67,7 @@ export function isPublicConsoleRoute(request: Request): boolean {
   if (url.pathname.startsWith("/api/auth/")) {
     return true;
   }
-  if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console")) {
+  if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console" || url.pathname === "/admin")) {
     return true;
   }
   if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/favicon.svg") {

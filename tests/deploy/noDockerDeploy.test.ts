@@ -36,6 +36,7 @@ describe("no-Docker VPS deployment package", () => {
     expect(envExample).toContain("HAITU_PORT=4173");
     expect(envExample).toContain("HAITU_DATA_DIR=/var/lib/haitu-video");
     expect(envExample).toContain("HAITU_SECRET_KEY=replace-with-at-least-32-random-bytes");
+    expect(envExample).toContain("HAITU_ADMIN_EMAIL=");
     expect(envExample).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(envExample).toContain("HAITU_AUTH_EMAIL_FROM=");
     expect(envExample).toContain("RESEND_API_KEY=");
@@ -58,6 +59,7 @@ describe("no-Docker VPS deployment package", () => {
     expect(deployScript).toContain('sudo -u "$APP_USER" HOME="$APP_HOME" "$@"');
     expect(deployScript).toContain("run_app_env()");
     expect(deployScript).toContain('HAITU_DB_PATH="${HAITU_DB_PATH:-}"');
+    expect(deployScript).toContain('HAITU_ADMIN_EMAIL="${HAITU_ADMIN_EMAIL:-}"');
     expect(deployScript).toContain('systemctl restart "$SERVICE"');
     expect(deployScript).toContain('HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"');
     expect(deployScript).toContain('curl -fsS "$HEALTH_URL"');
@@ -83,10 +85,12 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("Cloudflare Stream");
     expect(guide).toContain("Cloudflare R2");
     expect(guide).toContain("HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes");
+    expect(guide).toContain("HAITU_ADMIN_EMAIL=you@haitu.online");
     expect(guide).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(guide).toContain("HAITU_AUTH_EMAIL_FROM=login@haitu.online");
     expect(guide).toContain("RESEND_API_KEY=");
     expect(guide).toContain("账号注册和忘记密码使用邮箱验证码");
+    expect(guide).toContain("`HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin`");
     expect(guide).toContain("SQLite 用户账号体系");
     expect(guide).not.toContain("HAITU_AUTH_PASSWORD");
     expect(guide).not.toContain("单管理员登录保护");
