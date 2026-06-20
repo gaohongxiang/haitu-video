@@ -799,7 +799,7 @@ describe("console API", () => {
     expect(productLibraryHome).not.toContain("buttonVariants({ size: \"sm\", variant: \"primary\" })");
     expect(productLibraryHome).not.toContain("event.stopPropagation()");
     expect(productLibraryHome).not.toContain("cursor-pointer");
-    expect(productLibraryHome).toContain("hover:bg-[#f8fbff]");
+    expect(productLibraryHome).toContain("hover:bg-[var(--card)]");
     expect(productLibraryHome).not.toContain("onView(product.sku)");
     expect(productLibraryHome).toContain("添加商品");
     expect(productLibraryHome).toContain("openProductDialog");
@@ -937,7 +937,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("if (!productForStoryboard) return;");
     expect(creationComposerSource).toContain("await onGenerateStoryboardDraft(productForStoryboard)");
     expect(creationComposerSource).toContain("const generateVideoButtonClass = cn(");
-    expect(creationComposerSource).toContain('generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100 disabled:opacity-100"');
+    expect(creationComposerSource).toContain('generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"');
     expect(creationComposerSource).toContain('const generationReadinessMessageClass = cn(');
     expect(creationComposerSource).toContain("min-h-12 w-full max-w-[360px]");
     expect(creationComposerSource).toContain("justify-self-center");
@@ -954,7 +954,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
     expect(creationComposerSource).toContain("generation-readiness-message");
     expect(creationComposerSource).toContain("text-[var(--danger)]");
-    expect(creationComposerSource).toContain('generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]"');
+    expect(creationComposerSource).toContain('generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"');
     expect(creationComposerSource).toContain("{generationReadiness.label}");
     expect(creationComposerSource).toContain("productFactsStatusLabel({");
     expect(creationComposerSource).toContain("storyboardStatusLabel(storyboardDraftSource)");
@@ -988,7 +988,7 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(creationComposerSource).not.toContain("creation-parameter-dock");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
-    expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
+    expect(creationComposerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[var(--border)] bg-[var(--card)] p-4");
     expect(creationComposerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(appSource).not.toContain("window.confirm");
     expect(appSource).not.toContain("window.alert");
@@ -1042,8 +1042,9 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("productReady: boolean");
     expect(storyboardPanelSource).toContain("disabled={isGeneratingStoryboard || !productReady}");
-    expect(storyboardPanelSource).toContain("text-[#9aa7ba]");
-    expect(storyboardPanelSource).toContain("text-[#172033]");
+    expect(storyboardPanelSource).toContain("bg-[var(--card)]");
+    expect(storyboardPanelSource).toContain("text-[#9a8776]");
+    expect(storyboardPanelSource).toContain("text-[var(--text)]");
     expect(creationComposerSource).toContain("product-facts-editor");
     expect(creationComposerSource).toContain("product-facts-actions");
     expect(creationComposerSource).toContain("product-facts-body");
@@ -2227,13 +2228,14 @@ describe("console API", () => {
     expect(composerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(composerSource).not.toContain("creation-parameter-dock");
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[22px] border");
-    expect(composerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] p-4");
+    expect(composerSource).not.toContain("video-creation-frame grid gap-4 overflow-visible rounded-[24px] border border-[var(--border)] bg-[var(--card)] p-4");
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(composerSource).toContain("product-reference-inline");
     expect(composerSource).toContain("storyboard-side-panel");
     expect(composerSource).toContain("storyboardDraftIsGuidance");
-    expect(composerSource).toContain("text-[#9aa7ba]");
-    expect(composerSource).toContain("text-[#172033]");
+    expect(composerSource).toContain("bg-[var(--card)]");
+    expect(composerSource).toContain("text-[#9a8776]");
+    expect(composerSource).toContain("text-[var(--text)]");
     expect(composerSource).toContain("product-facts-editor");
     expect(composerSource).toContain("product-facts-actions");
     expect(composerSource).toContain("product-facts-body");

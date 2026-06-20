@@ -2,15 +2,19 @@
 
 :root {
   color-scheme: light;
-  --bg: #f6ece2;
-  --panel: #fffdf9;
-  --panel2: #fbf3ea;
-  --border: #eaded3;
-  --border-strong: #e0cfc0;
-  --text: #172033;
-  --muted: #746a61;
+  --bg: #f3e6d8;
+  --panel: #fffaf3;
+  --panel2: #f8ede1;
+  --card: #fff5e9;
+  --card2: #ffefd9;
+  --field: #fffbf5;
+  --field2: #fff4e6;
+  --border: #ead7c4;
+  --border-strong: #dbc2ab;
+  --text: #2a211b;
+  --muted: #76685c;
   --accent: #0aa394;
-  --accent2: #2563eb;
+  --accent2: #6f442c;
   --danger: #e54835;
   --warn: #b7791f;
   --ok: #16a06a;

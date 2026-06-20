@@ -70,7 +70,7 @@ import { cn } from "./lib/utils.js";
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
 const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const floatingTooltipClass =
-  "pointer-events-none absolute whitespace-nowrap rounded-md border border-[#dbe4f0] bg-white px-2.5 py-1.5 text-[11px] font-black text-[#66748a] opacity-0 shadow-[0_10px_24px_rgba(30,42,68,.12)] transition";
+  "pointer-events-none absolute whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--field)] px-2.5 py-1.5 text-[11px] font-black text-[var(--muted)] opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.12)] transition";
 
 type ProviderName = "mock" | "seedance" | "volcengine-seedance";
 type VideoModelChoice = "mock" | "seedance-2-fast" | "seedance-2" | "seedance-1-5-pro";
@@ -2723,12 +2723,12 @@ export function App() {
           <section className="grid gap-4" aria-label="仪表盘">
             <KpiGrid
               items={[
-                { label: "商品", value: formatNumber(products.length), hint: "可创作商品", icon: Package, tone: "blue" },
+                { label: "商品", value: formatNumber(products.length), hint: "可创作商品", icon: Package, tone: "clay" },
                 { label: "生成记录", value: formatNumber(ledger?.summary.totalJobs), hint: `${formatNumber(ledger?.summary.completedJobs)} 完成`, icon: Clapperboard, tone: "green" },
-                { label: "付费任务", value: formatNumber(ledger?.summary.paidJobs), hint: `${formatNumber(ledger?.summary.mockJobs)} 内部任务`, icon: CircleDollarSign, tone: "orange" },
-                { label: "总 Token", value: formatNumber(ledger?.summary.totalTokens), hint: `¥${money(ledger?.summary.estimatedCostCny)}`, icon: Gauge, tone: "violet" },
-                { label: "最终视频", value: formatNumber(ledger?.summary.finalVideos), hint: "可下载视频", icon: FileVideo, tone: "rose" },
-                { label: "复用 raw", value: formatNumber(ledger?.summary.reusedRawManifests), hint: "省一次生成", icon: Database, tone: "cyan" }
+                { label: "付费任务", value: formatNumber(ledger?.summary.paidJobs), hint: `${formatNumber(ledger?.summary.mockJobs)} 内部任务`, icon: CircleDollarSign, tone: "ember" },
+                { label: "总 Token", value: formatNumber(ledger?.summary.totalTokens), hint: `¥${money(ledger?.summary.estimatedCostCny)}`, icon: Gauge, tone: "ochre" },
+                { label: "最终视频", value: formatNumber(ledger?.summary.finalVideos), hint: "可下载视频", icon: FileVideo, tone: "coral" },
+                { label: "复用 raw", value: formatNumber(ledger?.summary.reusedRawManifests), hint: "省一次生成", icon: Database, tone: "sage" }
               ]}
             />
 
@@ -2933,7 +2933,7 @@ export function App() {
                         ? "grid-cols-1 justify-items-center px-0"
                         : "grid-cols-[28px_minmax(0,1fr)] gap-2 px-3",
                       active
-                        ? "border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,white)] text-[var(--text)]"
+                        ? "border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--text)]"
                         : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
                     )}
                   >
@@ -2958,7 +2958,7 @@ export function App() {
       </aside>
 
       <section className="grid h-dvh min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-        <header className="sticky top-0 z-20 grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[#fffdf9]/94 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
+        <header className="sticky top-0 z-20 grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/94 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="m-0 text-xl font-black leading-tight">{activeSectionLabel}</h1>
@@ -3049,13 +3049,13 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
         aria-label="账号菜单"
         aria-expanded={open}
         className={cn(
-          "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-[#fffdf9] px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,#fffdf9)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
-          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_7%,#fffdf9)]"
+          "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,var(--panel))] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
+          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))]"
         )}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="grid h-6 w-6 place-items-center rounded-md bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[11px] font-black text-[var(--accent)]">
+        <span className="grid h-6 w-6 place-items-center rounded-md bg-[color-mix(in_srgb,var(--accent)_12%,var(--field))] text-[11px] font-black text-[var(--accent)]">
           {accountInitial}
         </span>
         <span className="truncate">{accountLabel}</span>
@@ -3063,8 +3063,8 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[var(--border-strong)] bg-[#fffdf9] shadow-[0_18px_46px_rgba(96,64,43,.16)]">
-          <div className="grid gap-1.5 border-b border-[var(--border)] bg-[linear-gradient(180deg,#fffdf9,#fbf3ea)] px-3 py-3">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] shadow-[0_18px_46px_rgba(96,64,43,.16)]">
+          <div className="grid gap-1.5 border-b border-[var(--border)] bg-[linear-gradient(180deg,var(--panel),var(--panel2))] px-3 py-3">
             <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
             <div className="truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
           </div>
@@ -3110,7 +3110,7 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
             ? "border-amber-200 bg-amber-50/88 text-amber-900"
             : ok
               ? "border-emerald-200 bg-emerald-50/90 text-emerald-950"
-              : "border-[#dbe4f0] bg-white/88 text-[#172033]"
+              : "border-[var(--border)] bg-[var(--field)]/90 text-[var(--text)]"
         )}
         role="status"
         aria-live="polite"
@@ -3128,7 +3128,7 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
         </div>
         <button
           type="button"
-          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-current opacity-65 transition hover:bg-white/65 hover:opacity-100"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-current opacity-65 transition hover:bg-[var(--field2)] hover:opacity-100"
           aria-label="关闭提示"
           onClick={onClose}
         >
@@ -3169,7 +3169,7 @@ function ConfirmActionDialog({
   const danger = action.tone === "danger";
   const Icon = paid ? CircleDollarSign : danger ? AlertTriangle : ShieldCheck;
   const iconClass = paid ? "text-amber-700" : danger ? "text-[var(--danger)]" : "text-[var(--accent)]";
-  const iconBgClass = paid ? "bg-amber-50" : danger ? "bg-red-50" : "bg-[color-mix(in_srgb,var(--accent)_10%,white)]";
+  const iconBgClass = paid ? "bg-amber-50" : danger ? "bg-red-50" : "bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))]";
   const confirmVariant = danger ? "danger" : paid ? "primary" : "primary";
 
   return (
@@ -3184,15 +3184,15 @@ function ConfirmActionDialog({
         }
       }}
     >
-      <section className="grid w-full max-w-[500px] gap-4 rounded-[18px] border border-[#dbe4f0] bg-white p-5 shadow-[0_28px_90px_rgba(23,32,51,.26)]">
+      <section className="grid w-full max-w-[500px] gap-4 rounded-[18px] border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_28px_90px_rgba(96,64,43,.18)]">
         <div className="flex items-start justify-between gap-3">
           <div className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)] gap-3">
-            <div className={cn("grid h-10 w-10 place-items-center rounded-xl border border-white shadow-[0_12px_24px_rgba(30,42,68,.08)]", iconBgClass)}>
+            <div className={cn("grid h-10 w-10 place-items-center rounded-xl border border-[var(--field)] shadow-[0_12px_24px_rgba(96,64,43,.08)]", iconBgClass)}>
               <Icon className={iconClass} size={19} strokeWidth={2.4} />
             </div>
             <div className="min-w-0">
-              <div className="text-[17px] font-black leading-6 text-[#172033]">{action.title}</div>
-              <div className="mt-2 break-words text-[13px] font-bold leading-6 text-[#2b3445]">{action.message}</div>
+              <div className="text-[17px] font-black leading-6 text-[var(--text)]">{action.title}</div>
+              <div className="mt-2 break-words text-[13px] font-bold leading-6 text-[var(--text)]">{action.message}</div>
             </div>
           </div>
           <Button className="w-fit" size="icon" variant="ghost" aria-label="关闭确认弹窗" disabled={isBusy} onClick={onCancel}>
@@ -3200,7 +3200,7 @@ function ConfirmActionDialog({
           </Button>
         </div>
         {action.details?.length ? (
-          <div className="grid gap-1.5 rounded-[12px] border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2.5 text-xs font-semibold leading-5 text-[#6c7890]">
+          <div className="grid gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-xs font-semibold leading-5 text-[var(--muted)]">
             {action.details.map((detail) => (
               <div key={detail}>{detail}</div>
             ))}
@@ -3271,8 +3271,8 @@ function LoginScreen({
     sent: forgotPasswordOtpSent
   });
   return (
-    <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(10,163,148,.15),transparent_26%),radial-gradient(circle_at_85%_0,rgba(37,99,235,.12),transparent_30%),var(--bg)] px-4 py-8 text-[var(--text)]">
-      <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(15,23,42,.12)]">
+    <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(224,178,134,.28),transparent_28%),radial-gradient(circle_at_86%_4%,rgba(198,90,54,.12),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(10,163,148,.10),transparent_34%),var(--bg)] px-4 py-8 text-[var(--text)]">
+      <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(96,64,43,.14)]">
         <div className="mb-5 flex items-center gap-3">
           <BrandLogo className="h-11 w-11" />
           <div className="min-w-0">
@@ -3888,11 +3888,11 @@ function ProductCreationComposer({
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const generateVideoButtonClass = cn(
     "min-h-12 w-full justify-center rounded-[14px] text-sm",
-    generateVideoDisabled && "border-[#d6dee9] bg-[#edf2f7] text-[#93a0b3] shadow-none hover:brightness-100 disabled:opacity-100"
+    generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"
   );
   const generationReadinessMessageClass = cn(
     "generation-readiness-message flex min-h-12 w-full max-w-[360px] justify-self-center items-center justify-center text-center text-xs font-black leading-5",
-    generationReadiness.ready ? "text-[#6c7890]" : "text-[var(--danger)]"
+    generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"
   );
   const generateVideoSummary = [
     productFactsStatusLabel({ selectedProduct, importText }),
@@ -4059,11 +4059,11 @@ function ProductCreationComposer({
   return (
     <section
       id="视频创作"
-      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[var(--border-strong)] bg-[#fffaf5] shadow-[0_22px_64px_rgba(96,64,43,.10)]"
+      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[var(--border-strong)] bg-[var(--card)] shadow-[0_22px_64px_rgba(96,64,43,.10)]"
       onPaste={handleReferencePaste}
     >
       <div className="product-creation-canvas overflow-visible">
-        <div className="product-control-bar grid gap-2 border-b border-[var(--border)] bg-[#fffdf9] p-3 min-[1280px]:px-4">
+        <div className="product-control-bar grid gap-2 border-b border-[var(--border)] bg-[var(--panel)] p-3 min-[1280px]:px-4">
           <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))] min-[1280px]:items-end">
             <ProductCreationProductPicker
               className="product-creation-picker min-w-0"
@@ -4141,10 +4141,10 @@ function ProductCreationComposer({
           <div className="grid min-w-0 border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
             <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-black text-[#172033]">商品资料</div>
+                <div className="text-sm font-black text-[var(--text)]">商品资料</div>
                 <div className="flex items-center gap-2">
                   {productAutoSaveLabel ? (
-                    <span className="text-[11px] font-black text-[#8b9bb3]">{productAutoSaveLabel}</span>
+                    <span className="text-[11px] font-black text-[var(--muted)]">{productAutoSaveLabel}</span>
                   ) : null}
                   <Button className="min-h-9 w-fit rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
                     {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
@@ -4164,7 +4164,7 @@ function ProductCreationComposer({
             </div>
 
             {importNotes.length > 0 ? (
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[#6c7890]">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
                 {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
               </div>
             ) : null}
@@ -4187,8 +4187,8 @@ function ProductCreationComposer({
           </div>
         </div>
 
-        <div className="video-generate-bar grid gap-3 border-t border-[var(--border)] bg-[#fffdf9] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-          <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
+        <div className="video-generate-bar grid gap-3 border-t border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+          <div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{generateVideoSummary}</div>
           <div className={generationReadinessMessageClass}>
             {generationReadiness.label}
           </div>
@@ -4299,7 +4299,7 @@ function CompactChoiceDropdown<T extends string>({
       <button
         type="button"
         className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
+          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           open
             ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
             : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
@@ -4309,11 +4309,11 @@ function CompactChoiceDropdown<T extends string>({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="min-w-0 truncate">{activeLabel}</span>
-        <ChevronDown className={cn("h-4 w-4 shrink-0 text-[#8b9bb3] transition", open && "rotate-180 text-[var(--accent)]")} />
+        <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--muted)] transition", open && "rotate-180 text-[var(--accent)]")} />
       </button>
       {open ? (
         <div
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[#fffdf9] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
           role="listbox"
         >
           {options.map((option) => {
@@ -4327,8 +4327,8 @@ function CompactChoiceDropdown<T extends string>({
                 className={cn(
                   "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black transition",
                   active
-                    ? "bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)] text-[#172033]"
-                    : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[#172033]"
+                    ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))] text-[var(--text)]"
+                    : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
                 )}
                 onClick={() => {
                   onChange(option);
@@ -4413,8 +4413,8 @@ function ProductComposerReferenceTray({
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-black text-[#172033]">参考图</div>
-          <div className="text-xs font-bold text-[#8b9bb3]">添加图片</div>
+          <div className="text-sm font-black text-[var(--text)]">参考图</div>
+          <div className="text-xs font-bold text-[var(--muted)]">添加图片</div>
         </div>
         <Badge>{images.length > 0 ? `${images.length} 张` : visibleDraftImages.length > 0 ? `${visibleDraftImages.length} 张` : `${pendingFiles.length} 张`}</Badge>
       </div>
@@ -4422,14 +4422,14 @@ function ProductComposerReferenceTray({
         className={cn(
           "grid min-h-[66px] cursor-pointer place-items-center rounded-[12px] border border-dashed p-2 text-center transition",
           dragOver
-            ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,white)] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
-            : "border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]"
+            ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field))] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
+            : "border-[color-mix(in_srgb,var(--accent)_38%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] hover:border-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--field))]"
         )}
       >
         <span className="grid justify-items-center gap-0.5 text-sm font-black text-[var(--accent)]">
           <Plus size={16} />
           添加图片
-          <span className="text-[11px] font-bold text-[#8b9bb3]">可多选 · 拖拽或粘贴图片</span>
+          <span className="text-[11px] font-bold text-[var(--muted)]">可多选 · 拖拽或粘贴图片</span>
         </span>
         <input
           className="sr-only"
@@ -4479,9 +4479,9 @@ function ProductComposerReferenceTray({
             const file = pendingFiles[index];
             const fileName = file?.name ?? image.original;
             return (
-              <div key={`${fileName}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[#e5ecf6] bg-white pr-11 shadow-[0_8px_18px_rgba(30,42,68,.04)]">
+              <div key={`${fileName}-${index}`} className="relative grid min-h-16 min-w-0 grid-cols-[72px_minmax(0,1fr)] items-center gap-3 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] pr-11 shadow-[0_8px_18px_rgba(96,64,43,.04)]">
                 <button
-                  className="h-16 w-[72px] overflow-hidden bg-[#f3f6fb]"
+                  className="h-16 w-[72px] overflow-hidden bg-[var(--panel2)]"
                   type="button"
                   title="查看待上传图片"
                   onClick={() => onPendingPreview(index)}
@@ -4489,11 +4489,11 @@ function ProductComposerReferenceTray({
                   <img className="h-16 w-[72px] object-cover transition hover:scale-[1.03]" src={image.previewUrl ?? ""} alt={`${fileName} preview`} />
                 </button>
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-black text-[#172033]">待上传 {index + 1}</div>
+                  <div className="truncate text-xs font-black text-[var(--text)]">待上传 {index + 1}</div>
                   <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{fileName}</div>
                 </div>
                 <button
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[#8b9bb3] transition hover:bg-red-50 hover:text-[var(--danger)]"
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[var(--muted)] transition hover:bg-red-50 hover:text-[var(--danger)]"
                   type="button"
                   title="移除待上传图片"
                   onClick={() => onClearPendingFile(index)}
@@ -4505,7 +4505,7 @@ function ProductComposerReferenceTray({
           })}
         </div>
       ) : (
-        <div className="rounded-[12px] border border-[#eef3f8] bg-white px-3 py-3 text-xs font-bold leading-5 text-[#8b9bb3]">
+        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--field)] px-3 py-3 text-xs font-bold leading-5 text-[var(--muted)]">
           参考图会影响商品外观、材质和镜头细节。支持拖拽或粘贴图片。
         </div>
       )}
@@ -4551,8 +4551,8 @@ function StoryboardComposerPanel({
     <section className="storyboard-side-panel grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-black text-[#172033]">脚本分镜</div>
-          <div className="mt-1 text-xs font-bold text-[#8b9bb3]">可选；留空会按商品资料生成。</div>
+          <div className="text-base font-black text-[var(--text)]">脚本分镜</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">可选；留空会按商品资料生成。</div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Badge>{templateLabel(template)}</Badge>
@@ -4563,8 +4563,8 @@ function StoryboardComposerPanel({
       <div className="min-h-0">
         <Textarea
           className={cn(
-            "h-full min-h-0 resize-none border-[#dbe4f0] bg-white text-sm leading-7 transition-colors",
-            storyboardDraftIsGuidance ? "font-semibold text-[#9aa7ba]" : "font-bold text-[#172033]"
+            "h-full min-h-0 resize-none border-[var(--border-strong)] bg-[var(--card)] text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
+            storyboardDraftIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
           )}
           value={storyboardDraft}
           onChange={(event) => onStoryboardDraftChange(event.target.value)}
@@ -4605,7 +4605,7 @@ function StoryboardComposerPanel({
         <button
           type="button"
           className={cn(
-            "flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2 text-left text-xs font-black text-[var(--muted)] transition",
+            "flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border bg-[var(--card)] px-3 py-2 text-left text-xs font-black text-[var(--muted)] transition",
             historyOpen
               ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
               : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
@@ -4617,12 +4617,12 @@ function StoryboardComposerPanel({
           <span>分镜历史记录</span>
           <span className="flex items-center gap-2">
             <Badge>{storyboardHistory.length} 条</Badge>
-            <ChevronDown size={14} className={cn("text-[#8b9bb3] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
+            <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
           </span>
         </button>
         {historyOpen ? (
           <div
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[#fffdf9] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
             role="listbox"
           >
             {storyboardHistory.length > 0 ? (
@@ -4638,13 +4638,13 @@ function StoryboardComposerPanel({
                     }}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-black text-[#172033]">{formatHistoryTime(record.createdAt)}</div>
+                      <div className="text-xs font-black text-[var(--text)]">{formatHistoryTime(record.createdAt)}</div>
                       <div className="flex gap-1">
                         <Badge>{templateLabel(record.style)}</Badge>
                         <Badge>{formatDuration(record.duration)}</Badge>
                       </div>
                     </div>
-                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[#6c7890]">{historyPreview(record.script)}</div>
+                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[var(--muted)]">{historyPreview(record.script)}</div>
                   </button>
                   <button
                     type="button"
@@ -4662,7 +4662,7 @@ function StoryboardComposerPanel({
                 </article>
               ))
             ) : (
-              <div className="rounded-[10px] border border-dashed border-[#dbe4f0] bg-[#fbfdff] px-3 py-4 text-center text-xs font-bold text-[#8b9bb3]">
+              <div className="rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--panel2)] px-3 py-4 text-center text-xs font-bold text-[var(--muted)]">
                 还没有 AI 生成历史
               </div>
             )}
@@ -4696,16 +4696,16 @@ function VideoHistoryPanel({
 }) {
   const productDownloadContext = videoDownloadProductContext(product, draft, importText);
   return (
-    <section className="grid gap-3 border-t border-[#e5ecf6] bg-[#fbfdff] p-5">
+    <section className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-base font-black text-[#172033]">历史记录</div>
-          <div className="mt-1 text-xs font-bold text-[#8b9bb3]">当前商品生成过的视频都会显示在这里。</div>
+          <div className="text-base font-black text-[var(--text)]">历史记录</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">当前商品生成过的视频都会显示在这里。</div>
         </div>
         <Badge>{jobs.length} 个</Badge>
       </div>
       {jobs.length > 0 ? (
-        <div className="generation-history-scroll grid max-h-[360px] overflow-y-auto rounded-[14px] border border-[#e5ecf6] bg-white">
+        <div className="generation-history-scroll grid max-h-[360px] overflow-y-auto rounded-[14px] border border-[var(--border)] bg-[var(--field)]">
           {jobs.map((job, index) => {
             const activeVersion = isActiveCreativeVersion(job);
             const playableVideo = hasPlayableVideo(job);
@@ -4713,16 +4713,16 @@ function VideoHistoryPanel({
             const retryJob = job.status === "failed" && !recoverJob ? job.videoJob : undefined;
             const lifecycleLabel = creativeVersionLifecycleHint(job);
             return (
-              <article key={job.id} className="grid gap-2 border-b border-[#eef3f8] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <article key={job.id} className="grid gap-2 border-b border-[var(--border)] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <strong className="truncate text-sm font-black text-[#172033]">{videoLabel(index)}</strong>
+                    <strong className="truncate text-sm font-black text-[var(--text)]">{videoLabel(index)}</strong>
                     <Badge tone={activeVersion ? "warn" : playableVideo ? "ok" : "neutral"}>
                       {activeVersion ? <RefreshCcw className="mr-1 h-3 w-3 animate-spin" /> : null}
                       {creativeVersionDisplayStatus(job)}
                     </Badge>
                   </div>
-                  <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
+                  <div className="mt-1 truncate text-xs font-semibold text-[var(--muted)]">
                     {[...creativeVersionMetaParts(job), lifecycleLabel].filter(Boolean).join(" · ")}
                   </div>
                   <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
@@ -4803,8 +4803,8 @@ function ProductLibraryHome({
     <section className="product-library-shell grid gap-3">
       <div className="product-library-toolbar flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="m-0 text-[24px] font-black leading-tight text-[#172033]">商品库</h2>
-          <div className="mt-1 text-xs font-semibold text-[#8b9bb3]">{products.length} 个商品</div>
+          <h2 className="m-0 text-[24px] font-black leading-tight text-[var(--text)]">商品库</h2>
+          <div className="mt-1 text-xs font-semibold text-[var(--muted)]">{products.length} 个商品</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="primary" onClick={openProductDialog}>
@@ -4814,27 +4814,27 @@ function ProductLibraryHome({
         </div>
       </div>
 
-      <section className="product-library-list overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_14px_36px_rgba(30,42,68,.08)]">
-        <div className="grid gap-2 border-b border-[#e5ecf6] bg-[#fbfdff] px-4 py-3 min-[760px]:grid-cols-[minmax(0,1fr)_240px_auto] min-[760px]:items-center">
-          <div className="text-xs font-black uppercase tracking-[.16em] text-[#8b9bb3]">商品</div>
-          <div className="hidden text-xs font-black uppercase tracking-[.16em] text-[#8b9bb3] min-[760px]:block">商品资料</div>
-          <div className="hidden text-xs font-black uppercase tracking-[.16em] text-[#8b9bb3] min-[760px]:block">进入</div>
+      <section className="product-library-list overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--field)] shadow-[0_14px_36px_rgba(96,64,43,.08)]">
+        <div className="grid gap-2 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 min-[760px]:grid-cols-[minmax(0,1fr)_240px_auto] min-[760px]:items-center">
+          <div className="text-xs font-black uppercase tracking-[.16em] text-[var(--muted)]">商品</div>
+          <div className="hidden text-xs font-black uppercase tracking-[.16em] text-[var(--muted)] min-[760px]:block">商品资料</div>
+          <div className="hidden text-xs font-black uppercase tracking-[.16em] text-[var(--muted)] min-[760px]:block">进入</div>
         </div>
-        <div className="divide-y divide-[#e5ecf6]">
+        <div className="divide-y divide-[var(--border)]">
           {products.map((product) => {
             const status = productLibraryStatus(product);
             return (
               <article
                 key={product.path}
-                className="grid gap-3 px-4 py-4 text-sm transition hover:bg-[#f8fbff] min-[760px]:grid-cols-[minmax(0,1fr)_240px_auto] min-[760px]:items-center"
+                className="grid gap-3 px-4 py-4 text-sm transition hover:bg-[var(--card)] min-[760px]:grid-cols-[minmax(0,1fr)_240px_auto] min-[760px]:items-center"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-black text-[#172033]">{product.title_ja}</div>
+                  <div className="truncate text-[15px] font-black text-[var(--text)]">{product.title_ja}</div>
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="text-xs font-black text-[#8b9bb3] min-[760px]:hidden">商品资料</span>
+                  <span className="text-xs font-black text-[var(--muted)] min-[760px]:hidden">商品资料</span>
                   <Badge tone={status.tone}>{status.label}</Badge>
-                  <span className="truncate text-xs font-semibold text-[#6c7890]">{status.detail}</span>
+                  <span className="truncate text-xs font-semibold text-[var(--muted)]">{status.detail}</span>
                 </div>
                 <div className="flex flex-wrap gap-2 min-[760px]:justify-end">
                   <Button className="product-library-row-action" size="sm" variant="primary" onClick={() => void onCreateVideo(product)}>
@@ -4941,15 +4941,15 @@ function ProductLibraryDialog({
   const activeMode: ProductEditorMode = isEditMode ? "manual" : editorMode || mode;
   const hasDraftFacts = Boolean(draft.sku || draft.title_ja || draft.category || draft.verified_selling_points || draft.reference_images);
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#172033]/38 p-4">
-      <section className="max-h-[min(820px,calc(100vh-32px))] w-full max-w-[920px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.24)]">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e5ecf6] bg-[#fbfdff] px-5 py-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(42,33,27,.38)] p-4">
+      <section className="max-h-[min(820px,calc(100vh-32px))] w-full max-w-[920px] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--panel)] shadow-[0_28px_90px_rgba(96,64,43,.22)]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--card)] px-5 py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>{isEditMode ? "编辑资料" : activeMode === "import" ? "粘贴导入" : "手动填写"}</Badge>
               {!isEditMode && activeMode === "import" ? <Badge tone="ok">推荐</Badge> : null}
             </div>
-            <h3 className="m-0 mt-2 text-[20px] font-black text-[#172033]">{isEditMode ? "编辑当前商品" : "添加商品"}</h3>
+            <h3 className="m-0 mt-2 text-[20px] font-black text-[var(--text)]">{isEditMode ? "编辑当前商品" : "添加商品"}</h3>
           </div>
           <Button size="icon" variant="ghost" aria-label="关闭弹窗" onClick={onClose}>
             <X size={14} />
@@ -4979,7 +4979,7 @@ function ProductLibraryDialog({
 
           {!isEditMode && activeMode === "import" ? (
             <form
-              className="grid gap-3 rounded-[14px] border border-[#dbe4f0] bg-[#f8fbff] p-4"
+              className="grid gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--card)] p-4"
               onSubmit={(event) => {
                 event.preventDefault();
                 void onImportSave();
@@ -5074,13 +5074,13 @@ function DeleteCreativeVersionDialog({
         }
       }}
     >
-      <section className="grid w-full max-w-[460px] gap-4 rounded-[18px] border border-red-100 bg-white p-5 shadow-[0_28px_90px_rgba(23,32,51,.24)]">
+      <section className="grid w-full max-w-[460px] gap-4 rounded-[18px] border border-red-100 bg-[var(--panel)] p-5 shadow-[0_28px_90px_rgba(96,64,43,.22)]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-base font-black text-[#172033]">
+            <div className="text-base font-black text-[var(--text)]">
               {activeVersion ? "取消并删除这个视频？" : "删除这个视频记录？"}
             </div>
-            <div className="mt-1 text-xs font-semibold leading-5 text-[#6c7890]">
+            <div className="mt-1 text-xs font-semibold leading-5 text-[var(--muted)]">
               {activeVersion
                 ? "确认后会取消生成，并从历史记录中移除。"
                 : job.source === "ledger"
@@ -5092,8 +5092,8 @@ function DeleteCreativeVersionDialog({
             <X size={15} />
           </Button>
         </div>
-        <div className="rounded-[14px] border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#6c7890]">
-          <div className="font-black text-[#172033]">{videoLabel(index)}</div>
+        <div className="rounded-[14px] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-bold leading-5 text-[var(--muted)]">
+          <div className="font-black text-[var(--text)]">{videoLabel(index)}</div>
           <div>{creativeVersionMetaParts(job).join(" · ")}</div>
         </div>
         <div className="flex justify-end gap-2">
@@ -5167,17 +5167,17 @@ function VideoPreviewDialog({
         }
       }}
     >
-      <section className="grid max-h-[min(760px,calc(100vh-32px))] w-full max-w-[880px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.26)]">
-        <div className="flex min-w-0 items-start justify-between gap-3 border-b border-[#e5ecf6] px-4 py-3">
+      <section className="grid max-h-[min(760px,calc(100vh-32px))] w-full max-w-[880px] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--panel)] shadow-[0_28px_90px_rgba(96,64,43,.22)]">
+        <div className="flex min-w-0 items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 className="m-0 truncate text-base font-black text-[#172033]">{previewTitle}</h3>
+              <h3 className="m-0 truncate text-base font-black text-[var(--text)]">{previewTitle}</h3>
               <Badge tone={activeVersion ? "warn" : playableVideo ? "ok" : "neutral"}>
                 {activeVersion ? <RefreshCcw className="mr-1 h-3 w-3 animate-spin" /> : null}
                 {statusText}
               </Badge>
             </div>
-            <div className="mt-1 truncate text-xs font-semibold text-[#6c7890]">
+            <div className="mt-1 truncate text-xs font-semibold text-[var(--muted)]">
               {creativeVersionMetaParts(job).join(" · ")}
             </div>
             <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
@@ -5189,7 +5189,7 @@ function VideoPreviewDialog({
 
         <div className="grid gap-3 overflow-auto p-4">
           {playableVideo && job.finalVideoUrl ? (
-            <div className="overflow-hidden rounded-[14px] border border-[#dbe4f0] bg-[#0f172a]">
+            <div className="overflow-hidden rounded-[14px] border border-[var(--border)] bg-[#0f172a]">
               <video
                 className="aspect-video h-full w-full bg-[#0f172a] object-contain"
                 controls
@@ -5199,19 +5199,19 @@ function VideoPreviewDialog({
               />
             </div>
           ) : (
-            <div className="grid aspect-video place-items-center rounded-[14px] border border-dashed border-[#cfd9ea] bg-[#f7f9fe] p-6 text-center">
+            <div className="grid aspect-video place-items-center rounded-[14px] border border-dashed border-[var(--border-strong)] bg-[var(--card)] p-6 text-center">
               <div className="grid justify-items-center gap-2">
                 {activeVersion ? (
                   <RefreshCcw className="h-7 w-7 animate-spin text-[var(--accent)]" />
                 ) : job.status === "failed" ? (
                   <AlertTriangle className="h-7 w-7 text-[var(--danger)]" />
                 ) : (
-                  <FileVideo className="h-7 w-7 text-[#8b9bb3]" />
+                  <FileVideo className="h-7 w-7 text-[var(--muted)]" />
                 )}
-                <div className="text-sm font-black text-[#172033]">
+                <div className="text-sm font-black text-[var(--text)]">
                   {activeVersion ? "视频还在生成中" : recoverJob ? "成片下载失败" : job.status === "failed" ? "视频生成失败" : "暂无可播放视频文件"}
                 </div>
-                <div className="max-w-[520px] text-xs font-semibold leading-5 text-[#6c7890]">
+                <div className="max-w-[520px] text-xs font-semibold leading-5 text-[var(--muted)]">
                   {activeVersion
                     ? "生成完成后这里会自动变成可播放预览。"
                     : failureReason || "这个记录暂时没有成片文件，可以保留记录或删除后重新生成。"}
@@ -5265,7 +5265,7 @@ function VideoHashtagChips({ hashtags, onToast }: { hashtags?: string[]; onToast
   return (
     <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
       {cleaned.slice(0, 8).map((tag) => (
-        <span key={tag} className="rounded-full border border-[#dbe4f0] bg-[#f7f9fe] px-2 py-1 text-[11px] font-black text-[#36506f]">
+        <span key={tag} className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-black text-[var(--text)]">
           {tag}
         </span>
       ))}
@@ -5334,7 +5334,7 @@ function ProductCreationProductPicker({
       <button
         type="button"
         className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
+          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           productPickerOpen
             ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
             : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
@@ -5345,11 +5345,11 @@ function ProductCreationProductPicker({
         onClick={() => setProductPickerOpen((open) => !open)}
       >
         <span className="min-w-0 truncate">{selectedProductLabel}</span>
-        <ChevronDown className={cn("shrink-0 text-[#8b9bb3] transition", productPickerOpen && "rotate-180 text-[var(--accent)]")} size={15} />
+        <ChevronDown className={cn("shrink-0 text-[var(--muted)] transition", productPickerOpen && "rotate-180 text-[var(--accent)]")} size={15} />
       </button>
       {productPickerOpen ? (
         <div
-          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[#fffdf9] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
+          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
           role="listbox"
         >
           <button
@@ -5357,8 +5357,8 @@ function ProductCreationProductPicker({
             role="option"
             aria-selected={!selectedProductOption}
             className={cn(
-              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_6%,#fffdf9)] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,#fffdf9)]",
-              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)]"
+              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--panel))] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--panel))]",
+              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))]"
             )}
             onClick={() => handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)}
           >
@@ -5369,7 +5369,7 @@ function ProductCreationProductPicker({
             type="button"
             role="option"
             aria-selected={false}
-            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[#172033]"
+            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
             onClick={() => {
               setProductPickerOpen(false);
               onImportFile();
@@ -5387,7 +5387,7 @@ function ProductCreationProductPicker({
                   key={option.sku}
                   className={cn(
                     "group/product-option grid min-h-10 grid-cols-[minmax(0,1fr)_32px] items-center gap-1 rounded-lg transition",
-                    active ? "bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)] text-[#172033]" : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[#172033]"
+                    active ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
                   )}
                 >
                   <button
@@ -5419,7 +5419,7 @@ function ProductCreationProductPicker({
               );
             })
           ) : (
-            <div className="px-3 py-2 text-xs font-bold text-[#8b9bb3]">暂无商品</div>
+            <div className="px-3 py-2 text-xs font-bold text-[var(--muted)]">暂无商品</div>
           )}
         </div>
       ) : null}
@@ -5537,14 +5537,14 @@ function ProductFileImportDialog({
         }
       }}
     >
-      <section className="grid max-h-[min(780px,calc(100vh-32px))] w-full max-w-[960px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.26)]">
-        <div className="flex min-w-0 items-start justify-between gap-3 border-b border-[#e5ecf6] bg-[#fbfdff] px-5 py-4">
+      <section className="grid max-h-[min(780px,calc(100vh-32px))] w-full max-w-[960px] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--panel)] shadow-[0_28px_90px_rgba(96,64,43,.22)]">
+        <div className="flex min-w-0 items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--card)] px-5 py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>{batchIds.length > 1 ? `已选 ${batchIds.length} 个` : "默认选 1 个"}</Badge>
               {preview ? <Badge tone={previewBadgeTone}>{previewBadgeLabel}</Badge> : null}
             </div>
-            <h3 className="m-0 mt-2 text-[20px] font-black text-[#172033]">{title}</h3>
+            <h3 className="m-0 mt-2 text-[20px] font-black text-[var(--text)]">{title}</h3>
           </div>
           <Button size="icon" variant="ghost" aria-label="关闭弹窗" disabled={isWorking} onClick={onClose}>
             <X size={14} />
@@ -5552,12 +5552,12 @@ function ProductFileImportDialog({
         </div>
 
         <div className="grid gap-4 overflow-auto p-5">
-          <label className="grid cursor-pointer gap-2 rounded-[14px] border border-dashed border-[color-mix(in_srgb,var(--accent)_42%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_5%,white)] p-4 text-center transition hover:bg-[color-mix(in_srgb,var(--accent)_8%,white)]">
-            <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-white text-[var(--accent)] shadow-[0_10px_22px_rgba(30,42,68,.08)]">
+          <label className="grid cursor-pointer gap-2 rounded-[14px] border border-dashed border-[color-mix(in_srgb,var(--accent)_42%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] p-4 text-center transition hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--field))]">
+            <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-[var(--field)] text-[var(--accent)] shadow-[0_10px_22px_rgba(96,64,43,.08)]">
               <FileSpreadsheet size={18} />
             </span>
-            <span className="text-sm font-black text-[#172033]">选择 CSV/Excel 文件</span>
-            <span className="text-xs font-semibold leading-5 text-[#6c7890]">
+            <span className="text-sm font-black text-[var(--text)]">选择 CSV/Excel 文件</span>
+            <span className="text-xs font-semibold leading-5 text-[var(--muted)]">
               解析后默认选择一个商品；单选会把原始资料整理后填入商品资料框。
             </span>
             <input
@@ -5571,15 +5571,15 @@ function ProductFileImportDialog({
 
           {preview ? (
             <div className="grid gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e5ecf6] bg-[#f8fbff] px-3 py-2 text-xs font-bold text-[#6c7890]">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-bold text-[var(--muted)]">
                 <span>{previewSummaryText}</span>
                 <span>可保存 {preview.summary.ready} · 建议整理 {preview.summary.needsAi} · 重复商品 {preview.summary.duplicateSku} · 失败 {preview.summary.failed}</span>
               </div>
               {rows.length > 0 ? (
-                <div className="max-h-[360px] overflow-auto rounded-xl border border-[#dbe4f0]">
+                <div className="max-h-[360px] overflow-auto rounded-xl border border-[var(--border)]">
                   <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-                    <thead className="sticky top-0 bg-white shadow-[0_1px_0_#e5ecf6]">
-                      <tr className="text-[#6c7890]">
+                    <thead className="sticky top-0 bg-[var(--field)] shadow-[0_1px_0_var(--border)]">
+                      <tr className="text-[var(--muted)]">
                         <th className="w-14 whitespace-nowrap px-3 py-2 font-black">
                           <input
                             type="checkbox"
@@ -5601,12 +5601,12 @@ function ProductFileImportDialog({
                         <th className="whitespace-nowrap px-3 py-2 font-black">缺失项</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#e5ecf6]">
+                    <tbody className="divide-y divide-[var(--border)]">
                       {rows.map((row) => {
                         const disabled = !fileImportCanSelect(row);
                         const active = checkedRowIds.includes(row.rowId);
                         return (
-                          <tr key={row.rowId} className={cn(active ? "bg-[color-mix(in_srgb,var(--accent)_8%,white)]" : "bg-white", disabled && "opacity-60")}>
+                          <tr key={row.rowId} className={cn(active ? "bg-[color-mix(in_srgb,var(--accent)_8%,var(--field))]" : "bg-[var(--field)]", disabled && "opacity-60")}>
                             <td className="whitespace-nowrap px-3 py-2">
                               <input
                                 type="checkbox"
@@ -5616,12 +5616,12 @@ function ProductFileImportDialog({
                               />
                             </td>
                             <td className="whitespace-nowrap px-3 py-2"><Badge tone={fileImportRowTone(row.status)}>{fileImportRowLabel(row.status)}</Badge></td>
-                            <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2 font-black text-[#172033]">{fileImportProductIdLabel(row)}</td>
-                            <td className="max-w-[300px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[#172033]" title={row.product?.title_ja ?? row.error ?? ""}>{row.product?.title_ja ?? row.error ?? "-"}</td>
-                            <td className="max-w-[130px] truncate whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{fileImportSourceRowsLabel(row)}</td>
-                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{row.referenceImageCount} 张</td>
-                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[#6c7890]">{row.quality.score}/100</td>
-                            <td className="max-w-[240px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[#6c7890]" title={row.quality.missingFields.join("、")}>{row.quality.missingFields.join("、") || "-"}</td>
+                            <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2 font-black text-[var(--text)]">{fileImportProductIdLabel(row)}</td>
+                            <td className="max-w-[300px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[var(--text)]" title={row.product?.title_ja ?? row.error ?? ""}>{row.product?.title_ja ?? row.error ?? "-"}</td>
+                            <td className="max-w-[130px] truncate whitespace-nowrap px-3 py-2 font-bold text-[var(--muted)]">{fileImportSourceRowsLabel(row)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[var(--muted)]">{row.referenceImageCount} 张</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-bold text-[var(--muted)]">{row.quality.score}/100</td>
+                            <td className="max-w-[240px] truncate whitespace-nowrap px-3 py-2 font-semibold text-[var(--muted)]" title={row.quality.missingFields.join("、")}>{row.quality.missingFields.join("、") || "-"}</td>
                           </tr>
                         );
                       })}
@@ -5644,7 +5644,7 @@ function ProductFileImportDialog({
           ) : null}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[#e5ecf6] bg-white px-5 py-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--border)] bg-[var(--panel)] px-5 py-4">
           <Button className="w-fit" variant="ghost" disabled={isWorking} onClick={onClose}>
             取消
           </Button>
@@ -5836,10 +5836,10 @@ function ReferenceImageFigure({
 }) {
   const canPreview = Boolean(image.previewUrl);
   return (
-    <figure className="group relative grid grid-cols-[72px_minmax(0,1fr)] m-0 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-white p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
+    <figure className="group relative grid grid-cols-[72px_minmax(0,1fr)] m-0 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--field)] p-2 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]">
       <button
         type="button"
-        className="overflow-hidden rounded-[9px] border border-[#eef3f8] bg-[var(--panel2)]"
+        className="overflow-hidden rounded-[9px] border border-[var(--border)] bg-[var(--panel2)]"
         disabled={!canPreview}
         title={canPreview ? "查看参考图" : referenceStatusLabel(image.status)}
         onClick={onPreview}
@@ -5853,10 +5853,10 @@ function ReferenceImageFigure({
         )}
       </button>
       <figcaption className="min-w-0">
-        <div className="truncate text-xs font-black text-[#172033]">参考图 {index + 1}</div>
+        <div className="truncate text-xs font-black text-[var(--text)]">参考图 {index + 1}</div>
         <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</div>
       </figcaption>
-      <div className="reference-image-actions pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-[10px] border border-[#e5ecf6] bg-white/95 p-1 opacity-0 shadow-[0_12px_28px_rgba(30,42,68,.14)] transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      <div className="reference-image-actions pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--field)]/95 p-1 opacity-0 shadow-[0_12px_28px_rgba(96,64,43,.14)] transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
         {image.status === "outside-project-root" ? (
           <Button className="h-8 w-8 p-0" size="icon" title="导入资产" onClick={() => void onImportAssets(sku)}>
             <Download size={12} />
@@ -5930,11 +5930,11 @@ function ReferenceImagePreviewDialog({
         }
       }}
     >
-      <section className="grid max-h-[min(760px,calc(100vh-32px))] w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[#dbe4f0] bg-white shadow-[0_28px_90px_rgba(23,32,51,.26)]">
-        <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[#e5ecf6] px-4 py-3">
+      <section className="grid max-h-[min(760px,calc(100vh-32px))] w-full max-w-[760px] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--panel)] shadow-[0_28px_90px_rgba(96,64,43,.22)]">
+        <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-sm font-black text-[#172033]">参考图预览</div>
-            <div className="truncate text-xs font-semibold text-[#6c7890]">
+            <div className="text-sm font-black text-[var(--text)]">参考图预览</div>
+            <div className="truncate text-xs font-semibold text-[var(--muted)]">
               {image.original}
               {canNavigate ? ` · ${activeIndex + 1}/${previewableImages.length}` : ""}
             </div>
@@ -5965,7 +5965,7 @@ function ReferenceImagePreviewDialog({
           {canNavigate ? (
             <>
               <Button
-                className="absolute left-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-white/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
+                className="absolute left-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-[var(--field)]/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
                 size="icon"
                 title="上一张"
                 onClick={onPrevious}
@@ -5973,7 +5973,7 @@ function ReferenceImagePreviewDialog({
                 <ChevronLeft size={18} />
               </Button>
               <Button
-                className="absolute right-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-white/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
+                className="absolute right-4 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full bg-[var(--field)]/92 p-0 shadow-[0_12px_28px_rgba(15,23,42,.24)]"
                 size="icon"
                 title="下一张"
                 onClick={onNext}
@@ -6008,7 +6008,7 @@ function ProductEntryModeButton({
     <button
       type="button"
       className={cn(
-        "grid gap-2 rounded-lg border bg-white p-3 text-left transition",
+        "grid gap-2 rounded-lg border bg-[var(--field)] p-3 text-left transition",
         active
           ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] shadow-[0_14px_30px_rgba(10,163,148,.12)]"
           : "border-[var(--border)] hover:border-[var(--accent)] hover:shadow-[0_10px_22px_rgba(15,23,42,.06)]"
@@ -6045,7 +6045,7 @@ function ProductImportResultPreview({
   const forbiddenClaims = splitLines(draft.forbidden_claims);
   const references = splitLines(draft.reference_images);
   return (
-    <div className="grid gap-3 rounded-lg border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-white p-3">
+    <div className="grid gap-3 rounded-lg border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[var(--field)] p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-black">整理后的商品资料</div>
@@ -6207,7 +6207,7 @@ function ProductDraftForm({
         onChange={(value) => setDraft({ ...draft, reference_images: value })}
       />
 
-      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex justify-end border-t border-[#e5ecf6] bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex justify-end border-t border-[var(--border)] bg-[var(--panel)]/95 px-4 py-3 backdrop-blur">
         <Button className="w-fit" size="sm" variant="primary" type="submit">
           <Plus size={14} />
           {submitLabel}
@@ -6229,14 +6229,14 @@ function ProductDraftSection({
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-3 border-b border-[#e5ecf6] pb-5 last:border-b-0 last:pb-0">
+    <section className="grid gap-3 border-b border-[var(--border)] pb-5 last:border-b-0 last:pb-0">
       <div className="flex items-start gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_10%,white)] text-[var(--accent)]">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]">
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-sm font-black text-[#172033]">{title}</div>
-          <div className="mt-1 text-xs font-semibold leading-5 text-[#6c7890]">{description}</div>
+          <div className="text-sm font-black text-[var(--text)]">{title}</div>
+          <div className="mt-1 text-xs font-semibold leading-5 text-[var(--muted)]">{description}</div>
         </div>
       </div>
       {children}
@@ -6260,10 +6260,10 @@ function ProductDraftTextareaGroup({
   tone?: "neutral" | "risk";
 }) {
   return (
-    <label className={cn("grid gap-2 rounded-[14px] p-3", tone === "risk" ? "bg-[#fff7ed]" : "bg-[#f8fbff]")}>
-      <span className={cn("text-[12px] font-black", tone === "risk" ? "text-[#9a6a28]" : "text-[#6c7890]")}>{label}</span>
+    <label className={cn("grid gap-2 rounded-[14px] p-3", tone === "risk" ? "bg-[#fff7ed]" : "bg-[var(--card)]")}>
+      <span className={cn("text-[12px] font-black", tone === "risk" ? "text-[#9a6a28]" : "text-[var(--muted)]")}>{label}</span>
       <Textarea
-        className="min-h-[unset] border-0 bg-white shadow-[inset_0_0_0_1px_#dbe4f0]"
+        className="min-h-[unset] border-0 bg-[var(--field)] shadow-[inset_0_0_0_1px_var(--border)]"
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -6281,13 +6281,13 @@ function ProductDraftReferencePaths({ value, onChange }: { value: string; onChan
       description="一行一个本地路径；保存后会在商品信息页显示为参考图素材。"
       icon={<ImageIcon size={15} />}
     >
-      <div className="grid gap-3 rounded-[14px] bg-[#f8fbff] p-3">
+      <div className="grid gap-3 rounded-[14px] bg-[var(--card)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge tone={referenceCount >= 3 ? "ok" : "warn"}>{referenceCount} 条路径</Badge>
-          <span className="text-xs font-semibold text-[#6c7890]">建议至少 3 张参考图</span>
+          <span className="text-xs font-semibold text-[var(--muted)]">建议至少 3 张参考图</span>
         </div>
         <Textarea
-          className="min-h-[120px] border-0 bg-white shadow-[inset_0_0_0_1px_#dbe4f0]"
+          className="min-h-[120px] border-0 bg-[var(--field)] shadow-[inset_0_0_0_1px_var(--border)]"
           rows={5}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -6320,7 +6320,7 @@ function DashboardStatsPanel({
   const recentChart = buildRecentChartOption(analytics.recent);
   return (
     <section className="grid gap-4" aria-label="统计仪表盘">
-      <Card className="p-3">
+      <Card className="bg-[var(--card)] p-3">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-[13px] font-black text-[var(--text)]">时间范围:</span>
@@ -6348,7 +6348,7 @@ function DashboardStatsPanel({
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(420px,.98fr)_minmax(0,1fr)]">
-        <Card>
+        <Card className="bg-[var(--card)]">
           <PanelTitle icon={<CircleDollarSign size={16} />} right={<Badge>{analytics.providerRows.length} 个通道</Badge>}>
             模型分布
           </PanelTitle>
@@ -6381,7 +6381,7 @@ function DashboardStatsPanel({
           </div>
         </Card>
 
-        <Card>
+        <Card className="bg-[var(--card)]">
           <PanelTitle icon={<Gauge size={16} />} right={<Badge>Token + 人民币</Badge>}>
             Token / 成本趋势
           </PanelTitle>
@@ -6389,14 +6389,14 @@ function DashboardStatsPanel({
         </Card>
       </div>
 
-      <Card>
+      <Card className="bg-[var(--card)]">
         <PanelTitle icon={<WalletCards size={16} />} right={<Badge>{analytics.recent.length}/12</Badge>}>
           最近使用
         </PanelTitle>
         <ChartBlock option={recentChart} height={260} empty={analytics.recent.length === 0} />
         <div className="mt-3 grid gap-2">
           {analytics.recent.slice(0, 8).map((item) => (
-            <div key={item.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-white p-2 text-xs md:grid-cols-[minmax(150px,1.2fr)_minmax(140px,1fr)_88px_90px_90px_80px] md:items-center">
+            <div key={item.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-2 text-xs md:grid-cols-[minmax(150px,1.2fr)_minmax(140px,1fr)_88px_90px_90px_80px] md:items-center">
               <strong className="min-w-0 truncate text-[var(--text)]">{item.productSku}</strong>
               <span className="min-w-0 truncate text-[var(--muted)]">{providerLabel(item.provider)}</span>
               <Badge tone={jobStatusTone(item.status as VideoJob["status"])}>{statusLabel(item.status)}</Badge>
@@ -6478,11 +6478,11 @@ function ApiModelConfigPanel({
   const editingGroup = groups.find((group) => group.providerId === editingProviderId);
   const configuredCount = [...config.textModels, ...config.imageModels, ...config.videoModels].filter((model) => model.configured).length;
   return (
-    <Card id="API Key">
+    <Card id="API Key" className="bg-[var(--card)]">
       <PanelTitle icon={<KeyRound size={16} />} right={<Badge>{configuredCount} 条已配置</Badge>}>
         API Key
       </PanelTitle>
-      <div className="mb-3 rounded-lg border border-[#dbe4f0] bg-[#f8fbff] px-3 py-2 text-xs font-bold leading-5 text-[#5f6d84]">
+      <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 py-2 text-xs font-bold leading-5 text-[var(--muted)]">
         这里配置的是你自己的模型 API Key，系统会按你的配置调用文本、图片和视频模型。
       </div>
       <div className="grid gap-3">
@@ -6565,15 +6565,15 @@ function ApiModelConfigGroup({
 }) {
   const configuredCount = models.filter((model) => model.configured).length;
   return (
-    <section className="grid gap-2.5 rounded-lg border border-[#dbe4f0] bg-[#fbfdff] p-3 text-[12px]">
+    <section className="grid gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-[12px]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="m-0 text-[15px] font-black leading-5 text-[#172033]">{title}</h3>
+            <h3 className="m-0 text-[15px] font-black leading-5 text-[var(--text)]">{title}</h3>
             <Badge className="min-h-5 px-1.5 text-[10px]">{badge}</Badge>
             <Badge className="min-h-5 px-1.5 text-[10px]" tone={configuredCount > 0 ? "ok" : "danger"}>{configuredCount > 0 ? `${configuredCount} 条可用` : "未配置"}</Badge>
           </div>
-          <div className="mt-0.5 text-[12px] font-medium leading-5 text-[#6c7890]">{description}</div>
+          <div className="mt-0.5 text-[12px] font-medium leading-5 text-[var(--muted)]">{description}</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="primary" type="button" disabled={isBusy} onClick={onAdd}>
@@ -6584,17 +6584,17 @@ function ApiModelConfigGroup({
       </div>
       <div className="grid gap-1.5">
         {models.map((model, index) => (
-          <div key={model.configId ?? `${model.id}-${index}`} className="grid gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 min-[980px]:grid-cols-[minmax(180px,1.1fr)_120px_minmax(180px,1fr)_72px_auto] min-[980px]:items-center">
+          <div key={model.configId ?? `${model.id}-${index}`} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 min-[980px]:grid-cols-[minmax(180px,1.1fr)_120px_minmax(180px,1fr)_72px_auto] min-[980px]:items-center">
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-1.5">
                 {index === 0 && model.configured ? <Badge className="min-h-5 px-1.5 text-[10px]" tone="ok">默认</Badge> : null}
-                <strong className="truncate text-[13px] font-black text-[#172033]">{model.label}</strong>
+                <strong className="truncate text-[13px] font-black text-[var(--text)]">{model.label}</strong>
               </div>
-              <div className="mt-0.5 truncate text-[11px] font-semibold text-[#8b97aa]">{model.baseUrl}</div>
+              <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--muted)]">{model.baseUrl}</div>
             </div>
-            <div className="text-[12px] font-bold text-[#5f6d84]">{model.providerLabel || draft.vendor || "-"}</div>
-            <div className="truncate text-[12px] font-bold text-[#172033]" title={model.model}>{model.model || draft.model || "-"}</div>
-            <div className="text-[12px] font-black text-[#172033]">优先级 {model.priority ?? 0}</div>
+            <div className="text-[12px] font-bold text-[var(--muted)]">{model.providerLabel || draft.vendor || "-"}</div>
+            <div className="truncate text-[12px] font-bold text-[var(--text)]" title={model.model}>{model.model || draft.model || "-"}</div>
+            <div className="text-[12px] font-black text-[var(--text)]">优先级 {model.priority ?? 0}</div>
             <div className="flex flex-wrap justify-end gap-1.5">
               <Button className="min-h-7 px-2 text-[12px]" size="sm" type="button" disabled={isBusy} onClick={() => onEdit(model)}>
                 编辑
@@ -6641,13 +6641,13 @@ function ApiModelConfigDialog({
   const isEditingExisting = Boolean(draft.configId);
   const isTesting = testStatus?.message === "测试配置中...";
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#172033]/35 p-4">
-      <section className="max-h-[min(860px,calc(100vh-32px))] w-full max-w-[860px] overflow-auto rounded-[18px] border border-[#cfd9ea] bg-[#fbfcff] p-6 shadow-[0_24px_72px_rgba(23,32,51,.22)]">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(42,33,27,.35)] p-4">
+      <section className="max-h-[min(860px,calc(100vh-32px))] w-full max-w-[860px] overflow-auto rounded-[18px] border border-[var(--border-strong)] bg-[var(--panel)] p-6 shadow-[0_24px_72px_rgba(96,64,43,.20)]">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[.16em] text-[#8b9bb3]">{isEditingExisting ? "EDIT CONFIG" : "NEW CONFIG"}</div>
-            <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[#172033]">{isEditingExisting ? title.replace("添加", "编辑") : title}</h3>
-            <div className="mt-2 text-[13px] font-semibold leading-5 text-[#61718d]">
+            <div className="text-[11px] font-black uppercase tracking-[.16em] text-[var(--muted)]">{isEditingExisting ? "EDIT CONFIG" : "NEW CONFIG"}</div>
+            <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[var(--text)]">{isEditingExisting ? title.replace("添加", "编辑") : title}</h3>
+            <div className="mt-2 text-[13px] font-semibold leading-5 text-[var(--muted)]">
               {isEditingExisting ? "不填写 API Key 时会保留原 Key；优先级越高越先使用。" : "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。"}
             </div>
           </div>
@@ -6683,7 +6683,7 @@ function ApiModelConfigDialog({
               onChange={(event) => onDraftChange(providerId, { priority: Number(event.target.value) })}
             />
           </Field>
-          <div className="text-[12px] font-semibold leading-5 text-[#8b9bb3]">
+          <div className="text-[12px] font-semibold leading-5 text-[var(--muted)]">
             数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。
           </div>
           <Field label="API Key">
@@ -6698,8 +6698,8 @@ function ApiModelConfigDialog({
           <Field label="Base URL">
             <Input value={draft.baseUrl} onChange={(event) => onDraftChange(providerId, { baseUrl: event.target.value })} />
           </Field>
-          <div className="rounded-lg border border-dashed border-[#d7e3f5] bg-[#f6f9ff] px-3 py-2 text-[12px] font-semibold text-[#8b9bb3]">
-            实际端点前缀: <span className="font-mono text-[#172033]">{endpointPrefix}</span>
+          <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] font-semibold text-[var(--muted)]">
+            实际端点前缀: <span className="font-mono text-[var(--text)]">{endpointPrefix}</span>
           </div>
           <Field label="模型（逗号分隔）">
             <Input value={draft.model} onChange={(event) => onDraftChange(providerId, { model: event.target.value })} />
@@ -6712,7 +6712,7 @@ function ApiModelConfigDialog({
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : testStatus.tone === "danger"
                     ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-[#d7e3f5] bg-[#f6f9ff] text-[#61718d]"
+                    : "border-[var(--border)] bg-[var(--card)] text-[var(--muted)]"
               )}
             >
               {testStatus.message}
@@ -6751,7 +6751,7 @@ function VideoJobsPanel({
 }) {
   const activeCount = jobs.filter((job) => job.status === "queued" || job.status === "running").length;
   return (
-    <Card id="生成任务记录">
+    <Card id="生成任务记录" className="bg-[var(--card)]">
       <PanelTitle icon={<Gauge size={16} />} right={<Badge tone={activeCount > 0 ? "warn" : "neutral"}>{activeCount} 个进行中</Badge>}>
         生成任务记录
       </PanelTitle>
@@ -6761,7 +6761,7 @@ function VideoJobsPanel({
             <article
               key={job.id}
               className={cn(
-                "grid gap-3 rounded-lg border bg-white p-3 text-xs xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)] xl:items-start",
+                "grid gap-3 rounded-lg border bg-[var(--card2)] p-3 text-xs xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)] xl:items-start",
                 job.status === "failed" ? "border-red-200 bg-red-50/40" : job.status === "canceled" ? "border-slate-200 bg-slate-50" : "border-[var(--border)]"
               )}
             >
@@ -6840,7 +6840,7 @@ function videoJobResultHint(job: VideoJob): string {
 
 function AuditLogPanel({ auditLog }: { auditLog?: AuditLogLedger }) {
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle icon={<ClipboardCheck size={16} />} right={<Badge>{auditLog ? auditLog.summary.totalEvents : "audit"}</Badge>}>
         操作审计
       </PanelTitle>
@@ -6854,7 +6854,7 @@ function AuditLogPanel({ auditLog }: { auditLog?: AuditLogLedger }) {
           {auditLog.events.length > 0 ? (
             <div className="grid gap-2">
               {auditLog.events.slice(0, 10).map((event) => (
-                <article key={event.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-white p-3 text-xs lg:grid-cols-[150px_minmax(160px,1fr)_minmax(170px,1.4fr)_120px] lg:items-center">
+                <article key={event.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-xs lg:grid-cols-[150px_minmax(160px,1fr)_minmax(170px,1.4fr)_120px] lg:items-center">
                   <div className="min-w-0">
                     <div className="truncate text-[13px] font-black text-[var(--text)]">{auditActionLabel(event.action)}</div>
                     <div className="truncate text-[var(--muted)]">{event.action}</div>
@@ -6888,7 +6888,7 @@ function StorageBackupPanel({
   isBusy: boolean;
 }) {
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle
         icon={<Database size={16} />}
         right={
@@ -6914,7 +6914,7 @@ function StorageBackupPanel({
           </div>
           <div className="grid gap-2 lg:grid-cols-3">
             {report.scopes.map((scope) => (
-              <article key={scope.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-white p-3 text-xs">
+              <article key={scope.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <strong className="truncate text-[13px] text-[var(--text)]">{scope.label}</strong>
                   <Badge tone={scope.mustBackup ? "ok" : "neutral"}>{scope.mustBackup ? "必备份" : "可选"}</Badge>
@@ -6929,7 +6929,7 @@ function StorageBackupPanel({
               </article>
             ))}
           </div>
-          <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-white p-3 text-xs">
+          <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-[13px] font-black text-[var(--text)]">本地备份包</div>
@@ -6977,7 +6977,7 @@ function StorageBackupPanel({
 
 function VideoAssetsPanel({ assets, onDelete, isBusy }: { assets?: VideoAssetLedger; onDelete: (asset: VideoAsset) => Promise<void>; isBusy: boolean }) {
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle icon={<Database size={16} />} right={<Badge>{assets ? formatBytes(assets.summary.totalBytes) : "local"}</Badge>}>
         视频资产
       </PanelTitle>
@@ -6995,7 +6995,7 @@ function VideoAssetsPanel({ assets, onDelete, isBusy }: { assets?: VideoAssetLed
               <article
                 key={`${asset.kind}-${asset.path}`}
                 className={cn(
-                  "grid gap-2 rounded-lg border bg-white p-3 text-xs lg:grid-cols-[96px_minmax(150px,1fr)_minmax(170px,1fr)_96px_120px_minmax(170px,auto)] lg:items-center",
+                  "grid gap-2 rounded-lg border bg-[var(--card2)] p-3 text-xs lg:grid-cols-[96px_minmax(150px,1fr)_minmax(170px,1fr)_96px_120px_minmax(170px,auto)] lg:items-center",
                   asset.exists ? "border-[var(--border)]" : "border-red-200 bg-red-50/50"
                 )}
               >
@@ -7044,7 +7044,7 @@ function ProviderUsagePanel({
   isBusy: boolean;
 }) {
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle icon={<BadgeJapaneseYen size={16} />} right={<Badge>{usage ? `${usage.items.length}/${usage.total}` : "只读"}</Badge>}>
         官方用量
       </PanelTitle>
@@ -7079,7 +7079,7 @@ function ProviderUsagePanel({
             {usage.items.map((item) => (
               <article
                 key={item.id}
-                className="grid gap-2 rounded-lg border border-[var(--border)] bg-white p-3 text-xs lg:grid-cols-[minmax(160px,1fr)_minmax(220px,1.2fr)_90px_90px_100px_130px] lg:items-center"
+                className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-xs lg:grid-cols-[minmax(160px,1fr)_minmax(220px,1.2fr)_90px_90px_100px_130px] lg:items-center"
               >
                 <div className="min-w-0">
                   <div className="truncate text-[13px] font-black">{item.id}</div>
@@ -7111,7 +7111,7 @@ function FeeSummaryPanel({ ledger, reports }: { ledger?: Ledger; reports: Report
   const estimatedCostCny = summary?.estimatedCostCny ?? productRows.reduce((total, row) => roundMoney(total + row.estimatedCostCny), 0);
   const finalVideos = summary?.finalVideos ?? productRows.reduce((total, row) => total + row.finalVideos, 0);
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle icon={<WalletCards size={16} />} right={<Badge>{formatNumber(productRows.length)} 个商品</Badge>}>
         费用汇总
       </PanelTitle>
@@ -7127,7 +7127,7 @@ function FeeSummaryPanel({ ledger, reports }: { ledger?: Ledger; reports: Report
         <h3 className="m-0 text-sm font-black text-[var(--text)]">按商品费用</h3>
         <span className="text-xs font-semibold text-[var(--muted)]">只统计生成次数、付费次数和估算费用。</span>
       </div>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)] bg-white">
+      <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--field)]">
         <table className="w-full min-w-[620px] border-separate border-spacing-0 text-left text-xs">
           <thead className="text-[var(--muted)]">
             <tr>
@@ -7182,20 +7182,20 @@ function ReportsPanel({
   onCancel: (taskId: string) => Promise<void>;
 }) {
   return (
-    <Card>
+    <Card className="bg-[var(--card)]">
       <PanelTitle icon={<FileVideo size={16} />} right={<Badge>{reports.length}/{allReports.length}</Badge>}>生成报告</PanelTitle>
       <div className="mb-3 grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 md:grid-cols-[repeat(3,minmax(130px,1fr))_auto] md:items-end">
         <FilterSelect label="商品" value={filters.productSku} options={productOptions} allLabel="全部商品" onChange={(value) => setFilters({ ...filters, productSku: value })} />
         <FilterSelect label="生成通道" value={filters.provider} options={providerOptions} allLabel="全部通道" formatOption={providerLabel} onChange={(value) => setFilters({ ...filters, provider: value })} />
         <FilterSelect label="状态" value={filters.status} options={statusOptions} allLabel="全部状态" formatOption={statusLabel} onChange={(value) => setFilters({ ...filters, status: value })} />
-        <label className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-bold">
+        <label className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] px-3 text-xs font-bold">
           <input className="h-4 w-4 accent-[var(--accent)]" type="checkbox" checked={filters.finalOnly} onChange={(event) => setFilters({ ...filters, finalOnly: event.target.checked })} />
           只看成片
         </label>
       </div>
       <div className="grid gap-3">
         {reports.map((report) => (
-          <article key={report.path} className="grid gap-3 rounded-lg border border-[var(--border)] bg-white p-3 xl:grid-cols-[minmax(160px,230px)_minmax(260px,1fr)_minmax(260px,340px)]">
+          <article key={report.path} className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 xl:grid-cols-[minmax(160px,230px)_minmax(260px,1fr)_minmax(260px,340px)]">
             <div className="aspect-[9/16] max-h-[360px] overflow-hidden rounded-lg border border-[var(--border)] bg-[#151a17]">
               {report.finalVideoUrl ? (
                 <video className="h-full w-full object-contain" controls playsInline preload="metadata" src={report.finalVideoUrl} />
@@ -7246,11 +7246,13 @@ function ReportsPanel({
   );
 }
 
-function KpiGrid({ items }: { items: Array<{ label: string; value: string; hint: string; icon: typeof Package; tone: "blue" | "green" | "orange" | "violet" | "rose" | "cyan" }> }) {
+type KpiTone = "clay" | "green" | "ember" | "ochre" | "coral" | "sage";
+
+function KpiGrid({ items }: { items: Array<{ label: string; value: string; hint: string; icon: typeof Package; tone: KpiTone }> }) {
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="任务台账">
       {items.map(({ label, value, hint, icon: Icon, tone }) => (
-        <article key={label} className="grid min-h-[106px] min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[var(--border)] bg-white p-4 shadow-[var(--shadow)]">
+        <article key={label} className="grid min-h-[106px] min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow)]">
           <div className={cn("grid h-11 w-11 place-items-center rounded-lg", toneClass(tone))}>
             <Icon size={20} />
           </div>
@@ -7365,9 +7367,13 @@ function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
+const chartPalette = ["#6f442c", "#0aa394", "#c65a36", "#b7791f", "#d87955", "#738a66"];
+const chartAxisColor = "#8a7665";
+const chartGridLineColor = "#ead7c4";
+
 function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsOption {
   return {
-    color: ["#2563eb", "#10b981", "#f59e0b", "#06b6d4", "#8b5cf6", "#ef4444"],
+    color: chartPalette,
     tooltip: {
       trigger: "item",
       formatter: "{b}: {c} 次 ({d}%)"
@@ -7377,7 +7383,7 @@ function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsOption {
       left: "center",
       itemWidth: 10,
       itemHeight: 10,
-      textStyle: { color: "#657184", fontSize: 11 }
+      textStyle: { color: chartAxisColor, fontSize: 11 }
     },
     series: [
       {
@@ -7405,32 +7411,32 @@ function errorMessage(error: unknown): string {
 
 function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOption {
   return {
-    color: ["#2563eb", "#0aa394", "#f97316"],
+    color: ["#6f442c", "#0aa394", "#c65a36"],
     tooltip: { trigger: "axis" },
     legend: {
       top: 0,
       right: 8,
-      textStyle: { color: "#657184", fontSize: 12 }
+      textStyle: { color: chartAxisColor, fontSize: 12 }
     },
     grid: { top: 46, right: 48, bottom: 54, left: 48 },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: points.map((point) => point.label),
-      axisLabel: { color: "#657184", rotate: 36, fontSize: 10 },
-      axisLine: { lineStyle: { color: "#dde6e7" } }
+      axisLabel: { color: chartAxisColor, rotate: 36, fontSize: 10 },
+      axisLine: { lineStyle: { color: chartGridLineColor } }
     },
     yAxis: [
       {
         type: "value",
         name: "Token",
-        axisLabel: { color: "#657184", formatter: (value: number) => formatCompactNumber(value) },
-        splitLine: { lineStyle: { color: "#e6edf0" } }
+        axisLabel: { color: chartAxisColor, formatter: (value: number) => formatCompactNumber(value) },
+        splitLine: { lineStyle: { color: chartGridLineColor } }
       },
       {
         type: "value",
         name: "¥",
-        axisLabel: { color: "#657184", formatter: (value: number) => `¥${value}` },
+        axisLabel: { color: chartAxisColor, formatter: (value: number) => `¥${value}` },
         splitLine: { show: false }
       }
     ],
@@ -7465,30 +7471,30 @@ function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOption {
 function buildRecentChartOption(rows: DashboardRecentRow[]): EChartsOption {
   const ordered = [...rows].reverse();
   return {
-    color: ["#2563eb", "#f97316"],
+    color: ["#6f442c", "#c65a36"],
     tooltip: { trigger: "axis" },
     legend: {
       top: 0,
       right: 8,
-      textStyle: { color: "#657184", fontSize: 12 }
+      textStyle: { color: chartAxisColor, fontSize: 12 }
     },
     grid: { top: 46, right: 48, bottom: 54, left: 52 },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: ordered.map((row) => row.label),
-      axisLabel: { color: "#657184", rotate: 28, fontSize: 10 },
-      axisLine: { lineStyle: { color: "#dde6e7" } }
+      axisLabel: { color: chartAxisColor, rotate: 28, fontSize: 10 },
+      axisLine: { lineStyle: { color: chartGridLineColor } }
     },
     yAxis: [
       {
         type: "value",
-        axisLabel: { color: "#657184", formatter: (value: number) => formatCompactNumber(value) },
-        splitLine: { lineStyle: { color: "#e6edf0" } }
+        axisLabel: { color: chartAxisColor, formatter: (value: number) => formatCompactNumber(value) },
+        splitLine: { lineStyle: { color: chartGridLineColor } }
       },
       {
         type: "value",
-        axisLabel: { color: "#657184", formatter: (value: number) => `¥${value}` },
+        axisLabel: { color: chartAxisColor, formatter: (value: number) => `¥${value}` },
         splitLine: { show: false }
       }
     ],
@@ -7737,14 +7743,14 @@ function productNameFromPath(path: string): string {
   return path.split(/[\\/]/).pop()?.replace(/\.json$/i, "") || "unknown";
 }
 
-function toneClass(tone: "blue" | "green" | "orange" | "violet" | "rose" | "cyan") {
+function toneClass(tone: KpiTone) {
   const classes = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-emerald-50 text-emerald-600",
-    orange: "bg-orange-50 text-orange-600",
-    violet: "bg-violet-50 text-violet-600",
-    rose: "bg-rose-50 text-rose-600",
-    cyan: "bg-cyan-50 text-cyan-600"
+    clay: "bg-[#f4e6d4] text-[#6f442c]",
+    green: "bg-[color-mix(in_srgb,var(--accent)_11%,var(--field))] text-[var(--accent)]",
+    ember: "bg-[#f8e3d7] text-[#c65a36]",
+    ochre: "bg-[#f5e5bf] text-[#9b6d16]",
+    coral: "bg-[#fae4dc] text-[#b95538]",
+    sage: "bg-[#e6ead7] text-[#667b58]"
   };
   return classes[tone];
 }
