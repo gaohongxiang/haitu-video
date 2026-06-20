@@ -60,6 +60,7 @@ import {
   isStructuredProductComposerText,
   productComposerTextToDraft,
   productDraftToComposerText,
+  extractProductComposerImageReferences,
   removeDraftReferenceImage,
   removeReferenceFromComposerText,
   type ProductDraft
@@ -4013,6 +4014,16 @@ function ProductCreationComposer({
     setPendingImageFiles((current) => [...current, ...acceptedFiles]);
   }
 
+  async function copyPastedMediaReferencesToProduct(references: string[]) {
+    if (references.length === 0) return;
+    try {
+      const files = await Promise.all(references.map(mediaReferenceToFile));
+      handleReferenceFiles(files);
+    } catch (error) {
+      onToast(errorMessage(error));
+    }
+  }
+
   function clipboardReferenceFiles(clipboardData: DataTransfer): File[] {
     const clipboardFiles = Array.from(clipboardData.files);
     if (clipboardFiles.length > 0) return clipboardFiles;
@@ -4031,10 +4042,20 @@ function ProductCreationComposer({
 
   function handleProductFactsPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const files = clipboardReferenceFiles(event.clipboardData);
-    if (!files.some(isReferenceImageFile)) return;
+    if (files.some(isReferenceImageFile)) {
+      event.stopPropagation();
+      event.preventDefault();
+      handleReferenceFiles(files);
+      return;
+    }
+    const mediaReferences = extractProductComposerImageReferences([
+      event.clipboardData.getData("text/plain"),
+      event.clipboardData.getData("text/html")
+    ].join("\n")).filter(isSameOriginMediaReference);
+    if (mediaReferences.length === 0) return;
     event.stopPropagation();
     event.preventDefault();
-    handleReferenceFiles(files);
+    void copyPastedMediaReferencesToProduct(mediaReferences);
   }
 
   async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
@@ -4608,6 +4629,47 @@ function isReferenceImageFile(file: File): boolean {
     return true;
   }
   return /\.(jpe?g|png|webp)$/i.test(file.name);
+}
+
+function isSameOriginMediaReference(reference: string): boolean {
+  try {
+    const url = new URL(reference, window.location.href);
+    const mediaPath = url.searchParams.get("path") ?? "";
+    return url.origin === window.location.origin &&
+      url.pathname === "/media" &&
+      /\.(jpe?g|png|webp)$/i.test(mediaPath);
+  } catch {
+    return false;
+  }
+}
+
+async function mediaReferenceToFile(reference: string): Promise<File> {
+  const url = new URL(reference, window.location.href);
+  const response = await fetch(`${url.pathname}${url.search}`);
+  if (!response.ok) {
+    throw new Error(`参考图读取失败: HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  const fileName = mediaReferenceFileName(url, blob.type);
+  return new File([blob], fileName, {
+    type: blob.type || mediaReferenceMimeType(fileName)
+  });
+}
+
+function mediaReferenceFileName(url: URL, mimeType: string): string {
+  const mediaPath = url.searchParams.get("path") ?? "";
+  const decodedName = mediaPath.split(/[\\/]/).pop() ?? "";
+  if (/\.(?:jpe?g|png|webp)$/i.test(decodedName)) {
+    return decodedName;
+  }
+  const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : ".jpg";
+  return `copied-reference${extension}`;
+}
+
+function mediaReferenceMimeType(fileName: string): string {
+  if (/\.png$/i.test(fileName)) return "image/png";
+  if (/\.webp$/i.test(fileName)) return "image/webp";
+  return "image/jpeg";
 }
 
 function StoryboardComposerPanel({

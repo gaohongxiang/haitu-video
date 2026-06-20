@@ -1038,7 +1038,10 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("handleProductFactsPaste");
     expect(creationComposerSource).toContain("event.stopPropagation()");
     expect(creationComposerSource).toContain("event.preventDefault()");
-    expect(creationComposerSource).not.toContain('event.clipboardData.getData("text/plain")');
+    expect(creationComposerSource).toContain('event.clipboardData.getData("text/plain")');
+    expect(creationComposerSource).toContain('event.clipboardData.getData("text/html")');
+    expect(creationComposerSource).toContain("copyPastedMediaReferencesToProduct");
+    expect(creationComposerSource).toContain("isSameOriginMediaReference");
     expect(creationComposerSource).toContain("onPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
@@ -3715,6 +3718,46 @@ describe("console API", () => {
       previewUrl: `/media?path=${encodeURIComponent(uploadedPath)}`,
       status: "previewable"
     });
+  });
+
+  it("does not reuse stale reference image filenames when uploading product images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-upload-assets-stale-name-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(productPath, {
+      reference_images: ["refs/reference-01.jpg"]
+    });
+    const stalePath = join(productPath, "..", "refs", "reference-02.jpg");
+    await mkdir(dirname(stalePath), { recursive: true });
+    await writeFile(stalePath, Buffer.from("stale-deleted-image"));
+    const server = createConsoleServer({ rootDir: root, fixturesDir });
+
+    const response = await server.fetchJson("/api/products/TK-001/reference-images", {
+      method: "POST",
+      body: JSON.stringify({
+        files: [
+          {
+            fileName: "copied-reference.jpg",
+            mimeType: "image/jpeg",
+            base64: Buffer.from("new-copied-image").toString("base64")
+          }
+        ]
+      })
+    });
+
+    const uploadedPath = join(productPath, "..", "refs", "reference-03.jpg");
+    const uploadedReference = "refs/reference-03.jpg";
+    expect(response.uploaded).toEqual([
+      {
+        originalName: "copied-reference.jpg",
+        path: uploadedPath,
+        reference: uploadedReference
+      }
+    ]);
+    expect(response.product.reference_images).toEqual(["refs/reference-01.jpg", uploadedReference]);
+    await expect(readFile(stalePath, "utf8")).resolves.toBe("stale-deleted-image");
+    await expect(readFile(uploadedPath, "utf8")).resolves.toBe("new-copied-image");
   });
 
   it("replaces placeholder reference image entries when uploading real product images", async () => {

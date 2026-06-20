@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   draftReferenceImageStatuses,
   defaultProductDraft,
+  extractProductComposerImageReferences,
   productComposerTextToDraft,
   removeDraftReferenceImage,
   removeReferenceFromComposerText
@@ -88,5 +89,14 @@ describe("productComposerTextToDraft", () => {
       "这是用户原始粘贴的商品资料",
       "材质看起来像 PU"
     ].join("\n"));
+  });
+
+  it("extracts same-console media image references from pasted product text", () => {
+    const mediaReference = "/media?path=%2Fdata%2Fworkspaces%2Fdefault%2Fproducts%2FSOURCE%2Frefs%2Freference-01.jpg";
+
+    expect(extractProductComposerImageReferences([
+      "参考图：",
+      mediaReference
+    ].join("\n"))).toEqual([mediaReference]);
   });
 });

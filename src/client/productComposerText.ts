@@ -50,7 +50,7 @@ export function productDraftToComposerText(draft: ProductDraft): string {
 
 export function isStructuredProductComposerText(value: string): boolean {
   return /(^|\n)\s*(商品ID|商品名|商品名称|产品名称|标题|カテゴリ|分类|素材|材质|尺寸|尺寸\/重量|サイズ|规格选项|规格|卖点|商品説明|商品描述|描述|使用场景|不可用卖点|禁止|参考图|图片|主图|画像)\s*[：:]/.test(value) ||
-    extractImageUrls(value).length > 0;
+    extractProductComposerImageReferences(value).length > 0;
 }
 
 export function productComposerTextToDraft(value: string, fallback: ProductDraft): ProductDraft {
@@ -90,7 +90,7 @@ export function productComposerTextToDraft(value: string, fallback: ProductDraft
 
   let hasReferenceInput = false;
   for (const rawLine of value.split(/\r?\n/)) {
-    const imageUrls = extractImageUrls(rawLine);
+    const imageUrls = extractProductComposerImageReferences(rawLine);
     if (imageUrls.length > 0) {
       hasReferenceInput = true;
       buckets.reference_images = [...(buckets.reference_images ?? []), ...imageUrls];
@@ -178,10 +178,25 @@ function splitReferenceText(value: string): string[] {
     .filter(Boolean);
 }
 
-function extractImageUrls(value: string): string[] {
-  return Array.from(value.matchAll(/https?:\/\/[^\s"'<>，,；;）)]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>，,；;）)]*)?/gi)).map(
-    (match) => match[0]
-  );
+export function extractProductComposerImageReferences(value: string): string[] {
+  return uniqueLines([
+    ...Array.from(value.matchAll(/https?:\/\/[^\s"'<>，,；;）)]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>，,；;）)]*)?/gi)).map(
+      (match) => match[0]
+    ),
+    ...Array.from(value.matchAll(/(?:https?:\/\/[^\s"'<>，,；;）)]+)?\/media\?path=[^\s"'<>，,；;）)]+/gi))
+      .map((match) => match[0].replaceAll("&amp;", "&"))
+      .filter(isMediaImageReference)
+  ]);
+}
+
+function isMediaImageReference(reference: string): boolean {
+  try {
+    const url = new URL(reference, "http://localhost");
+    const mediaPath = url.searchParams.get("path") ?? "";
+    return url.pathname === "/media" && /\.(?:jpe?g|png|webp)$/i.test(mediaPath);
+  } catch {
+    return false;
+  }
 }
 
 function isRemoteReference(reference: string): boolean {

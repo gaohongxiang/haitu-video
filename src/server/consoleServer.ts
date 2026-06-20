@@ -3507,10 +3507,16 @@ async function importProductReferenceAssets(input: {
       continue;
     }
     const extension = normalizedImageExtension(image.resolvedPath);
-    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index + 1).padStart(2, "0")}${extension}`);
+    const target = await nextAvailableReferenceImageTarget({
+      productFilePath,
+      referenceImages: nextReferenceImages,
+      startIndex: index + 1,
+      extension
+    });
+    const targetPath = target.path;
     await mkdir(dirname(targetPath), { recursive: true });
     await copyFile(image.resolvedPath, targetPath);
-    const reference = `refs/${basename(targetPath)}`;
+    const reference = target.reference;
     nextReferenceImages[index] = reference;
     imported.push({
       original: image.original,
@@ -3570,11 +3576,16 @@ async function uploadProductReferenceImages(input: {
     if (typeof file.base64 !== "string" || !file.base64.trim()) {
       throw new Error(`Reference image ${fileName} is missing base64 content.`);
     }
-    const index = nextReferenceImages.length + 1;
-    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index).padStart(2, "0")}${extension}`);
+    const target = await nextAvailableReferenceImageTarget({
+      productFilePath,
+      referenceImages: nextReferenceImages,
+      startIndex: nextReferenceImages.length + 1,
+      extension
+    });
+    const targetPath = target.path;
     await mkdir(dirname(targetPath), { recursive: true });
     await writeFile(targetPath, Buffer.from(file.base64, "base64"));
-    const reference = `refs/${basename(targetPath)}`;
+    const reference = target.reference;
     nextReferenceImages.push(reference);
     uploaded.push({
       originalName: fileName,
@@ -3626,10 +3637,16 @@ async function importRemoteReferenceImages(input: {
       if (!extension) {
         continue;
       }
-      const targetPath = join(dirname(input.productFilePath), "refs", `reference-${String(index + 1).padStart(2, "0")}${extension}`);
+      const target = await nextAvailableReferenceImageTarget({
+        productFilePath: input.productFilePath,
+        referenceImages: nextReferenceImages,
+        startIndex: index + 1,
+        extension
+      });
+      const targetPath = target.path;
       await mkdir(dirname(targetPath), { recursive: true });
       await writeFile(targetPath, Buffer.from(await response.arrayBuffer()));
-      const localReference = `refs/${basename(targetPath)}`;
+      const localReference = target.reference;
       nextReferenceImages[index] = localReference;
       downloaded.push({
         original: reference,
@@ -3673,11 +3690,16 @@ async function generateProductReferenceImages(input: {
   const nextReferenceImages = [...product.reference_images];
   const generated: GeneratedProductReferenceImage[] = [];
   for (const image of images) {
-    const index = nextReferenceImages.length + 1;
-    const targetPath = join(dirname(productFilePath), "refs", `reference-${String(index).padStart(2, "0")}${extensionFromMimeType(image.mimeType)}`);
+    const target = await nextAvailableReferenceImageTarget({
+      productFilePath,
+      referenceImages: nextReferenceImages,
+      startIndex: nextReferenceImages.length + 1,
+      extension: extensionFromMimeType(image.mimeType)
+    });
+    const targetPath = target.path;
     await mkdir(dirname(targetPath), { recursive: true });
     await writeFile(targetPath, image.bytes);
-    const reference = `refs/${basename(targetPath)}`;
+    const reference = target.reference;
     nextReferenceImages.push(reference);
     generated.push({
       path: targetPath,
@@ -4797,6 +4819,34 @@ function isHttpReference(reference: string): boolean {
 function normalizedImageExtension(path: string): string {
   const extension = extname(path).toLowerCase();
   return [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
+}
+
+async function nextAvailableReferenceImageTarget(input: {
+  productFilePath: string;
+  referenceImages: string[];
+  startIndex: number;
+  extension: string;
+}): Promise<{ path: string; reference: string }> {
+  const refsDir = join(dirname(input.productFilePath), "refs");
+  const usedReferences = new Set(input.referenceImages);
+  for (let index = Math.max(1, input.startIndex); index < 10000; index += 1) {
+    const targetPath = join(refsDir, `reference-${String(index).padStart(2, "0")}${input.extension}`);
+    const reference = `refs/${basename(targetPath)}`;
+    if (usedReferences.has(reference) || await pathExists(targetPath)) {
+      continue;
+    }
+    return { path: targetPath, reference };
+  }
+  throw new Error("Could not allocate a product reference image filename.");
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function imageExtensionFromUpload(fileName: string, mimeType: string): string | undefined {
