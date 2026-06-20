@@ -2875,7 +2875,7 @@ export function App() {
   return (
     <main
       className={cn(
-        "relative grid h-dvh overflow-hidden bg-[radial-gradient(circle_at_0_0,rgba(10,163,148,.12),transparent_28%),radial-gradient(circle_at_100%_0,rgba(37,99,235,.10),transparent_28%),var(--bg)] text-[var(--text)] transition-[grid-template-columns] duration-200",
+        "relative grid h-dvh overflow-hidden bg-[radial-gradient(circle_at_0_0,rgba(224,178,134,.28),transparent_30%),radial-gradient(circle_at_100%_0,rgba(198,90,54,.10),transparent_32%),linear-gradient(180deg,#f8efe7_0%,var(--bg)_52%,#f3e5d8_100%)] text-[var(--text)] transition-[grid-template-columns] duration-200",
         sidebarCollapsed
           ? "min-[900px]:grid-cols-[56px_minmax(0,1fr)]"
           : "min-[900px]:grid-cols-[184px_minmax(0,1fr)]"
@@ -2883,7 +2883,7 @@ export function App() {
     >
       <aside
         className={cn(
-          "relative hidden h-dvh min-h-0 overflow-visible border-r border-[var(--border)] bg-white transition-[width] duration-200 min-[900px]:grid min-[900px]:grid-rows-[auto_minmax(0,1fr)]",
+          "relative hidden h-dvh min-h-0 overflow-visible border-r border-[var(--border)] bg-[var(--panel)] transition-[width] duration-200 min-[900px]:grid min-[900px]:grid-rows-[auto_minmax(0,1fr)]",
           sidebarCollapsed ? "w-[56px]" : "w-[184px]"
         )}
       >
@@ -2895,7 +2895,7 @@ export function App() {
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
           <span className="app-sidebar-collapse-edge pointer-events-none grid h-12 w-4 place-items-center">
-            <span className="app-sidebar-collapse-thumb grid h-10 w-4 place-items-center rounded-full border border-[#d5dfec] bg-white/95 shadow-[0_8px_20px_rgba(30,42,68,.10)]">
+            <span className="app-sidebar-collapse-thumb grid h-10 w-4 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_8px_20px_rgba(96,64,43,.10)]">
               {sidebarCollapsed ? <ChevronRight size={13} strokeWidth={2.4} /> : <ChevronLeft size={13} strokeWidth={2.4} />}
             </span>
           </span>
@@ -2958,7 +2958,7 @@ export function App() {
       </aside>
 
       <section className="grid h-dvh min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-        <header className="sticky top-0 z-20 grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
+        <header className="sticky top-0 z-20 grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[#fffdf9]/94 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="m-0 text-xl font-black leading-tight">{activeSectionLabel}</h1>
@@ -3049,8 +3049,8 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
         aria-label="账号菜单"
         aria-expanded={open}
         className={cn(
-          "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border)] bg-white px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(15,23,42,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,white)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
-          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,white)]"
+          "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-[#fffdf9] px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,#fffdf9)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
+          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_7%,#fffdf9)]"
         )}
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
@@ -3063,13 +3063,10 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[#dbe4f0] bg-white shadow-[0_18px_46px_rgba(15,23,42,.16)]">
-          <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-2.5 border-b border-[#e8eef6] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-3 py-3">
-            <BrandLogo className="h-9 w-9" />
-            <div className="min-w-0">
-              <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
-              <div className="mt-1 truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
-            </div>
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[var(--border-strong)] bg-[#fffdf9] shadow-[0_18px_46px_rgba(96,64,43,.16)]">
+          <div className="grid gap-1.5 border-b border-[var(--border)] bg-[linear-gradient(180deg,#fffdf9,#fbf3ea)] px-3 py-3">
+            <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
+            <div className="truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
           </div>
           <div className="p-1.5">
             <button
@@ -4062,11 +4059,11 @@ function ProductCreationComposer({
   return (
     <section
       id="视频创作"
-      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[#dbe4f0] bg-[#fbfdff] shadow-[0_22px_64px_rgba(30,42,68,.10)]"
+      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[var(--border-strong)] bg-[#fffaf5] shadow-[0_22px_64px_rgba(96,64,43,.10)]"
       onPaste={handleReferencePaste}
     >
       <div className="product-creation-canvas overflow-visible">
-        <div className="product-control-bar grid gap-2 border-b border-[#e5ecf6] bg-white p-3 min-[1280px]:px-4">
+        <div className="product-control-bar grid gap-2 border-b border-[var(--border)] bg-[#fffdf9] p-3 min-[1280px]:px-4">
           <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))] min-[1280px]:items-end">
             <ProductCreationProductPicker
               className="product-creation-picker min-w-0"
@@ -4123,7 +4120,7 @@ function ProductCreationComposer({
         ) : null}
 
         <div className="grid items-stretch gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
-          <div className="border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
+          <div className="border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
             <ProductComposerReferenceTray
               className="h-full"
               product={selectedProduct}
@@ -4141,7 +4138,7 @@ function ProductCreationComposer({
             />
           </div>
 
-          <div className="grid min-w-0 border-b border-[#e5ecf6] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
+          <div className="grid min-w-0 border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
             <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
               <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-black text-[#172033]">商品资料</div>
@@ -4190,7 +4187,7 @@ function ProductCreationComposer({
           </div>
         </div>
 
-        <div className="video-generate-bar grid gap-3 border-t border-[#e5ecf6] bg-white p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+        <div className="video-generate-bar grid gap-3 border-t border-[var(--border)] bg-[#fffdf9] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
           <div className="min-w-0 truncate text-xs font-bold text-[#6c7890]">{generateVideoSummary}</div>
           <div className={generationReadinessMessageClass}>
             {generationReadiness.label}
@@ -4298,14 +4295,14 @@ function CompactChoiceDropdown<T extends string>({
         }
       }}
     >
-      <div className="truncate text-xs font-black text-[#6c7890]">{label}</div>
+      <div className="truncate text-xs font-black text-[var(--muted)]">{label}</div>
       <button
         type="button"
         className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
+          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           open
-            ? "border-[color-mix(in_srgb,var(--accent)_65%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(30,42,68,.05)]"
-            : "border-[#dbe4f0] hover:border-[color-mix(in_srgb,var(--accent)_45%,#dbe4f0)]"
+            ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
+            : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
         )}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -4316,7 +4313,7 @@ function CompactChoiceDropdown<T extends string>({
       </button>
       {open ? (
         <div
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[#fffdf9] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
           role="listbox"
         >
           {options.map((option) => {
@@ -4330,8 +4327,8 @@ function CompactChoiceDropdown<T extends string>({
                 className={cn(
                   "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black transition",
                   active
-                    ? "bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[#172033]"
-                    : "text-[#6c7890] hover:bg-[#f3f6fb] hover:text-[#172033]"
+                    ? "bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)] text-[#172033]"
+                    : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[#172033]"
                 )}
                 onClick={() => {
                   onChange(option);
@@ -4608,10 +4605,10 @@ function StoryboardComposerPanel({
         <button
           type="button"
           className={cn(
-            "flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2 text-left text-xs font-black text-[#6c7890] transition",
+            "flex min-h-10 w-full items-center justify-between gap-2 rounded-[12px] border bg-white px-3 py-2 text-left text-xs font-black text-[var(--muted)] transition",
             historyOpen
-              ? "border-[color-mix(in_srgb,var(--accent)_55%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
-              : "border-[#e5ecf6] hover:border-[color-mix(in_srgb,var(--accent)_35%,#dbe4f0)]"
+              ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
+              : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
           )}
           aria-haspopup="listbox"
           aria-expanded={historyOpen}
@@ -4625,12 +4622,12 @@ function StoryboardComposerPanel({
         </button>
         {historyOpen ? (
           <div
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[#dbe4f0] bg-white p-2 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[#fffdf9] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
             role="listbox"
           >
             {storyboardHistory.length > 0 ? (
               storyboardHistory.map((record) => (
-                <article key={record.id} className="group/storyboard-record grid grid-cols-[minmax(0,1fr)_32px] items-start gap-1 rounded-[10px] transition hover:bg-[#f7fbff]">
+                <article key={record.id} className="group/storyboard-record grid grid-cols-[minmax(0,1fr)_32px] items-start gap-1 rounded-[10px] transition hover:bg-[var(--panel2)]">
                   <button
                     type="button"
                     role="option"
@@ -5333,14 +5330,14 @@ function ProductCreationProductPicker({
         }
       }}
     >
-      <span className="shrink-0 text-[12px] font-black text-[#6c7890]">创作商品</span>
+      <span className="shrink-0 text-[12px] font-black text-[var(--muted)]">创作商品</span>
       <button
         type="button"
         className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(30,42,68,.05)] transition",
+          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-white px-3 text-left text-sm font-black text-[#172033] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           productPickerOpen
-            ? "border-[color-mix(in_srgb,var(--accent)_65%,#dbe4f0)] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(30,42,68,.05)]"
-            : "border-[#dbe4f0] hover:border-[color-mix(in_srgb,var(--accent)_45%,#dbe4f0)]"
+            ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
+            : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
         )}
         aria-haspopup="listbox"
         aria-expanded={productPickerOpen}
@@ -5352,7 +5349,7 @@ function ProductCreationProductPicker({
       </button>
       {productPickerOpen ? (
         <div
-          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[#dbe4f0] bg-white p-1.5 shadow-[0_18px_42px_rgba(30,42,68,.16)]"
+          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[#fffdf9] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
           role="listbox"
         >
           <button
@@ -5360,8 +5357,8 @@ function ProductCreationProductPicker({
             role="option"
             aria-selected={!selectedProductOption}
             className={cn(
-              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,#dbe4f0)] bg-[color-mix(in_srgb,var(--accent)_6%,white)] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,white)]",
-              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,white)]"
+              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_6%,#fffdf9)] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,#fffdf9)]",
+              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)]"
             )}
             onClick={() => handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)}
           >
@@ -5372,7 +5369,7 @@ function ProductCreationProductPicker({
             type="button"
             role="option"
             aria-selected={false}
-            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[#4f5f76] transition hover:bg-[#f3f6fb] hover:text-[#172033]"
+            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[#172033]"
             onClick={() => {
               setProductPickerOpen(false);
               onImportFile();
@@ -5390,7 +5387,7 @@ function ProductCreationProductPicker({
                   key={option.sku}
                   className={cn(
                     "group/product-option grid min-h-10 grid-cols-[minmax(0,1fr)_32px] items-center gap-1 rounded-lg transition",
-                    active ? "bg-[color-mix(in_srgb,var(--accent)_12%,white)] text-[#172033]" : "text-[#4f5f76] hover:bg-[#f3f6fb] hover:text-[#172033]"
+                    active ? "bg-[color-mix(in_srgb,var(--accent)_12%,#fffdf9)] text-[#172033]" : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[#172033]"
                   )}
                 >
                   <button
