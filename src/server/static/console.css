@@ -54,15 +54,11 @@ textarea {
 }
 
 .mark {
-  display: grid;
   width: 46px;
   height: 46px;
-  place-items: center;
-  color: white;
-  background: linear-gradient(135deg, #1f55d8, #10b6a6);
   border-radius: 12px;
-  font-weight: 800;
-  box-shadow: 0 10px 24px rgba(31, 85, 216, 0.22);
+  box-shadow: 0 10px 24px rgba(96, 64, 43, 0.18);
+  display: block;
 }
 
 .brand strong {
@@ -168,9 +164,9 @@ textarea {
 
 .avatar {
   width: 42px;
+  height: 42px;
   justify-content: center;
-  color: white;
-  background: var(--accent);
+  box-shadow: 0 8px 18px rgba(96, 64, 43, 0.14);
 }
 
 .ledger-strip {

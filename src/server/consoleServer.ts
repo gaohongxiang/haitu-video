@@ -5022,7 +5022,9 @@ async function staticResponse(fileName: string): Promise<Response> {
     ? "text/css; charset=utf-8"
     : safeName.endsWith(".js")
       ? "text/javascript; charset=utf-8"
-      : "text/plain; charset=utf-8";
+      : safeName.endsWith(".svg")
+        ? "image/svg+xml"
+        : "text/plain; charset=utf-8";
   return new Response(content, {
     headers: { "content-type": type }
   });

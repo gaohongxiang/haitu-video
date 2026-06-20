@@ -68,6 +68,7 @@ import { readableVideoProviderError } from "../core/videoProviderErrors.js";
 import { cn } from "./lib/utils.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
+const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[#dbe4f0] bg-white px-2.5 py-1.5 text-[11px] font-black text-[#66748a] opacity-0 shadow-[0_10px_24px_rgba(30,42,68,.12)] transition";
 
@@ -2900,7 +2901,7 @@ export function App() {
           </span>
         </button>
         <div className={cn("relative flex h-[72px] items-center border-b border-[var(--border)]", sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-3.5")}>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--accent2),var(--accent))] text-lg font-black text-white shadow-[0_12px_24px_rgba(10,163,148,.22)]">海</div>
+          <BrandLogo className="h-10 w-10" />
           <div className={cn("min-w-0", sidebarCollapsed && "sr-only")}>
             <div className="truncate text-[20px] font-black leading-tight">Haitu</div>
             <div className="truncate text-xs font-semibold text-[var(--muted)]">AI 商品视频平台</div>
@@ -3064,9 +3065,7 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
       {open ? (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[#dbe4f0] bg-white shadow-[0_18px_46px_rgba(15,23,42,.16)]">
           <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-2.5 border-b border-[#e8eef6] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-3 py-3">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--accent2),var(--accent))] text-sm font-black text-white shadow-[0_10px_20px_rgba(10,163,148,.18)]">
-              {accountInitial}
-            </div>
+            <BrandLogo className="h-9 w-9" />
             <div className="min-w-0">
               <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
               <div className="mt-1 truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
@@ -3278,7 +3277,7 @@ function LoginScreen({
     <main className="grid min-h-dvh place-items-center bg-[radial-gradient(circle_at_15%_10%,rgba(10,163,148,.15),transparent_26%),radial-gradient(circle_at_85%_0,rgba(37,99,235,.12),transparent_30%),var(--bg)] px-4 py-8 text-[var(--text)]">
       <Card className="w-full max-w-[420px] p-5 shadow-[0_22px_60px_rgba(15,23,42,.12)]">
         <div className="mb-5 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-[linear-gradient(135deg,var(--accent2),var(--accent))] text-lg font-black text-white shadow-[0_12px_24px_rgba(10,163,148,.22)]">海</div>
+          <BrandLogo className="h-11 w-11" />
           <div className="min-w-0">
             <h1 className="m-0 text-xl font-black leading-tight">Haitu 账号入口</h1>
             <p className="m-0 mt-1 text-xs font-semibold text-[var(--muted)]">
@@ -7266,6 +7265,17 @@ function KpiGrid({ items }: { items: Array<{ label: string; value: string; hint:
         </article>
       ))}
     </section>
+  );
+}
+
+function BrandLogo({ className }: { className?: string }) {
+  return (
+    <img
+      src={brandLogoUrl}
+      alt="Haitu"
+      className={cn("block shrink-0 rounded-lg shadow-[0_10px_20px_rgba(96,64,43,.18)]", className)}
+      draggable={false}
+    />
   );
 }
 
