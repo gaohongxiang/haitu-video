@@ -368,6 +368,114 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     }
   });
 
+  it("shows project admins one user's workspace products and video jobs", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const adminCookie = await registerUser(root, server, "owner@example.com");
+    const customerCookie = await registerUser(root, server, "customer@example.com");
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    try {
+      handle.sqlite
+        .prepare("UPDATE users SET role = 'admin', updated_at = @now WHERE email = @email")
+        .run({
+          email: "owner@example.com",
+          now: new Date().toISOString()
+        });
+    } finally {
+      closeDatabase(handle);
+    }
+
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      headers: { cookie: customerCookie },
+      body: JSON.stringify(productFacts("CUSTOMER-DETAIL-001", "详情商品"))
+    });
+    await queueCompletedMockJob(server, customerCookie, "CUSTOMER-DETAIL-002");
+    const overview = await server.fetchJson("/api/admin/overview", {
+      headers: { cookie: adminCookie }
+    }) as { users: Array<{ id: string; email: string }> };
+    const customer = overview.users.find((user) => user.email === "customer@example.com");
+    if (!customer) {
+      throw new Error("Customer missing from overview");
+    }
+
+    const unauthenticated = await server.fetch(`/api/admin/users/${encodeURIComponent(customer.id)}`);
+    const nonAdmin = await server.fetch(`/api/admin/users/${encodeURIComponent(customer.id)}`, {
+      headers: { cookie: customerCookie }
+    });
+    const detail = await server.fetchJson(`/api/admin/users/${encodeURIComponent(customer.id)}`, {
+      headers: { cookie: adminCookie }
+    }) as {
+      user: {
+        id: string;
+        email: string;
+        role: string;
+        emailVerified: boolean;
+        workspaceCount: number;
+        productCount: number;
+        videoJobCount: number;
+      };
+      videoStatusCounts: Record<string, number>;
+      workspaces: Array<{
+        id: string;
+        name: string;
+        role: string;
+        productCount: number;
+        videoJobCount: number;
+        completedJobCount: number;
+        failedJobCount: number;
+      }>;
+      products: Array<{ sku: string; title?: string }>;
+      videoJobs: Array<{
+        id: string;
+        productSku?: string;
+        status: string;
+        provider?: string;
+        model?: string;
+        durationSeconds?: number;
+        outputCount?: number;
+      }>;
+    };
+
+    expect(unauthenticated.status).toBe(401);
+    expect(nonAdmin.status).toBe(403);
+    expect(detail.user).toEqual(expect.objectContaining({
+      id: customer.id,
+      email: "customer@example.com",
+      role: "user",
+      emailVerified: true,
+      workspaceCount: 1,
+      productCount: 2,
+      videoJobCount: 1
+    }));
+    expect(detail.videoStatusCounts).toEqual(expect.objectContaining({
+      completed: 1
+    }));
+    expect(detail.workspaces).toEqual([
+      expect.objectContaining({
+        role: "owner",
+        productCount: 2,
+        videoJobCount: 1,
+        completedJobCount: 1,
+        failedJobCount: 0
+      })
+    ]);
+    expect(detail.products.map((product) => product.sku).sort()).toEqual(["CUSTOMER-DETAIL-001", "CUSTOMER-DETAIL-002"]);
+    expect(detail.videoJobs).toEqual([
+      expect.objectContaining({
+        productSku: "CUSTOMER-DETAIL-002",
+        status: "completed",
+        provider: "mock",
+        model: "mock",
+        durationSeconds: 8
+      })
+    ]);
+  });
+
   it("resolves API storage from the logged-in user's workspace", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";

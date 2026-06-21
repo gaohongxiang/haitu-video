@@ -79,7 +79,7 @@ import {
 } from "./providerKeyStore.js";
 import { cleanupExpiredVideos } from "./videoRetention.js";
 import { BetterAuthConsoleAuthStore } from "./auth/betterAuthStore.js";
-import { buildAdminOverview } from "./adminDashboard.js";
+import { buildAdminOverview, buildAdminUserDetail } from "./adminDashboard.js";
 import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
@@ -476,6 +476,14 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           return adminResponse;
         }
         return jsonResponse(buildAdminOverview(databaseHandle, options.now?.() ?? new Date()));
+      }
+      const adminUserMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+      if (request.method === "GET" && adminUserMatch) {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        return jsonResponse(buildAdminUserDetail(databaseHandle, decodeURIComponent(adminUserMatch[1] ?? "")));
       }
       const publicAssetMatch = url.pathname.match(/^\/api\/public-assets\/([A-Za-z0-9_-]+)$/);
       if (publicAssetMatch && (request.method === "GET" || request.method === "HEAD")) {

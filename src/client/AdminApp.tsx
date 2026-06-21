@@ -2,14 +2,17 @@ import {
   Activity,
   BarChart3,
   CheckCircle2,
+  Clock3,
   Database,
   KeyRound,
   LogOut,
   MailCheck,
+  Package,
   RefreshCcw,
   ShieldAlert,
   Users,
-  Video
+  Video,
+  X
 } from "lucide-react";
 import * as EChartsForReact from "echarts-for-react";
 import type { EChartsOption, EChartsReactProps } from "echarts-for-react";
@@ -81,6 +84,58 @@ interface AdminUserSummary {
   videoJobCount: number;
   createdAt: string;
   lastActiveAt?: string;
+}
+
+interface AdminUserDetail {
+  user: AdminUserSummary & {
+    lastSessionAt?: string;
+  };
+  videoStatusCounts: Record<string, number>;
+  workspaces: AdminUserWorkspaceSummary[];
+  products: AdminUserProductSummary[];
+  videoJobs: AdminUserVideoJobSummary[];
+}
+
+interface AdminUserWorkspaceSummary {
+  id: string;
+  name: string;
+  role: string;
+  ownerEmail?: string;
+  memberCount: number;
+  productCount: number;
+  videoJobCount: number;
+  completedJobCount: number;
+  failedJobCount: number;
+  queuedJobCount: number;
+  expiredJobCount: number;
+  lastVideoJobAt?: string;
+}
+
+interface AdminUserProductSummary {
+  id: string;
+  workspaceId: string;
+  sku: string;
+  title?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminUserVideoJobSummary {
+  id: string;
+  workspaceId: string;
+  productId?: string;
+  productSku?: string;
+  productTitle?: string;
+  status: string;
+  provider?: string;
+  model?: string;
+  language?: string;
+  durationSeconds?: number;
+  outputCount?: number;
+  jobDir: string;
+  createdAt: string;
+  completedAt?: string;
+  expiresAt?: string;
 }
 
 export function AdminApp() {
@@ -409,6 +464,33 @@ function AdminDashboard({
 }) {
   const growthOption = useMemo(() => buildGrowthOption(overview), [overview]);
   const activityOption = useMemo(() => buildActivityOption(overview), [overview]);
+  const [selectedUser, setSelectedUser] = useState<AdminUserSummary | undefined>();
+  const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | undefined>();
+  const [detailStatus, setDetailStatus] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  async function openUserDetail(user: AdminUserSummary) {
+    setSelectedUser(user);
+    setSelectedUserDetail(undefined);
+    setDetailStatus("");
+    setDetailLoading(true);
+    try {
+      const detail = await getJson<AdminUserDetail>(`/api/admin/users/${encodeURIComponent(user.id)}`);
+      setSelectedUserDetail(detail);
+    } catch (error) {
+      setDetailStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function closeUserDetail() {
+    setSelectedUser(undefined);
+    setSelectedUserDetail(undefined);
+    setDetailStatus("");
+    setDetailLoading(false);
+  }
+
   return (
     <main className="grid h-dvh grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--bg)] text-[var(--text)]">
       <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
@@ -455,10 +537,17 @@ function AdminDashboard({
                 <AdminChart option={activityOption} empty={overview.activity.every((row) => row.events === 0)} />
               </Card>
             </div>
-            <AdminUsersTable users={overview.users} />
+            <AdminUsersTable users={overview.users} onSelectUser={(user) => void openUserDetail(user)} />
           </section>
         )}
       </div>
+      <AdminUserDetailDrawer
+        detail={selectedUserDetail}
+        fallbackUser={selectedUser}
+        loading={detailLoading}
+        status={detailStatus}
+        onClose={closeUserDetail}
+      />
     </main>
   );
 }
@@ -514,7 +603,7 @@ function AdminChart({ empty, option }: { empty: boolean; option: EChartsOption }
   );
 }
 
-function AdminUsersTable({ users }: { users: AdminUserSummary[] }) {
+function AdminUsersTable({ onSelectUser, users }: { onSelectUser: (user: AdminUserSummary) => void; users: AdminUserSummary[] }) {
   return (
     <Card className="overflow-hidden bg-[var(--card)] p-0">
       <div className="border-b border-[var(--border)] p-4">
@@ -535,7 +624,18 @@ function AdminUsersTable({ users }: { users: AdminUserSummary[] }) {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="bg-[var(--card)]">
+              <tr
+                key={user.id}
+                tabIndex={0}
+                className="cursor-pointer bg-[var(--card)] outline-none transition hover:bg-[var(--field2)] focus:bg-[var(--field2)] focus-visible:shadow-[inset_3px_0_0_var(--accent)]"
+                onClick={() => onSelectUser(user)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectUser(user);
+                  }
+                }}
+              >
                 <AdminTd>
                   <div className="font-black text-[var(--text)]">{user.email}</div>
                   <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{user.displayName || user.id}</div>
@@ -557,6 +657,168 @@ function AdminUsersTable({ users }: { users: AdminUserSummary[] }) {
         </table>
       </div>
     </Card>
+  );
+}
+
+function AdminUserDetailDrawer({
+  detail,
+  fallbackUser,
+  loading,
+  onClose,
+  status
+}: {
+  detail?: AdminUserDetail;
+  fallbackUser?: AdminUserSummary;
+  loading: boolean;
+  onClose: () => void;
+  status: string;
+}) {
+  if (!fallbackUser) {
+    return null;
+  }
+  const user = detail?.user ?? fallbackUser;
+  const statusEntries = Object.entries(detail?.videoStatusCounts ?? {}).sort(([left], [right]) => left.localeCompare(right));
+  return (
+    <div className="fixed inset-0 z-50 grid bg-[rgba(42,33,27,.22)] min-[900px]:justify-items-end" role="dialog" aria-modal="true" aria-label="用户详情">
+      <button className="absolute inset-0 cursor-default" type="button" aria-label="关闭用户详情" onClick={onClose} />
+      <aside className="relative grid h-dvh w-full max-w-[760px] grid-rows-[auto_minmax(0,1fr)] border-l border-[var(--border)] bg-[var(--panel)] shadow-[0_30px_90px_rgba(42,33,27,.22)]">
+        <header className="grid gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-4 min-[720px]:grid-cols-[minmax(0,1fr)_auto] min-[720px]:items-start">
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="m-0 min-w-0 truncate text-lg font-black">{user.email}</h2>
+              <Badge tone={user.role === "admin" ? "ok" : "neutral"}>{user.role === "admin" ? "管理员" : "用户"}</Badge>
+              <Badge tone={user.emailVerified ? "ok" : "warn"}>{user.emailVerified ? "已验证" : "未验证"}</Badge>
+            </div>
+            <p className="m-0 mt-1 text-[12px] font-semibold text-[var(--muted)]">注册 {formatDateTime(user.createdAt)} / 最近活跃 {formatDateTime(user.lastActiveAt)}</p>
+          </div>
+          <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}>
+            <X size={16} />
+          </Button>
+        </header>
+
+        <div className="min-h-0 overflow-y-auto p-4">
+          {loading ? (
+            <div className="grid min-h-[280px] place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)]">
+              <div className="grid justify-items-center gap-2 text-xs font-black text-[var(--muted)]">
+                <RefreshCcw className="animate-spin text-[var(--accent)]" size={24} />
+                正在载入用户详情
+              </div>
+            </div>
+          ) : null}
+
+          {status ? <AdminStatus status={status} /> : null}
+
+          {detail ? (
+            <div className="grid gap-4">
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="用户详情指标">
+                <DetailMetric icon={<Database size={16} />} label="工作区" value={detail.user.workspaceCount} />
+                <DetailMetric icon={<Package size={16} />} label="商品" value={detail.user.productCount} />
+                <DetailMetric icon={<Video size={16} />} label="视频任务" value={detail.user.videoJobCount} />
+                <DetailMetric icon={<Clock3 size={16} />} label="最近会话" value={formatDateTime(detail.user.lastSessionAt)} />
+              </section>
+
+              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="m-0 text-sm font-black">视频状态</h3>
+                  <Badge>{statusEntries.length} 类</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {statusEntries.length > 0 ? statusEntries.map(([name, count]) => (
+                    <Badge key={name} tone={adminJobStatusTone(name)}>{adminJobStatusLabel(name)} {formatNumber(count)}</Badge>
+                  )) : <span className="text-xs font-semibold text-[var(--muted)]">暂无视频任务</span>}
+                </div>
+              </section>
+
+              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="m-0 text-sm font-black">工作区</h3>
+                  <Badge>{detail.workspaces.length} 个</Badge>
+                </div>
+                <div className="grid gap-2">
+                  {detail.workspaces.map((workspace) => (
+                    <div key={workspace.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs min-[720px]:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="min-w-0">
+                        <div className="truncate font-black">{workspace.name}</div>
+                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">owner: {workspace.ownerEmail ?? "-"} / role: {workspace.role}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 min-[720px]:justify-end">
+                        <Badge>{workspace.memberCount} 成员</Badge>
+                        <Badge>{workspace.productCount} 商品</Badge>
+                        <Badge>{workspace.videoJobCount} 任务</Badge>
+                        <Badge tone="ok">{workspace.completedJobCount} 完成</Badge>
+                        <Badge tone={workspace.failedJobCount > 0 ? "danger" : "neutral"}>{workspace.failedJobCount} 失败</Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {detail.workspaces.length === 0 ? <EmptyAdminDetail text="暂无工作区" /> : null}
+                </div>
+              </section>
+
+              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="m-0 text-sm font-black">最近视频任务</h3>
+                  <Badge>{detail.videoJobs.length}/50</Badge>
+                </div>
+                <div className="grid gap-2">
+                  {detail.videoJobs.map((job) => (
+                    <div key={job.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs min-[720px]:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="min-w-0">
+                        <div className="truncate font-black">{job.productSku ?? job.id}</div>
+                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">{job.model ?? "-"} / {job.language ?? "-"} / {formatDuration(job.durationSeconds)}</div>
+                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">创建 {formatDateTime(job.createdAt)} / 完成 {formatDateTime(job.completedAt)}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 min-[720px]:justify-end">
+                        <Badge tone={adminJobStatusTone(job.status)}>{adminJobStatusLabel(job.status)}</Badge>
+                        <Badge>{job.provider ?? "-"}</Badge>
+                        <Badge>{formatNumber(job.outputCount)} 输出</Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {detail.videoJobs.length === 0 ? <EmptyAdminDetail text="暂无视频任务" /> : null}
+                </div>
+              </section>
+
+              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="m-0 text-sm font-black">最近商品</h3>
+                  <Badge>{detail.products.length}/50</Badge>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {detail.products.map((product) => (
+                    <div key={product.id} className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs">
+                      <div className="truncate font-black">{product.sku}</div>
+                      <div className="mt-1 truncate font-semibold text-[var(--muted)]">{product.title ?? "-"}</div>
+                      <div className="mt-1 text-[11px] font-semibold text-[var(--muted)]">更新 {formatDateTime(product.updatedAt)}</div>
+                    </div>
+                  ))}
+                  {detail.products.length === 0 ? <EmptyAdminDetail text="暂无商品" /> : null}
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DetailMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+  return (
+    <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
+      <div className="flex items-center gap-2 text-[12px] font-black text-[var(--muted)]">
+        <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-[var(--panel2)] text-[var(--accent)]">{icon}</span>
+        {label}
+      </div>
+      <div className="text-lg font-black leading-tight">{typeof value === "number" ? formatNumber(value) : value}</div>
+    </div>
+  );
+}
+
+function EmptyAdminDetail({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)] p-4 text-center text-xs font-bold text-[var(--muted)]">
+      {text}
+    </div>
   );
 }
 
@@ -715,4 +977,27 @@ function formatDateTime(value?: string) {
 function formatNumber(value?: number) {
   if (value === undefined || value === null) return "-";
   return new Intl.NumberFormat("zh-CN").format(value);
+}
+
+function formatDuration(value?: number) {
+  return value === undefined ? "-" : `${value}s`;
+}
+
+function adminJobStatusTone(status: string): "neutral" | "ok" | "danger" | "warn" {
+  if (status === "completed") return "ok";
+  if (status === "failed" || status === "canceled") return "danger";
+  if (status === "queued" || status === "running") return "warn";
+  return "neutral";
+}
+
+function adminJobStatusLabel(status: string) {
+  return ({
+    canceled: "已取消",
+    completed: "已完成",
+    expired: "已过期",
+    failed: "失败",
+    queued: "排队中",
+    running: "生成中",
+    unknown: "未知"
+  } as Record<string, string>)[status] ?? status;
 }
