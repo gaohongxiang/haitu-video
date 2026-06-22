@@ -64,6 +64,25 @@ export interface MakeVideoReport {
 
 export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promise<MakeVideoReport> {
   await mkdir(input.outDir, { recursive: true });
+  const rawOutputRoot = join(input.outDir, "raw");
+  const explicitReuseManifest = input.forceRegenerate || !input.reuseManifestPath
+    ? undefined
+    : await readCompletedManifest(input.reuseManifestPath);
+
+  if (explicitReuseManifest) {
+    const recoveredRawOutput = await ensureRawOutput(explicitReuseManifest, input);
+    return writePipelineReport({
+      input,
+      rawManifest: explicitReuseManifest,
+      productSku: explicitReuseManifest.product.sku,
+      existingManifest: explicitReuseManifest,
+      recoveredRawOutput
+    });
+  }
+  if (input.reuseManifestPath && !input.forceRegenerate) {
+    throw new Error(`恢复下载清单不存在或不可用：${input.reuseManifestPath}`);
+  }
+
   const rawProduct = JSON.parse(await readFile(input.productPath, "utf8")) as unknown;
   const product = parseProductFacts(rawProduct);
   const productWithResolvedAssets = {
@@ -72,18 +91,16 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
       productFilePath: input.productPath
     })
   };
-  const rawOutputRoot = join(input.outDir, "raw");
-  const existingManifestPath = join(rawOutputRoot, productWithResolvedAssets.sku, "v1", "manifest.json");
-  const existingManifest = input.forceRegenerate
-    ? undefined
-    : await readCompletedManifest(input.reuseManifestPath ?? existingManifestPath);
-  if (isPaidProvider(input.providerName) && !input.confirmPaid && !existingManifest) {
+  const defaultManifestPath = join(rawOutputRoot, productWithResolvedAssets.sku, "v1", "manifest.json");
+  const defaultManifest = input.forceRegenerate ? undefined : await readCompletedManifest(defaultManifestPath);
+
+  if (isPaidProvider(input.providerName) && !input.confirmPaid && !defaultManifest) {
     throw new Error(
       `Provider ${input.providerName} makes paid requests. Re-run with --confirmPaid true after checking duration and estimated cost.`
     );
   }
   const rawManifest =
-    existingManifest ??
+    defaultManifest ??
     (await runProductJob({
       product: productWithResolvedAssets,
       version: 1,
@@ -103,17 +120,35 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
       durationSeconds: input.durationSeconds
     }));
   const recoveredRawOutput = await ensureRawOutput(rawManifest, input);
-  const final = await maybePostprocess(rawManifest, input);
-  const reportPath = join(input.outDir, "make-video-report.json");
+  return writePipelineReport({
+    input,
+    rawManifest,
+    productSku: productWithResolvedAssets.sku,
+    existingManifest: defaultManifest,
+    recoveredRawOutput
+  });
+}
+
+async function writePipelineReport(input: {
+  input: MakeVideoPipelineInput;
+  rawManifest: ProductJobManifest;
+  productSku: string;
+  existingManifest?: ProductJobManifest;
+  recoveredRawOutput: boolean;
+}): Promise<MakeVideoReport> {
+  const { rawManifest } = input;
+  const pipelineInput = input.input;
+  const final = await maybePostprocess(rawManifest, pipelineInput);
+  const reportPath = join(pipelineInput.outDir, "make-video-report.json");
   const totalTokens = rawManifest.usage?.totalTokens ?? rawManifest.usage?.completionTokens;
-  const tokenPriceCnyPerMillion = input.tokenPriceCnyPerMillion ?? Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
+  const tokenPriceCnyPerMillion = pipelineInput.tokenPriceCnyPerMillion ?? Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
   const report: MakeVideoReport = {
     type: "haitu_make_video_report",
     status: "completed",
-    productSku: productWithResolvedAssets.sku,
-    provider: input.providerName,
-    durationSeconds: input.durationSeconds,
-    paidRequestConfirmed: input.confirmPaid,
+    productSku: input.productSku,
+    provider: pipelineInput.providerName,
+    durationSeconds: pipelineInput.durationSeconds,
+    paidRequestConfirmed: pipelineInput.confirmPaid,
     raw: {
       manifestPath: rawManifest.paths.manifest,
       outputPath: rawManifest.output.path,
@@ -128,10 +163,10 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
             tokenPriceCnyPerMillion,
             totalTokens,
             estimatedCostCny: estimateCny(totalTokens, tokenPriceCnyPerMillion)
-          },
+      },
     totalCost: rawManifest.cost.total,
-    reusedRawManifest: existingManifest !== undefined,
-    recoveredRawOutput,
+    reusedRawManifest: input.existingManifest !== undefined,
+    recoveredRawOutput: input.recoveredRawOutput,
     reportPath
   };
   await writeFile(reportPath, JSON.stringify(report, null, 2), "utf8");

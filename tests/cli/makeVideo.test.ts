@@ -379,6 +379,95 @@ describe("runMakeVideoCli", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it("recovers a reusable provider task after the original product JSON was deleted", async () => {
+    process.env.ARK_API_KEY = "from-env";
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-missing-product-"));
+    tempDirs.push(tempDir);
+    const productPath = join(tempDir, "products", "deleted-product.json");
+    const outDir = join(tempDir, "outputs");
+    const existingDir = join(tempDir, "existing");
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(existingDir, { recursive: true }));
+    const missingVideo = join(existingDir, "missing.mp4");
+    const existingManifest = join(existingDir, "manifest.json");
+    await writeCompletedMp4Manifest(existingManifest, missingVideo);
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const value = String(url);
+      if (value.endsWith("/api/v3/contents/generations/tasks/task-existing")) {
+        return jsonResponse({
+          id: "task-existing",
+          status: "succeeded",
+          output: { video_url: "https://cdn.example.com/recovered-after-delete.mp4" }
+        });
+      }
+      if (value === "https://cdn.example.com/recovered-after-delete.mp4") {
+        return new Response(Buffer.from("recovered mp4"), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${value}`);
+    }) as unknown as typeof fetch;
+
+    const report = await runMakeVideoCli(
+      [
+        "--product",
+        productPath,
+        "--outDir",
+        outDir,
+        "--provider",
+        "volcengine-seedance",
+        "--confirmPaid",
+        "false",
+        "--reuseManifest",
+        existingManifest
+      ],
+      {
+        cwd: tempDir,
+        fetchImpl,
+        postprocessVideo: async () => ({
+          manifestPath: join(outDir, "final", "final-manifest.json"),
+          outputPath: join(outDir, "final", "final.mp4"),
+          subtitlePath: join(outDir, "final", "final.ass")
+        })
+      }
+    );
+
+    expect(report.productSku).toBe("TK-001");
+    expect(report.reusedRawManifest).toBe(true);
+    expect(report.recoveredRawOutput).toBe(true);
+    expect(report.paidRequestConfirmed).toBe(false);
+    expect(await readFile(missingVideo, "utf8")).toBe("recovered mp4");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an unavailable reusable manifest instead of blaming a missing product JSON", async () => {
+    process.env.ARK_API_KEY = "from-env";
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-missing-manifest-"));
+    tempDirs.push(tempDir);
+    const productPath = join(tempDir, "products", "deleted-product.json");
+    const missingManifest = join(tempDir, "existing", "missing-manifest.json");
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: "should-not-call" })) as unknown as typeof fetch;
+
+    await expect(
+      runMakeVideoCli(
+        [
+          "--product",
+          productPath,
+          "--outDir",
+          join(tempDir, "outputs"),
+          "--provider",
+          "volcengine-seedance",
+          "--confirmPaid",
+          "false",
+          "--reuseManifest",
+          missingManifest
+        ],
+        {
+          cwd: tempDir,
+          fetchImpl
+        }
+      )
+    ).rejects.toThrow(/恢复下载清单不存在或不可用/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("refuses paid providers unless explicitly confirmed", async () => {
     process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-paid-"));
