@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+
+import { readableVideoProviderError, type ReadableVideoProviderErrorInput } from "../core/videoProviderErrors.js";
 import type { DatabaseHandle } from "./db/client.js";
 
 export interface AdminOverview {
@@ -83,6 +86,9 @@ export interface AdminUserVideoJobSummary {
   durationSeconds?: number;
   outputCount?: number;
   jobDir: string;
+  error?: string;
+  errorDetails?: ReadableVideoProviderErrorInput;
+  readableError?: string;
   createdAt: string;
   completedAt?: string;
   expiresAt?: string;
@@ -461,23 +467,74 @@ function buildUserVideoJobs(handle: DatabaseHandle, userId: string): AdminUserVi
     ORDER BY vj.created_at DESC
     LIMIT 50
   `).all(userId) as VideoJobDetailRow[];
-  return rows.map((row) => ({
-    id: row.id,
-    workspaceId: row.workspace_id,
-    productId: row.product_id ?? undefined,
-    productSku: row.product_sku ?? undefined,
-    productTitle: row.product_title ?? undefined,
-    status: row.status,
-    provider: providerFromModel(row.model),
-    model: row.model ?? undefined,
-    language: row.language ?? undefined,
-    durationSeconds: row.duration_seconds ?? undefined,
-    outputCount: row.output_count ?? undefined,
-    jobDir: row.job_dir,
-    createdAt: row.created_at,
-    completedAt: row.completed_at ?? undefined,
-    expiresAt: row.expires_at ?? undefined
-  }));
+  return rows.map((row) => {
+    const metadata = readVideoJobMetadata(row.job_dir);
+    const error = typeof metadata.error === "string" ? metadata.error : undefined;
+    const errorDetails = parseAdminVideoJobErrorDetails(metadata.errorDetails);
+    const readableError = row.status === "failed"
+      ? readableAdminVideoJobError(error, errorDetails)
+      : undefined;
+    return {
+      id: row.id,
+      workspaceId: row.workspace_id,
+      productId: row.product_id ?? undefined,
+      productSku: row.product_sku ?? undefined,
+      productTitle: row.product_title ?? undefined,
+      status: row.status,
+      provider: providerFromModel(row.model),
+      model: row.model ?? undefined,
+      language: row.language ?? undefined,
+      durationSeconds: row.duration_seconds ?? undefined,
+      outputCount: row.output_count ?? undefined,
+      jobDir: row.job_dir,
+      error,
+      errorDetails,
+      readableError,
+      createdAt: row.created_at,
+      completedAt: row.completed_at ?? undefined,
+      expiresAt: row.expires_at ?? undefined
+    };
+  });
+}
+
+function readVideoJobMetadata(jobDir: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readFileSync(`${jobDir}/job.json`, "utf8")) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseAdminVideoJobErrorDetails(value: unknown): ReadableVideoProviderErrorInput | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const input = value as Record<string, unknown>;
+  if (typeof input.message !== "string" || !input.message) {
+    return undefined;
+  }
+  return {
+    message: input.message,
+    rawMessage: typeof input.rawMessage === "string" ? input.rawMessage : undefined,
+    causeMessage: typeof input.causeMessage === "string" ? input.causeMessage : undefined,
+    causeCode: typeof input.causeCode === "string" ? input.causeCode : undefined,
+    providerPhase: typeof input.providerPhase === "string" ? input.providerPhase : undefined,
+    providerName: typeof input.providerName === "string" ? input.providerName : undefined,
+    providerModel: typeof input.providerModel === "string" ? input.providerModel : undefined,
+    referenceImageCount: typeof input.referenceImageCount === "number" ? input.referenceImageCount : undefined
+  };
+}
+
+function readableAdminVideoJobError(error: string | undefined, details: ReadableVideoProviderErrorInput | undefined): string | undefined {
+  const message = readableVideoProviderError(details ? {
+    ...details,
+    message: error ?? details.message,
+    rawMessage: details.message
+  } : error);
+  return message || undefined;
 }
 
 function buildUserVideoStatusCounts(handle: DatabaseHandle, userId: string): Record<string, number> {

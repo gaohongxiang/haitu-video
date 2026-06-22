@@ -69,7 +69,8 @@ export function readableVideoProviderError(input: ReadableVideoProviderErrorInpu
 }
 
 function shouldUseRawProviderMessage(message: string): boolean {
-  return message === "视频平台拒绝了这次生成请求。请检查参考图、商品资料和视频模型配置后重试。";
+  return message === "视频平台拒绝了这次生成请求。请检查参考图、商品资料和视频模型配置后重试。" ||
+    message === "视频平台拒绝了这次生成请求。请检查商品资料、参考图和视频模型配置后重试。";
 }
 
 function seedanceProviderDiagnosticMessage(message: string): string {
@@ -81,15 +82,26 @@ function seedanceProviderDiagnosticMessage(message: string): string {
   if (translated) {
     return translated;
   }
-  const reason = [
-    providerError.code ? providerCodeLabel(providerError.code) : "视频平台拒绝了这次生成请求",
-    providerError.message ? "请检查商品资料、参考图和视频模型配置后重试" : ""
-  ].filter(Boolean).join("。");
-  return userFacingReason(reason);
+  return seedanceProviderFallbackMessage(providerError);
 }
 
-function seedanceProviderMessage(providerError: { code?: string; message?: string }): string | undefined {
+interface SeedanceProviderError {
+  code?: string;
+  message?: string;
+  param?: string;
+  type?: string;
+}
+
+function seedanceProviderMessage(providerError: SeedanceProviderError): string | undefined {
   const message = providerError.message ?? "";
+  if (providerError.code === "ModelNotOpen") {
+    const model = seedanceModelName(message);
+    return userFacingReason(
+      model
+        ? `视频模型未开通：当前火山账号还没有开通 ${model}。请在火山方舟控制台开通该模型，或切换到已开通的视频模型后重试`
+        : "视频模型未开通：当前火山账号还没有开通所选视频模型。请在火山方舟控制台开通该模型，或切换到已开通的视频模型后重试"
+    );
+  }
   if (isSeedanceReferenceImageDownloadFailure(message)) {
     const referenceIndex = seedanceReferenceImageIndex(message);
     const target = referenceIndex ? `第 ${referenceIndex} 张参考图` : "某张参考图";
@@ -98,22 +110,55 @@ function seedanceProviderMessage(providerError: { code?: string; message?: strin
   if (providerError.code === "InvalidParameter" && message.toLowerCase().includes("prompt") && message.toLowerCase().includes("too long")) {
     return userFacingReason("提示词太长，视频平台拒绝了这次生成。请缩短商品描述、卖点或分镜内容后重试");
   }
+  if (isAccountBillingError(providerError)) {
+    return "视频平台账号欠费或余额异常，请检查火山/Seedance 账号账单和余额后重试。";
+  }
+  if (providerError.code === "ProviderInternalRule") {
+    return userFacingReason("视频平台根据内部规则拒绝了这次生成。优先处理参考图：删除真人、人脸、二维码、联系方式、品牌授权不明或过度暴露的图片；再缩短卖点和分镜，避免夸大功效、绝对化表述和敏感词后重试");
+  }
   return undefined;
 }
 
-function providerCodeLabel(code: string): string {
-  const labels: Record<string, string> = {
-    InvalidParameter: "提交给视频平台的参数不符合要求",
-    ProviderInternalRule: "视频平台根据内部规则拒绝了这次生成"
-  };
-  return labels[code] ?? "视频平台拒绝了这次生成请求";
+function seedanceProviderFallbackMessage(providerError: SeedanceProviderError): string {
+  const code = providerError.code ?? providerError.type;
+  const cleanMessage = cleanProviderMessage(providerError.message);
+  const headline = code ? `视频平台返回 ${code}` : "视频平台拒绝了这次生成请求";
+  const details = [
+    cleanMessage ? `${headline}：${cleanMessage}` : headline,
+    providerError.param ? `参数：${providerError.param}` : ""
+  ].filter(Boolean);
+  return userFacingReason(details.join("。"));
+}
+
+function cleanProviderMessage(message: string | undefined): string {
+  return (message ?? "")
+    .replace(/\s*Request id:\s*[a-z0-9-]+/gi, "")
+    .replace(/\s*request id\s*[:：]\s*[a-z0-9-]+/gi, "")
+    .trim()
+    .replace(/[.。]+$/, "");
+}
+
+function isAccountBillingError(providerError: SeedanceProviderError): boolean {
+  const diagnostic = `${providerError.code ?? ""} ${providerError.message ?? ""}`.toLowerCase();
+  return diagnostic.includes("overdue") ||
+    diagnostic.includes("arrears") ||
+    diagnostic.includes("balance") ||
+    diagnostic.includes("quota") ||
+    diagnostic.includes("insufficient") ||
+    diagnostic.includes("accountoverdue") ||
+    diagnostic.includes("insufficientbalance");
+}
+
+function seedanceModelName(message: string): string | undefined {
+  const match = message.match(/\b(doubao-seedance-[a-z0-9-]+)\b/i);
+  return match?.[1];
 }
 
 function userFacingReason(reason: string): string {
   return reason.endsWith("。") || reason.endsWith(".") ? reason : `${reason}。`;
 }
 
-function extractSeedanceProviderError(message: string): { code?: string; message?: string } | undefined {
+function extractSeedanceProviderError(message: string): SeedanceProviderError | undefined {
   const jsonText = message.match(/\{.*\}/s)?.[0];
   if (!jsonText) {
     const taskFailure = message.match(/failed:\s*(.+)$/i)?.[1]?.trim();
@@ -124,11 +169,15 @@ function extractSeedanceProviderError(message: string): { code?: string; message
       error?: {
         code?: unknown;
         message?: unknown;
+        param?: unknown;
+        type?: unknown;
       };
     };
     return {
       code: typeof parsed.error?.code === "string" ? parsed.error.code : undefined,
-      message: typeof parsed.error?.message === "string" ? parsed.error.message : undefined
+      message: typeof parsed.error?.message === "string" ? parsed.error.message : undefined,
+      param: typeof parsed.error?.param === "string" && parsed.error.param ? parsed.error.param : undefined,
+      type: typeof parsed.error?.type === "string" ? parsed.error.type : undefined
     };
   } catch {
     return undefined;

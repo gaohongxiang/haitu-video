@@ -285,6 +285,64 @@ describe("buildJobLedger", () => {
     }));
   });
 
+  it("includes failed job error details from job metadata for history rows", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-ledger-failed-error-"));
+    tempDirs.push(root);
+    const outputsDir = join(root, "outputs");
+    const jobDir = join(outputsDir, "failed-seedance-reference");
+    await writeReport(join(jobDir, "job.json"), {
+      id: "failed-seedance-reference",
+      workspaceId: "default",
+      status: "failed",
+      provider: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      durationSeconds: 10,
+      createdAt: "2026-06-19T09:09:51.636Z",
+      updatedAt: "2026-06-19T09:51:42.209Z",
+      error: "视频平台拒绝了这次生成请求。请检查参考图、商品资料和视频模型配置后重试。",
+      errorDetails: {
+        message:
+          'Volcengine Seedance API error 400: {"error":{"code":"InvalidParameter","message":"The parameter `content[1].image_url` specified in the request is not valid: resource download failed. Request id: 0217818627016466a92a7a560d2de26f44703930971dcb5f489a2","param":"content[1].image_url","type":"BadRequest"}}',
+        name: "Error",
+        providerPhase: "create-task",
+        providerName: "volcengine-seedance",
+        providerModel: "doubao-seedance-2-0-fast-260128",
+        referenceImageCount: 9,
+        usedTemporaryAssetUrls: true
+      }
+    });
+    await writeReport(join(jobDir, "make-video-report.json"), {
+      type: "haitu_make_video_report",
+      status: "failed",
+      productSku: "DXM-001",
+      provider: "volcengine-seedance",
+      durationSeconds: 10,
+      raw: {
+        manifestPath: join(jobDir, "raw", "manifest.json"),
+        outputPath: join(jobDir, "raw", "missing.mp4")
+      },
+      totalCost: {
+        amount: 0,
+        currency: "CNY"
+      },
+      reusedRawManifest: false,
+      recoveredRawOutput: false
+    });
+
+    const ledger = await buildJobLedger(outputsDir);
+
+    expect(ledger.jobs[0]).toEqual(expect.objectContaining({
+      id: "failed-seedance-reference",
+      status: "failed",
+      error: "视频平台拒绝了这次生成请求。请检查参考图、商品资料和视频模型配置后重试。",
+      errorDetails: expect.objectContaining({
+        providerPhase: "create-task",
+        providerModel: "doubao-seedance-2-0-fast-260128",
+        referenceImageCount: 9
+      })
+    }));
+  });
+
   it("keeps expired job history while hiding previewable video URLs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-ledger-expired-"));
     tempDirs.push(root);

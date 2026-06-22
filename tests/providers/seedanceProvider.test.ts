@@ -560,6 +560,73 @@ describe("SeedanceProvider", () => {
     await expect(readFile(result.output.path, "utf8")).resolves.toBe("retried video bytes");
   });
 
+  it("downloads completed videos with range requests when full-object GET stalls", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-download-range-"));
+    tempDirs.push(outDir);
+    const videoBytes = Buffer.concat([
+      Buffer.alloc(1_048_576, "a"),
+      Buffer.from("final-range-tail")
+    ]);
+    const rangeHeaders: string[] = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "task-range-download", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/task-range-download")) {
+        return jsonResponse({
+          id: "task-range-download",
+          status: "succeeded",
+          output: { video_url: "https://cdn.example.com/range-video.mp4" }
+        });
+      }
+      if (String(url) === "https://cdn.example.com/range-video.mp4") {
+        const range = headerValue(init?.headers, "range");
+        if (!range) {
+          throw new Error("Full-object download should not be used for Seedance videos.");
+        }
+        rangeHeaders.push(range);
+        const match = range.match(/^bytes=(\d+)-(\d+)$/);
+        if (!match) {
+          throw new Error(`Unexpected range header: ${range}`);
+        }
+        const start = Number(match[1]);
+        const requestedEnd = Number(match[2]);
+        const end = Math.min(requestedEnd, videoBytes.length - 1);
+        const body = videoBytes.subarray(start, end + 1);
+        return new Response(body, {
+          status: 206,
+          headers: {
+            "content-length": String(body.length),
+            "content-range": `bytes ${start}-${end}/${videoBytes.length}`,
+            "content-type": "video/mp4"
+          }
+        });
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new SeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      fetchImpl
+    });
+
+    const result = await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "TK-001",
+      prompt: "Create a product ad.",
+      script: "今すぐチェック",
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      outputDir: outDir
+    });
+
+    expect(rangeHeaders.length).toBeGreaterThan(1);
+    await expect(readFile(result.output.path)).resolves.toEqual(videoBytes);
+  });
+
   it("keeps task usage and video URL on completed-task download failures", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-download-failure-metadata-"));
     tempDirs.push(outDir);
@@ -648,4 +715,19 @@ function jsonResponse(body: unknown): Response {
     status: 200,
     headers: { "content-type": "application/json" }
   });
+}
+
+function headerValue(headers: HeadersInit | undefined, name: string): string | undefined {
+  if (!headers) {
+    return undefined;
+  }
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? undefined;
+  }
+  if (Array.isArray(headers)) {
+    const entry = headers.find(([key]) => key.toLowerCase() === name.toLowerCase());
+    return entry?.[1];
+  }
+  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return match?.[1];
 }

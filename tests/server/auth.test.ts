@@ -438,6 +438,9 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         model?: string;
         durationSeconds?: number;
         outputCount?: number;
+        error?: string;
+        errorDetails?: { message: string; providerModel?: string };
+        readableError?: string;
       }>;
     };
 
@@ -472,6 +475,66 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         provider: "mock",
         model: "mock",
         durationSeconds: 8
+      })
+    ]);
+  });
+
+  it("shows project admins failed video job reasons from job metadata", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const adminCookie = await registerUser(root, server, "owner@example.com");
+    const customerCookie = await registerUser(root, server, "customer@example.com");
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    try {
+      handle.sqlite
+        .prepare("UPDATE users SET role = 'admin', updated_at = @now WHERE email = @email")
+        .run({
+          email: "owner@example.com",
+          now: new Date().toISOString()
+        });
+    } finally {
+      closeDatabase(handle);
+    }
+
+    await server.fetchJson("/api/products", {
+      method: "POST",
+      headers: { cookie: customerCookie },
+      body: JSON.stringify(productFacts("MODEL-NOT-OPEN-001", "MODEL-NOT-OPEN-001 商品"))
+    });
+    const failedJobId = await seedFailedModelNotOpenJob(root, "MODEL-NOT-OPEN-001");
+    const overview = await server.fetchJson("/api/admin/overview", {
+      headers: { cookie: adminCookie }
+    }) as { users: Array<{ id: string; email: string }> };
+    const customer = overview.users.find((user) => user.email === "customer@example.com");
+    if (!customer) {
+      throw new Error("Customer missing from overview");
+    }
+
+    const detail = await server.fetchJson(`/api/admin/users/${encodeURIComponent(customer.id)}`, {
+      headers: { cookie: adminCookie }
+    }) as {
+      videoJobs: Array<{
+        id: string;
+        status: string;
+        error?: string;
+        errorDetails?: { message: string; providerModel?: string };
+        readableError?: string;
+      }>;
+    };
+
+    expect(detail.videoJobs).toEqual([
+      expect.objectContaining({
+        id: failedJobId,
+        status: "failed",
+        error: "视频平台拒绝了这次生成请求。请检查商品资料、参考图和视频模型配置后重试。",
+        errorDetails: expect.objectContaining({
+          providerModel: "doubao-seedance-2-0-fast-260128"
+        }),
+        readableError: "视频模型未开通：当前火山账号还没有开通 doubao-seedance-2-0-fast-260128。请在火山方舟控制台开通该模型，或切换到已开通的视频模型后重试。"
       })
     ]);
   });
@@ -987,6 +1050,57 @@ async function queueCompletedMockJob(
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error(`Video job did not complete: ${jobId}`);
+}
+
+async function seedFailedModelNotOpenJob(root: string, sku: string): Promise<string> {
+  const dataDir = testDataDir(root);
+  const handle = openDatabase({ dataDir, env: process.env });
+  const jobId = "job-model-not-open";
+  let workspaceId = "";
+  let jobDir = "";
+  try {
+    const product = handle.sqlite
+      .prepare("SELECT id, workspace_id FROM products WHERE sku = ?")
+      .get(sku) as { id: string; workspace_id: string };
+    workspaceId = product.workspace_id;
+    jobDir = join(dataDir, "workspaces", workspaceId, "jobs", jobId);
+    handle.sqlite.prepare(`
+      INSERT INTO video_jobs (id, workspace_id, product_id, status, model, language, duration_seconds, output_count, job_dir, created_at, completed_at, expires_at)
+      VALUES (@id, @workspaceId, @productId, 'failed', 'doubao-seedance-2-0-fast-260128', 'ja', 10, 0, @jobDir, '2026-06-22T07:52:59.354Z', '2026-06-22T07:53:33.935Z', '2026-06-23T07:52:59.354Z')
+    `).run({
+      id: jobId,
+      workspaceId,
+      productId: product.id,
+      jobDir
+    });
+  } finally {
+    closeDatabase(handle);
+  }
+  await mkdir(jobDir, { recursive: true });
+  await writeFile(join(jobDir, "job.json"), JSON.stringify({
+    id: jobId,
+    workspaceId,
+    status: "failed",
+    productSku: sku,
+    provider: "volcengine-seedance",
+    providerModel: "doubao-seedance-2-0-fast-260128",
+    durationSeconds: 10,
+    createdAt: "2026-06-22T07:52:59.354Z",
+    startedAt: "2026-06-22T07:53:33.104Z",
+    completedAt: "2026-06-22T07:53:33.935Z",
+    error: "视频平台拒绝了这次生成请求。请检查商品资料、参考图和视频模型配置后重试。",
+    errorDetails: {
+      message:
+        'Volcengine Seedance API error 404: {"error":{"code":"ModelNotOpen","message":"Your account 2129621938 has not activated the model doubao-seedance-2-0-fast-260128. Please activate the model service in the Ark Console. Request id: 0217821148135632d417bd9da6e7dfe27ae15305eaa9a4f8641c3","param":"","type":"Not Found"}}',
+      name: "Error",
+      providerPhase: "create-task",
+      providerName: "volcengine-seedance",
+      providerModel: "doubao-seedance-2-0-fast-260128",
+      referenceImageCount: 7,
+      usedTemporaryAssetUrls: true
+    }
+  }, null, 2), "utf8");
+  return jobId;
 }
 
 async function seedExpiredVideoJob(

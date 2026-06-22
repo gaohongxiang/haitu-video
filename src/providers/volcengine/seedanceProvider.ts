@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, join, resolve } from "node:path";
 
 import { maxSeedanceReferenceImages } from "../../core/videoProviderErrors.js";
@@ -27,6 +28,7 @@ interface VolcengineSeedanceProviderOptions {
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   downloadTimeoutMs?: number;
   downloadMaxAttempts?: number;
+  downloadChunkBytes?: number;
 }
 
 interface VolcengineSeedanceTaskResponse {
@@ -117,6 +119,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly referenceImageUrlResolver?: ReferenceImageUrlResolver;
   private readonly downloadTimeoutMs: number;
   private readonly downloadMaxAttempts: number;
+  private readonly downloadChunkBytes: number;
 
   constructor(options: VolcengineSeedanceProviderOptions = {}) {
     this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
@@ -144,6 +147,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     this.referenceImageUrlResolver = options.referenceImageUrlResolver;
     this.downloadTimeoutMs = options.downloadTimeoutMs ?? Number(process.env.SEEDANCE_DOWNLOAD_TIMEOUT_MS ?? 60000);
     this.downloadMaxAttempts = options.downloadMaxAttempts ?? Number(process.env.SEEDANCE_DOWNLOAD_MAX_ATTEMPTS ?? 3);
+    this.downloadChunkBytes = options.downloadChunkBytes ?? Number(process.env.SEEDANCE_DOWNLOAD_CHUNK_BYTES ?? 1048576);
   }
 
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
@@ -341,17 +345,11 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     let lastError: unknown;
     for (let attempt = 1; attempt <= Math.max(1, this.downloadMaxAttempts); attempt += 1) {
       try {
-        const response = await this.fetchWithTimeout(url, this.downloadTimeoutMs);
-        if (!response.ok) {
-          throw new Error(
-            `Failed to download Volcengine Seedance video: ${response.status} ${response.statusText}`
-          );
-        }
-        const bytes = Buffer.from(await response.arrayBuffer());
-        await writeFile(outputPath, bytes);
+        await this.downloadWithRanges(url, outputPath);
         return;
       } catch (error) {
         lastError = error;
+        await rm(outputPath, { force: true });
         if (attempt < Math.max(1, this.downloadMaxAttempts)) {
           await sleep(1000 * attempt);
         }
@@ -360,11 +358,52 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
-  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  private async downloadWithRanges(url: string, outputPath: string): Promise<void> {
+    const chunkBytes = Math.max(256 * 1024, Math.floor(this.downloadChunkBytes));
+    const file = createWriteStream(outputPath, { flags: "w" });
+    try {
+      let offset = 0;
+      let totalSize: number | undefined;
+      while (totalSize === undefined || offset < totalSize) {
+        const end = offset + chunkBytes - 1;
+        const response = await this.fetchWithTimeout(url, this.downloadTimeoutMs, {
+          range: `bytes=${offset}-${end}`
+        });
+        if (response.status !== 206 && !(offset === 0 && response.status === 200)) {
+          throw new Error(
+            `Failed to download Volcengine Seedance video: ${response.status} ${response.statusText}`
+          );
+        }
+        const body = Buffer.from(await this.readResponseBodyWithTimeout(response));
+        if (body.length === 0) {
+          throw new Error("Failed to download Volcengine Seedance video: empty response body.");
+        }
+        await writeStreamChunk(file, body);
+        offset += body.length;
+        totalSize = contentRangeTotal(response.headers.get("content-range")) ?? totalSize;
+        if (response.status === 200) {
+          totalSize = offset;
+        }
+      }
+    } finally {
+      await closeWriteStream(file);
+    }
+  }
+
+  private async readResponseBodyWithTimeout(response: Response): Promise<ArrayBuffer> {
+    return withTimeout(
+      response.arrayBuffer(),
+      this.downloadTimeoutMs,
+      "Volcengine Seedance video body download timed out."
+    );
+  }
+
+  private async fetchWithTimeout(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await this.fetchImpl(url, {
+        headers,
         signal: controller.signal
       });
     } finally {
@@ -451,6 +490,53 @@ async function normalizeImageReference(reference: string): Promise<string> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  });
+}
+
+function writeStreamChunk(stream: ReturnType<typeof createWriteStream>, chunk: Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.write(chunk, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+function closeWriteStream(stream: ReturnType<typeof createWriteStream>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.end((error?: Error | null) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+function contentRangeTotal(value: string | null): number | undefined {
+  const match = value?.match(/^bytes\s+\d+-\d+\/(\d+)$/i);
+  if (!match) {
+    return undefined;
+  }
+  const total = Number(match[1]);
+  return Number.isFinite(total) ? total : undefined;
 }
 
 function parseBoolean(value: string): boolean {

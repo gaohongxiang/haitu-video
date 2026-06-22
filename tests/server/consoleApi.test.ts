@@ -1209,7 +1209,10 @@ describe("console API", () => {
     expect(appSource).toContain("将于");
     expect(appSource).toContain("function formatAbsoluteMinuteTime");
     expect(appSource).not.toContain('return "刚刚"');
-    expect(videoHistorySource).toContain("[...creativeVersionMetaParts(job), lifecycleLabel].filter(Boolean).join(\" · \")");
+    expect(videoHistorySource).toContain("const failureReason = creativeVersionFailureReason(job);");
+    expect(videoHistorySource).toContain("{[...metaParts, failureReason ? \"\" : lifecycleLabel].filter(Boolean).join(\" · \")}");
+    expect(videoHistorySource).toContain("<AlertTriangle");
+    expect(videoHistorySource).toContain("<span>{failureReason}</span>");
     expect(appSource).toContain("function creativeVersionMetaParts");
     expect(formatCreativeVersionTimeSource).toContain('job.status !== "completed" && job.status !== "succeeded" && !hasPlayableVideo(job)');
     expect(formatCreativeVersionTimeSource).toContain("job.completedAt ?? job.createdAt");

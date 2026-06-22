@@ -133,6 +133,8 @@ interface AdminUserVideoJobSummary {
   durationSeconds?: number;
   outputCount?: number;
   jobDir: string;
+  error?: string;
+  readableError?: string;
   createdAt: string;
   completedAt?: string;
   expiresAt?: string;
@@ -766,6 +768,12 @@ function AdminUserDetailDrawer({
                         <div className="truncate font-black">{job.productSku ?? job.id}</div>
                         <div className="mt-1 truncate font-semibold text-[var(--muted)]">{job.model ?? "-"} / {job.language ?? "-"} / {formatDuration(job.durationSeconds)}</div>
                         <div className="mt-1 truncate font-semibold text-[var(--muted)]">创建 {formatDateTime(job.createdAt)} / 完成 {formatDateTime(job.completedAt)}</div>
+                        {job.readableError || job.error ? (
+                          <div className="mt-2 flex max-w-[760px] items-start gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 font-bold leading-5 text-red-700">
+                            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{job.readableError ?? job.error}</span>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-1.5 min-[720px]:justify-end">
                         <Badge tone={adminJobStatusTone(job.status)}>{adminJobStatusLabel(job.status)}</Badge>

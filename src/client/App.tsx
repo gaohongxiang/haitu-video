@@ -314,6 +314,7 @@ interface LedgerJob {
   reportPath: string;
   productSku?: string;
   provider?: string;
+  providerModel?: string;
   status?: string;
   durationSeconds?: number;
   taskId?: string;
@@ -325,6 +326,8 @@ interface LedgerJob {
   expired?: boolean;
   rawManifestPath?: string;
   selectedFinal: boolean;
+  error?: string;
+  errorDetails?: VideoJobErrorDetails;
   qc?: QcSummaryItem;
   contentReview: JobContentReviewSnapshot;
 }
@@ -4863,6 +4866,8 @@ function VideoHistoryPanel({
             const recoverJob = job.status === "failed" && job.videoJob?.canRecoverDownload ? job.videoJob : undefined;
             const retryJob = job.status === "failed" && !recoverJob ? job.videoJob : undefined;
             const lifecycleLabel = creativeVersionLifecycleHint(job);
+            const failureReason = creativeVersionFailureReason(job);
+            const metaParts = creativeVersionMetaParts(job);
             return (
               <article key={job.id} className="grid gap-2 border-b border-[var(--border)] px-3 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
@@ -4874,8 +4879,14 @@ function VideoHistoryPanel({
                     </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs font-semibold text-[var(--muted)]">
-                    {[...creativeVersionMetaParts(job), lifecycleLabel].filter(Boolean).join(" · ")}
+                    {[...metaParts, failureReason ? "" : lifecycleLabel].filter(Boolean).join(" · ")}
                   </div>
+                  {failureReason ? (
+                    <div className="mt-2 flex max-w-[720px] items-start gap-1.5 rounded-[10px] border border-red-100 bg-red-50 px-2.5 py-2 text-xs font-bold leading-5 text-red-700">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>{failureReason}</span>
+                    </div>
+                  ) : null}
                   <VideoHashtagChips hashtags={job.hashtags} onToast={onToast} />
                 </div>
                 <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
@@ -8186,20 +8197,47 @@ function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
 }
 
 function ledgerJobToCreativeVersion(job: LedgerJob): CreativeVersionItem {
+  const createdAt = createdAtFromReportPath(job.reportPath);
+  const status = isVideoJobStatus(job.status) ? job.status : "failed";
   return {
     id: job.id,
     status: job.status,
     provider: job.provider,
+    providerModel: job.providerModel,
     durationSeconds: job.durationSeconds,
     selectedFinal: job.selectedFinal,
     hasFinalVideo: hasPlayableVideo(job),
     finalVideoUrl: job.finalVideoUrl,
-    createdAt: createdAtFromReportPath(job.reportPath),
+    createdAt,
     expiresAt: job.expiresAt,
     expired: job.expired,
     hashtags: job.contentReview.hashtags,
-    source: "ledger"
+    source: "ledger",
+    videoJob: job.error || job.errorDetails
+      ? {
+          id: job.id,
+          status,
+          productPath: "",
+          productSku: job.productSku,
+          provider: job.provider,
+          providerModel: job.providerModel,
+          durationSeconds: job.durationSeconds,
+          confirmPaid: job.provider !== undefined && job.provider !== "mock",
+          outDir: "",
+          error: job.error,
+          errorDetails: job.errorDetails,
+          createdAt: createdAt ?? "",
+          updatedAt: createdAt ?? "",
+          completedAt: createdAt,
+          expiresAt: job.expiresAt,
+          expired: job.expired
+        }
+      : undefined
   };
+}
+
+function isVideoJobStatus(value: string | undefined): value is VideoJob["status"] {
+  return value === "queued" || value === "running" || value === "completed" || value === "failed" || value === "canceled";
 }
 
 function videoDownloadProductContext(product: ProductDetail | undefined, draft: ProductDraft, importText: string): VideoDownloadProductContext {

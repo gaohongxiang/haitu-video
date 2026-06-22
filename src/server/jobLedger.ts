@@ -10,6 +10,7 @@ export interface JobLedgerRow {
   reportPath: string;
   productSku?: string;
   provider?: string;
+  providerModel?: string;
   status?: string;
   durationSeconds?: number;
   taskId?: string;
@@ -27,8 +28,25 @@ export interface JobLedgerRow {
   reusedRawManifest: boolean;
   recoveredRawOutput: boolean;
   selectedFinal: boolean;
+  error?: string;
+  errorDetails?: JobLedgerErrorDetails;
   manualReview?: ManualVersionReview;
   contentReview: JobContentReviewSnapshot;
+}
+
+export interface JobLedgerErrorDetails {
+  message: string;
+  name?: string;
+  causeMessage?: string;
+  causeCode?: string;
+  providerPhase?: string;
+  providerName?: string;
+  providerModel?: string;
+  referenceImageCount?: number;
+  usedTemporaryAssetUrls?: boolean;
+  providerTaskId?: string;
+  providerVideoUrl?: string;
+  recoverableRawManifestPath?: string;
 }
 
 export interface JobContentReviewSnapshot {
@@ -185,11 +203,15 @@ async function toLedgerRow(
   const expired = jobMetadata.expired === true;
   const expiresAt = typeof jobMetadata.expiresAt === "string" ? jobMetadata.expiresAt : undefined;
   const finalOutputPath = report.final?.outputPath;
+  const providerModel = typeof jobMetadata.providerModel === "string" ? jobMetadata.providerModel : undefined;
+  const error = typeof jobMetadata.error === "string" ? jobMetadata.error : undefined;
+  const errorDetails = parseJobLedgerErrorDetails(jobMetadata.errorDetails);
   return {
     id,
     reportPath,
     productSku,
     provider: report.provider,
+    providerModel,
     status: report.status,
     durationSeconds: report.durationSeconds,
     taskId: report.raw?.taskId,
@@ -207,6 +229,8 @@ async function toLedgerRow(
     reusedRawManifest: report.reusedRawManifest ?? false,
     recoveredRawOutput: report.recoveredRawOutput ?? false,
     selectedFinal: selectedFinalJobId === id,
+    error,
+    errorDetails,
     manualReview: productReview?.versionReviews?.[id],
     contentReview: await buildContentReviewSnapshot({
       rawManifestPath,
@@ -225,6 +249,30 @@ async function readJobMetadata(reportPath: string): Promise<Record<string, unkno
   } catch {
     return {};
   }
+}
+
+function parseJobLedgerErrorDetails(value: unknown): JobLedgerErrorDetails | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const input = value as Record<string, unknown>;
+  if (typeof input.message !== "string" || !input.message) {
+    return undefined;
+  }
+  return {
+    message: input.message,
+    name: typeof input.name === "string" ? input.name : undefined,
+    causeMessage: typeof input.causeMessage === "string" ? input.causeMessage : undefined,
+    causeCode: typeof input.causeCode === "string" ? input.causeCode : undefined,
+    providerPhase: typeof input.providerPhase === "string" ? input.providerPhase : undefined,
+    providerName: typeof input.providerName === "string" ? input.providerName : undefined,
+    providerModel: typeof input.providerModel === "string" ? input.providerModel : undefined,
+    referenceImageCount: typeof input.referenceImageCount === "number" ? input.referenceImageCount : undefined,
+    usedTemporaryAssetUrls: typeof input.usedTemporaryAssetUrls === "boolean" ? input.usedTemporaryAssetUrls : undefined,
+    providerTaskId: typeof input.providerTaskId === "string" ? input.providerTaskId : undefined,
+    providerVideoUrl: typeof input.providerVideoUrl === "string" ? input.providerVideoUrl : undefined,
+    recoverableRawManifestPath: typeof input.recoverableRawManifestPath === "string" ? input.recoverableRawManifestPath : undefined
+  };
 }
 
 async function buildContentReviewSnapshot(input: {
