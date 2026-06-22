@@ -141,7 +141,7 @@ interface AdminUserVideoJobSummary {
 }
 
 export function AdminApp() {
-  const [session, setSession] = useState<AuthSession>({ authEnabled: true, authenticated: false });
+  const [session, setSession] = useState<AuthSession | undefined>();
   const [overview, setOverview] = useState<AdminOverview | undefined>();
   const [authMode, setAuthMode] = useState<AuthFlowMode>("entry");
   const [email, setEmail] = useState("");
@@ -290,6 +290,10 @@ export function AdminApp() {
     }
   }
 
+  if (!session) {
+    return <AdminShellLoadingScreen status={status} />;
+  }
+
   if (!session.authenticated) {
     return (
       <AdminLoginScreen
@@ -324,6 +328,32 @@ export function AdminApp() {
       onRefresh={() => void refreshOverview()}
       onLogout={() => void logout()}
     />
+  );
+}
+
+function AdminShellLoadingScreen({ status }: { status: string }) {
+  return (
+    <main className="grid min-h-dvh grid-rows-[auto_minmax(0,1fr)] bg-[var(--bg)] text-[var(--text)]">
+      <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <img src={brandLogoUrl} alt="Haitu" className="h-8 w-8 rounded-[8px]" />
+            <h1 className="m-0 text-xl font-black leading-tight">项目方后台</h1>
+            <Badge tone="ok">Admin</Badge>
+          </div>
+          <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">正在确认后台登录状态</p>
+        </div>
+      </header>
+      <div className="grid min-h-0 place-items-center px-4 py-4 min-[1100px]:px-6">
+        <Card className="grid min-h-[260px] w-full max-w-[520px] place-items-center bg-[var(--card)]">
+          <div className="grid justify-items-center gap-3 text-center">
+            <RefreshCcw className="animate-spin text-[var(--accent)]" size={30} />
+            <div className="text-sm font-black">正在检查登录状态</div>
+            {status ? <div className="max-w-[360px] text-xs font-semibold leading-5 text-[var(--muted)]">{status}</div> : null}
+          </div>
+        </Card>
+      </div>
+    </main>
   );
 }
 
@@ -763,24 +793,7 @@ function AdminUserDetailDrawer({
                 </div>
                 <div className="grid gap-2">
                   {detail.videoJobs.map((job) => (
-                    <div key={job.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs min-[720px]:grid-cols-[minmax(0,1fr)_auto]">
-                      <div className="min-w-0">
-                        <div className="truncate font-black">{job.productSku ?? job.id}</div>
-                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">{job.model ?? "-"} / {job.language ?? "-"} / {formatDuration(job.durationSeconds)}</div>
-                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">创建 {formatDateTime(job.createdAt)} / 完成 {formatDateTime(job.completedAt)}</div>
-                        {job.readableError || job.error ? (
-                          <div className="mt-2 flex max-w-[760px] items-start gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 font-bold leading-5 text-red-700">
-                            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>{job.readableError ?? job.error}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 min-[720px]:justify-end">
-                        <Badge tone={adminJobStatusTone(job.status)}>{adminJobStatusLabel(job.status)}</Badge>
-                        <Badge>{job.provider ?? "-"}</Badge>
-                        <Badge>{formatNumber(job.outputCount)} 输出</Badge>
-                      </div>
-                    </div>
+                    <AdminVideoJobCard key={job.id} job={job} />
                   ))}
                   {detail.videoJobs.length === 0 ? <EmptyAdminDetail text="暂无视频任务" /> : null}
                 </div>
@@ -806,6 +819,51 @@ function AdminUserDetailDrawer({
           ) : null}
         </div>
       </aside>
+    </div>
+  );
+}
+
+function AdminVideoJobCard({ job }: { job: AdminUserVideoJobSummary }) {
+  const error = job.readableError ?? job.error;
+  return (
+    <article className="grid min-w-0 gap-3 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs min-[720px]:grid-cols-[minmax(0,1fr)_148px]">
+      <div className="min-w-0">
+        <div className="break-words font-black leading-5 text-[var(--text)]">{job.productSku ?? job.id}</div>
+        <div className="mt-1 break-words font-semibold leading-5 text-[var(--muted)]">
+          {job.model ?? "-"} / {job.language ?? "-"} / {formatDuration(job.durationSeconds)}
+        </div>
+        <div className="mt-1 break-words font-semibold leading-5 text-[var(--muted)]">
+          创建 {formatDateTime(job.createdAt)} / 完成 {formatDateTime(job.completedAt)}
+        </div>
+        {error ? (
+          <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 font-bold leading-5 text-red-700">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-words">{error}</span>
+          </div>
+        ) : null}
+      </div>
+      <AdminJobMetaRail job={job} />
+    </article>
+  );
+}
+
+function AdminJobMetaRail({ job }: { job: AdminUserVideoJobSummary }) {
+  return (
+    <div className="grid min-w-0 grid-cols-3 gap-1.5 min-[720px]:grid-cols-1 min-[720px]:content-start">
+      <span
+        className={cn(
+          "grid min-h-8 place-items-center rounded-[8px] border px-2 text-center text-[11px] font-black leading-4",
+          adminJobStatusToneClass(job.status)
+        )}
+      >
+        {adminJobStatusLabel(job.status)}
+      </span>
+      <span className="admin-provider-chip min-w-0 truncate rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] px-2 py-2 text-center text-[11px] font-black leading-4 text-[var(--muted)]">
+        {job.provider ?? "-"}
+      </span>
+      <span className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] px-2 py-2 text-center text-[11px] font-black leading-4 text-[var(--muted)]">
+        {formatNumber(job.outputCount)} 输出
+      </span>
     </div>
   );
 }
@@ -906,10 +964,10 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
   const rows = overview?.activity ?? [];
   return {
     color: ["#c65a36", "#0aa394"],
-    grid: { left: 36, right: 18, top: 22, bottom: 34 },
+    grid: { left: 36, right: 18, top: 22, bottom: 62 },
     tooltip: { trigger: "axis" },
     legend: {
-      bottom: 0,
+      bottom: 4,
       textStyle: { color: "#76685c", fontWeight: 700 }
     },
     xAxis: {
@@ -996,6 +1054,14 @@ function adminJobStatusTone(status: string): "neutral" | "ok" | "danger" | "warn
   if (status === "failed" || status === "canceled") return "danger";
   if (status === "queued" || status === "running") return "warn";
   return "neutral";
+}
+
+function adminJobStatusToneClass(status: string): string {
+  const tone = adminJobStatusTone(status);
+  if (tone === "ok") return "border-emerald-200 bg-emerald-50 text-[var(--ok)]";
+  if (tone === "danger") return "border-red-200 bg-red-50 text-[var(--danger)]";
+  if (tone === "warn") return "border-amber-200 bg-amber-50 text-[var(--warn)]";
+  return "border-[var(--border)] bg-[var(--panel2)] text-[var(--muted)]";
 }
 
 function adminJobStatusLabel(status: string) {
