@@ -25,6 +25,7 @@ export interface MakeVideoPipelineInput {
   fetchImpl?: typeof fetch;
   apiKey?: string;
   providerBaseUrl?: string;
+  providerModelConfigId?: string;
   providerModel?: string;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   tokenPriceCnyPerMillion?: number;
@@ -206,11 +207,11 @@ async function recoverVolcengineOutput(input: {
   baseUrl?: string;
   fetchImpl: typeof fetch;
 }): Promise<void> {
-  const apiKey = input.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
+  const apiKey = input.apiKey ?? "";
   if (!apiKey) {
-    throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Cannot recover provider output.");
+    throw new Error("请先在 API 管理配置视频模型 API Key。");
   }
-  const baseUrl = input.baseUrl ?? process.env.SEEDANCE_BASE_URL ?? "https://ark.cn-beijing.volces.com";
+  const baseUrl = input.baseUrl ?? "https://ark.cn-beijing.volces.com";
   const taskResponse = await input.fetchImpl(
     `${baseUrl}/api/v3/contents/generations/tasks/${encodeURIComponent(input.taskId)}`,
     {

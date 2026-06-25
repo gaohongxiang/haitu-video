@@ -1,3 +1,5 @@
+import { defaultImageModelBaseUrl, defaultImageModelId } from "./modelCatalog.js";
+
 export interface OpenAiCompatibleImageProviderOptions {
   apiKey?: string;
   baseUrl?: string;
@@ -33,9 +35,9 @@ export class OpenAiCompatibleImageProvider {
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: OpenAiCompatibleImageProviderOptions = {}) {
-    this.apiKey = options.apiKey ?? process.env.IMAGE_MODEL_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
-    this.baseUrl = imagesBaseUrl(options.baseUrl ?? process.env.IMAGE_MODEL_BASE_URL ?? "https://api.openai.com");
-    this.model = options.model ?? process.env.IMAGE_MODEL_MODEL ?? "gpt-image-2";
+    this.apiKey = options.apiKey ?? "";
+    this.baseUrl = imagesBaseUrl(options.baseUrl ?? defaultImageModelBaseUrl());
+    this.model = options.model ?? defaultImageModelId();
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 

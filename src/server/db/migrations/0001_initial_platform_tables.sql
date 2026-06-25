@@ -82,24 +82,6 @@ CREATE TABLE IF NOT EXISTS video_assets (
   deleted_at TEXT
 );
 
-CREATE TABLE IF NOT EXISTS provider_keys (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  provider TEXT NOT NULL,
-  config_id TEXT NOT NULL,
-  encrypted_key TEXT NOT NULL,
-  key_preview TEXT NOT NULL,
-  name TEXT,
-  vendor TEXT,
-  priority INTEGER NOT NULL DEFAULT 0,
-  base_url TEXT,
-  model TEXT,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE (workspace_id, provider, config_id)
-);
-
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT PRIMARY KEY,
   actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -121,6 +103,5 @@ CREATE INDEX IF NOT EXISTS video_jobs_workspace_id_idx ON video_jobs(workspace_i
 CREATE INDEX IF NOT EXISTS video_jobs_product_id_idx ON video_jobs(product_id);
 CREATE INDEX IF NOT EXISTS video_assets_workspace_id_idx ON video_assets(workspace_id);
 CREATE INDEX IF NOT EXISTS video_assets_job_id_idx ON video_assets(job_id);
-CREATE INDEX IF NOT EXISTS provider_keys_workspace_id_idx ON provider_keys(workspace_id);
 CREATE INDEX IF NOT EXISTS audit_logs_workspace_id_idx ON audit_logs(workspace_id);
 CREATE INDEX IF NOT EXISTS audit_logs_actor_user_id_idx ON audit_logs(actor_user_id);

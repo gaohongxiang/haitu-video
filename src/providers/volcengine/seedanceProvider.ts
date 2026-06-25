@@ -4,6 +4,7 @@ import { extname, isAbsolute, join, resolve } from "node:path";
 
 import { maxSeedanceReferenceImages } from "../../core/videoProviderErrors.js";
 import { defaultFinalVideoLanguage, providerScriptLanguageLabel } from "../../core/videoLanguage.js";
+import { defaultVideoModelBaseUrl, defaultVideoModelId } from "../modelCatalog.js";
 import type {
   MoneyAmount,
   ReferenceImageUrlResolver,
@@ -122,11 +123,11 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly downloadChunkBytes: number;
 
   constructor(options: VolcengineSeedanceProviderOptions = {}) {
-    this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
+    this.apiKey = options.apiKey ?? "";
     this.baseUrl =
-      options.baseUrl ?? process.env.SEEDANCE_BASE_URL ?? "https://ark.cn-beijing.volces.com";
+      options.baseUrl ?? defaultVideoModelBaseUrl();
     this.model =
-      options.model ?? process.env.SEEDANCE_MODEL ?? "doubao-seedance-2-0-260128";
+      options.model ?? defaultVideoModelId();
     this.pollIntervalMs = options.pollIntervalMs ?? Number(process.env.SEEDANCE_POLL_MS ?? 5000);
     this.maxPolls = options.maxPolls ?? Number(process.env.SEEDANCE_MAX_POLLS ?? 120);
     this.resolution =
@@ -152,7 +153,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
 
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
     if (!this.apiKey) {
-      throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Refusing to make a paid request.");
+      throw new Error("请先在 API 管理配置视频模型 API Key。");
     }
 
     await mkdir(request.outputDir, { recursive: true });
@@ -411,8 +412,6 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     }
   }
 }
-
-export { VolcengineSeedanceProvider as SeedanceProvider };
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();

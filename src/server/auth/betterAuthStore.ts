@@ -187,6 +187,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     if (!session) {
       return jsonResponse({ error: "Authentication required" }, 401);
     }
+    this.promoteConfiguredAdminEmail(session.user);
     const user = this.findPlatformUser(session.user.id);
     if (user?.role !== "admin") {
       return jsonResponse({ error: "Admin access required" }, 403);
@@ -214,6 +215,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     if (!session) {
       throw new Error("Authentication required");
     }
+    this.promoteConfiguredAdminEmail(session.user);
     const user = this.findPlatformUser(session.user.id);
     if (user?.role !== "admin") {
       throw new Error("Admin access required");
@@ -406,6 +408,21 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       FROM users
       WHERE id = ?
     `).get(userId) as PlatformUserRow | undefined;
+  }
+
+  private promoteConfiguredAdminEmail(user: { id: string; email: string }): void {
+    if (!this.isConfiguredAdminEmail(user.email)) {
+      return;
+    }
+    const now = this.now().toISOString();
+    this.input.handle.sqlite.prepare(`
+      UPDATE users
+      SET role = 'admin', updated_at = @now
+      WHERE id = @id AND role <> 'admin'
+    `).run({
+      id: user.id,
+      now
+    });
   }
 
   private ensureWorkspaceForVerifiedUser(user: { id: string; email: string }): void {

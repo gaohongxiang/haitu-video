@@ -25,6 +25,18 @@ const migrations: Migration[] = [
   {
     id: "0003_better_auth",
     sql: readMigrationSql("0003_better_auth.sql")
+  },
+  {
+    id: "0006_unified_model_configs",
+    sql: readMigrationSql("0006_unified_model_configs.sql")
+  },
+  {
+    id: "0007_wallet_and_api_modes",
+    sql: readMigrationSql("0007_wallet_and_api_modes.sql")
+  },
+  {
+    id: "0008_model_service_preferences",
+    sql: readMigrationSql("0008_model_service_preferences.sql")
   }
 ];
 

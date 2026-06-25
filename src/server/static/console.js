@@ -622,7 +622,7 @@ function isPaidProvider(provider) {
 
 function visibleProviderValue(provider) {
   const defaultVisibleProvider = "volcengine-seedance";
-  if (provider === defaultVisibleProvider || provider === "seedance") {
+  if (provider === defaultVisibleProvider) {
     return defaultVisibleProvider;
   }
   return defaultVisibleProvider;

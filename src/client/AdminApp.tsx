@@ -3,12 +3,15 @@ import {
   BarChart3,
   CheckCircle2,
   Clock3,
+  CreditCard,
   Database,
   KeyRound,
+  LayoutDashboard,
   LogOut,
   MailCheck,
   Package,
   RefreshCcw,
+  Settings2,
   ShieldAlert,
   Users,
   Video,
@@ -23,12 +26,65 @@ import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
+import {
+  apiModeForProviderDraft,
+  draftFromProviderConfig,
+  modelConfigPresets,
+  resetModelConfigDraft,
+  SharedModelConfigDialog,
+  SharedModelServiceGroup,
+  type ModelConfigDraft,
+  type ModelConfigProviderId,
+  type ModelConfigTestStatus,
+  type ModelServiceGroup,
+  type ProviderConfigItem,
+  type ProviderConfigLedger
+} from "./components/modelServiceConfig.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
 const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const authOtpCooldownDurationSeconds = 60;
 
 type AuthFlowMode = "entry" | "verify-email";
+type AdminSection = "overview" | "users" | "platform-models" | "billing" | "system";
+
+const adminNavigationItems: Array<{
+  id: AdminSection;
+  label: string;
+  description: string;
+  icon: ComponentType<{ size?: number; className?: string }>;
+}> = [
+  {
+    id: "overview",
+    label: "概览",
+    description: "增长、活跃、任务指标",
+    icon: LayoutDashboard
+  },
+  {
+    id: "users",
+    label: "用户管理",
+    description: "用户、工作区、任务明细",
+    icon: Users
+  },
+  {
+    id: "platform-models",
+    label: "平台模型",
+    description: "模型商、版本、平台 Key",
+    icon: KeyRound
+  },
+  {
+    id: "billing",
+    label: "充值账单",
+    description: "余额、充值、收费记录",
+    icon: CreditCard
+  },
+  {
+    id: "system",
+    label: "系统",
+    description: "备份、审计、运行状态",
+    icon: Settings2
+  }
+];
 
 interface AuthSession {
   authEnabled: boolean;
@@ -140,6 +196,92 @@ interface AdminUserVideoJobSummary {
   expiresAt?: string;
 }
 
+type PlatformModelAdminConfigResponse = Pick<ProviderConfigLedger, "textModels" | "imageModels" | "videoModels">;
+
+interface ModelConfigKeyRevealResponse {
+  ok: true;
+  provider: ModelConfigProviderId;
+  configId: string;
+  apiKey: string;
+  keyPreview?: string;
+}
+
+const platformModelAdminProviders: Array<{
+  providerId: ModelConfigProviderId;
+  endpoint: string;
+  title: string;
+  description: string;
+  badge: string;
+}> = [
+  {
+    providerId: "openai-compatible-text",
+    endpoint: "/api/platform/model-configs/openai-compatible-text",
+    title: "文本模型",
+    description: "商品整理、脚本分镜等文本调用。",
+    badge: "文本"
+  },
+  {
+    providerId: "openai-compatible-image",
+    endpoint: "/api/platform/model-configs/openai-compatible-image",
+    title: "图片模型",
+    description: "商品图、素材图等图片生成调用。",
+    badge: "图片"
+  },
+  {
+    providerId: "volcengine-seedance",
+    endpoint: "/api/platform/model-configs/volcengine-seedance",
+    title: "视频模型",
+    description: "成片生成调用。",
+    badge: "视频"
+  }
+];
+
+function defaultPlatformConfigLedger(): ProviderConfigLedger {
+  return {
+    textModels: [],
+    imageModels: [],
+    videoModels: [],
+    providers: [],
+    runtime: {
+      textConfigured: false,
+      imageConfigured: false,
+      videoConfigured: false
+    }
+  };
+}
+
+function defaultPlatformModelDrafts(): Record<ModelConfigProviderId, ModelConfigDraft> {
+  return {
+    "openai-compatible-text": resetModelConfigDraft("openai-compatible-text"),
+    "openai-compatible-image": resetModelConfigDraft("openai-compatible-image"),
+    "volcengine-seedance": resetModelConfigDraft("volcengine-seedance")
+  };
+}
+
+function platformConfigLedgerFromResponse(response: PlatformModelAdminConfigResponse): ProviderConfigLedger {
+  return {
+    textModels: response.textModels,
+    imageModels: response.imageModels,
+    videoModels: response.videoModels,
+    providers: response.videoModels,
+    runtime: {
+      textConfigured: response.textModels.some((model) => model.configured && model.enabled !== false),
+      imageConfigured: response.imageModels.some((model) => model.configured && model.enabled !== false),
+      videoConfigured: response.videoModels.some((model) => model.configured && model.enabled !== false)
+    }
+  };
+}
+
+function platformModelsForProvider(config: ProviderConfigLedger, providerId: ModelConfigProviderId): ProviderConfigItem[] {
+  if (providerId === "openai-compatible-text") {
+    return config.textModels;
+  }
+  if (providerId === "openai-compatible-image") {
+    return config.imageModels;
+  }
+  return config.videoModels;
+}
+
 export function AdminApp() {
   const [session, setSession] = useState<AuthSession | undefined>();
   const [overview, setOverview] = useState<AdminOverview | undefined>();
@@ -147,10 +289,14 @@ export function AdminApp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
-  const [status, setStatus] = useState("正在检查登录状态...");
+  const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
+  const [platformConfig, setPlatformConfig] = useState<ProviderConfigLedger>(() => defaultPlatformConfigLedger());
+  const [platformDrafts, setPlatformDrafts] = useState<Record<ModelConfigProviderId, ModelConfigDraft>>(() => defaultPlatformModelDrafts());
+  const [platformTestStatus] = useState<Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>>({});
+  const [editingPlatformProviderId, setEditingPlatformProviderId] = useState<ModelConfigProviderId | undefined>();
 
   useEffect(() => {
     void bootstrap();
@@ -185,8 +331,12 @@ export function AdminApp() {
     setBusy(true);
     setForbidden(false);
     try {
-      const nextOverview = await getJson<AdminOverview>("/api/admin/overview");
+      const [nextOverview, platformModels] = await Promise.all([
+        getJson<AdminOverview>("/api/admin/overview"),
+        getJson<PlatformModelAdminConfigResponse>("/api/platform/model-configs")
+      ]);
       setOverview(nextOverview);
+      setPlatformConfig(platformConfigLedgerFromResponse(platformModels));
       setStatus("");
     } catch (error) {
       if (error instanceof HttpError && error.status === 403) {
@@ -290,11 +440,106 @@ export function AdminApp() {
     }
   }
 
-  if (!session) {
-    return <AdminShellLoadingScreen status={status} />;
+  function updatePlatformDraft(providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) {
+    setPlatformDrafts((current) => {
+      return {
+        ...current,
+        [providerId]: {
+          ...current[providerId],
+          ...patch
+        }
+      };
+    });
   }
 
-  if (!session.authenticated) {
+  function applyPlatformPreset(providerId: ModelConfigProviderId, preset: ModelConfigDraft) {
+    updatePlatformDraft(providerId, {
+      ...preset,
+      configId: platformDrafts[providerId]?.configId,
+      apiKey: "",
+      keyPreview: platformDrafts[providerId]?.keyPreview,
+      enabled: platformDrafts[providerId]?.enabled ?? preset.enabled
+    });
+  }
+
+  function addPlatformModelService(providerId: ModelConfigProviderId) {
+    updatePlatformDraft(providerId, resetModelConfigDraft(providerId));
+    setEditingPlatformProviderId(providerId);
+  }
+
+  function editPlatformModelService(providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) {
+    updatePlatformDraft(providerId, draftFromProviderConfig(providerId, model, models));
+    setEditingPlatformProviderId(providerId);
+  }
+
+  async function savePlatformModelConfig(providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const draft = platformDrafts[providerId];
+    if (!draft) {
+      setStatus("没有可保存的平台模型配置。");
+      return;
+    }
+    if (!draft.apiKey.trim() && !draft.configId) {
+      setStatus("请先填写平台 Key。");
+      return;
+    }
+    if (draft.models.length === 0) {
+      setStatus("请至少选择一个模型版本。");
+      return;
+    }
+    setBusy(true);
+    setStatus("");
+    try {
+      await putJson(platformModelAdminEndpoint(providerId), {
+        configId: draft.configId,
+        apiKey: draft.apiKey.trim() || undefined,
+        name: draft.name.trim(),
+        vendor: draft.vendor.trim(),
+        baseUrl: draft.baseUrl.trim(),
+        model: draft.models,
+        apiMode: apiModeForProviderDraft(providerId, draft),
+        priority: Number.isFinite(draft.priority) ? draft.priority : 0,
+        enabled: draft.enabled
+      });
+      await refreshOverview();
+      setEditingPlatformProviderId(undefined);
+      setStatus("平台模型已保存，Key 已加密写入数据库，并已更新平台模型配置。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearPlatformModelConfig(providerId: ModelConfigProviderId, configId?: string) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const suffix = configId ? `?configId=${encodeURIComponent(configId)}` : "";
+      const response = await fetch(`${platformModelAdminEndpoint(providerId)}${suffix}`, {
+        method: "DELETE"
+      });
+      await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response);
+      await refreshOverview();
+      setStatus("已删除平台模型服务。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revealPlatformModelConfigApiKey(providerId: ModelConfigProviderId, configId: string) {
+    const response = await getJson<ModelConfigKeyRevealResponse>(
+      `${platformModelAdminEndpoint(providerId)}/key?configId=${encodeURIComponent(configId)}`
+    );
+    updatePlatformDraft(providerId, {
+      keyPreview: response.keyPreview
+    });
+    return response.apiKey;
+  }
+
+  if (session && !session.authenticated) {
     return (
       <AdminLoginScreen
         mode={authMode}
@@ -316,44 +561,31 @@ export function AdminApp() {
   }
 
   if (forbidden) {
-    return <AdminForbidden email={session.user?.email} isBusy={busy} onLogout={() => void logout()} />;
+    return <AdminForbidden email={session?.user?.email} isBusy={busy} onLogout={() => void logout()} />;
   }
 
   return (
     <AdminDashboard
-      email={session.user?.email}
+      checkingSession={!session}
+      email={session?.user?.email}
       overview={overview}
       status={status}
       isBusy={busy}
       onRefresh={() => void refreshOverview()}
       onLogout={() => void logout()}
+      platformConfig={platformConfig}
+      platformDrafts={platformDrafts}
+      onPlatformDraftChange={updatePlatformDraft}
+      onPlatformPresetApply={applyPlatformPreset}
+      onAddPlatformModelService={addPlatformModelService}
+      onEditPlatformModelService={editPlatformModelService}
+      onSavePlatformModelConfig={savePlatformModelConfig}
+      onClearPlatformModelConfig={clearPlatformModelConfig}
+      onRevealPlatformModelConfigKey={revealPlatformModelConfigApiKey}
+      editingPlatformProviderId={editingPlatformProviderId}
+      platformTestStatus={platformTestStatus}
+      onClosePlatformModelDialog={() => setEditingPlatformProviderId(undefined)}
     />
-  );
-}
-
-function AdminShellLoadingScreen({ status }: { status: string }) {
-  return (
-    <main className="grid min-h-dvh grid-rows-[auto_minmax(0,1fr)] bg-[var(--bg)] text-[var(--text)]">
-      <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <img src={brandLogoUrl} alt="Haitu" className="h-8 w-8 rounded-[8px]" />
-            <h1 className="m-0 text-xl font-black leading-tight">项目方后台</h1>
-            <Badge tone="ok">Admin</Badge>
-          </div>
-          <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">正在确认后台登录状态</p>
-        </div>
-      </header>
-      <div className="grid min-h-0 place-items-center px-4 py-4 min-[1100px]:px-6">
-        <Card className="grid min-h-[260px] w-full max-w-[520px] place-items-center bg-[var(--card)]">
-          <div className="grid justify-items-center gap-3 text-center">
-            <RefreshCcw className="animate-spin text-[var(--accent)]" size={30} />
-            <div className="text-sm font-black">正在检查登录状态</div>
-            {status ? <div className="max-w-[360px] text-xs font-semibold leading-5 text-[var(--muted)]">{status}</div> : null}
-          </div>
-        </Card>
-      </div>
-    </main>
   );
 }
 
@@ -480,26 +712,55 @@ function AdminLoginScreen({
 }
 
 function AdminDashboard({
+  checkingSession,
   email,
+  editingPlatformProviderId,
   isBusy,
+  onAddPlatformModelService,
+  onClearPlatformModelConfig,
+  onClosePlatformModelDialog,
+  onEditPlatformModelService,
   onLogout,
+  onPlatformDraftChange,
+  onPlatformPresetApply,
+  onRevealPlatformModelConfigKey,
   onRefresh,
+  onSavePlatformModelConfig,
   overview,
+  platformConfig,
+  platformDrafts,
+  platformTestStatus,
   status
 }: {
+  checkingSession: boolean;
   email?: string;
+  editingPlatformProviderId?: ModelConfigProviderId;
   isBusy: boolean;
   onLogout: () => void;
+  onPlatformDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
+  onPlatformPresetApply: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
+  onAddPlatformModelService: (providerId: ModelConfigProviderId) => void;
+  onEditPlatformModelService: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
+  onClearPlatformModelConfig: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onRevealPlatformModelConfigKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
+  onClosePlatformModelDialog: () => void;
   onRefresh: () => void;
+  onSavePlatformModelConfig: (providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
   overview?: AdminOverview;
+  platformConfig: ProviderConfigLedger;
+  platformDrafts: Record<ModelConfigProviderId, ModelConfigDraft>;
+  platformTestStatus: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
   status: string;
 }) {
+  const adminShellStatus = checkingSession ? "检查登录状态" : isBusy ? "刷新数据中" : "";
   const growthOption = useMemo(() => buildGrowthOption(overview), [overview]);
   const activityOption = useMemo(() => buildActivityOption(overview), [overview]);
+  const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | undefined>();
   const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | undefined>();
   const [detailStatus, setDetailStatus] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
+  const activeNavigationItem = adminNavigationItems.find((item) => item.id === activeSection) ?? adminNavigationItems[0];
 
   async function openUserDetail(user: AdminUserSummary) {
     setSelectedUser(user);
@@ -523,56 +784,113 @@ function AdminDashboard({
     setDetailLoading(false);
   }
 
-  return (
-    <main className="grid h-dvh grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-      <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <img src={brandLogoUrl} alt="Haitu" className="h-8 w-8 rounded-[8px]" />
-            <h1 className="m-0 text-xl font-black leading-tight">项目方后台</h1>
-            <Badge tone="ok">Admin</Badge>
+  function renderAdminSection() {
+    if (!overview) {
+      return <AdminDashboardSkeleton checkingSession={checkingSession} />;
+    }
+    if (activeSection === "overview") {
+      return (
+        <section className="grid gap-4" aria-label="后台概览">
+          <AdminMetricGrid overview={overview} />
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card className="bg-[var(--card)]">
+              <CardHeader heading="注册趋势" icon={<BarChart3 size={16} />} right={<Badge>30 天</Badge>} />
+              <AdminChart option={growthOption} empty={overview.growth.every((row) => row.registrations === 0)} />
+            </Card>
+            <Card className="bg-[var(--card)]">
+              <CardHeader heading="活跃趋势" icon={<Activity size={16} />} right={<Badge>30 天</Badge>} />
+              <AdminChart option={activityOption} empty={overview.activity.every((row) => row.events === 0)} />
+            </Card>
           </div>
-          <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">用户增长、活跃和使用概览</p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge>{email ?? "admin"}</Badge>
-          <Button onClick={onRefresh} disabled={isBusy}>
-            <RefreshCcw size={14} />
-            刷新
-          </Button>
-          <Button variant="ghost" onClick={onLogout} disabled={isBusy}>
-            <LogOut size={14} />
-            退出
-          </Button>
-        </div>
-      </header>
+        </section>
+      );
+    }
+    if (activeSection === "users") {
+      return (
+        <section className="grid gap-4" aria-label="用户管理">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <AdminCompactMetric label="用户" value={overview.metrics.totalUsers} hint={`${overview.metrics.verifiedUsers} 已验证`} />
+            <AdminCompactMetric label="工作区" value={overview.metrics.totalWorkspaces} hint="全站工作区" />
+            <AdminCompactMetric label="视频任务" value={overview.metrics.totalVideoJobs} hint="用户生成记录" />
+          </div>
+          <AdminUsersTable users={overview.users} onSelectUser={(user) => void openUserDetail(user)} />
+        </section>
+      );
+    }
+    if (activeSection === "platform-models") {
+      return (
+        <section className="grid gap-4" aria-label="平台模型">
+          <PlatformModelAdminPanel
+            config={platformConfig}
+            drafts={platformDrafts}
+            editingProviderId={editingPlatformProviderId}
+            isBusy={isBusy}
+            testStatuses={platformTestStatus}
+            onAdd={onAddPlatformModelService}
+            onApplyPreset={onPlatformPresetApply}
+            onClear={onClearPlatformModelConfig}
+            onCloseDialog={onClosePlatformModelDialog}
+            onDraftChange={onPlatformDraftChange}
+            onEdit={onEditPlatformModelService}
+            onRevealApiKey={onRevealPlatformModelConfigKey}
+            onSave={onSavePlatformModelConfig}
+          />
+        </section>
+      );
+    }
+    if (activeSection === "billing") {
+      return (
+        <AdminPlaceholderSection
+          icon={<CreditCard size={18} />}
+          title="充值账单"
+          badge="待接入"
+          items={["余额管理", "充值记录", "平台调用收费"]}
+        />
+      );
+    }
+    return (
+      <AdminPlaceholderSection
+        icon={<Settings2 size={18} />}
+        title="系统"
+        badge="待接入"
+        items={["备份", "审计日志", "运行状态"]}
+      />
+    );
+  }
 
-      <div className="min-h-0 overflow-y-auto px-4 py-4 min-[1100px]:px-6">
-        {status ? <AdminStatus status={status} /> : null}
-        {!overview ? (
-          <Card className="grid min-h-[360px] place-items-center bg-[var(--card)]">
-            <div className="grid justify-items-center gap-3 text-center">
-              <RefreshCcw className="animate-spin text-[var(--accent)]" size={30} />
-              <div className="text-sm font-black">正在载入后台数据</div>
+  return (
+    <main className="grid h-dvh grid-cols-[260px_minmax(0,1fr)] overflow-hidden bg-[var(--bg)] text-[var(--text)] max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto_minmax(0,1fr)]">
+      <AdminSidebar
+        activeSection={activeSection}
+        email={email}
+        onSectionChange={setActiveSection}
+      />
+      <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+        <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="m-0 text-xl font-black leading-tight">{activeNavigationItem.label}</h1>
+              <Badge tone="ok">Admin</Badge>
             </div>
-          </Card>
-        ) : (
-          <section className="grid gap-4" aria-label="项目方用户后台">
-            <AdminMetricGrid overview={overview} />
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Card className="bg-[var(--card)]">
-                <CardHeader heading="注册趋势" icon={<BarChart3 size={16} />} right={<Badge>30 天</Badge>} />
-                <AdminChart option={growthOption} empty={overview.growth.every((row) => row.registrations === 0)} />
-              </Card>
-              <Card className="bg-[var(--card)]">
-                <CardHeader heading="活跃趋势" icon={<Activity size={16} />} right={<Badge>30 天</Badge>} />
-                <AdminChart option={activityOption} empty={overview.activity.every((row) => row.events === 0)} />
-              </Card>
-            </div>
-            <AdminUsersTable users={overview.users} onSelectUser={(user) => void openUserDetail(user)} />
-          </section>
-        )}
-      </div>
+            <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">{activeNavigationItem.description}</p>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Button onClick={onRefresh} disabled={isBusy}>
+              <RefreshCcw className={isBusy ? "animate-spin" : undefined} size={14} />
+              {adminShellStatus || "刷新"}
+            </Button>
+            <Button variant="ghost" onClick={onLogout} disabled={isBusy}>
+              <LogOut size={14} />
+              退出
+            </Button>
+          </div>
+        </header>
+
+        <div className="min-h-0 overflow-y-auto px-4 py-4 min-[1100px]:px-6">
+          {status ? <AdminStatus status={status} /> : null}
+          {renderAdminSection()}
+        </div>
+      </section>
       <AdminUserDetailDrawer
         detail={selectedUserDetail}
         fallbackUser={selectedUser}
@@ -581,6 +899,159 @@ function AdminDashboard({
         onClose={closeUserDetail}
       />
     </main>
+  );
+}
+
+function platformModelAdminEndpoint(providerId: ModelConfigProviderId): string {
+  return platformModelAdminProviders.find((provider) => provider.providerId === providerId)?.endpoint
+    ?? `/api/platform/model-configs/${providerId}`;
+}
+
+function AdminSidebar({
+  activeSection,
+  email,
+  onSectionChange
+}: {
+  activeSection: AdminSection;
+  email?: string;
+  onSectionChange: (section: AdminSection) => void;
+}) {
+  return (
+    <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] border-r border-[var(--border)] bg-[var(--panel)] max-[900px]:grid-rows-none max-[900px]:border-b max-[900px]:border-r-0">
+      <div className="flex min-w-0 items-center gap-3 border-b border-[var(--border)] px-4 py-4 max-[900px]:border-b-0">
+        <img src={brandLogoUrl} alt="Haitu" className="h-9 w-9 rounded-[8px]" />
+        <div className="min-w-0">
+          <div className="truncate text-[16px] font-black leading-tight">项目方后台</div>
+          <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--muted)]">{email ?? "admin"}</div>
+        </div>
+      </div>
+      <nav className="min-h-0 overflow-y-auto px-3 py-3 max-[900px]:overflow-x-auto max-[900px]:overflow-y-hidden max-[900px]:px-4 max-[900px]:pt-0" aria-label="后台导航">
+        <div className="grid gap-1.5 max-[900px]:flex max-[900px]:min-w-max">
+          {adminNavigationItems.map((item) => {
+            const Icon = item.icon;
+            const active = item.id === activeSection;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={cn(
+                  "grid min-h-[58px] grid-cols-[30px_minmax(0,1fr)] items-center gap-2 rounded-lg border px-2.5 text-left transition",
+                  active
+                    ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--text)] shadow-[inset_3px_0_0_var(--accent)]"
+                    : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--field)]",
+                  "max-[900px]:min-w-[138px] max-[900px]:grid-cols-[22px_minmax(0,1fr)] max-[900px]:shadow-none"
+                )}
+                aria-current={active ? "page" : undefined}
+                onClick={() => onSectionChange(item.id)}
+              >
+                <span className={cn("grid h-7 w-7 place-items-center rounded-[8px]", active ? "bg-[var(--accent)] text-white" : "bg-[var(--panel2)] text-[var(--accent)]")}>
+                  <Icon size={15} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-black">{item.label}</span>
+                  <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-80">{item.description}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+      <div className="border-t border-[var(--border)] px-4 py-3 text-[11px] font-semibold leading-5 text-[var(--muted)] max-[900px]:hidden">
+        平台 Key 只在后台加密保存，普通用户只选择可用组合。
+      </div>
+    </aside>
+  );
+}
+
+function PlatformModelAdminPanel({
+  config,
+  drafts,
+  editingProviderId,
+  isBusy,
+  testStatuses,
+  onAdd,
+  onApplyPreset,
+  onClear,
+  onCloseDialog,
+  onDraftChange,
+  onEdit,
+  onRevealApiKey,
+  onSave
+}: {
+  config: ProviderConfigLedger;
+  drafts: Record<ModelConfigProviderId, ModelConfigDraft>;
+  editingProviderId?: ModelConfigProviderId;
+  isBusy: boolean;
+  testStatuses: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
+  onAdd: (providerId: ModelConfigProviderId) => void;
+  onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
+  onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onCloseDialog: () => void;
+  onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
+  onEdit: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
+  onRevealApiKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
+  onSave: (providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  const groups: ModelServiceGroup[] = platformModelAdminProviders.map((provider) => ({
+    kind: provider.providerId === "openai-compatible-text" ? "text" : provider.providerId === "openai-compatible-image" ? "image" : "video",
+    title: provider.title,
+    description: provider.description,
+    models: platformModelsForProvider(config, provider.providerId),
+    providerId: provider.providerId,
+    badge: provider.badge
+  }));
+  const editingGroup = groups.find((group) => group.providerId === editingProviderId);
+  const configuredCount = groups.reduce((total, group) => total + group.models.filter((model) => model.configured).length, 0);
+  return (
+    <Card className="bg-[var(--card)]">
+      <CardHeader
+        heading="平台模型配置"
+        icon={<KeyRound size={16} />}
+        right={<Badge tone={configuredCount > 0 ? "ok" : "neutral"}>{configuredCount} 条平台服务</Badge>}
+      />
+      <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 py-2 text-[12px] font-semibold leading-5 text-[var(--muted)]">
+        平台 API Key 加密写入数据库；这里和用户自带 API 使用同一套模型服务配置，只是服务归属为平台托管。
+      </div>
+      <div className="grid gap-3">
+        {groups.map((group) => (
+          <SharedModelServiceGroup
+            key={group.providerId}
+            title={group.title}
+            badge={group.badge}
+            description={group.description}
+            providerId={group.providerId}
+            models={group.models}
+            apiOwner="platform"
+            keyBadgeLabel="平台托管"
+            addButtonLabel={(badge) => `添加${badge}服务`}
+            emptyText="还没有配置平台服务，添加平台 API Key 后这里会显示已启用的模型服务。"
+            canManageServices
+            isBusy={isBusy}
+            onAdd={() => onAdd(group.providerId)}
+            onEdit={(model) => onEdit(group.providerId, model, group.models)}
+            onClear={onClear}
+          />
+        ))}
+      </div>
+      {editingGroup ? (
+        <SharedModelConfigDialog
+          title={`添加${editingGroup.badge}服务`}
+          badge={editingGroup.badge}
+          providerId={editingGroup.providerId}
+          draft={drafts[editingGroup.providerId]}
+          testStatus={testStatuses[editingGroup.providerId]}
+          presets={modelConfigPresets[editingGroup.providerId]}
+          apiKeyLabel="平台 API Key"
+          enableLabel="启用"
+          onDraftChange={onDraftChange}
+          onApplyPreset={onApplyPreset}
+          onClose={onCloseDialog}
+          onRevealApiKey={onRevealApiKey}
+          onSave={onSave}
+          isBusy={isBusy}
+        />
+      ) : null}
+    </Card>
   );
 }
 
@@ -613,6 +1084,94 @@ function AdminMetricGrid({ overview }: { overview: AdminOverview }) {
         );
       })}
     </section>
+  );
+}
+
+function AdminCompactMetric({ hint, label, value }: { hint: string; label: string; value: number }) {
+  return (
+    <Card className="bg-[var(--card)] p-3">
+      <div className="text-[12px] font-black text-[var(--muted)]">{label}</div>
+      <div className="mt-1 text-[22px] font-black tabular-nums leading-tight">{formatNumber(value)}</div>
+      <div className="mt-1 truncate text-[11px] font-semibold text-[var(--muted)]">{hint}</div>
+    </Card>
+  );
+}
+
+function AdminPlaceholderSection({
+  badge,
+  icon,
+  items,
+  title
+}: {
+  badge: string;
+  icon: React.ReactNode;
+  items: string[];
+  title: string;
+}) {
+  return (
+    <Card className="bg-[var(--card)]">
+      <CardHeader heading={title} icon={icon} right={<Badge>{badge}</Badge>} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        {items.map((item) => (
+          <div key={item} className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)] px-3 py-4 text-center text-xs font-black text-[var(--muted)]">
+            {item}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function AdminDashboardSkeleton({ checkingSession }: { checkingSession: boolean }) {
+  const label = checkingSession ? "检查登录状态" : "刷新数据中";
+  return (
+    <section className="grid gap-4" aria-label={label}>
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-black text-[var(--muted)]">
+        <RefreshCcw className="animate-spin text-[var(--accent)]" size={14} />
+        {label}
+      </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="后台指标占位">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Card key={index} className="bg-[var(--card)] p-3">
+            <div className="grid gap-2">
+              <div className="h-3 w-16 rounded bg-[var(--panel2)]" />
+              <div className="h-7 w-12 rounded bg-[var(--panel2)]" />
+              <div className="h-3 w-20 rounded bg-[var(--panel2)]" />
+            </div>
+          </Card>
+        ))}
+      </section>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <AdminSkeletonPanel />
+        <AdminSkeletonPanel />
+      </div>
+      <Card className="overflow-hidden bg-[var(--card)] p-0">
+        <div className="border-b border-[var(--border)] p-4">
+          <div className="h-5 w-24 rounded bg-[var(--panel2)]" />
+        </div>
+        <div className="grid gap-3 p-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-10 rounded bg-[var(--panel2)]" />
+          ))}
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+function AdminSkeletonPanel() {
+  return (
+    <Card className="bg-[var(--card)]">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="h-5 w-24 rounded bg-[var(--panel2)]" />
+        <div className="h-6 w-12 rounded-full bg-[var(--panel2)]" />
+      </div>
+      <div className="grid h-[280px] content-end gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--field)] p-4">
+        <div className="h-[42%] w-full rounded bg-[var(--panel2)]" />
+        <div className="h-[26%] w-full rounded bg-[var(--panel2)]" />
+        <div className="h-[58%] w-full rounded bg-[var(--panel2)]" />
+      </div>
+    </Card>
   );
 }
 
@@ -1008,6 +1567,15 @@ async function getJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  return readJsonResponse<T>(response);
+}
+
+async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });

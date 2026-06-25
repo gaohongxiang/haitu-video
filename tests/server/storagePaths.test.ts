@@ -49,8 +49,7 @@ describe("storage path resolution", () => {
       dir: join(dataDir, "workspaces", "default"),
       productsDir: join(dataDir, "workspaces", "default", "products"),
       jobsDir: join(dataDir, "workspaces", "default", "jobs"),
-      settingsDir: join(dataDir, "workspaces", "default", "settings"),
-      providerKeysFile: join(dataDir, "workspaces", "default", "settings", "provider-keys.json")
+      settingsDir: join(dataDir, "workspaces", "default", "settings")
     });
   });
 

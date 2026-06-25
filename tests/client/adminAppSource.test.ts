@@ -3,13 +3,19 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const adminAppPath = "src/client/AdminApp.tsx";
+const sharedModelConfigPath = "src/client/components/modelServiceConfig.tsx";
 
 describe("admin app source", () => {
-  it("keeps the admin shell in an auth-checking state instead of flashing the login page", async () => {
+  it("keeps the admin shell mounted while checking auth and loading data", async () => {
     const source = await readFile(adminAppPath, "utf8");
 
     expect(source).toContain("useState<AuthSession | undefined>();");
-    expect(source).toContain("<AdminShellLoadingScreen status={status} />");
+    expect(source).toContain("<AdminDashboard");
+    expect(source).toContain("checkingSession={!session}");
+    expect(source).toContain('const adminShellStatus = checkingSession ? "检查登录状态" : isBusy ? "刷新数据中" : "";');
+    expect(source).not.toContain("function AdminShellLoadingScreen");
+    expect(source).not.toContain("正在检查登录状态");
+    expect(source).not.toContain("正在载入后台数据");
     expect(source).not.toContain('useState<AuthSession>({ authEnabled: true, authenticated: false })');
   });
 
@@ -33,5 +39,60 @@ describe("admin app source", () => {
     expect(activityOptionSource).toContain("grid: { left: 36, right: 18, top: 22, bottom: 62 }");
     expect(activityOptionSource).toContain("legend: {");
     expect(activityOptionSource).toContain("bottom: 4");
+  });
+
+  it("lets project admins configure platform model keys without exposing them to users", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+
+    expect(source).toContain("PlatformModelAdminPanel");
+    expect(source).toContain("/api/platform/model-configs/openai-compatible-text");
+    expect(source).toContain("/api/platform/model-configs/openai-compatible-image");
+    expect(source).toContain("/api/platform/model-configs/volcengine-seedance");
+    expect(source).toContain('getJson<PlatformModelAdminConfigResponse>("/api/platform/model-configs")');
+    expect(source).toContain("platformConfigLedgerFromResponse");
+    expect(source).toContain("keyPreview");
+    expect(source).toContain("revealPlatformModelConfigApiKey");
+    expect(source).toContain('method: "DELETE"');
+    expect(source).toContain("平台 API Key 加密写入数据库");
+  });
+
+  it("shows platform models as multi-service lists with editable base urls", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+    const sharedSource = await readFile(sharedModelConfigPath, "utf8");
+    const panelSource = source.slice(source.indexOf("function PlatformModelAdminPanel"), source.indexOf("function AdminMetricGrid"));
+
+    expect(source).toContain('from "./components/modelServiceConfig.js"');
+    expect(source).toContain("SharedModelServiceGroup");
+    expect(source).toContain("SharedModelConfigDialog");
+    expect(source).not.toContain("function PlatformModelServiceForm");
+    expect(source).not.toContain("PlatformModelDraftsByProvider");
+    expect(source).not.toContain("createPlatformModelDraft");
+    expect(source).not.toContain("addPlatformModelDraft");
+    expect(source).not.toContain("savedPlatformModelDrafts");
+    expect(panelSource).toContain('apiOwner="platform"');
+    expect(panelSource).toContain('apiKeyLabel="平台 API Key"');
+    expect(panelSource).toContain('keyBadgeLabel="平台托管"');
+    expect(panelSource).toContain('addButtonLabel={(badge) => `添加${badge}服务`}');
+    expect(panelSource).toContain("platformModelsForProvider(config, provider.providerId)");
+    expect(panelSource).toContain("启用");
+    expect(panelSource).toContain("添加${badge}服务");
+    expect(sharedSource).toContain("baseUrl");
+    expect(sharedSource).toContain("实际端点前缀");
+    expect(sharedSource).toContain("优先级");
+    expect(sharedSource).toContain("showApiKey");
+    expect(sharedSource).toContain("toggleCatalogModel");
+  });
+
+  it("splits admin work into a left navigation shell instead of one crowded page", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+    const dashboardSource = source.slice(source.indexOf("function AdminDashboard"), source.indexOf("function platformModelAdminEndpoint"));
+
+    expect(source).toContain('type AdminSection = "overview" | "users" | "platform-models" | "billing" | "system";');
+    expect(source).toContain("const adminNavigationItems");
+    expect(source).toContain("AdminSidebar");
+    expect(source).toContain("renderAdminSection");
+    expect(dashboardSource).toContain("grid h-dvh grid-cols-[260px_minmax(0,1fr)]");
+    expect(dashboardSource).toContain("activeSection");
+    expect(dashboardSource).not.toContain("<AdminMetricGrid overview={overview} />\n            <div className=\"grid gap-4 xl:grid-cols-2\">");
   });
 });

@@ -2,7 +2,7 @@ import { MockVideoProvider } from "./mockVideoProvider.js";
 import type { ReferenceImageUrlResolver, VideoProvider } from "./types.js";
 import { VolcengineSeedanceProvider } from "./volcengine/seedanceProvider.js";
 
-export type VideoProviderName = "mock" | "seedance" | "volcengine-seedance";
+export type VideoProviderName = "mock" | "volcengine-seedance";
 
 export interface ProviderFactoryOptions {
   apiKey?: string;
@@ -19,7 +19,6 @@ export function createVideoProvider(
   switch (name) {
     case "mock":
       return new MockVideoProvider();
-    case "seedance":
     case "volcengine-seedance":
       return new VolcengineSeedanceProvider({
         apiKey: options.apiKey,

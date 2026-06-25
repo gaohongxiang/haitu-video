@@ -8,7 +8,7 @@
 - Node 进程由 systemd 保活。
 - 首选公网入口是 Cloudflare Tunnel，服务器只监听 `127.0.0.1:4173`。
 - Caddy 直连只作为备用方案。
-- Seedance/火山引擎仍是付费调用，部署本身不会触发生成请求。
+- 平台模型 Key 只放在服务端环境变量或密钥管理里，部署本身不会触发生成请求。
 
 ## 服务器目录
 
@@ -72,11 +72,19 @@ HAITU_ADMIN_EMAIL=you@haitu.online
 BETTER_AUTH_URL=https://haitu.online
 HAITU_AUTH_EMAIL_FROM=login@haitu.online
 RESEND_API_KEY=
+HAITU_PLATFORM_OPENAI_API_KEY=
+HAITU_PLATFORM_DEEPSEEK_API_KEY=
+HAITU_PLATFORM_DOUBAO_API_KEY=
+HAITU_PLATFORM_GEMINI_API_KEY=
+HAITU_PLATFORM_VOLCENGINE_API_KEY=
+HAITU_PLATFORM_DEFAULT_TEXT_MODEL=deepseek-v4-pro
+HAITU_PLATFORM_DEFAULT_IMAGE_MODEL=gpt-image-2
+HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast
 SEEDANCE_RESOLUTION=480p
 SEEDANCE_WATERMARK=false
 ```
 
-`HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。真实 API key 只放在 `/etc/haitu-video.env` 或控制台 API 管理设置里，不写进仓库。
+`HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的 BYOK 模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。平台 API Key 用 `HAITU_PLATFORM_*` 放在 `/etc/haitu-video.env` 或密钥管理里；用户自带 Key 由用户在 API 管理保存，两者都不写进仓库。
 
 账号注册和忘记密码使用邮箱验证码。配置 `RESEND_API_KEY` 和 `HAITU_AUTH_EMAIL_FROM` 后会发送真实邮件；未配置时验证码会写入 `/var/lib/haitu-video/system/auth-email-outbox.jsonl`，只适合本地调试。
 

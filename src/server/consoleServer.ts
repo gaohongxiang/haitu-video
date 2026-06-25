@@ -33,15 +33,19 @@ import { generateJapaneseAdScript } from "../core/scriptGenerator.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
 import type { ReferenceImageUrlResolver } from "../providers/types.js";
 import { VolcengineUsageClient, type ListUsageTasksRequest } from "../providers/volcengine/usageClient.js";
+import { imageModelBaseUrl, imageModelName, textModelBaseUrl, textModelName } from "../providers/openaiCompatibleTextProvider.js";
+import { createImageProvider, type ImageProvider } from "../providers/imageProviderFactory.js";
 import {
-  OpenAiCompatibleTextProvider,
-  imageModelBaseUrl,
-  imageModelName,
-  textModelBaseUrl,
-  textModelName
-} from "../providers/openaiCompatibleTextProvider.js";
+  catalogEntryForModel,
+  defaultCatalogEntryForVendor,
+  defaultVideoModelBaseUrl,
+  defaultVideoModelId,
+  type ModelProviderId
+} from "../providers/modelCatalog.js";
+import { discoverAvailableModels, type DiscoveredModel } from "../providers/modelDiscovery.js";
+import { createTextProvider, inferTextModelApiMode, normalizeTextModelApiMode } from "../providers/textProviderFactory.js";
+import type { TextProvider } from "../providers/textProviderTypes.js";
 import { ZodError } from "zod";
-import { OpenAiCompatibleImageProvider } from "../providers/openaiCompatibleImageProvider.js";
 import { FileAuditLog } from "./auditLog.js";
 import { buildJobLedger, buildJobLedgerFromReports, deleteJobLedgerEntry } from "./jobLedger.js";
 import { isPublicConsoleRoute, type ConsoleAuthStore } from "./consoleAuth.js";
@@ -65,26 +69,26 @@ import {
   type SelectFinalInput
 } from "./reviewStore.js";
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
-import { LocalVideoJobQueue, type LocalVideoJobQueueOptions } from "./consoleVideoJobQueue.js";
-import {
-  maskSecret,
-  providerKeyStatus,
-  resolveImageModelApiKey,
-  resolveProviderApiKey,
-  resolveTextModelApiKey,
-  type ApiProviderId,
-  type ProviderKeySource,
-  type ProviderKeyStore,
-  type ProviderStoredConfig
-} from "./providerKeyStore.js";
+import { LocalVideoJobQueue, type LocalVideoJobQueueOptions, type VideoJobRequest } from "./consoleVideoJobQueue.js";
 import { cleanupExpiredVideos } from "./videoRetention.js";
 import { BetterAuthConsoleAuthStore } from "./auth/betterAuthStore.js";
 import { buildAdminOverview, buildAdminUserDetail } from "./adminDashboard.js";
 import { closeDatabase, openDatabase, type DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { ensureDefaultWorkspace, runMigrations } from "./db/migrate.js";
-import { SqliteProviderKeyStore } from "./db/sqliteProviderKeyStore.js";
+import { SqliteModelConfigStore } from "./db/sqliteModelConfigStore.js";
 import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
+import {
+  modelProviderStatus,
+  type ApiOwner,
+  type ModelConfigStore,
+  type ModelProviderKeySource,
+  type ModelStoredConfig
+} from "./modelConfigStore.js";
+import { ModelBundleStore, type ModelBundle, type ModelBundleInput } from "./modelBundleStore.js";
+import { ModelServicePreferenceStore, normalizeServiceMode, type ModelServicePreference } from "./modelServicePreferenceStore.js";
+import { InsufficientWalletBalanceError, WalletStore } from "./walletStore.js";
+import { ensurePlatformBundles, ensurePlatformModelProvisioning } from "./platformModelProvisioning.js";
 
 export interface ConsoleServerOptions {
   rootDir?: string;
@@ -108,10 +112,13 @@ export interface ConsoleServerHandle {
   publicAssetTokenStoreForTests?: PublicAssetTokenStore;
 }
 
+type AiUsageKind = "text" | "image";
+
 interface MakeVideoRequest {
   productPath: string;
   outDirName?: string;
   provider?: VideoProviderName;
+  providerModelConfigId?: string;
   providerModel?: string;
   duration?: number;
   template?: ScriptTemplate;
@@ -137,6 +144,7 @@ interface PublishPackageRequest {
 interface PreflightRequest {
   productPath: string;
   provider?: VideoProviderName;
+  providerModelConfigId?: string;
   duration?: number;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
@@ -173,15 +181,23 @@ interface ReorderProductReferenceImagesRequest {
 interface GenerateProductReferenceImagesRequest {
   count?: number;
   prompt?: string;
+  imageModelConfigId?: string;
 }
 
 interface ImportProductPreviewRequest {
   text?: string;
+  textModelConfigId?: string;
+}
+
+interface WalletTopUpRequest {
+  amountCny?: number;
+  description?: string;
 }
 
 interface StoryboardDraftRequest {
   duration?: number;
   template?: ScriptTemplate;
+  textModelConfigId?: string;
 }
 
 interface StoryboardHistoryRequest {
@@ -232,18 +248,35 @@ interface TemplateManagementRequest {
   enabledTemplates?: unknown;
 }
 
-interface ProviderKeyRequest {
+interface ModelConfigRequest {
   configId?: string;
   apiKey?: string;
   name?: string;
   vendor?: string;
   priority?: number;
   baseUrl?: string;
-  model?: string;
+  model?: string | string[];
+  apiMode?: string;
   enabled?: boolean;
+  taskScopes?: Array<"product_import" | "storyboard">;
+  tags?: string[];
 }
 
-interface ProviderConfigTestRequest extends ProviderKeyRequest {}
+interface ProviderConfigTestRequest extends ModelConfigRequest {}
+
+interface ProviderModelDiscoveryResponse {
+  ok: true;
+  provider: ModelProviderId;
+  models: DiscoveredModel[];
+}
+
+interface ModelConfigKeyRevealResponse {
+  ok: true;
+  provider: ModelProviderId;
+  configId: string;
+  apiKey: string;
+  keyPreview?: string;
+}
 
 interface UploadedProductReferenceImage {
   originalName: string;
@@ -257,18 +290,24 @@ interface GeneratedProductReferenceImage {
 }
 
 interface ProviderConfigItem {
-  id: ApiProviderId;
+  id: ModelProviderId;
   configId?: string;
+  credentialId?: string;
   label: string;
   providerLabel?: string;
+  apiOwner?: ApiOwner;
   configured: boolean;
-  keySource?: ProviderKeySource;
+  keySource?: ModelProviderKeySource;
   keyPreview?: string;
   baseUrl: string;
   model: string;
+  apiMode?: string;
   priority: number;
   capabilities: string[];
   modelKind: "text" | "image" | "video";
+  enabled?: boolean;
+  taskScopes?: string[];
+  tags?: string[];
 }
 
 interface VideoProviderConfigItem extends ProviderConfigItem {
@@ -286,6 +325,32 @@ interface ProviderConfigLedger {
   imageModels: ProviderConfigItem[];
   videoModels: VideoProviderConfigItem[];
   providers: VideoProviderConfigItem[];
+  runtime: {
+    textConfigured: boolean;
+    imageConfigured: boolean;
+    videoConfigured: boolean;
+  };
+}
+
+interface PlatformModelAdminConfigItem {
+  id: ModelProviderId;
+  configId?: string;
+  label: string;
+  vendor?: string;
+  model: string;
+  baseUrl?: string;
+  apiMode?: string;
+  priority: number;
+  configured: boolean;
+  keyPreview?: string;
+  apiOwner: "platform";
+  enabled?: boolean;
+}
+
+interface PlatformModelAdminConfigResponse {
+  textModels: PlatformModelAdminConfigItem[];
+  imageModels: PlatformModelAdminConfigItem[];
+  videoModels: PlatformModelAdminConfigItem[];
 }
 
 interface ProductListQuality {
@@ -303,12 +368,17 @@ interface ConsoleRequestContext {
   workspacePaths: ReturnType<typeof getWorkspacePaths>;
   fixturesDir: string;
   outputsDir: string;
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore: ModelConfigStore;
+  modelBundleStore: ModelBundleStore;
+  modelServicePreferenceStore: ModelServicePreferenceStore;
+  walletStore: WalletStore;
   videoJobQueue: LocalVideoJobQueue;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
 }
 
 const PUBLIC_ASSET_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
+const aiInsufficientBalanceMessage = "余额不足，请先充值后再使用 AI 功能。";
 
 export function createConsoleServer(options: ConsoleServerOptions = {}): ConsoleServerHandle {
   const rootDir = options.rootDir ?? process.cwd();
@@ -331,10 +401,19 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
   });
   const publicBaseUrl = publicBaseUrlFromEnv();
   const databaseHandle = createDatabaseHandle(dataDir);
-  const defaultProviderKeyStore = createProviderKeyStore({
+  const defaultModelConfigStore = createModelConfigStore({
     databaseHandle,
+    workspaceId: DEFAULT_WORKSPACE_ID
+  });
+  const defaultModelBundleStore = new ModelBundleStore({
+    handle: databaseHandle,
     workspaceId: DEFAULT_WORKSPACE_ID,
-    legacyFilePath: workspacePaths.providerKeysFile
+    now: options.now
+  });
+  const defaultModelServicePreferenceStore = new ModelServicePreferenceStore({
+    handle: databaseHandle,
+    workspaceId: DEFAULT_WORKSPACE_ID,
+    now: options.now
   });
   const auditLog = new FileAuditLog(join(storageRoots.systemDir, "audit-log.jsonl"));
   const authStore = new BetterAuthConsoleAuthStore({
@@ -343,7 +422,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
     env: process.env
   });
   const runConfiguredMakeVideoPipeline = createConfiguredMakeVideoPipeline({
-    providerKeyStore: defaultProviderKeyStore,
+    modelConfigStore: defaultModelConfigStore,
+    platformModelConfigStore: defaultModelConfigStore,
+    modelBundleStore: defaultModelBundleStore,
+    modelServicePreferenceStore: defaultModelServicePreferenceStore,
     runMakeVideoPipeline: options.runMakeVideoPipeline
   });
   const defaultReferenceImageUrlResolver = createReferenceImageUrlResolver({
@@ -366,6 +448,25 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
   const workspaceVideoJobQueues = new Map<string, LocalVideoJobQueue>([
     [DEFAULT_WORKSPACE_ID, videoJobQueue]
   ]);
+  const ensurePlatformBundlesForAllWorkspaces = async () => {
+    await Promise.all(retentionWorkspaceIds(databaseHandle).map((workspaceId) => ensurePlatformModelProvisioning({
+      env: process.env,
+      platformModelConfigStore: defaultModelConfigStore,
+      modelBundleStore: new ModelBundleStore({
+        handle: databaseHandle,
+        workspaceId,
+        now: options.now
+      }),
+      modelServicePreferenceStore: new ModelServicePreferenceStore({
+        handle: databaseHandle,
+        workspaceId,
+        now: options.now
+      })
+    })));
+  };
+  void ensurePlatformBundlesForAllWorkspaces().catch((error: unknown) => {
+    console.warn("Failed to provision platform model bundles.", error);
+  });
   const runVideoRetentionCleanup = async () => {
     for (const workspaceId of retentionWorkspaceIds(databaseHandle)) {
       await cleanupExpiredVideos({
@@ -523,14 +624,16 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         rootDir,
         databaseHandle,
         authStore,
-        defaultProviderKeyStore,
+        defaultModelConfigStore,
         defaultVideoJobQueue: videoJobQueue,
         workspaceVideoJobQueues,
         settingsStore,
         fetchImpl: options.fetchImpl,
         runMakeVideoPipeline: options.runMakeVideoPipeline,
         publicBaseUrl,
-        publicAssetTokenStore
+        publicAssetTokenStore,
+        platformModelConfigStore: defaultModelConfigStore,
+        now: options.now
       });
       if (request.method === "GET" && url.pathname === "/api/products") {
         return jsonResponse({
@@ -539,6 +642,79 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             workspaceId: requestContext.workspaceId
           })
         });
+      }
+      if (request.method === "GET" && url.pathname === "/api/wallet") {
+        return jsonResponse(requestContext.walletStore.getSummary());
+      }
+      if (request.method === "POST" && url.pathname === "/api/wallet/top-up") {
+        const body = (await request.json()) as WalletTopUpRequest;
+        const wallet = requestContext.walletStore.topUp({
+          amountCny: Number(body.amountCny),
+          description: normalizeText(body.description) ?? "充值"
+        });
+        await auditLog.append({
+          action: "wallet.top_up",
+          metadata: {
+            workspaceId: requestContext.workspaceId,
+            amountCny: body.amountCny
+          }
+        });
+        return jsonResponse({ wallet });
+      }
+      if (request.method === "GET" && url.pathname === "/api/model-bundles") {
+        return jsonResponse({
+          bundles: requestContext.modelBundleStore.list()
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/model-service-preference") {
+        return jsonResponse({
+          preference: requestContext.modelServicePreferenceStore.get()
+        });
+      }
+      if (request.method === "PUT" && url.pathname === "/api/model-service-preference") {
+        const input = (await request.json()) as Partial<ModelServicePreference>;
+        await assertModelServicePreferenceBundlesExist(input, requestContext.modelBundleStore);
+        const preference = requestContext.modelServicePreferenceStore.set({
+          serviceMode: normalizeServiceMode(input.serviceMode),
+          platformBundleId: input.platformBundleId,
+          byokBundleId: input.byokBundleId
+        });
+        await auditLog.append({
+          action: "model_service_preference.saved",
+          metadata: {
+            workspaceId: requestContext.workspaceId,
+            serviceMode: preference.serviceMode,
+            platformBundleId: preference.platformBundleId,
+            byokBundleId: preference.byokBundleId
+          }
+        });
+        return jsonResponse({ preference });
+      }
+      if (request.method === "PUT" && url.pathname === "/api/model-bundles") {
+        const input = (await request.json()) as ModelBundleInput;
+        await assertModelBundleConfigsExist(input, {
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore
+        });
+        const bundle = requestContext.modelBundleStore.set(input);
+        await auditLog.append({
+          action: "model_bundle.saved",
+          target: bundle.bundleId,
+          metadata: {
+            label: bundle.label
+          }
+        });
+        return jsonResponse({ bundle });
+      }
+      const modelBundleMatch = url.pathname.match(/^\/api\/model-bundles\/([^/]+)$/);
+      if (modelBundleMatch && request.method === "DELETE") {
+        const bundleId = decodeURIComponent(modelBundleMatch[1] ?? "");
+        requestContext.modelBundleStore.delete(bundleId);
+        await auditLog.append({
+          action: "model_bundle.deleted",
+          target: bundleId
+        });
+        return jsonResponse({ ok: true });
       }
       if (request.method === "POST" && url.pathname === "/api/products") {
         return jsonResponse({
@@ -557,7 +733,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (request.method === "POST" && url.pathname === "/api/products/import-ai-preview") {
         return jsonResponse(await buildAiImportedProductPreview({
-          providerKeyStore: requestContext.providerKeyStore,
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+          walletStore: requestContext.walletStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as ImportProductPreviewRequest
         }));
@@ -617,7 +797,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             outputsDir: requestContext.outputsDir,
             fixturesDir: requestContext.fixturesDir,
             settingsStore,
-            providerKeyStore: requestContext.providerKeyStore,
+            modelConfigStore: requestContext.modelConfigStore,
+            platformModelConfigStore: requestContext.platformModelConfigStore,
+            modelBundleStore: requestContext.modelBundleStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+            walletStore: requestContext.walletStore,
             videoJobQueue: requestContext.videoJobQueue
           })
         });
@@ -629,7 +813,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           sku,
           fixturesDir: requestContext.fixturesDir,
           rootDir: dataDir,
-          providerKeyStore: requestContext.providerKeyStore,
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+          walletStore: requestContext.walletStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as StoryboardDraftRequest
         }));
@@ -742,7 +930,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           await generateProductReferenceImages({
             fixturesDir: requestContext.fixturesDir,
             rootDir: dataDir,
-            providerKeyStore: requestContext.providerKeyStore,
+            modelConfigStore: requestContext.modelConfigStore,
+            platformModelConfigStore: requestContext.platformModelConfigStore,
+            modelBundleStore: requestContext.modelBundleStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+            walletStore: requestContext.walletStore,
             fetchImpl: options.fetchImpl,
             sku: decodeURIComponent(generateProductAssetsMatch[1] ?? ""),
             input: (await request.json()) as GenerateProductReferenceImagesRequest
@@ -866,23 +1058,113 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         return jsonResponse(result);
       }
       if (request.method === "GET" && url.pathname === "/api/provider-config") {
-        return jsonResponse(await buildProviderConfig(requestContext.providerKeyStore));
+        return jsonResponse(await buildProviderConfig({
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore
+        }));
       }
-      const providerKeyTestMatch = url.pathname.match(/^\/api\/provider-keys\/([^/]+)\/test$/);
-      if (providerKeyTestMatch && request.method === "POST") {
-        const provider = parseApiProviderId(decodeURIComponent(providerKeyTestMatch[1] ?? ""));
-        return jsonResponse(await testProviderConfig(provider, {
-          providerKeyStore: requestContext.providerKeyStore,
+      if (request.method === "GET" && url.pathname === "/api/platform/model-configs") {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        return jsonResponse(await buildPlatformModelAdminConfig(requestContext.platformModelConfigStore));
+      }
+      const platformModelConfigMatch = url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)$/);
+      const platformModelConfigKeyMatch = url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)\/key$/);
+      if (platformModelConfigKeyMatch && request.method === "GET") {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        const provider = parseModelProviderId(decodeURIComponent(platformModelConfigKeyMatch[1] ?? ""));
+        const configId = url.searchParams.get("configId") ?? undefined;
+        return jsonResponse(await revealProviderConfigKey(provider, {
+          modelConfigStore: requestContext.platformModelConfigStore,
+          configId
+        }));
+      }
+      if (platformModelConfigMatch && request.method === "PUT") {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        const provider = parseModelProviderId(decodeURIComponent(platformModelConfigMatch[1] ?? ""));
+        const providerInput = (await request.json()) as ModelConfigRequest;
+        const saved = await requestContext.platformModelConfigStore.set(provider, platformModelConfigInput(provider, providerInput));
+        await ensurePlatformBundles({
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore
+        });
+        await auditLog.append({
+          action: "platform_model_config.saved",
+          target: provider,
+          metadata: {
+            keyPreview: saved.keyPreview
+          }
+        });
+        return jsonResponse({ provider: saved });
+      }
+      if (platformModelConfigMatch && request.method === "DELETE") {
+        const adminResponse = await authStore.requireAdmin(request);
+        if (adminResponse) {
+          return adminResponse;
+        }
+        const provider = parseModelProviderId(decodeURIComponent(platformModelConfigMatch[1] ?? ""));
+        const configId = url.searchParams.get("configId") ?? undefined;
+        const deleted = await requestContext.platformModelConfigStore.delete(provider, configId);
+        await ensurePlatformBundles({
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore
+        });
+        await auditLog.append({
+          action: "platform_model_config.deleted",
+          target: provider,
+          metadata: {
+            configId
+          }
+        });
+        return jsonResponse({ provider: deleted });
+      }
+      const providerModelsMatch = url.pathname.match(/^\/api\/model-configs\/([^/]+)\/models$/);
+      if (providerModelsMatch && request.method === "POST") {
+        const provider = parseModelProviderId(decodeURIComponent(providerModelsMatch[1] ?? ""));
+        return jsonResponse(await refreshProviderModels(provider, {
+          modelConfigStore: requestContext.modelConfigStore,
           fetchImpl: options.fetchImpl,
           input: (await request.json()) as ProviderConfigTestRequest
         }));
       }
-      const providerKeyMatch = url.pathname.match(/^\/api\/provider-keys\/([^/]+)$/);
-      if (providerKeyMatch && request.method === "PUT") {
-        const provider = parseApiProviderId(decodeURIComponent(providerKeyMatch[1] ?? ""));
-        const saved = await requestContext.providerKeyStore.set(provider, (await request.json()) as ProviderKeyRequest);
+      const modelConfigTestMatch = url.pathname.match(/^\/api\/model-configs\/([^/]+)\/test$/);
+      if (modelConfigTestMatch && request.method === "POST") {
+        const provider = parseModelProviderId(decodeURIComponent(modelConfigTestMatch[1] ?? ""));
+        return jsonResponse(await testProviderConfig(provider, {
+          modelConfigStore: requestContext.modelConfigStore,
+          fetchImpl: options.fetchImpl,
+          input: (await request.json()) as ProviderConfigTestRequest
+        }));
+      }
+      const modelConfigMatch = url.pathname.match(/^\/api\/model-configs\/([^/]+)$/);
+      const modelConfigKeyMatch = url.pathname.match(/^\/api\/model-configs\/([^/]+)\/key$/);
+      if (modelConfigKeyMatch && request.method === "GET") {
+        const provider = parseModelProviderId(decodeURIComponent(modelConfigKeyMatch[1] ?? ""));
+        const configId = url.searchParams.get("configId") ?? undefined;
+        return jsonResponse(await revealProviderConfigKey(provider, {
+          modelConfigStore: requestContext.modelConfigStore,
+          configId
+        }));
+      }
+      if (modelConfigMatch && request.method === "PUT") {
+        const provider = parseModelProviderId(decodeURIComponent(modelConfigMatch[1] ?? ""));
+        const providerInput = (await request.json()) as ModelConfigRequest;
+        const saved = await requestContext.modelConfigStore.set(provider, {
+          ...providerInput,
+          apiOwner: "byok"
+        });
         await auditLog.append({
-          action: "provider_key.saved",
+          action: "model_config.saved",
           target: provider,
           metadata: {
             keySource: saved.keySource,
@@ -893,11 +1175,12 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           provider: saved
         });
       }
-      if (providerKeyMatch && request.method === "DELETE") {
-        const provider = parseApiProviderId(decodeURIComponent(providerKeyMatch[1] ?? ""));
-        const deleted = await requestContext.providerKeyStore.delete(provider, url.searchParams.get("configId") ?? undefined);
+      if (modelConfigMatch && request.method === "DELETE") {
+        const provider = parseModelProviderId(decodeURIComponent(modelConfigMatch[1] ?? ""));
+        const configId = url.searchParams.get("configId") ?? undefined;
+        const deleted = await requestContext.modelConfigStore.delete(provider, configId);
         await auditLog.append({
-          action: "provider_key.deleted",
+          action: "model_config.deleted",
           target: provider,
           metadata: {
             keySource: deleted.keySource
@@ -1019,7 +1302,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           rootDir: dataDir,
           outputsDir: requestContext.outputsDir,
           settingsStore,
-          providerKeyStore: requestContext.providerKeyStore,
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
           fetchImpl: options.fetchImpl,
           runMakeVideoPipeline: options.runMakeVideoPipeline,
           referenceImageUrlResolver: requestContext.referenceImageUrlResolver
@@ -1034,7 +1320,11 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             outputsDir: requestContext.outputsDir,
             fixturesDir: requestContext.fixturesDir,
             settingsStore,
-            providerKeyStore: requestContext.providerKeyStore,
+            modelConfigStore: requestContext.modelConfigStore,
+            platformModelConfigStore: requestContext.platformModelConfigStore,
+            modelBundleStore: requestContext.modelBundleStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+            walletStore: requestContext.walletStore,
             videoJobQueue: requestContext.videoJobQueue
           })
         });
@@ -1044,19 +1334,33 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         const productPath = resolveWithin(dataDir, body.productPath);
         const settings = await settingsStore.read();
         const providerName = body.provider ?? settings.defaultProvider;
-        await assertVideoModelConfigured(requestContext.providerKeyStore, providerName);
+        const videoModel = await resolveVideoRequestModel({
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore,
+          modelBundleStore: requestContext.modelBundleStore,
+          modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+          provider: providerName,
+          body
+        });
         await assertTemplateEnabled(body, settingsStore);
         await assertPaidProductReady({
           provider: providerName,
           productPath,
           rootDir: dataDir
         });
+        const billing = reserveVideoJobBilling({
+          walletStore: requestContext.walletStore,
+          provider: providerName,
+          modelConfig: videoModel.config,
+          durationSeconds: body.duration ?? settings.defaultDurationSeconds
+        });
         return jsonResponse({
           job: await requestContext.videoJobQueue.enqueue({
             productPath,
             outDirName: body.outDirName,
             provider: body.provider,
-            providerModel: body.providerModel,
+            providerModelConfigId: videoModel.providerModelConfigId,
+            providerModel: videoModel.providerModel,
             duration: body.duration,
             template: body.template,
             finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
@@ -1064,6 +1368,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
             scriptLines: sanitizeLines(body.scriptLines),
             storyboardLines: sanitizeLines(body.storyboardLines),
             confirmPaid: body.confirmPaid ?? providerName !== "mock",
+            ...billing,
             reuseManifest: body.reuseManifest ? resolveWithin(dataDir, body.reuseManifest) : undefined
           })
         });
@@ -1106,7 +1411,8 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           jobId,
           confirmPaid: body.confirmPaid,
           videoJobQueue: requestContext.videoJobQueue,
-          providerKeyStore: requestContext.providerKeyStore
+          modelConfigStore: requestContext.modelConfigStore,
+          platformModelConfigStore: requestContext.platformModelConfigStore
         });
         const job = await requestContext.videoJobQueue.retry(jobId, {
           confirmPaid: body.confirmPaid === true
@@ -1151,7 +1457,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (request.method === "GET" && url.pathname === "/api/provider-tasks") {
         return jsonResponse({
           usage: await listProviderTasks(url, {
-            providerKeyStore: defaultProviderKeyStore,
+            modelConfigStore: requestContext.modelConfigStore,
+            platformModelConfigStore: requestContext.platformModelConfigStore,
+            modelBundleStore: requestContext.modelBundleStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
             fetchImpl: options.fetchImpl
           })
         });
@@ -1162,14 +1471,20 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
         if (request.method === "GET" && !url.pathname.endsWith("/cancel")) {
           return jsonResponse({
             task: await getProviderTask(taskId, {
-              providerKeyStore: defaultProviderKeyStore,
+              modelConfigStore: requestContext.modelConfigStore,
+              platformModelConfigStore: requestContext.platformModelConfigStore,
+              modelBundleStore: requestContext.modelBundleStore,
+              modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
               fetchImpl: options.fetchImpl
             })
           });
         }
         if (request.method === "POST" && url.pathname.endsWith("/cancel")) {
           await cancelQueuedProviderTask(taskId, {
-            providerKeyStore: defaultProviderKeyStore,
+            modelConfigStore: requestContext.modelConfigStore,
+            platformModelConfigStore: requestContext.platformModelConfigStore,
+            modelBundleStore: requestContext.modelBundleStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
             fetchImpl: options.fetchImpl
           });
           return jsonResponse({
@@ -1199,7 +1514,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       if (message.includes("Can recover only video jobs")) {
         return jsonResponse({ error: "这条任务没有可恢复的成片下载。只有视频已生成、但服务器下载失败的任务才能重新下载成片。" }, 409);
       }
-      if (message.includes("Unknown provider key target") || message.includes("Provider API key is required")) {
+      if (message.includes("Unknown model provider target") || message.includes("Provider API key is required")) {
         return jsonResponse({ error: message }, 422);
       }
       if (message.includes("requires confirmPaid")) {
@@ -1207,6 +1522,10 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
       }
       if (message.includes("请先配置视频模型")) {
         return jsonResponse({ error: message }, 402);
+      }
+      if (error instanceof InsufficientWalletBalanceError || message.includes("余额不足")) {
+        const errorMessage = message.includes("使用 AI 功能") ? aiInsufficientBalanceMessage : message;
+        return jsonResponse({ error: errorMessage }, 402);
       }
       if (message.includes("is disabled. Enable it in template management")) {
         return jsonResponse({ error: message }, 422);
@@ -1299,7 +1618,7 @@ async function createRequestContext(input: {
   rootDir: string;
   databaseHandle: DatabaseHandle;
   authStore: ConsoleAuthStore;
-  defaultProviderKeyStore: ProviderKeyStore;
+  defaultModelConfigStore: ModelConfigStore;
   defaultVideoJobQueue: LocalVideoJobQueue;
   workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
   settingsStore: FileConsoleSettingsStore;
@@ -1307,14 +1626,17 @@ async function createRequestContext(input: {
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   publicBaseUrl?: string;
   publicAssetTokenStore: PublicAssetTokenStore;
+  platformModelConfigStore: ModelConfigStore;
+  now?: () => Date;
 }): Promise<ConsoleRequestContext> {
   const resolved = await input.authStore.resolveCurrentWorkspace(input.request);
   const workspacePaths = getWorkspacePaths(input.dataDir, resolved.workspaceId);
-  const providerKeyStore = createProviderKeyStore({
-    databaseHandle: input.databaseHandle,
-    workspaceId: resolved.workspaceId,
-    legacyFilePath: workspacePaths.providerKeysFile
-  });
+  const modelConfigStore = resolved.workspaceId === DEFAULT_WORKSPACE_ID
+    ? input.defaultModelConfigStore
+    : createModelConfigStore({
+      databaseHandle: input.databaseHandle,
+      workspaceId: resolved.workspaceId
+    });
   const referenceImageUrlResolver = createReferenceImageUrlResolver({
     dataDir: input.dataDir,
     workspaceId: resolved.workspaceId,
@@ -1322,22 +1644,49 @@ async function createRequestContext(input: {
     publicAssetTokenStore: input.publicAssetTokenStore,
     fetchImpl: input.fetchImpl
   });
+  const modelBundleStore = new ModelBundleStore({
+    handle: input.databaseHandle,
+    workspaceId: resolved.workspaceId,
+    now: input.now
+  });
+  const modelServicePreferenceStore = new ModelServicePreferenceStore({
+    handle: input.databaseHandle,
+    workspaceId: resolved.workspaceId,
+    now: input.now
+  });
+  await ensurePlatformModelProvisioning({
+    env: process.env,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore,
+    modelServicePreferenceStore
+  });
   return {
     workspaceId: resolved.workspaceId,
     databaseHandle: input.databaseHandle,
     workspacePaths,
     fixturesDir: workspacePaths.productsDir,
     outputsDir: workspacePaths.jobsDir,
-    providerKeyStore,
+    modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore,
+    modelServicePreferenceStore,
+    walletStore: new WalletStore({
+      handle: input.databaseHandle,
+      workspaceId: resolved.workspaceId,
+      now: input.now
+    }),
     referenceImageUrlResolver,
     videoJobQueue: videoJobQueueForWorkspace({
       workspaceId: resolved.workspaceId,
       workspacePaths,
-      providerKeyStore,
+      modelConfigStore,
+      platformModelConfigStore: input.platformModelConfigStore,
       defaultVideoJobQueue: input.defaultVideoJobQueue,
       workspaceVideoJobQueues: input.workspaceVideoJobQueues,
       rootDir: input.rootDir,
       settingsStore: input.settingsStore,
+      modelBundleStore,
+      modelServicePreferenceStore,
       fetchImpl: input.fetchImpl,
       runMakeVideoPipeline: input.runMakeVideoPipeline,
       dataDir: input.dataDir,
@@ -1352,11 +1701,14 @@ async function createRequestContext(input: {
 function videoJobQueueForWorkspace(input: {
   workspaceId: string;
   workspacePaths: ReturnType<typeof getWorkspacePaths>;
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore: ModelConfigStore;
   defaultVideoJobQueue: LocalVideoJobQueue;
   workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
   rootDir: string;
   settingsStore: FileConsoleSettingsStore;
+  modelBundleStore: ModelBundleStore;
+  modelServicePreferenceStore: ModelServicePreferenceStore;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   dataDir: string;
@@ -1379,7 +1731,10 @@ function videoJobQueueForWorkspace(input: {
     settingsStore: input.settingsStore,
     fetchImpl: input.fetchImpl,
     runMakeVideoPipeline: createConfiguredMakeVideoPipeline({
-      providerKeyStore: input.providerKeyStore,
+      modelConfigStore: input.modelConfigStore,
+      platformModelConfigStore: input.platformModelConfigStore,
+      modelBundleStore: input.modelBundleStore,
+      modelServicePreferenceStore: input.modelServicePreferenceStore,
       runMakeVideoPipeline: input.runMakeVideoPipeline
     }),
     referenceImageUrlResolver: input.referenceImageUrlResolver,
@@ -1390,11 +1745,21 @@ function videoJobQueueForWorkspace(input: {
 }
 
 function createConfiguredMakeVideoPipeline(input: {
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
 }): LocalVideoJobQueueOptions["runMakeVideoPipeline"] {
   return async (pipelineInput) => {
-    const config = await selectedVideoProviderConfig(input.providerKeyStore, pipelineInput.providerName);
+    const config = await selectedVideoModelConfig({
+      modelConfigStore: input.modelConfigStore,
+      platformModelConfigStore: input.platformModelConfigStore,
+      modelBundleStore: input.modelBundleStore,
+      modelServicePreferenceStore: input.modelServicePreferenceStore,
+      provider: pipelineInput.providerName,
+      providerModelConfigId: pipelineInput.providerModelConfigId
+    });
     const runPipeline = input.runMakeVideoPipeline ?? runMakeVideoPipeline;
     return runPipeline({
       ...pipelineInput,
@@ -1405,18 +1770,15 @@ function createConfiguredMakeVideoPipeline(input: {
   };
 }
 
-function createProviderKeyStore(input: {
+function createModelConfigStore(input: {
   databaseHandle: DatabaseHandle;
   workspaceId: string;
-  legacyFilePath: string;
-}): ProviderKeyStore {
-  const store = new SqliteProviderKeyStore({
+}): ModelConfigStore {
+  const store = new SqliteModelConfigStore({
     handle: input.databaseHandle,
     secretKey: resolveDatabaseSecretKey(process.env),
-    workspaceId: input.workspaceId,
-    legacyFilePath: input.legacyFilePath
+    workspaceId: input.workspaceId
   });
-  store.migrateLegacyFile();
   return store;
 }
 
@@ -1433,7 +1795,10 @@ async function runConsoleMakeVideo(
     rootDir: string;
     outputsDir: string;
     settingsStore: FileConsoleSettingsStore;
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore?: ModelConfigStore;
+    modelBundleStore?: ModelBundleStore;
+    modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
     runMakeVideoPipeline?: typeof runMakeVideoPipeline;
     referenceImageUrlResolver?: ReferenceImageUrlResolver;
@@ -1450,7 +1815,14 @@ async function runConsoleMakeVideo(
     rootDir: options.rootDir
   });
   await mkdir(options.outputsDir, { recursive: true });
-  const providerConfig = await selectedVideoProviderConfig(options.providerKeyStore, providerName);
+  const providerConfig = await selectedVideoModelConfig({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: providerName,
+    providerModelConfigId: body.providerModelConfigId
+  });
   const runPipeline = options.runMakeVideoPipeline ?? runMakeVideoPipeline;
   return runPipeline({
     productPath,
@@ -1466,6 +1838,7 @@ async function runConsoleMakeVideo(
     reuseManifestPath: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined,
     apiKey: providerConfig.apiKey,
     providerBaseUrl: providerConfig.baseUrl,
+    providerModelConfigId: body.providerModelConfigId,
     providerModel: body.providerModel ?? providerConfig.model,
     fetchImpl: options.fetchImpl,
     referenceImageUrlResolver: options.referenceImageUrlResolver
@@ -1517,7 +1890,11 @@ async function enqueueBatchVideoJobs(
     outputsDir: string;
     fixturesDir: string;
     settingsStore: FileConsoleSettingsStore;
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore: ModelConfigStore;
+    modelBundleStore: ModelBundleStore;
+    modelServicePreferenceStore: ModelServicePreferenceStore;
+    walletStore: WalletStore;
     videoJobQueue: LocalVideoJobQueue;
   }
 ) {
@@ -1525,7 +1902,14 @@ async function enqueueBatchVideoJobs(
   const versions = clampInteger(body.versions ?? 1, 1, 5);
   const settings = await options.settingsStore.read();
   const providerName = body.provider ?? settings.defaultProvider;
-  await assertVideoModelConfigured(options.providerKeyStore, providerName);
+  const videoModel = await resolveVideoRequestModel({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: providerName,
+    body
+  });
   await assertTemplateEnabled(body, options.settingsStore);
   await assertPaidProductReady({
     provider: providerName,
@@ -1534,13 +1918,20 @@ async function enqueueBatchVideoJobs(
   });
   const jobs = [];
   for (let index = 1; index <= versions; index += 1) {
+    const billing = reserveVideoJobBilling({
+      walletStore: options.walletStore,
+      provider: providerName,
+      modelConfig: videoModel.config,
+      durationSeconds: body.duration ?? settings.defaultDurationSeconds
+    });
     jobs.push(await options.videoJobQueue.enqueue({
       productPath,
       outDirName: body.outDirName
         ? `${sanitizePathSegment(body.outDirName)}-v${index}`
         : undefined,
       provider: body.provider,
-      providerModel: body.providerModel,
+      providerModelConfigId: videoModel.providerModelConfigId,
+      providerModel: videoModel.providerModel,
       duration: body.duration,
       template: body.template,
       finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
@@ -1548,6 +1939,7 @@ async function enqueueBatchVideoJobs(
       scriptLines: sanitizeLines(body.scriptLines),
       storyboardLines: sanitizeLines(body.storyboardLines),
       confirmPaid: body.confirmPaid ?? providerName !== "mock",
+      ...billing,
       reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
     }));
   }
@@ -1562,7 +1954,11 @@ async function enqueueProductVideoJobsBySku(
     outputsDir: string;
     fixturesDir: string;
     settingsStore: FileConsoleSettingsStore;
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore: ModelConfigStore;
+    modelBundleStore: ModelBundleStore;
+    modelServicePreferenceStore: ModelServicePreferenceStore;
+    walletStore: WalletStore;
     videoJobQueue: LocalVideoJobQueue;
   }
 ) {
@@ -1573,17 +1969,241 @@ async function enqueueProductVideoJobsBySku(
   }, options);
 }
 
+async function assertModelBundleConfigsExist(input: ModelBundleInput, stores: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore: ModelConfigStore;
+}): Promise<void> {
+  await assertBundleConfigExists("openai-compatible-text", input.textModelConfigId, input.apiOwner, stores);
+  await assertBundleConfigExists("openai-compatible-image", input.imageModelConfigId, input.apiOwner, stores);
+  await assertBundleConfigExists("volcengine-seedance", input.videoModelConfigId, input.apiOwner, stores);
+}
+
+async function assertBundleConfigExists(providerId: ModelProviderId, configId: string | undefined, apiOwner: ApiOwner | undefined, stores: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore: ModelConfigStore;
+}): Promise<void> {
+  const normalized = normalizeText(configId);
+  if (!normalized || normalized === "auto") {
+    return;
+  }
+  const config = await selectModelConfig({
+    providerId,
+    modelConfigStore: stores.modelConfigStore,
+    platformModelConfigStore: stores.platformModelConfigStore,
+    configId: normalized
+  });
+  if (!config) {
+    throw new Error("组合引用的模型配置不存在或已被删除。");
+  }
+  if (apiOwner && config.apiOwner !== apiOwner) {
+    throw new Error(apiOwner === "platform" ? "平台组合只能引用平台托管模型。" : "自带 API 组合只能引用自带 Key 模型。");
+  }
+}
+
+function platformModelConfigInput(providerId: ModelProviderId, input: ModelConfigRequest): ModelConfigRequest & { apiOwner: "platform" } {
+  const selectedModel = normalizeModelSelection(input.model);
+  const vendor = normalizeText(input.vendor)
+    ?? (selectedModel ? catalogEntryForModel(providerId, selectedModel)?.vendor : undefined)
+    ?? defaultCatalogEntryForVendor(providerId, defaultPlatformVendor(providerId)).vendor;
+  const catalogEntry = selectedModel
+    ? catalogEntryForModel(providerId, selectedModel) ?? defaultCatalogEntryForVendor(providerId, vendor)
+    : defaultCatalogEntryForVendor(providerId, vendor);
+  return {
+    ...input,
+    apiOwner: "platform",
+    name: normalizeText(input.name) ?? platformModelName(providerId, vendor),
+    vendor,
+    baseUrl: normalizeText(input.baseUrl) ?? catalogEntry.baseUrl,
+    model: input.model ?? catalogEntry.modelId,
+    apiMode: normalizeText(input.apiMode) ?? catalogEntry.apiMode,
+    enabled: input.enabled ?? true,
+    priority: input.priority ?? catalogEntry.priority,
+    tags: input.tags ?? ["平台托管"]
+  };
+}
+
+function defaultPlatformVendor(providerId: ModelProviderId): string {
+  if (providerId === "volcengine-seedance") return "volcengine";
+  return "openai";
+}
+
+function platformModelName(providerId: ModelProviderId, vendor: string): string {
+  if (providerId === "openai-compatible-text") return `${vendor} 文本`;
+  if (providerId === "openai-compatible-image") return `${vendor} 图片`;
+  return `${vendor} 视频`;
+}
+
+async function assertModelServicePreferenceBundlesExist(
+  input: Partial<ModelServicePreference>,
+  modelBundleStore: ModelBundleStore
+): Promise<void> {
+  const bundles = modelBundleStore.list();
+  const platformBundleId = normalizeText(input.platformBundleId);
+  const byokBundleId = normalizeText(input.byokBundleId);
+  if (platformBundleId) {
+    const bundle = bundles.find((item) => item.bundleId === platformBundleId);
+    if (!bundle) {
+      throw new Error("选择的平台模型组合不存在或已被删除。");
+    }
+    if (bundle.apiOwner !== "platform") {
+      throw new Error("平台模型模式只能选择平台组合。");
+    }
+  }
+  if (byokBundleId) {
+    const bundle = bundles.find((item) => item.bundleId === byokBundleId);
+    if (!bundle) {
+      throw new Error("选择的自带 API 组合不存在或已被删除。");
+    }
+    if (bundle.apiOwner !== "byok") {
+      throw new Error("自带 API 模式只能选择自带 API 组合。");
+    }
+  }
+}
+
+function reserveVideoJobBilling(input: {
+  walletStore: WalletStore;
+  provider: VideoProviderName | undefined;
+  modelConfig?: Partial<ModelStoredConfig>;
+  durationSeconds: number;
+}): Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId"> {
+  if (!input.provider || input.provider === "mock") {
+    return {};
+  }
+  const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
+  const platformFeeCny = platformFeeCnyPerVideo();
+  const upstreamEstimatedCostCny = apiBillingMode === "platform" ? estimatedVideoUpstreamCostCny(input.durationSeconds) : 0;
+  const reserveAmountCny = roundMoney(platformFeeCny + upstreamEstimatedCostCny);
+  const reservation = input.walletStore.reserve({
+    amountCny: reserveAmountCny,
+    description: "视频生成预扣",
+    metadata: {
+      apiBillingMode,
+      platformFeeCny,
+      upstreamEstimatedCostCny
+    }
+  });
+  return {
+    apiBillingMode,
+    platformFeeCny,
+    upstreamEstimatedCostCny,
+    walletReservationId: reservation.reservationId
+  };
+}
+
+async function runMeteredAiAction<T>(input: {
+  walletStore: WalletStore;
+  kind: AiUsageKind;
+  modelConfig?: Partial<ModelStoredConfig>;
+  units?: number;
+  reserveDescription: string;
+  chargeDescription: string;
+  action: () => Promise<T>;
+  actualUnits?: (result: T) => number;
+}): Promise<T> {
+  const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
+  const platformFeeCny = platformFeeCnyForAi(input.kind);
+  const estimatedUnits = Math.max(1, input.units ?? 1);
+  const upstreamEstimatedCostCny = apiBillingMode === "platform"
+    ? estimatedAiUpstreamCostCny(input.kind, estimatedUnits)
+    : 0;
+  const reserveAmountCny = roundMoney(platformFeeCny * estimatedUnits + upstreamEstimatedCostCny);
+  let reservation: ReturnType<WalletStore["reserve"]>;
+  try {
+    reservation = input.walletStore.reserve({
+      amountCny: reserveAmountCny,
+      description: input.reserveDescription,
+      metadata: {
+        usageKind: input.kind,
+        apiBillingMode,
+        platformFeeCny,
+        upstreamEstimatedCostCny,
+        estimatedUnits,
+        providerId: input.modelConfig?.providerId,
+        configId: input.modelConfig?.configId,
+        model: input.modelConfig?.model
+      }
+    });
+  } catch (error) {
+    if (error instanceof InsufficientWalletBalanceError) {
+      throw new Error(aiInsufficientBalanceMessage);
+    }
+    throw error;
+  }
+  try {
+    const result = await input.action();
+    const actualUnits = Math.max(1, input.actualUnits?.(result) ?? estimatedUnits);
+    const actualUpstreamCostCny = apiBillingMode === "platform"
+      ? estimatedAiUpstreamCostCny(input.kind, actualUnits)
+      : 0;
+    input.walletStore.capture({
+      reservationId: reservation.reservationId,
+      amountCny: roundMoney(platformFeeCny * actualUnits + actualUpstreamCostCny),
+      description: input.chargeDescription,
+      metadata: {
+        usageKind: input.kind,
+        apiBillingMode,
+        platformFeeCny,
+        upstreamEstimatedCostCny,
+        upstreamActualCostCny: actualUpstreamCostCny,
+        estimatedUnits,
+        actualUnits,
+        providerId: input.modelConfig?.providerId,
+        configId: input.modelConfig?.configId,
+        model: input.modelConfig?.model
+      }
+    });
+    return result;
+  } catch (error) {
+    input.walletStore.release({
+      reservationId: reservation.reservationId,
+      description: "释放 AI 功能预扣",
+      metadata: {
+        usageKind: input.kind,
+        apiBillingMode,
+        providerId: input.modelConfig?.providerId,
+        configId: input.modelConfig?.configId,
+        model: input.modelConfig?.model
+      }
+    });
+    throw error;
+  }
+}
+
+function platformFeeCnyForAi(kind: AiUsageKind): number {
+  if (kind === "image") {
+    return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE, 0.3));
+  }
+  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT, 0.2));
+}
+
+function estimatedAiUpstreamCostCny(kind: AiUsageKind, units: number): number {
+  if (kind === "image") {
+    return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE, 0.7) * units);
+  }
+  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL, 0.2) * units);
+}
+
+function platformFeeCnyPerVideo(): number {
+  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO, 1));
+}
+
+function estimatedVideoUpstreamCostCny(durationSeconds: number): number {
+  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
+  return estimateCny(estimateVideoTokens(durationSeconds).expected, tokenPriceCnyPerMillion);
+}
+
 async function assertRetryVideoJobAllowed(input: {
   jobId: string;
   confirmPaid?: boolean;
   videoJobQueue: LocalVideoJobQueue;
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
 }): Promise<void> {
   const record = await input.videoJobQueue.get(input.jobId);
   if (record.provider && record.provider !== "mock" && input.confirmPaid !== true) {
     throw new Error("Retrying a paid video job requires confirmPaid: true.");
   }
-  await assertVideoModelConfigured(input.providerKeyStore, record.provider);
+  await assertVideoModelConfigured(input.modelConfigStore, input.platformModelConfigStore, record.provider, record.providerModelConfigId);
 }
 
 async function assertPaidProductReady(input: {
@@ -1685,11 +2305,20 @@ async function runConsolePreflight(
 async function getProviderTask(
   taskId: string,
   options: {
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore?: ModelConfigStore;
+    modelBundleStore?: ModelBundleStore;
+    modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
 ) {
-  const config = await selectedVideoProviderConfig(options.providerKeyStore, "volcengine-seedance");
+  const config = await selectedVideoModelConfig({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: "volcengine-seedance"
+  });
   return new VolcengineUsageClient({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
@@ -1700,11 +2329,20 @@ async function getProviderTask(
 async function listProviderTasks(
   url: URL,
   options: {
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore?: ModelConfigStore;
+    modelBundleStore?: ModelBundleStore;
+    modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
 ) {
-  const config = await selectedVideoProviderConfig(options.providerKeyStore, "volcengine-seedance");
+  const config = await selectedVideoModelConfig({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: "volcengine-seedance"
+  });
   return new VolcengineUsageClient({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
@@ -1723,42 +2361,103 @@ function providerUsageListRequestFromUrl(url: URL): ListUsageTasksRequest {
   };
 }
 
-async function buildProviderConfig(providerKeyStore: ProviderKeyStore): Promise<ProviderConfigLedger> {
-  const textStoredConfigs = await providerKeyStore.listConfigs("openai-compatible-text");
-  const imageStoredConfigs = await providerKeyStore.listConfigs("openai-compatible-image");
-  const videoStoredConfigs = await providerKeyStore.listConfigs("volcengine-seedance");
-  const videoModels = buildVideoModelConfigs(videoStoredConfigs);
+async function buildProviderConfig(input: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+}): Promise<ProviderConfigLedger> {
+  const textStoredConfigs = (await input.modelConfigStore.listConfigs("openai-compatible-text")).filter((config) => config.apiOwner !== "platform");
+  const imageStoredConfigs = (await input.modelConfigStore.listConfigs("openai-compatible-image")).filter((config) => config.apiOwner !== "platform");
+  const videoStoredConfigs = (await input.modelConfigStore.listConfigs("volcengine-seedance")).filter((config) => config.apiOwner !== "platform");
+  const platformTextConfigs = input.platformModelConfigStore && input.platformModelConfigStore !== input.modelConfigStore
+    ? await input.platformModelConfigStore.listConfigs("openai-compatible-text")
+    : (await input.modelConfigStore.listConfigs("openai-compatible-text")).filter((config) => config.apiOwner === "platform");
+  const platformImageConfigs = input.platformModelConfigStore && input.platformModelConfigStore !== input.modelConfigStore
+    ? await input.platformModelConfigStore.listConfigs("openai-compatible-image")
+    : (await input.modelConfigStore.listConfigs("openai-compatible-image")).filter((config) => config.apiOwner === "platform");
+  const platformVideoConfigs = input.platformModelConfigStore && input.platformModelConfigStore !== input.modelConfigStore
+    ? await input.platformModelConfigStore.listConfigs("volcengine-seedance")
+    : (await input.modelConfigStore.listConfigs("volcengine-seedance")).filter((config) => config.apiOwner === "platform");
+  const allTextConfigs = [...textStoredConfigs, ...platformTextConfigs];
+  const allImageConfigs = [...imageStoredConfigs, ...platformImageConfigs];
+  const allVideoConfigs = [...videoStoredConfigs, ...platformVideoConfigs];
+  const videoModels = buildVideoModelConfigs(allVideoConfigs);
   return {
-    textModels: buildTextModelConfigs(textStoredConfigs),
-    imageModels: buildImageModelConfigs(imageStoredConfigs),
+    textModels: buildTextModelConfigs(allTextConfigs),
+    imageModels: buildImageModelConfigs(allImageConfigs),
     videoModels,
-    providers: videoModels
+    providers: videoModels,
+    runtime: {
+      textConfigured: allTextConfigs.some((config) => Boolean(config.apiKey) && config.enabled),
+      imageConfigured: allImageConfigs.some((config) => Boolean(config.apiKey) && config.enabled),
+      videoConfigured: allVideoConfigs.some((config) => Boolean(config.apiKey) && config.enabled)
+    }
+  };
+}
+
+async function buildPlatformModelAdminConfig(store: ModelConfigStore): Promise<PlatformModelAdminConfigResponse> {
+  const [textModels, imageModels, videoModels] = await Promise.all([
+    store.listConfigs("openai-compatible-text"),
+    store.listConfigs("openai-compatible-image"),
+    store.listConfigs("volcengine-seedance")
+  ]);
+  return {
+    textModels: textModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem),
+    imageModels: imageModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem),
+    videoModels: videoModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem)
+  };
+}
+
+function isPlatformStoredConfig(config: ModelStoredConfig): boolean {
+  return config.apiOwner === "platform";
+}
+
+function platformModelAdminConfigItem(config: ModelStoredConfig): PlatformModelAdminConfigItem {
+  return {
+    id: config.providerId,
+    configId: config.configId,
+    label: config.label,
+    vendor: config.vendor,
+    model: config.model,
+    baseUrl: config.baseUrl,
+    apiMode: config.apiMode,
+    priority: config.priority,
+    configured: Boolean(config.apiKey) && config.enabled,
+    keyPreview: modelProviderStatus(config.providerId, {
+      apiKey: config.apiKey,
+      configId: config.configId
+    }).keyPreview,
+    apiOwner: "platform",
+    enabled: config.enabled
   };
 }
 
 async function testProviderConfig(
-  provider: ApiProviderId,
+  provider: ModelProviderId,
   options: {
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
     fetchImpl?: typeof fetch;
     input: ProviderConfigTestRequest;
   }
 ): Promise<{
   ok: true;
-  provider: ApiProviderId;
+  provider: ModelProviderId;
   model: string;
   message: string;
 }> {
-  const config = await effectiveProviderConfigForTest(provider, options.providerKeyStore, options.input);
+  const config = await effectiveProviderConfigForTest(provider, {
+    modelConfigStore: options.modelConfigStore,
+    input: options.input
+  });
   if (!config.apiKey) {
     throw new Error("请先填写 API Key，或保存一个带 Key 的配置后再测试。");
   }
   const fetchImpl = withProviderConfigTestTimeout(options.fetchImpl);
   if (provider === "openai-compatible-text") {
-    await new OpenAiCompatibleTextProvider({
+    await createTextProvider({
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
       model: config.model,
+      apiMode: config.apiMode,
       fetchImpl
     }).generateJson<{ ok: boolean }>({
       system: "Return only compact JSON.",
@@ -1773,7 +2472,7 @@ async function testProviderConfig(
     };
   }
   if (provider === "openai-compatible-image") {
-    await new OpenAiCompatibleImageProvider({
+    await createImageProvider({
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
       model: config.model,
@@ -1800,8 +2499,58 @@ async function testProviderConfig(
   return {
     ok: true,
     provider,
-    model: config.model ?? process.env.SEEDANCE_MODEL ?? "doubao-seedance-2-0-260128",
+    model: config.model ?? defaultVideoModelId(),
     message: "视频模型只读连通性测试成功，未创建视频任务。"
+  };
+}
+
+async function refreshProviderModels(
+  provider: ModelProviderId,
+  options: {
+    modelConfigStore: ModelConfigStore;
+    fetchImpl?: typeof fetch;
+    input: ProviderConfigTestRequest;
+  }
+): Promise<ProviderModelDiscoveryResponse> {
+  const config = await effectiveProviderConfigForTest(provider, {
+    modelConfigStore: options.modelConfigStore,
+    input: options.input
+  });
+  return {
+    ok: true,
+    provider,
+    models: await discoverAvailableModels(provider, {
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      fetchImpl: withProviderConfigTestTimeout(options.fetchImpl)
+    })
+  };
+}
+
+async function revealProviderConfigKey(
+  provider: ModelProviderId,
+  options: {
+    modelConfigStore: ModelConfigStore;
+    configId?: string;
+  }
+): Promise<ModelConfigKeyRevealResponse> {
+  const configId = normalizeText(options.configId);
+  if (!configId) {
+    throw new Error("configId is required to reveal a model API key.");
+  }
+  const config = await options.modelConfigStore.getConfig(provider, configId);
+  if (!config?.apiKey) {
+    throw new Error("Model API key is not available for this configuration.");
+  }
+  return {
+    ok: true,
+    provider,
+    configId: config.configId,
+    apiKey: config.apiKey,
+    keyPreview: modelProviderStatus(provider, {
+      apiKey: config.apiKey,
+      configId: config.configId
+    }).keyPreview
   };
 }
 
@@ -1819,86 +2568,100 @@ function withProviderConfigTestTimeout(fetchImpl: typeof fetch | undefined): typ
 }
 
 async function effectiveProviderConfigForTest(
-  provider: ApiProviderId,
-  providerKeyStore: ProviderKeyStore,
-  input: ProviderConfigTestRequest
-): Promise<ProviderStoredConfig> {
-  const saved = normalizeText(input.configId) ? await providerKeyStore.getConfig(provider) : {};
+  provider: ModelProviderId,
+  options: {
+    modelConfigStore: ModelConfigStore;
+    input: ProviderConfigTestRequest;
+  }
+): Promise<Partial<ModelStoredConfig> & Pick<ProviderConfigTestRequest, "apiKey" | "baseUrl" | "model" | "apiMode">> {
+  const input = options.input;
+  const saved = normalizeText(input.configId)
+    ? await options.modelConfigStore.getConfig(provider, input.configId)
+    : undefined;
+  const savedConfig: Partial<ModelStoredConfig> = saved ?? {};
+  const baseUrl = normalizeText(input.baseUrl) ?? savedConfig.baseUrl;
+  const model = normalizeModelSelection(input.model) ?? savedConfig.model;
+  const apiMode = provider === "openai-compatible-text"
+    ? effectiveTextModelApiModeForTest(input, savedConfig, baseUrl, model)
+    : normalizeTextModelApiMode(input.apiMode) ?? savedConfig.apiMode;
   return {
-    apiKey: normalizeText(input.apiKey) ?? saved.apiKey,
-    baseUrl: normalizeText(input.baseUrl) ?? saved.baseUrl,
-    model: normalizeText(input.model) ?? saved.model
+    apiKey: normalizeText(input.apiKey) ?? savedConfig.apiKey,
+    baseUrl,
+    model,
+    apiMode
   };
 }
 
-function buildTextModelConfigs(configs: ProviderStoredConfig[]): ProviderConfigItem[] {
+function effectiveTextModelApiModeForTest(
+  input: ProviderConfigTestRequest,
+  savedConfig: Partial<Pick<ModelStoredConfig, "baseUrl" | "model" | "apiMode">>,
+  baseUrl?: string,
+  model?: string
+): string | undefined {
+  const explicit = normalizeTextModelApiMode(input.apiMode);
+  if (explicit) {
+    return explicit;
+  }
+  const changedBaseUrl = input.baseUrl !== undefined && normalizeText(input.baseUrl) !== savedConfig.baseUrl;
+  const changedModel = input.model !== undefined && normalizeModelSelection(input.model) !== savedConfig.model;
+  if (changedBaseUrl || changedModel) {
+    return inferTextModelApiMode({ baseUrl, model });
+  }
+  return savedConfig.apiMode;
+}
+
+function buildTextModelConfigs(configs: ModelStoredConfig[]): ProviderConfigItem[] {
   if (configs.length === 0) {
-    const keyStatus = providerKeyStatus("openai-compatible-text");
-    return [{
-      id: "openai-compatible-text",
-      configId: "openai-compatible-text",
-      label: "文本模型",
-      providerLabel: "OpenAI 兼容",
-      configured: keyStatus.configured,
-      keySource: keyStatus.keySource,
-      keyPreview: keyStatus.keyPreview,
-      baseUrl: textModelBaseUrl(),
-      model: textModelName(),
-      priority: 0,
-      capabilities: ["商品整理", "脚本分镜"],
-      modelKind: "text"
-    }];
+    return [];
   }
   return configs.map((config) => {
-    const keyStatus = providerKeyStatus("openai-compatible-text", {
-      localKey: config.apiKey,
+    const keyStatus = modelProviderStatus("openai-compatible-text", {
+      apiKey: config.apiKey,
       configId: config.configId
     });
     return {
       id: "openai-compatible-text",
+      credentialId: config.credentialId,
       configId: config.configId,
-      label: config.name ?? "文本模型",
+      label: config.label,
       providerLabel: config.vendor ?? "OpenAI 兼容",
+      apiOwner: config.apiOwner,
       configured: keyStatus.configured,
       keySource: keyStatus.keySource,
       keyPreview: keyStatus.keyPreview,
       baseUrl: config.baseUrl ?? textModelBaseUrl(),
       model: config.model ?? textModelName(),
+      apiMode: inferTextModelApiMode({
+        apiMode: config.apiMode,
+        baseUrl: config.baseUrl ?? textModelBaseUrl(),
+        model: config.model ?? textModelName()
+      }),
       priority: config.priority ?? 0,
       capabilities: ["商品整理", "脚本分镜"],
-      modelKind: "text" as const
+      modelKind: "text" as const,
+      enabled: config.enabled,
+      taskScopes: config.taskScopes,
+      tags: config.tags
     };
   });
 }
 
-function buildImageModelConfigs(configs: ProviderStoredConfig[]): ProviderConfigItem[] {
+function buildImageModelConfigs(configs: ModelStoredConfig[]): ProviderConfigItem[] {
   if (configs.length === 0) {
-    const keyStatus = providerKeyStatus("openai-compatible-image");
-    return [{
-      id: "openai-compatible-image",
-      configId: "openai-compatible-image",
-      label: "图片模型",
-      providerLabel: "OpenAI 兼容",
-      configured: keyStatus.configured,
-      keySource: keyStatus.keySource,
-      keyPreview: keyStatus.keyPreview,
-      baseUrl: imageModelBaseUrl(),
-      model: imageModelName(),
-      priority: 0,
-      capabilities: ["商品图生成", "素材图生成"],
-      modelKind: "image"
-    }];
+    return [];
   }
   return configs.map((config) => {
-    const keyStatus = providerKeyStatus("openai-compatible-image", {
-      localKey: config.apiKey,
+    const keyStatus = modelProviderStatus("openai-compatible-image", {
+      apiKey: config.apiKey,
       configId: config.configId
     });
     return {
       id: "openai-compatible-image",
+      credentialId: config.credentialId,
       configId: config.configId,
-      label: config.name ?? "图片模型",
+      label: config.label,
       providerLabel: config.vendor ?? "OpenAI 兼容",
+      apiOwner: config.apiOwner,
       configured: keyStatus.configured,
       keySource: keyStatus.keySource,
       keyPreview: keyStatus.keyPreview,
@@ -1906,28 +2669,34 @@ function buildImageModelConfigs(configs: ProviderStoredConfig[]): ProviderConfig
       model: config.model ?? imageModelName(),
       priority: config.priority ?? 0,
       capabilities: ["商品图生成", "素材图生成"],
-      modelKind: "image" as const
+      modelKind: "image" as const,
+      enabled: config.enabled,
+      taskScopes: config.taskScopes,
+      tags: config.tags
     };
   });
 }
 
-function buildVideoModelConfigs(configs: ProviderStoredConfig[]): VideoProviderConfigItem[] {
-  const effectiveConfigs = configs.length > 0 ? configs : [{}];
-  return effectiveConfigs.map((config) => {
-    const keyStatus = providerKeyStatus("volcengine-seedance", {
-      localKey: config.apiKey,
+function buildVideoModelConfigs(configs: ModelStoredConfig[]): VideoProviderConfigItem[] {
+  return configs.map((config) => {
+    const model = config.model ?? defaultVideoModelId();
+    const catalogEntry = catalogEntryForModel("volcengine-seedance", model);
+    const keyStatus = modelProviderStatus("volcengine-seedance", {
+      apiKey: config.apiKey,
       configId: config.configId
     });
     return {
       id: "volcengine-seedance",
+      credentialId: config.credentialId,
       configId: config.configId ?? "volcengine-seedance",
-      label: config.name ?? "视频模型",
+      label: config.label ?? catalogEntry?.label ?? "视频模型",
       providerLabel: config.vendor ?? "火山引擎 Seedance",
+      apiOwner: config.apiOwner,
       configured: keyStatus.configured,
       keySource: keyStatus.keySource,
       keyPreview: keyStatus.keyPreview,
-      baseUrl: config.baseUrl ?? process.env.SEEDANCE_BASE_URL ?? "https://ark.cn-beijing.volces.com",
-      model: config.model ?? process.env.SEEDANCE_MODEL ?? "doubao-seedance-2-0-260128",
+      baseUrl: config.baseUrl ?? defaultVideoModelBaseUrl(),
+      model,
       priority: config.priority ?? 0,
       capabilities: ["视频生成"],
       modelKind: "video" as const,
@@ -1935,7 +2704,10 @@ function buildVideoModelConfigs(configs: ProviderStoredConfig[]): VideoProviderC
       tokenPriceCnyPerMillion: numberFromEnv(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION, 37),
       estimatedCostCnyPerSecond: numberFromEnv(process.env.SEEDANCE_ESTIMATED_COST_CNY_PER_SECOND, 0.8),
       watermark: booleanFromEnv(process.env.SEEDANCE_WATERMARK ?? "false"),
-      docsUrl: "https://www.volcengine.com/docs/82379/1541595?lang=zh"
+      docsUrl: catalogEntry?.docsUrl ?? "https://www.volcengine.com/docs/82379/1541595?lang=zh",
+      enabled: config.enabled,
+      taskScopes: config.taskScopes,
+      tags: config.tags
     };
   });
 }
@@ -1961,14 +2733,21 @@ function normalizeText(value: unknown): string | undefined {
   return text || undefined;
 }
 
-function parseApiProviderId(value: string): ApiProviderId {
+function normalizeModelSelection(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return value.find((item) => typeof item === "string" && item.trim())?.trim();
+  }
+  return normalizeText(value);
+}
+
+function parseModelProviderId(value: string): ModelProviderId {
   if (value === "openai-compatible-text" || value === "openai-compatible-image") {
     return value;
   }
-  if (value === "volcengine-seedance" || value === "seedance") {
+  if (value === "volcengine-seedance") {
     return "volcengine-seedance";
   }
-  throw new Error(`Unknown provider key target: ${value}`);
+  throw new Error(`Unknown model provider target: ${value}`);
 }
 
 function positiveIntegerFromQuery(
@@ -1992,36 +2771,132 @@ function clampInteger(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-async function selectedVideoProviderConfig(
-  providerKeyStore: ProviderKeyStore,
-  provider: VideoProviderName
-): Promise<{
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-}> {
-  const config = await providerKeyStore.getConfig(provider);
-  return {
-    apiKey: resolveProviderApiKey({
-      provider,
-      localKey: config.apiKey
-    }),
-    baseUrl: config.baseUrl,
-    model: config.model
-  };
+async function selectedVideoModelConfig(input: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  provider: VideoProviderName;
+  providerModelConfigId?: string;
+}): Promise<Partial<ModelStoredConfig>> {
+  if (input.provider === "mock") {
+    return {};
+  }
+  const requestedConfigId = normalizeText(input.providerModelConfigId);
+  const config = await selectModelConfig({
+    providerId: "volcengine-seedance",
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    bundleConfigSelector: (bundle) => bundle.videoModelConfigId,
+    configId: requestedConfigId
+  });
+  if (requestedConfigId && requestedConfigId !== "auto" && !config) {
+    throw new Error("所选视频模型配置不存在或已被删除。");
+  }
+  return config ?? {};
 }
 
 async function assertVideoModelConfigured(
-  providerKeyStore: ProviderKeyStore,
-  provider: VideoProviderName | undefined
+  modelConfigStore: ModelConfigStore,
+  platformModelConfigStore: ModelConfigStore | undefined,
+  provider: VideoProviderName | undefined,
+  providerModelConfigId?: string
 ): Promise<void> {
   if (!provider || provider === "mock") {
     return;
   }
-  const config = await selectedVideoProviderConfig(providerKeyStore, provider);
+  const config = await selectedVideoModelConfig({
+    modelConfigStore,
+    platformModelConfigStore,
+    provider,
+    providerModelConfigId
+  });
   if (!config.apiKey) {
     throw new Error("请先配置视频模型，再生成视频。");
   }
+}
+
+async function resolveVideoRequestModel(input: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  provider: VideoProviderName | undefined;
+  body: Pick<MakeVideoRequest, "providerModelConfigId" | "providerModel">;
+}): Promise<{
+  providerModelConfigId?: string;
+  providerModel?: string;
+  config?: Partial<ModelStoredConfig>;
+}> {
+  if (!input.provider || input.provider === "mock") {
+    return {
+      providerModel: input.body.providerModel
+    };
+  }
+  const config = await selectedVideoModelConfig({
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    provider: input.provider,
+    providerModelConfigId: input.body.providerModelConfigId
+  });
+  if (!config.apiKey) {
+    throw new Error("请先配置视频模型，再生成视频。");
+  }
+  return {
+    providerModelConfigId: config.configId,
+    providerModel: input.body.providerModel ?? config.model,
+    config
+  };
+}
+
+async function selectModelConfig(input: {
+  providerId: ModelProviderId;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  bundleConfigSelector?: (bundle: ModelBundle) => string | undefined;
+  configId?: string;
+}): Promise<ModelStoredConfig | undefined> {
+  if (input.configId && input.configId !== "auto") {
+    return await input.modelConfigStore.getConfigById(input.providerId, input.configId)
+      ?? await input.platformModelConfigStore?.getConfigById(input.providerId, input.configId);
+  }
+  const bundleConfigId = selectedBundleConfigId({
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    selector: input.bundleConfigSelector
+  });
+  if (bundleConfigId) {
+    return await input.modelConfigStore.getConfigById(input.providerId, bundleConfigId)
+      ?? await input.platformModelConfigStore?.getConfigById(input.providerId, bundleConfigId);
+  }
+  return await input.modelConfigStore.getConfig(input.providerId)
+    ?? await input.platformModelConfigStore?.getConfig(input.providerId);
+}
+
+function selectedBundleConfigId(input: {
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  selector?: (bundle: ModelBundle) => string | undefined;
+}): string | undefined {
+  if (!input.modelBundleStore || !input.modelServicePreferenceStore || !input.selector) {
+    return undefined;
+  }
+  const preference = input.modelServicePreferenceStore.get();
+  const selectedBundleId = preference.serviceMode === "platform" ? preference.platformBundleId : preference.byokBundleId;
+  const bundles = input.modelBundleStore.list();
+  const selectedBundle = selectedBundleId
+    ? bundles.find((bundle) => bundle.bundleId === selectedBundleId)
+    : bundles.find((bundle) => bundle.apiOwner === preference.serviceMode && bundle.enabled);
+  if (!selectedBundle || selectedBundle.apiOwner !== preference.serviceMode) {
+    return undefined;
+  }
+  return normalizeText(input.selector(selectedBundle));
 }
 
 function extensionFromMimeType(mimeType: string): ".jpg" | ".png" | ".webp" {
@@ -2058,11 +2933,20 @@ function taskIdsFromQuery(url: URL): string[] | undefined {
 async function cancelQueuedProviderTask(
   taskId: string,
   options: {
-    providerKeyStore: ProviderKeyStore;
+    modelConfigStore: ModelConfigStore;
+    platformModelConfigStore?: ModelConfigStore;
+    modelBundleStore?: ModelBundleStore;
+    modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
 ): Promise<void> {
-  const config = await selectedVideoProviderConfig(options.providerKeyStore, "volcengine-seedance");
+  const config = await selectedVideoModelConfig({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: "volcengine-seedance"
+  });
   const client = new VolcengineUsageClient({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
@@ -2392,7 +3276,7 @@ function internalValidationGapText(input: {
 
 function providerDisplayName(value?: string): string {
   if (value === "mock") return "内部任务";
-  if (value === "volcengine-seedance" || value === "seedance") return "火山引擎 Seedance";
+  if (value === "volcengine-seedance") return "火山引擎 Seedance";
   return value ?? "";
 }
 
@@ -2715,7 +3599,11 @@ function buildImportedProductPreview(input: ImportProductPreviewRequest): Import
 }
 
 async function buildAiImportedProductPreview(input: {
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  walletStore: WalletStore;
   fetchImpl?: typeof fetch;
   input: ImportProductPreviewRequest;
 }): Promise<ImportedProductPreview> {
@@ -2723,22 +3611,36 @@ async function buildAiImportedProductPreview(input: {
   if (!text) {
     throw new Error("Product import requires source text.");
   }
-  const provider = await createTextModelProvider(input.providerKeyStore, input.fetchImpl);
+  const textModel = await createTextModelProvider({
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    textModelConfigId: input.input.textModelConfigId,
+    fetchImpl: input.fetchImpl
+  });
   try {
-    const rawProduct = await provider.generateJson<unknown>({
-      system: [
-        "你是电商商品资料整理助手。",
-        "只输出 JSON object，不要 markdown。",
-        "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
-        "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
-        "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
-        "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
-        "价格、店铺名、物流信息不要写入商品资料。"
-      ].join("\n"),
-      user: [
-        "请整理这段商品资料：",
-        text
-      ].join("\n\n")
+    const rawProduct = await runMeteredAiAction({
+      walletStore: input.walletStore,
+      kind: "text",
+      modelConfig: textModel.config,
+      reserveDescription: "AI 资料整理预扣",
+      chargeDescription: "AI 资料整理扣费",
+      action: () => textModel.provider.generateJson<unknown>({
+        system: [
+          "你是电商商品资料整理助手。",
+          "只输出 JSON object，不要 markdown。",
+          "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
+          "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
+          "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
+          "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
+          "价格、店铺名、物流信息不要写入商品资料。"
+        ].join("\n"),
+        user: [
+          "请整理这段商品资料：",
+          text
+        ].join("\n\n")
+      })
     });
     const product = parseProductFacts(normalizeAiProductFacts(rawProduct, text));
     return {
@@ -3025,7 +3927,11 @@ async function buildAiStoryboardDraft(input: {
   sku: string;
   fixturesDir: string;
   rootDir: string;
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  walletStore: WalletStore;
   fetchImpl?: typeof fetch;
   input: StoryboardDraftRequest;
 }): Promise<{ scriptLines: string[]; storyboardLines: string[]; storyboardCnLines: string[]; notes: string[] }> {
@@ -3036,40 +3942,54 @@ async function buildAiStoryboardDraft(input: {
   });
   const duration = clampInteger(Number(input.input.duration ?? 8), 4, 15);
   const template = isScriptTemplate(input.input.template) ? input.input.template : "scene";
-  const provider = await createTextModelProvider(input.providerKeyStore, input.fetchImpl);
+  const textModel = await createTextModelProvider({
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    textModelConfigId: input.input.textModelConfigId,
+    fetchImpl: input.fetchImpl
+  });
   const templateDefinition = videoTemplateDefinitions.find((item) => item.id === template);
-  const draft = await provider.generateJson<{
-    scriptLines?: unknown;
-    storyboardLines?: unknown;
-    storyboardCnLines?: unknown;
-    notes?: unknown;
-  }>({
-    system: [
-      "你是 TikTok 商品短视频脚本分镜助手。",
-      "只输出 JSON object，不要 markdown。",
-      "输出字段必须是 scriptLines、storyboardLines、storyboardCnLines、notes，四者都是字符串数组。",
-      "scriptLines 必须使用简体中文，是给操作员参考的画面要点，不写字幕时间轴，不写 CTA。",
-      "storyboardLines 必须使用简体中文，是视频分镜脚本，按秒数描述画面顺序、卖点出现位置和镜头节奏。",
-      "storyboardCnLines 必须使用简体中文，是 storyboardLines 对应的生成说明，逐条解释镜头意图和注意点，不新增未经确认卖点。",
-      "不要在 scriptLines、storyboardLines、storyboardCnLines 中使用英文句子或日文句子；商品名可保留原文。",
-      "必须遵守 forbidden_claims，不要使用未确认功效、销量、排名、UV 数值等宣称。"
-    ].join("\n"),
-    user: [
-      `视频类型: ${template}`,
-      `视频类型说明: ${templateDefinition?.purpose ?? ""}`,
-      `视频时长: ${duration}s`,
-      "商品资料 JSON:",
-      JSON.stringify({
-        title_ja: product.title_ja,
-        category: product.category,
-        materials: product.materials,
-        dimensions: product.dimensions,
-        verified_selling_points: product.verified_selling_points,
-        usage_scenes: product.usage_scenes,
-        forbidden_claims: product.forbidden_claims,
-        reference_images: product.reference_images
-      }, null, 2)
-    ].join("\n")
+  const draft = await runMeteredAiAction({
+    walletStore: input.walletStore,
+    kind: "text",
+    modelConfig: textModel.config,
+    reserveDescription: "AI 分镜预扣",
+    chargeDescription: "AI 分镜扣费",
+    action: () => textModel.provider.generateJson<{
+      scriptLines?: unknown;
+      storyboardLines?: unknown;
+      storyboardCnLines?: unknown;
+      notes?: unknown;
+    }>({
+      system: [
+        "你是 TikTok 商品短视频脚本分镜助手。",
+        "只输出 JSON object，不要 markdown。",
+        "输出字段必须是 scriptLines、storyboardLines、storyboardCnLines、notes，四者都是字符串数组。",
+        "scriptLines 必须使用简体中文，是给操作员参考的画面要点，不写字幕时间轴，不写 CTA。",
+        "storyboardLines 必须使用简体中文，是视频分镜脚本，按秒数描述画面顺序、卖点出现位置和镜头节奏。",
+        "storyboardCnLines 必须使用简体中文，是 storyboardLines 对应的生成说明，逐条解释镜头意图和注意点，不新增未经确认卖点。",
+        "不要在 scriptLines、storyboardLines、storyboardCnLines 中使用英文句子或日文句子；商品名可保留原文。",
+        "必须遵守 forbidden_claims，不要使用未确认功效、销量、排名、UV 数值等宣称。"
+      ].join("\n"),
+      user: [
+        `视频类型: ${template}`,
+        `视频类型说明: ${templateDefinition?.purpose ?? ""}`,
+        `视频时长: ${duration}s`,
+        "商品资料 JSON:",
+        JSON.stringify({
+          title_ja: product.title_ja,
+          category: product.category,
+          materials: product.materials,
+          dimensions: product.dimensions,
+          verified_selling_points: product.verified_selling_points,
+          usage_scenes: product.usage_scenes,
+          forbidden_claims: product.forbidden_claims,
+          reference_images: product.reference_images
+        }, null, 2)
+      ].join("\n")
+    })
   });
   const scriptLines = normalizeStringArray(draft.scriptLines);
   const storyboardLines = normalizeStringArray(draft.storyboardLines);
@@ -3310,28 +4230,70 @@ function normalizeStoryboardScript(value: unknown): string {
   return script;
 }
 
-async function createTextModelProvider(providerKeyStore: ProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleTextProvider> {
-  const config = await providerKeyStore.getConfig("openai-compatible-text");
-  return new OpenAiCompatibleTextProvider({
-    apiKey: resolveTextModelApiKey({
-      localKey: config.apiKey
-    }),
-    baseUrl: config.baseUrl,
-    model: config.model,
-    fetchImpl
+async function createTextModelProvider(input: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  textModelConfigId?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ provider: TextProvider; config: Partial<ModelStoredConfig> }> {
+  const requestedConfigId = normalizeText(input.textModelConfigId);
+  const textConfig = await selectModelConfig({
+    providerId: "openai-compatible-text",
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    bundleConfigSelector: (bundle) => bundle.textModelConfigId,
+    configId: requestedConfigId
   });
+  if (requestedConfigId && requestedConfigId !== "auto" && !textConfig) {
+    throw new Error("所选文本模型配置不存在或已被删除。");
+  }
+  const config: Partial<ModelStoredConfig> = textConfig ?? {};
+  return {
+    provider: createTextProvider({
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+      model: config.model,
+      apiMode: config.apiMode,
+      fetchImpl: input.fetchImpl
+    }),
+    config
+  };
 }
 
-async function createImageModelProvider(providerKeyStore: ProviderKeyStore, fetchImpl?: typeof fetch): Promise<OpenAiCompatibleImageProvider> {
-  const config = await providerKeyStore.getConfig("openai-compatible-image");
-  return new OpenAiCompatibleImageProvider({
-    apiKey: resolveImageModelApiKey({
-      localKey: config.apiKey
-    }),
-    baseUrl: config.baseUrl,
-    model: config.model,
-    fetchImpl
+async function createImageModelProvider(input: {
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  imageModelConfigId?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ provider: ImageProvider; config: Partial<ModelStoredConfig> }> {
+  const requestedConfigId = normalizeText(input.imageModelConfigId);
+  const config = await selectModelConfig({
+    providerId: "openai-compatible-image",
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    bundleConfigSelector: (bundle) => bundle.imageModelConfigId,
+    configId: requestedConfigId
   });
+  if (requestedConfigId && requestedConfigId !== "auto" && !config) {
+    throw new Error("所选图片模型配置不存在或已被删除。");
+  }
+  return {
+    provider: createImageProvider({
+      apiKey: config?.apiKey,
+      baseUrl: config?.baseUrl,
+      model: config?.model,
+      fetchImpl: input.fetchImpl
+    }),
+    config: config ?? {}
+  };
 }
 
 function buildProductReferenceImagePrompt(
@@ -3683,7 +4645,11 @@ async function generateProductReferenceImages(input: {
   fixturesDir: string;
   rootDir: string;
   sku: string;
-  providerKeyStore: ProviderKeyStore;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  walletStore: WalletStore;
   fetchImpl?: typeof fetch;
   input: GenerateProductReferenceImagesRequest;
 }): Promise<{
@@ -3698,10 +4664,26 @@ async function generateProductReferenceImages(input: {
     1,
     4
   );
-  const provider = await createImageModelProvider(input.providerKeyStore, input.fetchImpl);
-  const images = await provider.generateImages({
-    count,
-    prompt: buildProductReferenceImagePrompt(product, input.input.prompt)
+  const imageModel = await createImageModelProvider({
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    imageModelConfigId: input.input.imageModelConfigId,
+    fetchImpl: input.fetchImpl
+  });
+  const images = await runMeteredAiAction({
+    walletStore: input.walletStore,
+    kind: "image",
+    modelConfig: imageModel.config,
+    units: count,
+    reserveDescription: "AI 图片生成预扣",
+    chargeDescription: "AI 图片生成扣费",
+    action: () => imageModel.provider.generateImages({
+      count,
+      prompt: buildProductReferenceImagePrompt(product, input.input.prompt)
+    }),
+    actualUnits: (result) => result.length
   });
   const nextReferenceImages = [...product.reference_images];
   const generated: GeneratedProductReferenceImage[] = [];
@@ -5067,6 +6049,10 @@ function estimateVideoTokens(durationSeconds: number): { low: number; expected: 
 
 function estimateCny(tokens: number, tokenPriceCnyPerMillion: number): number {
   return Math.round((tokens / 1_000_000) * tokenPriceCnyPerMillion * 100) / 100;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function estimateVideoCostCny(durationSeconds: number): number {

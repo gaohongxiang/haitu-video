@@ -15,11 +15,13 @@ import type { VideoProviderName } from "../providers/providerFactory.js";
 import type { MoneyAmount, ReferenceImageUrlResolver, VideoOutput, VideoProviderResult } from "../providers/types.js";
 import { FileConsoleSettingsStore } from "./consoleSettings.js";
 import type { DatabaseHandle } from "./db/client.js";
+import { WalletStore } from "./walletStore.js";
 
 export interface VideoJobRequest {
   productPath: string;
   outDirName?: string;
   provider?: VideoProviderName;
+  providerModelConfigId?: string;
   providerModel?: string;
   duration?: number;
   template?: ScriptTemplate;
@@ -28,6 +30,10 @@ export interface VideoJobRequest {
   scriptLines?: string[];
   storyboardLines?: string[];
   confirmPaid?: boolean;
+  apiBillingMode?: "platform" | "byok";
+  platformFeeCny?: number;
+  upstreamEstimatedCostCny?: number;
+  walletReservationId?: string;
   reuseManifest?: string;
 }
 
@@ -38,6 +44,7 @@ export interface VideoJobRecord {
   productPath: string;
   productSku?: string;
   provider?: VideoProviderName;
+  providerModelConfigId?: string;
   providerModel?: string;
   durationSeconds?: number;
   template?: ScriptTemplate;
@@ -46,6 +53,10 @@ export interface VideoJobRecord {
   scriptLines?: string[];
   storyboardLines?: string[];
   confirmPaid: boolean;
+  apiBillingMode?: "platform" | "byok";
+  platformFeeCny?: number;
+  upstreamEstimatedCostCny?: number;
+  walletReservationId?: string;
   reuseManifest?: string;
   outDir: string;
   reportPath?: string;
@@ -123,6 +134,7 @@ export class LocalVideoJobQueue {
       status: "queued",
       productPath: request.productPath,
       provider,
+      providerModelConfigId: request.providerModelConfigId,
       providerModel: request.providerModel,
       durationSeconds,
       template,
@@ -131,6 +143,10 @@ export class LocalVideoJobQueue {
       scriptLines: sanitizeLines(request.scriptLines),
       storyboardLines: sanitizeLines(request.storyboardLines),
       confirmPaid: request.confirmPaid ?? provider !== "mock",
+      apiBillingMode: request.apiBillingMode,
+      platformFeeCny: request.platformFeeCny,
+      upstreamEstimatedCostCny: request.upstreamEstimatedCostCny,
+      walletReservationId: request.walletReservationId,
       reuseManifest: request.reuseManifest,
       outDir,
       createdAt,
@@ -285,6 +301,7 @@ export class LocalVideoJobQueue {
         productPath: record.productPath,
         outDir: record.outDir,
         providerName: record.provider ?? "mock",
+        providerModelConfigId: record.providerModelConfigId,
         providerModel: record.providerModel,
         durationSeconds: record.durationSeconds ?? 8,
         template: record.template ?? "scene",
@@ -318,6 +335,9 @@ export class LocalVideoJobQueue {
         hashtags,
         totalTokens: report.billing?.totalTokens ?? report.usage?.totalTokens,
         estimatedCostCny: report.billing?.estimatedCostCny,
+        upstreamEstimatedCostCny: record.apiBillingMode === "platform"
+          ? report.billing?.estimatedCostCny ?? record.upstreamEstimatedCostCny
+          : 0,
         providerTaskId: report.raw.taskId,
         recoverableRawManifestPath: report.raw.manifestPath,
         providerVideoUrl: undefined,
@@ -325,6 +345,10 @@ export class LocalVideoJobQueue {
         error: undefined,
         errorDetails: undefined,
         completedAt: this.nowIso()
+      });
+      this.captureWalletCharge({
+        ...record,
+        estimatedCostCny: report.billing?.estimatedCostCny
       });
     } catch (error) {
       if ((await this.read(id)).status === "canceled") {
@@ -362,6 +386,7 @@ export class LocalVideoJobQueue {
         ...recoverable,
         completedAt: this.nowIso()
       });
+      this.releaseWalletReservation(record);
     }
   }
 
@@ -612,6 +637,57 @@ export class LocalVideoJobQueue {
     this.upsertDatabaseAsset(record, record.finalOutputPath, "final");
   }
 
+  private captureWalletCharge(record: VideoJobRecord): void {
+    if (!record.walletReservationId) {
+      return;
+    }
+    const handle = this.options.databaseHandle;
+    if (!handle) {
+      return;
+    }
+    const platformFeeCny = record.platformFeeCny ?? 0;
+    const upstreamCostCny = record.apiBillingMode === "platform"
+      ? record.estimatedCostCny ?? record.upstreamEstimatedCostCny ?? 0
+      : 0;
+    new WalletStore({
+      handle,
+      workspaceId: record.workspaceId ?? this.options.workspaceId ?? "default",
+      now: this.options.now
+    }).capture({
+      reservationId: record.walletReservationId,
+      jobId: record.id,
+      amountCny: roundMoney(platformFeeCny + upstreamCostCny),
+      description: "视频生成扣费",
+      metadata: {
+        apiBillingMode: record.apiBillingMode,
+        platformFeeCny,
+        upstreamCostCny
+      }
+    });
+  }
+
+  private releaseWalletReservation(record: VideoJobRecord): void {
+    if (!record.walletReservationId) {
+      return;
+    }
+    const handle = this.options.databaseHandle;
+    if (!handle) {
+      return;
+    }
+    new WalletStore({
+      handle,
+      workspaceId: record.workspaceId ?? this.options.workspaceId ?? "default",
+      now: this.options.now
+    }).release({
+      reservationId: record.walletReservationId,
+      jobId: record.id,
+      description: "视频生成失败，释放冻结金额",
+      metadata: {
+        apiBillingMode: record.apiBillingMode
+      }
+    });
+  }
+
   private upsertDatabaseAsset(record: VideoJobRecord, storagePath: string | undefined, kind: "raw" | "final"): void {
     const handle = this.options.databaseHandle;
     if (!handle || !storagePath) {
@@ -800,6 +876,10 @@ function isMoneyAmount(value: unknown): value is MoneyAmount {
 
 function mediaUrl(path: string): string {
   return `/media?path=${encodeURIComponent(path)}`;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 async function readHashtagsFromRawManifest(manifestPath: string | undefined): Promise<string[] | undefined> {

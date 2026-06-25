@@ -226,13 +226,13 @@ describe("console API", () => {
     expect(afterDelete).toEqual({ storyboards: [] });
   });
 
-  it("stores system settings, sessions, provider keys, and audit logs under HAITU_DATA_DIR and rejects outside media", async () => {
+  it("stores system settings, sessions, model configs, and audit logs under HAITU_DATA_DIR and rejects outside media", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-system-data-"));
     const dataDir = join(root, "data");
     tempDirs.push(root);
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
-    await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+    await server.fetchJson("/api/model-configs/openai-compatible-text", {
       method: "PUT",
       body: JSON.stringify({ apiKey: "text-secret-123456" })
     });
@@ -247,21 +247,21 @@ describe("console API", () => {
     const outsideMedia = await server.fetch(`/media?path=${encodeURIComponent(join(root, "outside.jpg"))}`);
 
     await expect(readFile(join(dataDir, "system", "console-settings.json"), "utf8")).resolves.toContain("詳しく見る");
-    await expect(readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8")).resolves.toContain("provider_key.saved");
-    await expect(readFile(join(dataDir, "workspaces", "default", "settings", "provider-keys.json"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8")).resolves.toContain("model_config.saved");
     const handle = openDatabase({ dataDir, env: process.env });
     try {
       const sessions = handle.sqlite.prepare("SELECT COUNT(*) AS count FROM auth_sessions").get() as { count: number };
-      const keys = handle.sqlite.prepare("SELECT key_preview, encrypted_key FROM provider_keys").all() as Array<{ key_preview: string; encrypted_key: string }>;
+      const keys = handle.sqlite
+        .prepare("SELECT key_preview, encrypted_key FROM model_credentials")
+        .all() as Array<{ key_preview: string; encrypted_key: string }>;
       expect(sessions.count).toBeGreaterThanOrEqual(1);
-      expect(keys[0]).toEqual(expect.objectContaining({
+      expect(keys).toEqual(expect.arrayContaining([expect.objectContaining({
         key_preview: "text...3456"
-      }));
-      expect(keys[0]?.encrypted_key).not.toContain("text-secret-123456");
+      })]));
+      expect(keys.find((row) => row.key_preview === "text...3456")?.encrypted_key).not.toContain("text-secret-123456");
     } finally {
       closeDatabase(handle);
     }
-    await expect(readFile(join(root, "outputs", "provider-keys.json"), "utf8")).rejects.toThrow();
     expect(mediaResponse.status).toBe(200);
     expect(outsideMedia.status).toBe(403);
   });
@@ -428,11 +428,11 @@ describe("console API", () => {
         password: "correct horse battery staple"
       })
     });
-    await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+    await server.fetchJson("/api/model-configs/volcengine-seedance", {
       method: "PUT",
       body: JSON.stringify({ apiKey: "sk-super-secret" })
     });
-    await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+    await server.fetchJson("/api/model-configs/volcengine-seedance", {
       method: "DELETE"
     });
     await server.fetchJson("/api/video-assets", {
@@ -449,8 +449,8 @@ describe("console API", () => {
       "auth.enter_failed",
       "auth.enter",
       "auth.email_verified",
-      "provider_key.saved",
-      "provider_key.deleted",
+      "model_config.saved",
+      "model_config.deleted",
       "video_asset.deleted"
     ]));
     expect(audit.events[0]).toEqual(expect.objectContaining({
@@ -503,6 +503,7 @@ describe("console API", () => {
     const js = await jsResponse.text();
     const favicon = await faviconResponse.text();
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
+    const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
     const stylesSource = await readFile(join(process.cwd(), "src", "client", "styles.css"), "utf8");
     const staticConsoleHtml = await readFile(join(process.cwd(), "src", "server", "static", "console.html"), "utf8");
     const staticConsoleJs = await readFile(join(process.cwd(), "src", "server", "static", "console.js"), "utf8");
@@ -864,8 +865,8 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<VideoAssetsPanel");
     const creationWorkspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
-    const videoModelOptionsSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const defaultVideoDurationSeconds"));
-    const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
+    const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
+    const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
     const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function productDraftToProductDetail"));
@@ -909,11 +910,18 @@ describe("console API", () => {
     expect(creationWorkspaceSource).toContain("mergeLedgerJobs");
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
-    expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
+    expect(modelServiceBundlesSource).toContain('export type ModelConfigChoice = "auto" | string;');
+    expect(appSource).toContain('useState<ModelConfigChoice>("auto")');
+    expect(appSource).toContain("selectedTextModelConfigId");
+    expect(appSource).toContain("selectedImageModelConfigId");
+    expect(appSource).toContain("selectedVideoModelConfigId");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
     expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
+    expect(appSource).toContain('setSelectedTextModelConfigId("auto")');
+    expect(appSource).toContain('setSelectedImageModelConfigId("auto")');
+    expect(appSource).toContain('setSelectedVideoModelConfigId("auto")');
     expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(appSource).toContain('type StoryboardDraftSource = "default" | "ai" | "manual";');
     expect(appSource).toContain('useState<StoryboardDraftSource>("default")');
@@ -970,20 +978,28 @@ describe("console API", () => {
     expect(appSource).toContain('return { ready: true, label: "将先整理资料包，再生成视频。" };');
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
+    expect(appSource).not.toContain("const videoModelConfigs");
+    expect(appSource).not.toContain("defaultVideoModelChoice");
+    expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
     expect(creationComposerSource).toContain("videoModelOptions");
-    expect(videoModelOptionsSource).not.toContain('"mock"');
-    expect(videoModelSource).toContain("seedance-2-fast");
-    expect(videoModelSource).toContain("seedance-2");
-    expect(videoModelSource).toContain("seedance-1-5-pro");
-    expect(videoModelSource).toContain("seedance2.0 fast");
-    expect(videoModelSource).toContain("seedance2.0");
-    expect(videoModelSource).toContain("seedance1.5 pro");
-    expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
-    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast"');
+    expect(creationComposerSource).toContain("imageModelOptions");
+    expect(creationComposerSource).toContain("modelSchemeSummary");
+    expect(creationComposerSource).toContain("schemeSummary");
+    expect(creationComposerSource).toContain("activeModelSchemeId");
+    expect(creationComposerSource).toContain("modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)");
+    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
+    expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
+    expect(creationComposerSource).toContain('label="模型方案"');
+    expect(creationComposerSource).not.toContain('label="文本模型"');
+    expect(creationComposerSource).not.toContain('label="图片模型"');
+    expect(creationComposerSource).not.toContain('label="视频模型"');
+    expect(appSource).toContain("const defaultVideoDurationSeconds = 10");
     expect(appSource).not.toContain("seed" + "nice");
-    expect(creationComposerSource).toContain("videoModelChoice");
-    expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
-    expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
+    expect(creationComposerSource).toContain("selectedVideoModelConfigId");
+    expect(creationComposerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(creationComposerSource).not.toContain("provider: videoModelConfig.provider");
+    expect(creationComposerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).not.toContain("已填分镜");
     expect(creationComposerSource).not.toContain("自动分镜");
@@ -1114,13 +1130,16 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("视频风格");
     expect(creationComposerSource).toContain("视频时长");
     expect(creationComposerSource).toContain("成片语言");
-    expect(creationComposerSource).toContain("生成模型");
+    expect(creationComposerSource).toContain("模型方案");
+    expect(creationComposerSource).not.toContain('label="生成模型"');
     expect(creationComposerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain('from "./productComposerText.js"');
     expect(creationComposerSource).toContain("handleGenerateVideo");
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct), {");
-    expect(creationComposerSource).toContain("provider: videoModelConfig.provider");
-    expect(creationComposerSource).toContain("providerModel: videoModelConfig.model");
+    expect(creationComposerSource).toContain('provider: "volcengine-seedance"');
+    expect(creationComposerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(creationComposerSource).not.toContain("provider: videoModelConfig.provider");
+    expect(creationComposerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
     expect(creationComposerSource).toContain("previewReferenceIndex");
@@ -1396,13 +1415,20 @@ describe("console API", () => {
     expect(appSource).not.toContain("启用风格");
     expect(appSource).not.toContain("设为默认");
     const settingsCase = appSource.slice(appSource.indexOf('case "settings"'), appSource.indexOf("if (authSession.authEnabled"));
+    const walletCase = appSource.slice(appSource.indexOf('case "wallet"'), appSource.indexOf('case "pricing"'));
     expect(settingsCase).not.toContain("<TemplateManagementPanel");
     expect(settingsCase).toContain("<ApiModelConfigPanel");
+    expect(settingsCase).not.toContain("wallet={wallet}");
+    expect(settingsCase).not.toContain("onTopUpWallet");
+    expect(walletCase).toContain("<WalletRechargePanel");
+    expect(walletCase).toContain("wallet={wallet}");
+    expect(walletCase).toContain("onTopUpWallet={topUpWallet}");
     expect(settingsCase).not.toContain("<SettingsPanel");
-    const apiManagementSource = appSource.slice(appSource.indexOf("function ApiModelConfigPanel"), appSource.indexOf("function VideoJobsPanel"));
+    const apiManagementSource = await readFile(join(process.cwd(), "src", "client", "components", "apiModelConfigPanel.tsx"), "utf8");
+    const sharedModelConfigSource = await readFile(join(process.cwd(), "src", "client", "components", "modelServiceConfig.tsx"), "utf8");
     expect(apiManagementSource).toContain("API Key");
-    expect(apiManagementSource).toContain("这里配置的是你自己的模型 API Key");
-    expect(apiManagementSource).toContain("系统会按你的配置调用文本、图片和视频模型");
+    expect(appSource).not.toContain("这里配置的是你自己的模型 API Key");
+    expect(appSource).not.toContain("系统会按你的配置调用文本、图片和视频模型");
     expect(apiManagementSource).not.toContain("这里配置的是平台自己的模型 API Key");
     expect(apiManagementSource).not.toContain("不要让普通用户在这里填写他们自己的密钥");
     expect(apiManagementSource).not.toContain("HAITU_DATA_DIR");
@@ -1412,16 +1438,35 @@ describe("console API", () => {
     expect(apiManagementSource).toContain("图片模型");
     expect(apiManagementSource).toContain("视频模型");
     expect(apiManagementSource).not.toContain("默认生成设置");
-    expect(apiManagementSource).toContain("Base URL");
-    expect(apiManagementSource).toContain("优先级");
-    expect(apiManagementSource).toContain("模型（逗号分隔）");
-    expect(apiManagementSource).toContain("测试配置");
-    expect(apiManagementSource).toContain("编辑");
-    expect(apiManagementSource).toContain("删除");
-    expect(apiManagementSource).toContain("条已配置");
-    expect(apiManagementSource).toContain("条可用");
-    expect(apiManagementSource).toContain("默认");
+    expect(sharedModelConfigSource).toContain("Base URL");
+    expect(sharedModelConfigSource).toContain("优先级");
+    expect(sharedModelConfigSource).toContain('label={<ModelVersionFieldLabel testStatus={testStatus} isTesting={isTesting} />}');
+    expect(sharedModelConfigSource).toContain("function ModelVersionFieldLabel");
+    expect(sharedModelConfigSource).toContain('type="checkbox"');
+    expect(sharedModelConfigSource).toContain("官方模型 ID 已内置");
+    expect(appSource).toContain("请至少选择一个模型版本。");
+    expect(sharedModelConfigSource).toContain("models: nextModels");
+    expect(appSource).not.toContain("const finalModels = nextModels.length > 0 ? nextModels");
+    expect(sharedModelConfigSource).toContain("catalogEntriesForVendor(providerId, draft.vendor)");
+    expect(apiManagementSource).not.toContain("模型版本（逗号或换行分隔）");
+    expect(apiManagementSource).not.toContain("模型（逗号分隔）");
+    expect(sharedModelConfigSource).toContain("实际端点前缀");
+    expect(sharedModelConfigSource).toContain("测试配置");
+    expect(sharedModelConfigSource).toContain("编辑");
+    expect(sharedModelConfigSource).toContain("删除");
+    expect(apiManagementSource).toContain("条模型服务");
+    expect(sharedModelConfigSource).toContain("条可用");
+    expect(sharedModelConfigSource).toContain("默认");
+    expect(sharedModelConfigSource).toContain("const configuredModels = models.filter((model) => model.configured);");
+    expect(sharedModelConfigSource).toContain("const configuredServices = groupConfiguredModelServices(providerId, configuredModels);");
+    expect(sharedModelConfigSource).toContain("configuredServices.length === 0");
+    expect(sharedModelConfigSource).toContain("还没有配置可用服务");
+    expect(sharedModelConfigSource).toContain("{configuredServices.map((service, index) => (");
+    expect(sharedModelConfigSource).toContain("{service.serviceLabel}");
     ["Key 来源", "Key 预览", "Token 单价", "估算秒价", "接口地址"].forEach((label) => {
+      expect(apiManagementSource).not.toContain(label);
+    });
+    ["API 模式", "Responses 流式", "Responses 非流式", "Chat Completions 兼容"].forEach((label) => {
       expect(apiManagementSource).not.toContain(label);
     });
     expect(appSource).not.toContain('aria-label="视频风格后台"');
@@ -1441,23 +1486,108 @@ describe("console API", () => {
     expect(appSource).toContain("商品资料暂不可付费生成");
     expect(appSource).not.toContain("剩余测试额度不足");
     expect(appSource).toContain("/api/provider-config");
+    expect(appSource).toContain("/api/wallet");
+    expect(appSource).toContain("/api/model-bundles");
+    expect(appSource).toContain("/api/model-service-preference");
+    expect(apiManagementSource).not.toContain("钱包余额");
+    expect(apiManagementSource).not.toContain("充值 ¥50");
+    expect(appSource).toContain("充值中心");
+    expect(appSource).toContain("WalletRechargePanel");
+    expect(apiManagementSource).toContain("服务模式");
+    expect(apiManagementSource).toContain("平台托管 API");
+    expect(apiManagementSource).toContain("自带 API");
+    expect(apiManagementSource).toContain("ModelServiceOwnerPanel");
+    expect(apiManagementSource).not.toContain("PlatformModelModePanel");
+    expect(apiManagementSource).not.toContain("ByokModelModePanel");
+    expect(apiManagementSource).toContain("apiOwner={activeMode}");
+    expect(apiManagementSource).toContain("canManageServices={activeMode === \"byok\"}");
+    expect(apiManagementSource).toContain("onServiceModeChange");
+    expect(appSource).not.toContain("saveByokModelBundle");
+    expect(appSource).not.toContain("savePlatformModelBundle");
+    expect(appSource).toContain("setSelectedTextModelConfigId(\"auto\")");
+    expect(appSource).toContain("const apiOwner = modelServicePreference.serviceMode");
+    expect(appSource).toContain("const selectedSchemeOwner = effectiveSelectedModelSchemeId ? modelSchemeOwner(effectiveSelectedModelSchemeId, modelSchemeOptions) ?? apiOwner : apiOwner");
+    expect(appSource).toContain('const textModelOptions = selectedSchemeOwner === "platform" ? platformTextModelOptions : byokTextModelOptions');
+    expect(appSource).toContain("const activeModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)");
+    expect(appSource).toContain("const schemeSummary = modelSchemeSummary({");
+    const ownerModeSource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelServiceOwnerPanel"), apiManagementSource.indexOf("function ModelBundleSummary"));
+    const bundleSummarySource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelBundleSummary"), apiManagementSource.indexOf("function ByokBundleManager"));
+    expect(ownerModeSource).toContain("if (apiOwner === \"platform\")");
+    expect(ownerModeSource).not.toContain("平台模型组合");
+    expect(ownerModeSource).not.toContain("自带 API 服务");
+    expect(ownerModeSource).not.toContain("平台密钥只在后台保存，并加密写入数据库");
+    expect(ownerModeSource).not.toContain("平台可用服务");
+    expect(ownerModeSource).not.toContain("configuredOwnerModels");
+    expect(ownerModeSource).toContain("<ModelBundleSummary");
+    expect(ownerModeSource).toContain("<SharedModelServiceGroup");
+    expect(bundleSummarySource).not.toContain("平台预设组合");
+    expect(bundleSummarySource).not.toContain("后台发布平台组合后，这里会显示可用方案。");
+    expect(bundleSummarySource).not.toContain("还没有模型组合");
+    expect(bundleSummarySource).not.toContain("保存成组合");
+    expect(ownerModeSource).not.toContain("模型自选组合");
+    expect(ownerModeSource).not.toContain("保存当前组合");
+    expect(apiManagementSource).not.toContain("模型自选组合");
     expect(appSource).toContain("ApiModelConfigPanel");
     expect(appSource).toContain("API Key");
-    expect(appSource).toContain("配置名称");
-    expect(appSource).toContain("保存 Key");
-    expect(appSource).toContain("清除 Key");
-    expect(appSource).toContain('`/api/provider-keys/${providerId}/test`');
+    expect(sharedModelConfigSource).toContain("showApiKey");
+    expect(appSource).toContain("revealModelConfigApiKey");
+    expect(sharedModelConfigSource).toContain("storedApiKeyMask");
+    expect(sharedModelConfigSource).toContain("输入新 Key 可替换，留空则保留原 Key");
+    expect(sharedModelConfigSource).toContain("const apiKeyInputPlaceholder = isEditingExisting");
+    expect(sharedModelConfigSource).toContain("const isShowingStoredApiKey = hasStoredApiKey && !isEditingApiKey && !draft.apiKey;");
+    expect(sharedModelConfigSource).toContain("const apiKeyFieldValue = isShowingStoredApiKey");
+    expect(sharedModelConfigSource).toContain("setIsEditingApiKey(true)");
+    expect(sharedModelConfigSource).toContain("setRevealedApiKey(response)");
+    expect(sharedModelConfigSource).toContain('className="relative"');
+    expect(sharedModelConfigSource).toContain('"pr-11"');
+    expect(sharedModelConfigSource).toContain('className="absolute right-1.5 top-1/2 -translate-y-1/2"');
+    expect(appSource).not.toContain("已保存 API Key");
+    expect(appSource).not.toContain("showStoredApiKey");
+    expect(appSource).not.toContain("showApiKeyInputReveal");
+    expect(appSource).not.toContain("apiKeyPlaceholder");
+    expect(appSource).not.toContain("const apiKeyDisplayValue = draft.apiKey;");
+    expect(appSource).not.toContain("draft.apiKey || storedApiKeyMask");
+    expect(appSource).not.toContain("apiKey: response.apiKey");
+    expect(sharedModelConfigSource).toContain('aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}');
+    expect(sharedModelConfigSource).toContain('{showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}');
+    expect(apiManagementSource).toContain("draftFromProviderConfig(providerId, model, models)");
+    expect(sharedModelConfigSource).toContain("const relatedModels = model.credentialId");
+    expect(sharedModelConfigSource).toContain("item.credentialId === model.credentialId");
+    expect(sharedModelConfigSource).toContain("配置名称");
+    expect(appSource).toContain("保存模型配置");
+    expect(appSource).toContain("清除模型配置");
+    expect(appSource).toContain('`/api/model-configs/${providerId}/test`');
     expect(appSource).toContain("testModelConfig");
     expect(appSource).toContain("测试配置中");
     expect(appSource).toContain("testStatus");
-    expect(apiManagementSource).toContain("{isTesting ? <RefreshCcw className=\"h-4 w-4 animate-spin\" /> : null}");
-    expect(apiManagementSource).toContain("{isTesting ? \"测试中\" : \"测试配置\"}");
-    expect(apiManagementSource).toContain("{!isTesting && testStatus ? (");
+    expect(sharedModelConfigSource).toContain("{isTesting ? <RefreshCcw className=\"h-4 w-4 animate-spin\" /> : null}");
+    expect(sharedModelConfigSource).toContain("{isTesting ? \"测试中\" : \"测试配置\"}");
+    expect(sharedModelConfigSource).toContain("模型版本");
+    expect(sharedModelConfigSource).toContain("inlineStatus.message");
+    expect(sharedModelConfigSource).not.toContain("{!isTesting && testStatus ? (");
     expect(appSource).toContain("测试成功");
     expect(appSource).toContain("测试失败");
     expect(appSource).toContain("setModelConfigTestStatus");
     expect(appSource).toContain("productStudioLoadError");
     expect(appSource).toContain("loadError={productStudioLoadError}");
+    expect(appSource).toContain("selectedTextModelConfigId");
+    expect(appSource).toContain("selectedImageModelConfigId");
+    expect(appSource).toContain("selectedVideoModelConfigId");
+    expect(appSource).toContain("modelConfigChoiceLabel");
+    expect(modelServiceBundlesSource).toContain('return "自动推荐";');
+    const buildModelSchemeOptionsSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function buildModelSchemeOptions"), modelServiceBundlesSource.indexOf("export function sortSelectableModelBundles"));
+    expect(buildModelSchemeOptionsSource).not.toContain("自动推荐");
+    expect(appSource).toContain("textModelConfigId: selectedTextModelConfigId");
+    expect(appSource).toContain("imageModelConfigId: selectedImageModelConfigId");
+    expect(appSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(appSource).toContain("textModelOptions");
+    expect(appSource).toContain("imageModelOptions");
+    expect(appSource).toContain("videoModelOptions");
+    expect(appSource).toContain('label="模型方案"');
+    expect(apiManagementSource).toContain('title: "文本模型"');
+    expect(apiManagementSource).toContain('title: "图片模型"');
+    expect(apiManagementSource).toContain('title: "视频模型"');
+    expect(appSource).not.toContain('label="生成模型"');
     expect(appSource).not.toContain("InlineProductFactsFields");
     expect(appSource).toContain("ProductComposerReferenceTray");
     expect(appSource).toContain("ProductCreationProductPicker");
@@ -1467,28 +1597,19 @@ describe("console API", () => {
     expect(appSource).not.toContain("ProductRiskList");
     expect(appSource).not.toContain("product-reference-strip");
     expect(appSource).not.toContain("默认生成设置");
-    expect(appSource).toContain("`/api/provider-keys/${providerId}`");
+    expect(appSource).toContain("`/api/model-configs/${providerId}`");
     expect(appSource).toContain("?configId=");
     expect(appSource).toContain('"openai-compatible-text"');
     expect(appSource).toContain('"openai-compatible-image"');
     expect(appSource).toContain('"volcengine-seedance"');
-    const modelPresetSource = appSource.slice(appSource.indexOf("const modelConfigPresets"), appSource.indexOf("const NEW_PRODUCT_SELECT_VALUE"));
-    expect(modelPresetSource).toContain('name: "OpenAI 推荐-文本"');
-    expect(modelPresetSource).toContain('model: "gpt-5.5"');
-    expect(modelPresetSource).toContain('name: "DeepSeek 推荐-文本"');
-    expect(modelPresetSource).toContain('model: "deepseek-v4-pro"');
-    expect(modelPresetSource).toContain('name: "豆包推荐-文本"');
-    expect(modelPresetSource).toContain('model: "doubao-seed-2-0-pro-260215"');
-    expect(modelPresetSource).toContain('name: "Gemini 推荐-图片"');
-    expect(modelPresetSource).toContain('model: "gemini-3-pro-image"');
-    expect(modelPresetSource).toContain('name: "OpenAI 推荐-图片"');
-    expect(modelPresetSource).toContain('model: "gpt-image-2"');
-    expect(modelPresetSource).toContain('name: "豆包 seedance2.0 fast 推荐-视频"');
-    expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-fast-260128"');
-    expect(modelPresetSource).toContain('name: "豆包 seedance2.0 推荐-视频"');
-    expect(modelPresetSource).toContain('model: "doubao-seedance-2-0-260128"');
-    expect(modelPresetSource).toContain('name: "豆包 seedance1.5 pro 推荐-视频"');
-    expect(modelPresetSource).toContain('model: "doubao-seedance-1-5-pro-251215"');
+    const modelPresetSource = sharedModelConfigSource.slice(sharedModelConfigSource.indexOf("function modelConfigPresetsForProvider"), sharedModelConfigSource.indexOf("export function defaultModelConfigPreset"));
+    expect(modelPresetSource).toContain("catalogVendorsForProvider(providerId)");
+    expect(modelPresetSource).toContain("modelConfigDraftFromVendor(providerId, vendor.value)");
+    expect(modelPresetSource).not.toContain(".map(modelConfigDraftFromCatalogEntry)");
+    const modelCatalogSource = await readFile(join(process.cwd(), "src", "providers", "modelCatalog.ts"), "utf8");
+    expect(modelCatalogSource).toContain("doubao-seedance-2-0-fast-260128");
+    expect(modelCatalogSource).toContain("doubao-seedance-2-0-260128");
+    expect(modelPresetSource).not.toContain("doubao-seedance-1-5-pro-251215");
     [
       "ChatFire 推荐-文本",
       "OpenRouter 推荐-文本",
@@ -1503,7 +1624,7 @@ describe("console API", () => {
     expect(viteConfig).toContain("@tailwindcss/vite");
   });
 
-  it("reports provider configuration without exposing API keys", async () => {
+  it("keeps provider configuration lists empty until users save model configs", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     const previousBaseUrl = process.env.SEEDANCE_BASE_URL;
@@ -1525,47 +1646,15 @@ describe("console API", () => {
       const serialized = JSON.stringify(response);
 
       expect(serialized).not.toContain("sk-secret-seedance-provider-key-123456");
-      expect(response.textModels).toEqual([
-        expect.objectContaining({
-          id: "openai-compatible-text",
-          label: "文本模型",
-          configured: false,
-          baseUrl: "https://api.openai.com",
-          model: "gpt-5.5",
-          capabilities: ["商品整理", "脚本分镜"]
-        })
-      ]);
-      expect(response.imageModels).toEqual([
-        expect.objectContaining({
-          id: "openai-compatible-image",
-          label: "图片模型",
-          configured: false,
-          baseUrl: "https://api.openai.com",
-          model: "gpt-image-2",
-          capabilities: ["商品图生成", "素材图生成"]
-        })
-      ]);
-      expect(response.videoModels).toEqual([
-        expect.objectContaining({
-          id: "volcengine-seedance",
-          label: "视频模型",
-          providerLabel: "火山引擎 Seedance",
-          configured: true,
-          keySource: "SEEDANCE_API_KEY",
-          keyPreview: "sk-s...3456",
-          baseUrl: "https://ark.example.test",
-          model: "doubao-seedance-test",
-          priority: 0,
-          capabilities: ["视频生成"],
-          modelKind: "video",
-          resolution: "480p",
-          tokenPriceCnyPerMillion: 37,
-          estimatedCostCnyPerSecond: 0.8,
-          watermark: true,
-          docsUrl: "https://www.volcengine.com/docs/82379/1541595?lang=zh"
-        })
-      ]);
+      expect(response.textModels).toEqual([]);
+      expect(response.imageModels).toEqual([]);
+      expect(response.videoModels).toEqual([]);
       expect(response.providers).toEqual(response.videoModels);
+      expect(response.runtime).toEqual({
+        textConfigured: false,
+        imageConfigured: false,
+        videoConfigured: false
+      });
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
@@ -1576,7 +1665,7 @@ describe("console API", () => {
     }
   });
 
-  it("reports ARK_API_KEY as the provider key fallback when Seedance key is absent", async () => {
+  it("does not show ARK_API_KEY fallback as a deletable video model config", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
@@ -1590,29 +1679,270 @@ describe("console API", () => {
       const serialized = JSON.stringify(response);
 
       expect(serialized).not.toContain("ark-secret-provider-key-abcdef");
-      expect(response.videoModels[0]).toEqual(expect.objectContaining({
-        configured: true,
-        keySource: "ARK_API_KEY",
-        keyPreview: "ark-...cdef"
-      }));
+      expect(response.videoModels).toEqual([]);
+      expect(response.runtime.videoConfigured).toBe(false);
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
     }
   });
 
-  it("stores a local BYOK provider key without exposing the secret", async () => {
+  it("lists platform-provided bundles from server-only platform keys without exposing secrets", async () => {
+    const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
+    const previousDeepSeekPlatformKey = process.env.HAITU_PLATFORM_DEEPSEEK_API_KEY;
+    const previousVolcenginePlatformKey = process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY;
+    const previousDefaultTextModel = process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL;
+    const previousDefaultImageModel = process.env.HAITU_PLATFORM_DEFAULT_IMAGE_MODEL;
+    const previousDefaultVideoModel = process.env.HAITU_PLATFORM_DEFAULT_VIDEO_MODEL;
+    process.env.HAITU_PLATFORM_OPENAI_API_KEY = "platform-openai-secret-9999";
+    process.env.HAITU_PLATFORM_DEEPSEEK_API_KEY = "platform-deepseek-secret-8888";
+    process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY = "platform-volcengine-secret-7777";
+    process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL = "deepseek-v4-pro";
+    process.env.HAITU_PLATFORM_DEFAULT_IMAGE_MODEL = "gpt-image-2";
+    process.env.HAITU_PLATFORM_DEFAULT_VIDEO_MODEL = "seedance-2.0-fast";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-platform-bundle-env-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      const [providerConfig, bundlesResponse, preferenceResponse] = await Promise.all([
+        server.fetchJson("/api/provider-config"),
+        server.fetchJson("/api/model-bundles"),
+        server.fetchJson("/api/model-service-preference")
+      ]);
+      const serialized = JSON.stringify({ providerConfig, bundlesResponse, preferenceResponse });
+
+      expect(serialized).not.toContain("platform-openai-secret-9999");
+      expect(serialized).not.toContain("platform-deepseek-secret-8888");
+      expect(serialized).not.toContain("platform-volcengine-secret-7777");
+      expect(providerConfig.textModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          configured: true,
+          model: "deepseek-v4-pro",
+          providerLabel: "deepseek"
+        })
+      ]));
+      expect(providerConfig.imageModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          configured: true,
+          model: "gpt-image-2",
+          providerLabel: "openai"
+        })
+      ]));
+      expect(providerConfig.videoModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          configured: true,
+          model: "doubao-seedance-2-0-fast-260128",
+          providerLabel: "volcengine"
+        })
+      ]));
+      expect(bundlesResponse.bundles).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          bundleId: "platform-quality-bundle",
+          apiOwner: "platform",
+          label: "高质量",
+          enabled: true
+        }),
+        expect.objectContaining({
+          bundleId: "platform-low-cost-bundle",
+          apiOwner: "platform",
+          label: "低成本",
+          enabled: true
+        })
+      ]));
+      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-custom-bundle");
+      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-default-bundle");
+      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-fast-bundle");
+      expect(preferenceResponse.preference).toEqual(expect.objectContaining({
+        platformBundleId: "platform-quality-bundle"
+      }));
+    } finally {
+      restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
+      restoreEnv("HAITU_PLATFORM_DEEPSEEK_API_KEY", previousDeepSeekPlatformKey);
+      restoreEnv("HAITU_PLATFORM_VOLCENGINE_API_KEY", previousVolcenginePlatformKey);
+      restoreEnv("HAITU_PLATFORM_DEFAULT_TEXT_MODEL", previousDefaultTextModel);
+      restoreEnv("HAITU_PLATFORM_DEFAULT_IMAGE_MODEL", previousDefaultImageModel);
+      restoreEnv("HAITU_PLATFORM_DEFAULT_VIDEO_MODEL", previousDefaultVideoModel);
+    }
+  });
+
+  it("removes legacy fixed platform custom bundles across saved workspaces", async () => {
+    const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
+    const previousVolcenginePlatformKey = process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY;
+    process.env.HAITU_PLATFORM_OPENAI_API_KEY = "platform-openai-legacy-cleanup-secret";
+    process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY = "platform-volcengine-legacy-cleanup-secret";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-platform-legacy-bundle-cleanup-"));
+      tempDirs.push(root);
+      const dataDir = testDataDir(root);
+      const database = openDatabase({ dataDir, env: process.env });
+      runMigrations(database);
+      database.sqlite.prepare(`
+        INSERT INTO workspaces (id, name, created_at, updated_at)
+        VALUES ('workspace-extra-cleanup', 'Extra Workspace', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+      `).run();
+      database.sqlite.prepare(`
+        INSERT INTO model_bundles (
+          id,
+          workspace_id,
+          bundle_id,
+          api_owner,
+          label,
+          text_model_config_id,
+          image_model_config_id,
+          video_model_config_id,
+          enabled,
+          priority,
+          created_at,
+          updated_at
+        ) VALUES (
+          'legacy-platform-custom-row',
+          'workspace-extra-cleanup',
+          'platform-custom-bundle',
+          'platform',
+          '自定义',
+          NULL,
+          NULL,
+          NULL,
+          1,
+          80,
+          '2026-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00.000Z'
+        )
+      `).run();
+      closeDatabase(database);
+
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+      await server.fetchJson("/api/provider-config");
+
+      const verifiedDatabase = openDatabase({ dataDir, env: process.env });
+      const bundleIds = verifiedDatabase.sqlite.prepare(`
+        SELECT bundle_id
+        FROM model_bundles
+        WHERE workspace_id = 'workspace-extra-cleanup'
+        ORDER BY bundle_id
+      `).all() as Array<{ bundle_id: string }>;
+      closeDatabase(verifiedDatabase);
+
+      expect(bundleIds.map((row) => row.bundle_id)).toEqual([
+        "platform-low-cost-bundle",
+        "platform-quality-bundle"
+      ]);
+    } finally {
+      restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
+      restoreEnv("HAITU_PLATFORM_VOLCENGINE_API_KEY", previousVolcenginePlatformKey);
+    }
+  });
+
+  it("stores server-only platform keys encrypted in model credentials", async () => {
+    const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
+    const previousDefaultTextModel = process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL;
+    process.env.HAITU_PLATFORM_OPENAI_API_KEY = "platform-openai-db-secret-123456";
+    process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL = "gpt-5.5";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-platform-key-db-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
+      const rows = database.sqlite.prepare(`
+        SELECT api_owner, encrypted_key, key_preview
+        FROM model_credentials
+        WHERE api_owner = 'platform'
+      `).all() as Array<{ api_owner: string; encrypted_key: string; key_preview: string }>;
+      closeDatabase(database);
+      const serialized = JSON.stringify(providerConfig);
+
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.some((row) => row.encrypted_key === "platform-openai-db-secret-123456")).toBe(false);
+      expect(rows.some((row) => row.encrypted_key.includes("platform-openai-db-secret-123456"))).toBe(false);
+      expect(rows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          api_owner: "platform",
+          key_preview: "plat...3456"
+        })
+      ]));
+      expect(serialized).not.toContain("platform-openai-db-secret-123456");
+    } finally {
+      restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
+      restoreEnv("HAITU_PLATFORM_DEFAULT_TEXT_MODEL", previousDefaultTextModel);
+    }
+  });
+
+  it("lets users switch to platform mode even before choosing a platform bundle", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-toggle-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    const savedPreference = await server.fetchJson("/api/model-service-preference", {
+      method: "PUT",
+      body: JSON.stringify({
+        serviceMode: "platform",
+        platformBundleId: ""
+      })
+    });
+
+    expect(savedPreference.preference).toEqual(expect.objectContaining({
+      serviceMode: "platform"
+    }));
+    expect(savedPreference.preference.platformBundleId).toBeUndefined();
+  });
+
+  it("clears a stale platform bundle selection when switching to platform mode without a bundle", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-stale-bundle-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+    await server.fetchJson("/api/model-bundles", {
+      method: "PUT",
+      body: JSON.stringify({
+        bundleId: "platform-stale-bundle",
+        apiOwner: "platform",
+        label: "旧平台组合",
+        enabled: true,
+        priority: 1
+      })
+    });
+    await server.fetchJson("/api/model-service-preference", {
+      method: "PUT",
+      body: JSON.stringify({
+        serviceMode: "platform",
+        platformBundleId: "platform-stale-bundle"
+      })
+    });
+    await server.fetchJson("/api/model-bundles/platform-stale-bundle", {
+      method: "DELETE"
+    });
+
+    const savedPreference = await server.fetchJson("/api/model-service-preference", {
+      method: "PUT",
+      body: JSON.stringify({
+        serviceMode: "platform",
+        platformBundleId: ""
+      })
+    });
+
+    expect(savedPreference.preference).toEqual(expect.objectContaining({
+      serviceMode: "platform"
+    }));
+    expect(savedPreference.preference.platformBundleId).toBeUndefined();
+  });
+
+  it("stores a local BYOK video model config without exposing the secret", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
     delete process.env.ARK_API_KEY;
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-store-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-model-config-store-"));
       tempDirs.push(root);
       const outputsDir = testJobsDir(root);
       const server = createConsoleServer({ rootDir: root, outputsDir });
 
-      const saved = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      const saved = await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "byok-secret-seedance-provider-key-9999"
@@ -1627,8 +1957,7 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "byok...9999"
       }));
-      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
-      const storedKey = await readStoredProviderKey(root, "volcengine-seedance");
+      const storedKey = await readStoredModelCredential(root, "volcengine-seedance");
       expect(storedKey.key_preview).toBe("byok...9999");
       expect(storedKey.encrypted_key).not.toContain("byok-secret-seedance-provider-key-9999");
 
@@ -1641,7 +1970,7 @@ describe("console API", () => {
         keyPreview: "byok...9999"
       }));
 
-      const cleared = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      const cleared = await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "DELETE"
       });
       expect(cleared.provider).toEqual(expect.objectContaining({
@@ -1655,7 +1984,7 @@ describe("console API", () => {
     }
   });
 
-  it("stores local BYOK provider keys in encrypted SQLite when HAITU_SECRET_KEY is set", async () => {
+  it("stores local BYOK model configs in encrypted SQLite when HAITU_SECRET_KEY is set", async () => {
     const previousSecretKey = process.env.HAITU_SECRET_KEY;
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
@@ -1663,12 +1992,12 @@ describe("console API", () => {
     delete process.env.SEEDANCE_API_KEY;
     delete process.env.ARK_API_KEY;
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-sqlite-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-model-config-sqlite-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
       const session = await registerConsoleUser(testDataDir(root), server, "sqlite-key@example.com");
 
-      const saved = await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      const saved = await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         headers: { cookie: session.cookie },
         body: JSON.stringify({
@@ -1684,15 +2013,13 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "sqli...9999"
       }));
-      await expect(readFile(join(testDataDir(root), "workspaces", session.workspaceId, "settings", "provider-keys.json"), "utf8")).rejects.toThrow();
-
       const dbPath = join(testDataDir(root), "haitu.sqlite");
       const databaseBytes = await readFile(dbPath, "utf8");
       expect(databaseBytes).not.toContain("sqlite-secret-seedance-provider-key-9999");
       const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
       try {
         const row = handle.sqlite
-          .prepare("SELECT key_preview, encrypted_key FROM provider_keys WHERE provider = 'volcengine-seedance' AND workspace_id = ?")
+          .prepare("SELECT key_preview, encrypted_key FROM model_credentials WHERE provider_id = 'volcengine-seedance' AND workspace_id = ?")
           .get(session.workspaceId) as { key_preview: string; encrypted_key: string };
         expect(row.key_preview).toBe("sqli...9999");
         expect(row.encrypted_key).not.toContain("sqlite-secret-seedance-provider-key-9999");
@@ -1718,7 +2045,994 @@ describe("console API", () => {
     }
   });
 
-  it("migrates first-stage provider-keys.json into SQLite and reads SQLite first", async () => {
+  it("tracks wallet top-ups and transaction ledger for the current workspace", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-wallet-topup-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    await expect(server.fetchJson("/api/wallet")).resolves.toEqual(expect.objectContaining({
+      balanceCny: 0,
+      reservedCny: 0,
+      availableCny: 0,
+      transactions: []
+    }));
+
+    const toppedUp = await server.fetchJson("/api/wallet/top-up", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 20,
+        description: "manual test recharge"
+      })
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(toppedUp.wallet).toEqual(expect.objectContaining({
+      balanceCny: 20,
+      reservedCny: 0,
+      availableCny: 20
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 20,
+        description: "manual test recharge"
+      })
+    ]);
+  });
+
+  it("saves model bundles that combine text, image, and video model configs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-bundles-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+    await server.fetchJson("/api/model-configs/openai-compatible-text", {
+      method: "PUT",
+      body: JSON.stringify({
+        apiKey: "text-bundle-key",
+        name: "DeepSeek 文本",
+        vendor: "deepseek",
+        model: "deepseek-v4-pro",
+        baseUrl: "https://api.deepseek.com"
+      })
+    });
+    await server.fetchJson("/api/model-configs/openai-compatible-image", {
+      method: "PUT",
+      body: JSON.stringify({
+        apiKey: "image-bundle-key",
+        name: "GPT Image",
+        vendor: "openai",
+        model: "gpt-image-2",
+        baseUrl: "https://api.openai.com"
+      })
+    });
+    await server.fetchJson("/api/model-configs/volcengine-seedance", {
+      method: "PUT",
+      body: JSON.stringify({
+        apiKey: "video-bundle-key",
+        name: "Seedance Fast",
+        vendor: "volcengine",
+        model: "doubao-seedance-2-0-fast-260128",
+        baseUrl: "https://ark.cn-beijing.volces.com"
+      })
+    });
+    const providerConfig = await server.fetchJson("/api/provider-config");
+    const textConfigId = providerConfig.textModels[0].configId;
+    const imageConfigId = providerConfig.imageModels[0].configId;
+    const videoConfigId = providerConfig.videoModels[0].configId;
+
+    const saved = await server.fetchJson("/api/model-bundles", {
+      method: "PUT",
+      body: JSON.stringify({
+        label: "高质量组合",
+        description: "DeepSeek + GPT Image + Seedance Fast",
+        textModelConfigId: textConfigId,
+        imageModelConfigId: imageConfigId,
+        videoModelConfigId: videoConfigId,
+        enabled: true,
+        priority: 9
+      })
+    });
+    const listed = await server.fetchJson("/api/model-bundles");
+
+    expect(saved.bundle).toEqual(expect.objectContaining({
+      label: "高质量组合",
+      textModelConfigId: textConfigId,
+      imageModelConfigId: imageConfigId,
+      videoModelConfigId: videoConfigId,
+      enabled: true,
+      priority: 9
+    }));
+    expect(listed.bundles).toEqual([
+      expect.objectContaining({
+        label: "高质量组合",
+        textModelConfigId: textConfigId,
+        imageModelConfigId: imageConfigId,
+        videoModelConfigId: videoConfigId
+      })
+    ]);
+  });
+
+  it("persists model service mode and uses the selected platform bundle for AI calls", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    const previousTextFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
+    const previousUpstream = process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
+    process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL = "0.2";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-service-mode-platform-"));
+      tempDirs.push(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "PLATFORM-MODE-001",
+                  title_ja: "平台组合 テスト商品",
+                  category: "テスト",
+                  materials: ["PP"],
+                  dimensions: "約10cm",
+                  verified_selling_points: ["平台组合"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: [],
+                  reference_images: []
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 1000
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-text-secret-9999",
+          name: "平台 DeepSeek",
+          vendor: "deepseek",
+          baseUrl: "https://platform-text.example.test",
+          model: "deepseek-v4-pro",
+          apiMode: "chat_completions",
+          priority: 10
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const platformText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      expect(platformText).toEqual(expect.objectContaining({
+        apiOwner: "platform",
+        model: "deepseek-v4-pro"
+      }));
+      const savedBundle = await server.fetchJson("/api/model-bundles", {
+        method: "PUT",
+        body: JSON.stringify({
+          label: "平台推荐组合",
+          description: "平台文本 + 平台图片 + 平台视频",
+          apiOwner: "platform",
+          textModelConfigId: platformText.configId,
+          enabled: true,
+          priority: 100
+        })
+      });
+      const savedPreference = await server.fetchJson("/api/model-service-preference", {
+        method: "PUT",
+        body: JSON.stringify({
+          serviceMode: "platform",
+          platformBundleId: savedBundle.bundle.bundleId
+        })
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 2,
+          description: "platform bundle balance"
+        })
+      });
+
+      const preview = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：平台组合 テスト商品"
+        })
+      });
+      const listedPreference = await server.fetchJson("/api/model-service-preference");
+      const listedBundles = await server.fetchJson("/api/model-bundles");
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(savedPreference.preference).toEqual(expect.objectContaining({
+        serviceMode: "platform",
+        platformBundleId: savedBundle.bundle.bundleId
+      }));
+      expect(listedPreference.preference).toEqual(expect.objectContaining({
+        serviceMode: "platform",
+        platformBundleId: savedBundle.bundle.bundleId
+      }));
+      expect(listedBundles.bundles).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          label: "平台推荐组合",
+          apiOwner: "platform",
+          textModelConfigId: platformText.configId
+        })
+      ]));
+      expect(preview.product.sku).toBe("PLATFORM-MODE-001");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://platform-text.example.test/v1/chat/completions");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer platform-text-secret-9999"
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 1.6,
+        reservedCny: 0,
+        availableCny: 1.6
+      }));
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousTextFee);
+      restoreEnv("HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL", previousUpstream);
+    }
+  });
+
+  it("uses the selected BYOK bundle when the service mode is own API", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-service-mode-byok-"));
+      tempDirs.push(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "BYOK-MODE-001",
+                  title_ja: "自带API テスト商品",
+                  category: "テスト",
+                  materials: ["PP"],
+                  dimensions: "約10cm",
+                  verified_selling_points: ["自带API"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: [],
+                  reference_images: []
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 1000
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-text-secret-2222",
+          name: "用户 DeepSeek",
+          vendor: "deepseek",
+          baseUrl: "https://byok-text.example.test",
+          model: "deepseek-v4-flash",
+          apiMode: "chat_completions",
+          priority: 10
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const byokText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
+      const savedBundle = await server.fetchJson("/api/model-bundles", {
+        method: "PUT",
+        body: JSON.stringify({
+          label: "自带 API 组合",
+          apiOwner: "byok",
+          textModelConfigId: byokText.configId,
+          enabled: true,
+          priority: 50
+        })
+      });
+      await server.fetchJson("/api/model-service-preference", {
+        method: "PUT",
+        body: JSON.stringify({
+          serviceMode: "byok",
+          byokBundleId: savedBundle.bundle.bundleId
+        })
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 1,
+          description: "byok bundle balance"
+        })
+      });
+
+      const preview = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：自带API テスト商品"
+        })
+      });
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(preview.product.sku).toBe("BYOK-MODE-001");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://byok-text.example.test/v1/chat/completions");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer byok-text-secret-2222"
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 0.8,
+        reservedCny: 0,
+        availableCny: 0.8
+      }));
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousFee);
+    }
+  });
+
+  it("charges only the platform service fee when users generate video with their own BYOK API", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1.5";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-wallet-byok-video-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet-byok");
+      await writeProduct(productPath, {
+        sku: "WALLET-BYOK-001",
+        title_ja: "BYOK ミニ財布",
+        reference_images: ["main.jpg"]
+      });
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => ({
+          type: "haitu_make_video_report",
+          status: "completed",
+          productSku: "WALLET-BYOK-001",
+          provider: input.providerName,
+          durationSeconds: input.durationSeconds,
+          paidRequestConfirmed: input.confirmPaid,
+          raw: {
+            manifestPath: join(input.outDir, "raw", "manifest.json"),
+            outputPath: join(input.outDir, "raw", "video.mp4")
+          },
+          billing: {
+            tokenPriceCnyPerMillion: 37,
+            totalTokens: 100000,
+            estimatedCostCny: 3.7
+          },
+          totalCost: {
+            amount: 3.7,
+            currency: "CNY"
+          },
+          reusedRawManifest: false,
+          recoveredRawOutput: false,
+          reportPath: join(input.outDir, "make-video-report.json")
+        })
+      });
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-video-secret-1234",
+          name: "用户自带视频",
+          vendor: "volcengine",
+          baseUrl: "https://byok-video.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 5,
+          description: "BYOK service fee balance"
+        })
+      });
+
+      const queued = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      await waitForJobStatus(server, queued.job.id, "completed");
+      const wallet = await server.fetchJson("/api/wallet");
+      const latest = await server.fetchJson(`/api/video-jobs/${queued.job.id}`);
+
+      expect(latest.job).toEqual(expect.objectContaining({
+        apiBillingMode: "byok",
+        platformFeeCny: 1.5,
+        upstreamEstimatedCostCny: 0
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 3.5,
+        reservedCny: 0,
+        availableCny: 3.5
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number }) => [tx.type, tx.amountCny])).toEqual([
+        ["charge", -1.5],
+        ["reserve", -1.5],
+        ["recharge", 5]
+      ]);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
+    }
+  });
+
+  it("lets admins provide platform model configs and charges wallet for platform-hosted video generation", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-wallet-platform-video-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet-platform");
+      await writeProduct(productPath, {
+        sku: "WALLET-PLATFORM-001",
+        title_ja: "平台托管 ミニ財布",
+        reference_images: ["main.jpg"]
+      });
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      const capturedInputs: unknown[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          capturedInputs.push(input);
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "WALLET-PLATFORM-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            billing: {
+              tokenPriceCnyPerMillion: 37,
+              totalTokens: 60000,
+              estimatedCostCny: 2.22
+            },
+            totalCost: {
+              amount: 2.22,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-video-secret-9999",
+          name: "平台 Seedance",
+          vendor: "volcengine",
+          priority: 10,
+          baseUrl: "https://platform-video.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const platformVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      expect(platformVideo).toEqual(expect.objectContaining({
+        apiOwner: "platform",
+        model: "doubao-seedance-2-0-fast-260128"
+      }));
+
+      const blocked = await server.fetch("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          providerModelConfigId: platformVideo.configId,
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      expect(blocked.status).toBe(402);
+      await expect(blocked.json()).resolves.toEqual({
+        error: "余额不足，请先充值后再生成视频。"
+      });
+
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 10,
+          description: "platform video balance"
+        })
+      });
+      const queued = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          providerModelConfigId: platformVideo.configId,
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      await waitForJobStatus(server, queued.job.id, "completed");
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(capturedInputs[0]).toEqual(expect.objectContaining({
+        apiKey: "platform-video-secret-9999",
+        providerBaseUrl: "https://platform-video.example.test"
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 6.78,
+        reservedCny: 0,
+        availableCny: 6.78
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number }) => [tx.type, tx.amountCny])).toEqual([
+        ["refund", 0.77],
+        ["charge", -3.22],
+        ["reserve", -3.99],
+        ["recharge", 10]
+      ]);
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
+    }
+  });
+
+  it("lets admins configure platform text image and video models into an encrypted platform bundle", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-platform-models-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-text-secret-123456",
+          vendor: "deepseek",
+          model: ["deepseek-v4-pro"],
+          enabled: true
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-image-secret-abcdef",
+          vendor: "openai",
+          model: ["gpt-image-2"],
+          enabled: true
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-video-secret-fedcba",
+          vendor: "volcengine",
+          model: ["seedance-2.0-fast"],
+          enabled: true
+        })
+      });
+
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const bundles = await server.fetchJson("/api/model-bundles");
+      const serialized = JSON.stringify({ providerConfig, bundles });
+      const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
+      const rows = database.sqlite.prepare(`
+        SELECT api_owner, encrypted_key, key_preview
+        FROM model_credentials
+        WHERE api_owner = 'platform'
+        ORDER BY provider_id
+      `).all() as Array<{ api_owner: string; encrypted_key: string; key_preview: string }>;
+      closeDatabase(database);
+
+      expect(providerConfig.textModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          providerLabel: "deepseek",
+          model: "deepseek-v4-pro",
+          configured: true
+        })
+      ]));
+      expect(providerConfig.imageModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          providerLabel: "openai",
+          model: "gpt-image-2",
+          configured: true
+        })
+      ]));
+      expect(providerConfig.videoModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          providerLabel: "volcengine",
+          model: "doubao-seedance-2-0-fast-260128",
+          configured: true
+        })
+      ]));
+      expect(bundles.bundles).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          bundleId: "platform-quality-bundle",
+          apiOwner: "platform",
+          enabled: true
+        }),
+        expect.objectContaining({
+          bundleId: "platform-low-cost-bundle",
+          apiOwner: "platform",
+          enabled: true
+        })
+      ]));
+      expect(bundles.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-custom-bundle");
+      expect(rows).toHaveLength(3);
+      expect(rows.some((row) => row.encrypted_key.includes("platform-text-secret-123456"))).toBe(false);
+      expect(rows.some((row) => row.encrypted_key.includes("platform-image-secret-abcdef"))).toBe(false);
+      expect(rows.some((row) => row.encrypted_key.includes("platform-video-secret-fedcba"))).toBe(false);
+      expect(serialized).not.toContain("platform-text-secret-123456");
+      expect(serialized).not.toContain("platform-image-secret-abcdef");
+      expect(serialized).not.toContain("platform-video-secret-fedcba");
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
+  });
+
+  it("lets admins read saved platform model configs without plaintext keys", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-platform-models-read-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-read-secret-123456",
+          vendor: "deepseek",
+          model: ["deepseek-v4-flash"],
+          enabled: true
+        })
+      });
+
+      const response = await server.fetchJson("/api/platform/model-configs");
+      const serialized = JSON.stringify(response);
+
+      expect(response.textModels).toEqual([
+        expect.objectContaining({
+          apiOwner: "platform",
+          configured: true,
+          keyPreview: "plat...3456",
+          model: "deepseek-v4-flash",
+          vendor: "deepseek"
+        })
+      ]);
+      expect(response.imageModels).toEqual([]);
+      expect(response.videoModels).toEqual([]);
+      expect(serialized).not.toContain("platform-read-secret-123456");
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
+  });
+
+  it("lets admins reveal and delete saved platform model configs", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-platform-models-reveal-delete-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-reveal-secret-123456",
+          vendor: "deepseek",
+          model: ["deepseek-v4-pro", "deepseek-v4-flash"],
+          enabled: true
+        })
+      });
+
+      const saved = await server.fetchJson("/api/platform/model-configs");
+      expect(saved.textModels).toHaveLength(2);
+      const configId = saved.textModels[0].configId;
+      const credentialId = saved.textModels[0].credentialId;
+
+      const revealed = await server.fetchJson(`/api/platform/model-configs/openai-compatible-text/key?configId=${encodeURIComponent(configId)}`);
+      expect(revealed).toEqual({
+        ok: true,
+        provider: "openai-compatible-text",
+        configId,
+        apiKey: "platform-reveal-secret-123456",
+        keyPreview: "plat...3456"
+      });
+
+      await server.fetchJson(`/api/platform/model-configs/openai-compatible-text?configId=${encodeURIComponent(configId)}`, {
+        method: "DELETE"
+      });
+      const afterDelete = await server.fetchJson("/api/platform/model-configs");
+      expect(afterDelete.textModels.some((model: { credentialId?: string }) => model.credentialId === credentialId)).toBe(false);
+      expect(JSON.stringify(afterDelete)).not.toContain("platform-reveal-secret-123456");
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
+  });
+
+  it("lets admins keep multiple platform configs per model kind with custom base urls", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-platform-models-multi-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-deepseek-secret-123456",
+          vendor: "deepseek",
+          baseUrl: "https://deepseek-proxy.example.test",
+          model: ["deepseek-v4-pro"],
+          priority: 90,
+          enabled: true
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-openai-secret-abcdef",
+          vendor: "openai",
+          baseUrl: "https://openai-proxy.example.test",
+          model: ["gpt-5.5"],
+          priority: 100,
+          enabled: true
+        })
+      });
+
+      const response = await server.fetchJson("/api/platform/model-configs");
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const serialized = JSON.stringify({ response, providerConfig });
+
+      expect(response.textModels).toEqual([
+        expect.objectContaining({
+          vendor: "openai",
+          model: "gpt-5.5",
+          baseUrl: "https://openai-proxy.example.test",
+          keyPreview: "plat...cdef"
+        }),
+        expect.objectContaining({
+          vendor: "deepseek",
+          model: "deepseek-v4-pro",
+          baseUrl: "https://deepseek-proxy.example.test",
+          keyPreview: "plat...3456"
+        })
+      ]);
+      expect(providerConfig.textModels).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          apiOwner: "platform",
+          providerLabel: "openai",
+          baseUrl: "https://openai-proxy.example.test",
+          model: "gpt-5.5"
+        }),
+        expect.objectContaining({
+          apiOwner: "platform",
+          providerLabel: "deepseek",
+          baseUrl: "https://deepseek-proxy.example.test",
+          model: "deepseek-v4-pro"
+        })
+      ]));
+      expect(serialized).not.toContain("platform-deepseek-secret-123456");
+      expect(serialized).not.toContain("platform-openai-secret-abcdef");
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
+  });
+
+  it("charges only the platform service fee for BYOK AI product import", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-wallet-byok-text-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "TEXT-BYOK-001",
+                  title_ja: "BYOK AI整理 テスト商品",
+                  category: "テスト",
+                  materials: ["PP"],
+                  dimensions: "約10cm",
+                  verified_selling_points: ["AI整理"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: [],
+                  reference_images: []
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 1000
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-text-secret-1234",
+          name: "用户自带文本",
+          vendor: "deepseek",
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-pro",
+          apiMode: "chat_completions"
+        })
+      });
+      const blocked = await server.fetch("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：BYOK AI整理 テスト商品"
+        })
+      });
+      expect(blocked.status).toBe(402);
+      await expect(blocked.json()).resolves.toEqual({
+        error: "余额不足，请先充值后再使用 AI 功能。"
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 1,
+          description: "BYOK text balance"
+        })
+      });
+
+      const preview = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：BYOK AI整理 テスト商品"
+        })
+      });
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(preview.product.sku).toBe("TEXT-BYOK-001");
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 0.8,
+        reservedCny: 0,
+        availableCny: 0.8
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number; description?: string }) => [tx.type, tx.amountCny, tx.description])).toEqual([
+        ["charge", -0.2, "AI 资料整理扣费"],
+        ["reserve", -0.2, "AI 资料整理预扣"],
+        ["recharge", 1, "BYOK text balance"]
+      ]);
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousFee);
+    }
+  });
+
+  it("charges platform fee and upstream estimate for platform-hosted image generation", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE;
+    const previousUpstream = process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE = "0.3";
+    process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE = "0.7";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-wallet-platform-image-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet-image");
+      await writeProduct(productPath, {
+        sku: "IMG-WALLET-001",
+        title_ja: "平台图片 テスト商品",
+        reference_images: []
+      });
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          data: [
+            { b64_json: Buffer.from("generated-one").toString("base64"), mime_type: "image/png" },
+            { b64_json: Buffer.from("generated-two").toString("base64"), mime_type: "image/png" }
+          ]
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-image-secret-9999",
+          name: "平台图片",
+          vendor: "openai",
+          baseUrl: "https://platform-image.example.test",
+          model: "gpt-image-2",
+          priority: 10
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const platformImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      expect(platformImage).toEqual(expect.objectContaining({
+        apiOwner: "platform",
+        model: "gpt-image-2"
+      }));
+
+      const blocked = await server.fetch("/api/products/IMG-WALLET-001/reference-images/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          count: 2,
+          imageModelConfigId: platformImage.configId
+        })
+      });
+      expect(blocked.status).toBe(402);
+      await expect(blocked.json()).resolves.toEqual({
+        error: "余额不足，请先充值后再使用 AI 功能。"
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 5,
+          description: "platform image balance"
+        })
+      });
+
+      const generated = await server.fetchJson("/api/products/IMG-WALLET-001/reference-images/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          count: 2,
+          imageModelConfigId: platformImage.configId
+        })
+      });
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(generated.generated).toHaveLength(2);
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://platform-image.example.test/v1/images/generations");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer platform-image-secret-9999"
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 3,
+        reservedCny: 0,
+        availableCny: 3
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number; description?: string }) => [tx.type, tx.amountCny, tx.description])).toEqual([
+        ["charge", -2, "AI 图片生成扣费"],
+        ["reserve", -2, "AI 图片生成预扣"],
+        ["recharge", 5, "platform image balance"]
+      ]);
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_IMAGE", previousFee);
+      restoreEnv("HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE", previousUpstream);
+    }
+  });
+
+  it("uses unified model config tables as the API management source of truth", async () => {
     const previousSecretKey = process.env.HAITU_SECRET_KEY;
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
@@ -1726,58 +3040,69 @@ describe("console API", () => {
     delete process.env.TEXT_MODEL_API_KEY;
     delete process.env.OPENAI_API_KEY;
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-migrate-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-model-config-source-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
       const session = await registerConsoleUser(testDataDir(root), server, "sqlite-migrate@example.com");
-      const workspaceSettingsDir = join(testDataDir(root), "workspaces", session.workspaceId, "settings");
-      await mkdir(workspaceSettingsDir, { recursive: true });
-      await writeFile(
-        join(workspaceSettingsDir, "provider-keys.json"),
-        JSON.stringify({
-          providers: {
-            "openai-compatible-text": {
-              configId: "legacy-text",
-              apiKey: "legacy-text-secret-123456",
-              name: "Legacy Text",
-              vendor: "legacy",
-              priority: 5,
-              baseUrl: "https://legacy.example/",
-              model: "legacy-model",
-              enabled: true
-            }
-          }
-        }),
-        "utf8"
-      );
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        headers: { cookie: session.cookie },
+        body: JSON.stringify({
+          configId: "unified-text",
+          apiKey: "legacy-text-secret-123456",
+          name: "Unified Text",
+          vendor: "legacy",
+          priority: 5,
+          baseUrl: "https://legacy.example/",
+          model: "legacy-model",
+          apiMode: "chat_completions",
+          enabled: true
+        })
+      });
 
       const firstConfig = await server.fetchJson("/api/provider-config", {
         headers: { cookie: session.cookie }
       });
       expect(firstConfig.textModels[0]).toEqual(expect.objectContaining({
-        configId: "legacy-text",
+        configId: "unified-text",
         configured: true,
         keySource: "LOCAL_BYOK",
         keyPreview: "lega...3456",
         baseUrl: "https://legacy.example",
-        model: "legacy-model"
+        model: "legacy-model",
+        apiMode: "chat_completions"
       }));
 
       const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
       try {
         runMigrations(handle);
         handle.sqlite.prepare(`
-          UPDATE provider_keys
+          UPDATE model_credentials
           SET
             encrypted_key = @encryptedKey,
             key_preview = 'dbfi...9999',
             base_url = 'https://sqlite-first.example',
-            model = 'sqlite-first-model'
-          WHERE provider = 'openai-compatible-text' AND config_id = 'legacy-text'
+            api_mode = 'responses_stream'
+          WHERE provider_id = 'openai-compatible-text'
+            AND credential_id = (
+              SELECT credential_id FROM model_variants
+              WHERE provider_id = 'openai-compatible-text' AND config_id = 'unified-text'
+              LIMIT 1
+            )
             AND workspace_id = @workspaceId
         `).run({
           workspaceId: session.workspaceId,
           encryptedKey: encryptSecret("dbfirst-secret-9999", process.env.HAITU_SECRET_KEY)
+        });
+        handle.sqlite.prepare(`
+          UPDATE model_variants
+          SET model = 'sqlite-first-model'
+          WHERE provider_id = 'openai-compatible-text'
+            AND config_id = 'unified-text'
+            AND workspace_id = @workspaceId
+        `).run({
+          workspaceId: session.workspaceId
         });
       } finally {
         closeDatabase(handle);
@@ -1789,7 +3114,8 @@ describe("console API", () => {
       expect(secondConfig.textModels[0]).toEqual(expect.objectContaining({
         keyPreview: "dbfi...9999",
         baseUrl: "https://sqlite-first.example",
-        model: "sqlite-first-model"
+        model: "sqlite-first-model",
+        apiMode: "responses_stream"
       }));
     } finally {
       restoreEnv("HAITU_SECRET_KEY", previousSecretKey);
@@ -1811,7 +3137,7 @@ describe("console API", () => {
       const outputsDir = testJobsDir(root);
       const server = createConsoleServer({ rootDir: root, outputsDir });
 
-      const savedText = await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      const savedText = await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "text-model-secret-key-123456",
@@ -1819,10 +3145,11 @@ describe("console API", () => {
           vendor: "chatfire",
           priority: 8,
           baseUrl: "https://api.chatfire.site/",
-          model: "gemini-3-pro-preview"
+          model: "gemini-3-pro-preview",
+          apiMode: "chat_completions"
         })
       });
-      const savedImage = await server.fetchJson("/api/provider-keys/openai-compatible-image", {
+      const savedImage = await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "image-model-secret-key-abcdef"
@@ -1844,13 +3171,13 @@ describe("console API", () => {
         keyPreview: "imag...cdef"
       }));
 
-      await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
-      const storedTextKey = await readStoredProviderKey(root, "openai-compatible-text");
-      const storedImageKey = await readStoredProviderKey(root, "openai-compatible-image");
+      const storedTextKey = await readStoredModelCredential(root, "openai-compatible-text");
+      const storedImageKey = await readStoredModelCredential(root, "openai-compatible-image");
       expect(storedTextKey).toEqual(expect.objectContaining({
         key_preview: "text...3456",
         base_url: "https://api.chatfire.site",
-        model: "gemini-3-pro-preview"
+        model: "gemini-3-pro-preview",
+        api_mode: "chat_completions"
       }));
       expect(storedImageKey).toEqual(expect.objectContaining({
         key_preview: "imag...cdef"
@@ -1867,6 +3194,7 @@ describe("console API", () => {
         priority: 8,
         baseUrl: "https://api.chatfire.site",
         model: "gemini-3-pro-preview",
+        apiMode: "chat_completions",
         configured: true,
         keySource: "LOCAL_BYOK",
         keyPreview: "text...3456"
@@ -1876,10 +3204,276 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "imag...cdef"
       }));
+
+      const revealedText = await server.fetchJson(`/api/model-configs/openai-compatible-text/key?configId=${encodeURIComponent(config.textModels[0].configId)}`);
+      const revealedImage = await server.fetchJson(`/api/model-configs/openai-compatible-image/key?configId=${encodeURIComponent(config.imageModels[0].configId)}`);
+      expect(revealedText).toEqual({
+        ok: true,
+        provider: "openai-compatible-text",
+        configId: config.textModels[0].configId,
+        apiKey: "text-model-secret-key-123456",
+        keyPreview: "text...3456"
+      });
+      expect(revealedImage).toEqual({
+        ok: true,
+        provider: "openai-compatible-image",
+        configId: config.imageModels[0].configId,
+        apiKey: "image-model-secret-key-abcdef",
+        keyPreview: "imag...cdef"
+      });
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
       restoreEnv("IMAGE_MODEL_API_KEY", previousImageKey);
+    }
+  });
+
+  it("splits a batch text model save into one credential and multiple selectable variants", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-text-model-variants-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      const saved = await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-variant-secret-key-123456",
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          priority: 7,
+          baseUrl: "https://api.deepseek.com/",
+          model: "deepseek-v4-pro, deepseek-v4-flash\ndeepseek-v4-lite",
+          apiMode: "chat_completions"
+        })
+      });
+      const config = await server.fetchJson("/api/provider-config");
+      const stored = await readStoredTextModelRows(root);
+
+      expect(JSON.stringify(saved)).not.toContain("text-variant-secret-key-123456");
+      expect(JSON.stringify(config)).not.toContain("text-variant-secret-key-123456");
+      expect(saved.provider).toEqual(expect.objectContaining({
+        id: "openai-compatible-text",
+        configured: true,
+        keySource: "LOCAL_BYOK",
+        keyPreview: "text...3456"
+      }));
+      expect(config.textModels).toHaveLength(3);
+      expect(config.textModels.map((item: { model: string }) => item.model)).toEqual([
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "deepseek-v4-lite"
+      ]);
+      expect(config.textModels.map((item: { label: string }) => item.label)).toEqual([
+        "DeepSeek 文本",
+        "DeepSeek 文本",
+        "DeepSeek 文本"
+      ]);
+      expect(config.textModels).toEqual(config.textModels.map((item: Record<string, unknown>) => expect.objectContaining({
+        id: "openai-compatible-text",
+        providerLabel: "deepseek",
+        configured: true,
+        keySource: "LOCAL_BYOK",
+        keyPreview: "text...3456",
+        baseUrl: "https://api.deepseek.com",
+        apiMode: "chat_completions",
+        priority: 7,
+        modelKind: "text"
+      })));
+      expect(new Set(config.textModels.map((item: { configId: string }) => item.configId)).size).toBe(3);
+      expect(stored.credentials).toEqual([
+        expect.objectContaining({
+          key_preview: "text...3456",
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          base_url: "https://api.deepseek.com",
+          api_mode: "chat_completions"
+        })
+      ]);
+      expect(stored.credentials[0]?.encrypted_key).not.toContain("text-variant-secret-key-123456");
+      expect(stored.variants.map((row) => row.model)).toEqual([
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "deepseek-v4-lite"
+      ]);
+      expect(new Set(stored.variants.map((row) => row.credential_id))).toEqual(new Set([stored.credentials[0]?.credential_id]));
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("updates provider config after unchecked text model variants are saved", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-text-model-uncheck-api-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-variant-secret-key-123456",
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          priority: 7,
+          baseUrl: "https://api.deepseek.com/",
+          model: ["deepseek-v4-pro", "deepseek-v4-flash"],
+          apiMode: "chat_completions"
+        })
+      });
+      const firstConfig = await server.fetchJson("/api/provider-config");
+      const firstConfigId = firstConfig.textModels[0]?.configId;
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          configId: firstConfigId,
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          priority: 7,
+          baseUrl: "https://api.deepseek.com/",
+          model: ["deepseek-v4-pro"],
+          apiMode: "chat_completions"
+        })
+      });
+
+      const updatedConfig = await server.fetchJson("/api/provider-config");
+      expect(updatedConfig.textModels.map((item: { model: string }) => item.model)).toEqual(["deepseek-v4-pro"]);
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("reinfers text API mode from edited model config when no mode is submitted", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-text-model-mode-reinfer-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-mode-reinfer-secret-123456",
+          name: "OpenAI 文本",
+          vendor: "openai",
+          baseUrl: "https://api.openai.com",
+          model: "gpt-5.5",
+          apiMode: "responses_stream"
+        })
+      });
+      const openAiConfig = await server.fetchJson("/api/provider-config");
+      expect(openAiConfig.textModels[0]).toEqual(expect.objectContaining({
+        apiMode: "responses_stream"
+      }));
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          configId: openAiConfig.textModels[0].configId,
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-pro"
+        })
+      });
+      const deepSeekConfig = await server.fetchJson("/api/provider-config");
+      const stored = await readStoredTextModelRows(root);
+
+      expect(deepSeekConfig.textModels[0]).toEqual(expect.objectContaining({
+        providerLabel: "deepseek",
+        baseUrl: "https://api.deepseek.com",
+        model: "deepseek-v4-pro",
+        apiMode: "chat_completions"
+      }));
+      expect(stored.credentials[0]).toEqual(expect.objectContaining({
+        vendor: "deepseek",
+        base_url: "https://api.deepseek.com",
+        api_mode: "chat_completions"
+      }));
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("uses a manually selected text model variant for AI product import", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-text-model-manual-select-"));
+      tempDirs.push(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "MANUAL-FLASH-001",
+                  title_ja: "Flash手动选择 テスト商品",
+                  category: "テスト",
+                  materials: ["PP"],
+                  dimensions: "約10cm",
+                  verified_selling_points: ["手动选择版本"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: [],
+                  reference_images: []
+                })
+              }
+            }
+          ]
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "manual-selection-secret-123456",
+          name: "DeepSeek 文本",
+          vendor: "deepseek",
+          priority: 5,
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-pro, deepseek-v4-flash",
+          apiMode: "chat_completions"
+        })
+      });
+      const config = await server.fetchJson("/api/provider-config");
+      const flashConfig = config.textModels.find((item: { model: string }) => item.model === "deepseek-v4-flash");
+
+      expect(flashConfig).toBeDefined();
+      await topUpWalletForAiUsage(server);
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：Flash手动选择 テスト商品",
+          textModelConfigId: flashConfig.configId
+        })
+      });
+
+      expect(response.product.sku).toBe("MANUAL-FLASH-001");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.deepseek.com/v1/chat/completions");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer manual-selection-secret-123456"
+      }));
+      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
+      expect(body.model).toBe("deepseek-v4-flash");
+      expect(body.messages.at(-1).content).toContain("Flash手动选择");
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
     }
   });
 
@@ -1889,6 +3483,15 @@ describe("console API", () => {
     const outputsDir = testJobsDir(root);
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       const path = String(url);
+      if (path === "https://api.openai.com/v1/responses") {
+        return new Response([
+          `data: ${JSON.stringify({ type: "response.output_text.delta", delta: "{\"ok\":true}" })}\n\n`,
+          "data: [DONE]\n\n"
+        ].join(""), {
+          status: 200,
+          headers: { "content-type": "text/event-stream" }
+        });
+      }
       if (path === "https://api.openai.com/v1/chat/completions") {
         return jsonResponse({
           choices: [{ message: { content: "{\"ok\":true}" } }]
@@ -1909,7 +3512,7 @@ describe("console API", () => {
     }) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, outputsDir, fetchImpl });
 
-    const text = await server.fetchJson("/api/provider-keys/openai-compatible-text/test", {
+    const text = await server.fetchJson("/api/model-configs/openai-compatible-text/test", {
       method: "POST",
       body: JSON.stringify({
         apiKey: "text-test-secret",
@@ -1917,7 +3520,7 @@ describe("console API", () => {
         model: "gpt-5.5"
       })
     });
-    const image = await server.fetchJson("/api/provider-keys/openai-compatible-image/test", {
+    const image = await server.fetchJson("/api/model-configs/openai-compatible-image/test", {
       method: "POST",
       body: JSON.stringify({
         apiKey: "image-test-secret",
@@ -1925,7 +3528,7 @@ describe("console API", () => {
         model: "gpt-image-2"
       })
     });
-    const video = await server.fetchJson("/api/provider-keys/volcengine-seedance/test", {
+    const video = await server.fetchJson("/api/model-configs/volcengine-seedance/test", {
       method: "POST",
       body: JSON.stringify({
         apiKey: "video-test-secret",
@@ -1952,7 +3555,6 @@ describe("console API", () => {
     expect(JSON.stringify(text)).not.toContain("text-test-secret");
     expect(JSON.stringify(image)).not.toContain("image-test-secret");
     expect(JSON.stringify(video)).not.toContain("video-test-secret");
-    await expect(readFile(join(testSettingsDir(root), "provider-keys.json"), "utf8")).rejects.toThrow();
     expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
       authorization: "Bearer text-test-secret"
     }));
@@ -1965,6 +3567,60 @@ describe("console API", () => {
     }));
   });
 
+  it("tests edited text model configs with inferred mode when no mode is submitted", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-provider-test-mode-reinfer-"));
+      tempDirs.push(root);
+      const fetchImpl = vi.fn(async (input) => {
+        const path = String(input);
+        if (path === "https://api.deepseek.com/v1/chat/completions") {
+          return jsonResponse({
+            choices: [{ message: { content: "{\"ok\":true}" } }]
+          });
+        }
+        throw new Error(`Unexpected URL: ${path}`);
+      }) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fetchImpl });
+
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-test-mode-reinfer-secret-123456",
+          vendor: "openai",
+          baseUrl: "https://api.openai.com",
+          model: "gpt-5.5",
+          apiMode: "responses_stream"
+        })
+      });
+      const config = await server.fetchJson("/api/provider-config");
+      const tested = await server.fetchJson("/api/model-configs/openai-compatible-text/test", {
+        method: "POST",
+        body: JSON.stringify({
+          configId: config.textModels[0].configId,
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-pro"
+        })
+      });
+
+      expect(tested).toEqual(expect.objectContaining({
+        ok: true,
+        provider: "openai-compatible-text",
+        model: "deepseek-v4-pro"
+      }));
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.deepseek.com/v1/chat/completions");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer text-test-mode-reinfer-secret-123456"
+      }));
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
   it("times out provider config tests with a clear error", async () => {
     const previousTimeout = process.env.PROVIDER_CONFIG_TEST_TIMEOUT_MS;
     process.env.PROVIDER_CONFIG_TEST_TIMEOUT_MS = "20";
@@ -1974,7 +3630,7 @@ describe("console API", () => {
       const fetchImpl = vi.fn(async () => new Promise<Response>(() => undefined)) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fetchImpl });
 
-      const response = await server.fetch("/api/provider-keys/openai-compatible-text/test", {
+      const response = await server.fetch("/api/model-configs/openai-compatible-text/test", {
         method: "POST",
         body: JSON.stringify({
           apiKey: "text-test-secret",
@@ -2026,7 +3682,7 @@ describe("console API", () => {
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fetchImpl });
 
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "low-priority-text-secret-0001",
@@ -2037,7 +3693,7 @@ describe("console API", () => {
           model: "low-model"
         })
       });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "high-priority-text-secret-9999",
@@ -2056,6 +3712,7 @@ describe("console API", () => {
       expect(JSON.stringify(config)).not.toContain("high-priority-text-secret-9999");
       expect(JSON.stringify(config)).not.toContain("low-priority-text-secret-0001");
 
+      await topUpWalletForAiUsage(server);
       await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2075,13 +3732,13 @@ describe("console API", () => {
     }
   });
 
-  it("uses the local BYOK provider key for read-only usage checks when env keys are absent", async () => {
+  it("uses the local BYOK video model config for read-only usage checks when env keys are absent", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
     delete process.env.ARK_API_KEY;
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-provider-key-usage-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-model-config-usage-"));
       tempDirs.push(root);
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
@@ -2097,7 +3754,7 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fetchImpl });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "byok-usage-secret-1234"
@@ -2182,6 +3839,7 @@ describe("console API", () => {
 
   it("renders video creation as one composer with inline product packing, controls, storyboard, and video history", async () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
+    const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
 
     const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
@@ -2190,8 +3848,8 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<ProductLibraryDialogMount");
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
-    const videoModelOptionsSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const defaultVideoDurationSeconds"));
-    const videoModelSource = appSource.slice(appSource.indexOf("const videoModelOptions"), appSource.indexOf("const modelConfigPresets"));
+    const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
+    const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
     const defaultStoryboardSource = appSource.slice(appSource.indexOf("function defaultStoryboardDraft"), appSource.indexOf("function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
     expect(workspaceSource).toContain("selectedProductStoryboardHistory");
@@ -2199,11 +3857,18 @@ describe("console API", () => {
     expect(workspaceSource).not.toContain("<VideoCreationEmptyShell");
     expect(workspaceSource).not.toContain("ensureVideoProductSelection");
     expect(workspaceSource).not.toContain("ProductStudioPipeline");
-    expect(appSource).toContain("useState<VideoModelChoice>(defaultVideoModelChoice)");
+    expect(modelServiceBundlesSource).toContain('export type ModelConfigChoice = "auto" | string;');
+    expect(appSource).toContain('useState<ModelConfigChoice>("auto")');
+    expect(appSource).toContain("selectedTextModelConfigId");
+    expect(appSource).toContain("selectedImageModelConfigId");
+    expect(appSource).toContain("selectedVideoModelConfigId");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
     expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
+    expect(appSource).toContain('setSelectedTextModelConfigId("auto")');
+    expect(appSource).toContain('setSelectedImageModelConfigId("auto")');
+    expect(appSource).toContain('setSelectedVideoModelConfigId("auto")');
     expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(defaultStoryboardSource).toContain("scene");
     expect(defaultStoryboardSource).toContain("pain-point");
@@ -2223,20 +3888,28 @@ describe("console API", () => {
     expect(composerSource).toContain("video-generate-bar");
     expect(composerSource).toContain("generateVideoButtonLabel");
     expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
+    expect(appSource).not.toContain("const videoModelConfigs");
+    expect(appSource).not.toContain("defaultVideoModelChoice");
+    expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
     expect(composerSource).toContain("videoModelOptions");
-    expect(videoModelOptionsSource).not.toContain('"mock"');
-    expect(videoModelSource).toContain("seedance-2-fast");
-    expect(videoModelSource).toContain("seedance-2");
-    expect(videoModelSource).toContain("seedance-1-5-pro");
-    expect(videoModelSource).toContain("seedance2.0 fast");
-    expect(videoModelSource).toContain("seedance2.0");
-    expect(videoModelSource).toContain("seedance1.5 pro");
-    expect(videoModelSource).toContain("const defaultVideoDurationSeconds = 10");
-    expect(videoModelSource).toContain('const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast"');
+    expect(composerSource).toContain("imageModelOptions");
+    expect(composerSource).toContain("modelSchemeSummary");
+    expect(composerSource).toContain("schemeSummary");
+    expect(composerSource).toContain("activeModelSchemeId");
+    expect(composerSource).toContain("modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)");
+    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
+    expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
+    expect(composerSource).toContain('label="模型方案"');
+    expect(composerSource).not.toContain('label="文本模型"');
+    expect(composerSource).not.toContain('label="图片模型"');
+    expect(composerSource).not.toContain('label="视频模型"');
+    expect(appSource).toContain("const defaultVideoDurationSeconds = 10");
     expect(appSource).not.toContain("seed" + "nice");
-    expect(composerSource).toContain("videoModelChoice");
-    expect(composerSource).toContain("provider: videoModelConfig.provider");
-    expect(composerSource).toContain("providerModel: videoModelConfig.model");
+    expect(composerSource).toContain("selectedVideoModelConfigId");
+    expect(composerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(composerSource).not.toContain("provider: videoModelConfig.provider");
+    expect(composerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(composerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(composerSource).not.toContain("允许使用付费模型生成当前商品视频");
     expect(composerSource).not.toContain("creation-parameter-dock");
@@ -2309,7 +3982,8 @@ describe("console API", () => {
     expect(composerSource).toContain("视频风格");
     expect(composerSource).toContain("视频时长");
     expect(composerSource).toContain("成片语言");
-    expect(composerSource).toContain("生成模型");
+    expect(composerSource).toContain("模型方案");
+    expect(composerSource).not.toContain('label="生成模型"');
     expect(composerSource).toContain("生成视频");
     expect(composerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain('from "./productComposerText.js"');
@@ -2423,14 +4097,16 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
       const sourceText = "商品名：AI整理 ミニ収納ケース\n素材：PP";
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2461,6 +4137,176 @@ describe("console API", () => {
       expect(body.model).toBe("gpt-5.5");
       expect(body.messages.at(-1).content).toContain("商品名");
       await expect(server.fetchJson("/api/products")).resolves.toEqual({ products: [] });
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("uses streamed Responses for OpenAI GPT text model configs by default", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-responses-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        new Response([
+          `data: ${JSON.stringify({
+            type: "response.output_text.delta",
+            delta: JSON.stringify({
+              sku: "ITEM-RSP-001",
+              title_ja: "Responses整理 ミニ収納ケース",
+              category: "収納ケース",
+              materials: ["PP"],
+              dimensions: "約12x8x4cm",
+              verified_selling_points: ["小物を整理しやすい"],
+              usage_scenes: ["デスク"],
+              forbidden_claims: ["防水効果は未確認"],
+              reference_images: ["responses-case-01.jpg"]
+            })
+          })}\n\n`,
+          "data: [DONE]\n\n"
+        ].join(""), {
+          status: 200,
+          headers: { "content-type": "text/event-stream" }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-responses-secret-123456",
+          baseUrl: "https://api.openai.com",
+          model: "gpt-5.5"
+        })
+      });
+
+      await topUpWalletForAiUsage(server);
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：Responses整理 ミニ収納ケース\n素材：PP"
+        })
+      });
+
+      expect(response.product.sku).toBe("ITEM-RSP-001");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/responses");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer text-responses-secret-123456"
+      }));
+      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
+      expect(body).toEqual(expect.objectContaining({
+        model: "gpt-5.5",
+        stream: true
+      }));
+      expect(body.instructions).toContain("电商商品资料整理助手");
+      expect(body.input).toContain("Responses整理");
+      expect(body.text?.format).toEqual({ type: "json_object" });
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("keeps DeepSeek text model configs on Chat Completions", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-product-import-deepseek-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  sku: "ITEM-DS-001",
+                  title_ja: "DeepSeek整理 ミニ収納ケース",
+                  category: "収納ケース",
+                  materials: ["PP"],
+                  dimensions: "約12x8x4cm",
+                  verified_selling_points: ["小物を整理しやすい"],
+                  usage_scenes: ["デスク"],
+                  forbidden_claims: ["防水効果は未確認"],
+                  reference_images: ["deepseek-case-01.jpg"]
+                })
+              }
+            }
+          ]
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-deepseek-secret-123456",
+          vendor: "deepseek",
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-pro"
+        })
+      });
+
+      await topUpWalletForAiUsage(server);
+      const response = await server.fetchJson("/api/products/import-ai-preview", {
+        method: "POST",
+        body: JSON.stringify({
+          text: "商品名：DeepSeek整理 ミニ収納ケース\n素材：PP"
+        })
+      });
+
+      expect(response.product.sku).toBe("ITEM-DS-001");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.deepseek.com/v1/chat/completions");
+      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
+      expect(body.model).toBe("deepseek-v4-pro");
+      expect(body.messages.at(-1).content).toContain("DeepSeek整理");
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("refreshes available models through the unified discovery endpoint", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-model-refresh-"));
+      tempDirs.push(root);
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          data: [
+            { id: "deepseek-v4-pro" },
+            { id: "deepseek-v4-flash" }
+          ]
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fetchImpl });
+
+      const text = await server.fetchJson("/api/model-configs/openai-compatible-text/models", {
+        method: "POST",
+        body: JSON.stringify({
+          apiKey: "text-discovery-secret",
+          baseUrl: "https://api.deepseek.com"
+        })
+      });
+      const video = await server.fetchJson("/api/model-configs/volcengine-seedance/models", {
+        method: "POST",
+        body: JSON.stringify({
+          apiKey: "video-discovery-secret",
+          baseUrl: "https://ark.cn-beijing.volces.com"
+        })
+      });
+
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.deepseek.com/models");
+      expect(text.models.map((model: { id: string }) => model.id)).toEqual(["deepseek-v4-pro", "deepseek-v4-flash"]);
+      expect(video.models.map((model: { label: string }) => model.label)).toEqual(["seedance-2.0-fast", "seedance-2.0"]);
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
@@ -2510,13 +4356,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2590,13 +4438,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2657,13 +4507,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2715,13 +4567,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2768,13 +4622,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-model-secret-key-123456"
+          apiKey: "text-model-secret-key-123456",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
@@ -2837,13 +4693,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-storyboard-secret-7777"
+          apiKey: "text-storyboard-secret-7777",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/STORY-001/storyboard-draft", {
         method: "POST",
         body: JSON.stringify({
@@ -2913,13 +4771,15 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-storyboard-secret-7777"
+          apiKey: "text-storyboard-secret-7777",
+          apiMode: "chat_completions"
         })
       });
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/STORY-LANG/storyboard-draft", {
         method: "POST",
         body: JSON.stringify({
@@ -3872,7 +5732,7 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/provider-keys/openai-compatible-image", {
+      await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "low-priority-image-secret-0001",
@@ -3883,7 +5743,7 @@ describe("console API", () => {
           model: "low-image-model"
         })
       });
-      await server.fetchJson("/api/provider-keys/openai-compatible-image", {
+      await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "high-priority-image-secret-9999",
@@ -3894,11 +5754,16 @@ describe("console API", () => {
           model: "high-image-model"
         })
       });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const lowImageConfig = providerConfig.imageModels.find((model: { model: string }) => model.model === "low-image-model");
+      expect(lowImageConfig).toBeDefined();
 
+      await topUpWalletForAiUsage(server);
       const response = await server.fetchJson("/api/products/IMG-001/reference-images/generate", {
         method: "POST",
         body: JSON.stringify({
-          count: 1
+          count: 1,
+          imageModelConfigId: lowImageConfig.configId
         })
       });
 
@@ -3912,12 +5777,12 @@ describe("console API", () => {
       ]);
       await expect(readFile(generatedPath, "utf8")).resolves.toBe("generated-reference-image");
       expect(response.product.reference_images).toEqual(["main.jpg", generatedReference]);
-      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://high-image.example.test/v1/images/generations");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://low-image.example.test/v1/images/generations");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
-        authorization: "Bearer high-priority-image-secret-9999"
+        authorization: "Bearer low-priority-image-secret-0001"
       }));
       const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
-      expect(body.model).toBe("high-image-model");
+      expect(body.model).toBe("low-image-model");
       expect(body.prompt).toContain("接触冷感アームカバー");
       expect(body.n).toBe(1);
     } finally {
@@ -4313,7 +6178,6 @@ describe("console API", () => {
   });
 
   it("queries official provider usage for one task id without creating a generation", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const root = await mkdtemp(join(tmpdir(), "haitu-console-usage-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
@@ -4331,6 +6195,7 @@ describe("console API", () => {
       })
     ) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl });
+    await saveByokSeedanceConfig(server);
 
     const response = await server.fetchJson("/api/provider-tasks/cgt-usage");
 
@@ -4355,7 +6220,6 @@ describe("console API", () => {
   });
 
   it("lists official provider usage for customer support without creating generations", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const root = await mkdtemp(join(tmpdir(), "haitu-console-usage-list-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async () =>
@@ -4396,6 +6260,7 @@ describe("console API", () => {
       })
     ) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl });
+    await saveByokSeedanceConfig(server);
 
     const response = await server.fetchJson(
       "/api/provider-tasks?pageSize=10&status=succeeded&model=doubao-seedance-2-0-fast-260128"
@@ -5683,7 +7548,7 @@ describe("console API", () => {
     await mkdir(join(dataDir, "backups"), { recursive: true });
     await writeFile(join(productDir, "product.json"), JSON.stringify({ sku: "TK-001", workspaceId: "default" }), "utf8");
     await writeFile(join(productDir, "refs", "reference-01.jpg"), Buffer.from("image"));
-    await writeFile(join(settingsDir, "provider-keys.json"), JSON.stringify({ providers: {} }), "utf8");
+    await writeFile(join(settingsDir, "workspace-settings.json"), JSON.stringify({ locale: "ja-JP" }), "utf8");
     await writeFile(join(systemDir, "console-settings.json"), JSON.stringify({ defaultCta: "check" }), "utf8");
     await writeFile(join(jobDir, "job.json"), JSON.stringify({ id: "job-1", workspaceId: "default" }), "utf8");
     await writeFile(join(jobDir, "make-video-report.json"), JSON.stringify({ productSku: "TK-001" }), "utf8");
@@ -5705,7 +7570,7 @@ describe("console API", () => {
     expect(archiveList.status).toBe(0);
     expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/product.json");
     expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/refs/reference-01.jpg");
-    expect(archiveList.stdout).toContain("workspaces/default/settings/provider-keys.json");
+    expect(archiveList.stdout).toContain("workspaces/default/settings/workspace-settings.json");
     expect(archiveList.stdout).toContain("system/console-settings.json");
     expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/job.json");
     expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/make-video-report.json");
@@ -5848,7 +7713,6 @@ describe("console API", () => {
   });
 
   it("cancels queued provider tasks only after checking their status", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const root = await mkdtemp(join(tmpdir(), "haitu-console-cancel-"));
     tempDirs.push(root);
     const fetchImpl = vi
@@ -5861,6 +7725,7 @@ describe("console API", () => {
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 })) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl });
+    await saveByokSeedanceConfig(server);
 
     const response = await server.fetchJson("/api/provider-tasks/cgt-queued/cancel", {
       method: "POST"
@@ -5875,7 +7740,6 @@ describe("console API", () => {
   });
 
   it("refuses to cancel provider tasks that are not queued", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const root = await mkdtemp(join(tmpdir(), "haitu-console-cancel-running-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async () =>
@@ -5885,6 +7749,7 @@ describe("console API", () => {
       })
     ) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl });
+    await saveByokSeedanceConfig(server);
 
     const response = await server.fetch("/api/provider-tasks/cgt-running/cancel", {
       method: "POST"
@@ -5969,7 +7834,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "paid-key",
@@ -6093,7 +7958,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "low-priority-video-secret-0001",
@@ -6104,7 +7969,7 @@ describe("console API", () => {
           model: "low-video-model"
         })
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "high-priority-video-secret-9999",
@@ -6115,6 +7980,7 @@ describe("console API", () => {
           model: "high-video-model"
         })
       });
+      await topUpWalletForPaidVideo(server);
 
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
@@ -6192,7 +8058,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "paid-key",
@@ -6200,6 +8066,7 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
+      await topUpWalletForPaidVideo(server);
 
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
@@ -6268,7 +8135,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "paid-key",
@@ -6276,6 +8143,7 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
+      await topUpWalletForPaidVideo(server);
 
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
@@ -6356,7 +8224,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "paid-key",
@@ -6364,6 +8232,7 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
+      await topUpWalletForPaidVideo(server);
 
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
@@ -6441,7 +8310,7 @@ describe("console API", () => {
     }
   });
 
-  it("allows product video jobs to override the selected Seedance model without a separate paid confirmation", async () => {
+  it("uses a manually selected video model config for product video jobs", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
@@ -6488,7 +8357,7 @@ describe("console API", () => {
           };
         }
       });
-      await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "configured-video-secret-9999",
@@ -6499,12 +8368,27 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "standard-video-secret-0001",
+          name: "标准版",
+          vendor: "volcengine",
+          priority: 1,
+          baseUrl: "https://seedance-standard.example.test",
+          model: "doubao-seedance-2-0-260128"
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const standardVideoConfig = providerConfig.videoModels.find((model: { model: string }) => model.model === "doubao-seedance-2-0-260128");
+      expect(standardVideoConfig).toBeDefined();
+      await topUpWalletForPaidVideo(server);
 
       const response = await server.fetchJson("/api/products/WALLET-BLACK-001/video-jobs", {
         method: "POST",
         body: JSON.stringify({
           provider: "volcengine-seedance",
-          providerModel: "doubao-seedance-2-0-260128",
+          providerModelConfigId: standardVideoConfig.configId,
           duration: 8,
           template: "scene",
           cta: "今すぐチェック",
@@ -6521,15 +8405,20 @@ describe("console API", () => {
 
       expect(response.jobs[0]).toEqual(expect.objectContaining({
         provider: "volcengine-seedance",
+        providerModelConfigId: standardVideoConfig.configId,
         providerModel: "doubao-seedance-2-0-260128",
         confirmPaid: true
       }));
       expect(capturedInputs[0]).toEqual(expect.objectContaining({
-        apiKey: "configured-video-secret-9999",
-        providerBaseUrl: "https://seedance.example.test",
+        apiKey: "standard-video-secret-0001",
+        providerBaseUrl: "https://seedance-standard.example.test",
+        providerModelConfigId: standardVideoConfig.configId,
         providerModel: "doubao-seedance-2-0-260128",
         confirmPaid: true
       }));
+      await expect(readFile(jobFilePath(outputsDir, response.jobs[0].id), "utf8")).resolves.toContain(
+        `"providerModelConfigId": "${standardVideoConfig.configId}"`
+      );
       await expect(readFile(jobFilePath(outputsDir, response.jobs[0].id), "utf8")).resolves.toContain(
         "\"providerModel\": \"doubao-seedance-2-0-260128\""
       );
@@ -7948,6 +9837,18 @@ function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleSer
   return server;
 }
 
+async function saveByokSeedanceConfig(server: TestConsoleServerHandle): Promise<void> {
+  await server.fetchJson("/api/model-configs/volcengine-seedance", {
+    method: "PUT",
+    body: JSON.stringify({
+      apiKey: "byok-seedance-test-key",
+      vendor: "volcengine",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "seedance-2.0-fast"
+    })
+  });
+}
+
 async function importDefaultWorkspaceFiles(dataDir: string, workspaceId: string): Promise<void> {
   if (workspaceId !== "default") {
     return;
@@ -8052,23 +9953,90 @@ async function latestEmailOtp(dataDir: string, email: string, type: "email-verif
   throw new Error(`No OTP found for ${email} (${type})`);
 }
 
-async function readStoredProviderKey(root: string, provider: string): Promise<{
+async function readStoredModelCredential(root: string, provider: string): Promise<{
   key_preview: string;
   encrypted_key: string;
   base_url: string | null;
   model: string | null;
+  api_mode: string | null;
 }> {
   const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
   try {
     return handle.sqlite.prepare(`
-      SELECT key_preview, encrypted_key, base_url, model
-      FROM provider_keys
-      WHERE provider = ?
+      SELECT
+        credential.key_preview,
+        credential.encrypted_key,
+        credential.base_url,
+        variant.model,
+        credential.api_mode
+      FROM model_variants AS variant
+      INNER JOIN model_credentials AS credential
+        ON credential.workspace_id = variant.workspace_id
+        AND credential.credential_id = variant.credential_id
+      WHERE variant.provider_id = ?
+      ORDER BY variant.priority DESC, variant.variant_order ASC, variant.updated_at DESC
+      LIMIT 1
     `).get(provider) as {
       key_preview: string;
       encrypted_key: string;
       base_url: string | null;
       model: string | null;
+      api_mode: string | null;
+    };
+  } finally {
+    closeDatabase(handle);
+  }
+}
+
+async function readStoredTextModelRows(root: string): Promise<{
+  credentials: Array<{
+    credential_id: string;
+    encrypted_key: string;
+    key_preview: string;
+    name: string | null;
+    vendor: string | null;
+    base_url: string | null;
+    api_mode: string | null;
+  }>;
+  variants: Array<{
+    credential_id: string;
+    config_id: string;
+    label: string;
+    model: string;
+    priority: number;
+  }>;
+}> {
+  const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+  try {
+    const credentials = handle.sqlite.prepare(`
+      SELECT credential_id, encrypted_key, key_preview, name, vendor, base_url, api_mode
+      FROM model_credentials
+      WHERE provider_id = 'openai-compatible-text'
+      ORDER BY updated_at DESC, created_at DESC
+    `).all() as Array<{
+      credential_id: string;
+      encrypted_key: string;
+      key_preview: string;
+      name: string | null;
+      vendor: string | null;
+      base_url: string | null;
+      api_mode: string | null;
+    }>;
+    const variants = handle.sqlite.prepare(`
+      SELECT credential_id, config_id, label, model, priority
+      FROM model_variants
+      WHERE provider_id = 'openai-compatible-text'
+      ORDER BY priority DESC, variant_order ASC, updated_at DESC
+    `).all() as Array<{
+      credential_id: string;
+      config_id: string;
+      label: string;
+      model: string;
+      priority: number;
+    }>;
+    return {
+      credentials,
+      variants
     };
   } finally {
     closeDatabase(handle);
@@ -8128,8 +10096,28 @@ async function writeFileReport(path: string, report: unknown): Promise<void> {
   await writeFile(path, JSON.stringify(report, null, 2), "utf8");
 }
 
+async function topUpWalletForPaidVideo(server: TestConsoleServerHandle, amountCny = 100): Promise<void> {
+  await server.fetchJson("/api/wallet/top-up", {
+    method: "POST",
+    body: JSON.stringify({
+      amountCny,
+      description: "test paid video balance"
+    })
+  });
+}
+
+async function topUpWalletForAiUsage(server: TestConsoleServerHandle, amountCny = 10): Promise<void> {
+  await server.fetchJson("/api/wallet/top-up", {
+    method: "POST",
+    body: JSON.stringify({
+      amountCny,
+      description: "test AI usage balance"
+    })
+  });
+}
+
 async function configurePaidVideoModel(server: TestConsoleServerHandle): Promise<void> {
-  await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+  await server.fetchJson("/api/model-configs/volcengine-seedance", {
     method: "PUT",
     body: JSON.stringify({
       apiKey: "paid-key",
@@ -8137,6 +10125,7 @@ async function configurePaidVideoModel(server: TestConsoleServerHandle): Promise
       model: "doubao-seedance-2-0-fast-260128"
     })
   });
+  await topUpWalletForPaidVideo(server);
 }
 
 function jsonResponse(body: unknown): Response {

@@ -83,9 +83,9 @@ export class VolcengineUsageClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: VolcengineUsageClientOptions = {}) {
-    this.apiKey = options.apiKey ?? process.env.SEEDANCE_API_KEY ?? process.env.ARK_API_KEY ?? "";
+    this.apiKey = options.apiKey ?? "";
     this.baseUrl =
-      options.baseUrl ?? process.env.SEEDANCE_BASE_URL ?? "https://ark.cn-beijing.volces.com";
+      options.baseUrl ?? "https://ark.cn-beijing.volces.com";
     this.tokenPriceCnyPerMillion =
       options.tokenPriceCnyPerMillion ??
       Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
@@ -94,7 +94,7 @@ export class VolcengineUsageClient {
 
   async listTasks(request: ListUsageTasksRequest = {}): Promise<UsageReport> {
     if (!this.apiKey) {
-      throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Cannot query usage.");
+      throw new Error("请先在 API 管理配置视频模型 API Key。");
     }
 
     const response = await this.getJson<VolcengineTaskListResponse>(
@@ -114,7 +114,7 @@ export class VolcengineUsageClient {
 
   async getTask(taskId: string): Promise<UsageTaskItem> {
     if (!this.apiKey) {
-      throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Cannot query usage.");
+      throw new Error("请先在 API 管理配置视频模型 API Key。");
     }
     const task = await this.getJson<VolcengineTaskResponse>(
       `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`
@@ -124,7 +124,7 @@ export class VolcengineUsageClient {
 
   async deleteTask(taskId: string): Promise<void> {
     if (!this.apiKey) {
-      throw new Error("Missing SEEDANCE_API_KEY or ARK_API_KEY. Cannot delete task.");
+      throw new Error("请先在 API 管理配置视频模型 API Key。");
     }
     await this.requestJson<unknown>(
       `/api/v3/contents/generations/tasks/${encodeURIComponent(taskId)}`,

@@ -35,7 +35,6 @@ export function getWorkspacePaths(dataDir: string, workspaceId = DEFAULT_WORKSPA
   productsDir: string;
   jobsDir: string;
   settingsDir: string;
-  providerKeysFile: string;
 } {
   const safeWorkspaceId = assertSafeSegment(workspaceId, "workspace id");
   const workspaceDir = join(getStorageRoots(dataDir).workspacesDir, safeWorkspaceId);
@@ -45,8 +44,7 @@ export function getWorkspacePaths(dataDir: string, workspaceId = DEFAULT_WORKSPA
     dir: workspaceDir,
     productsDir: join(workspaceDir, "products"),
     jobsDir: join(workspaceDir, "jobs"),
-    settingsDir,
-    providerKeysFile: join(settingsDir, "provider-keys.json")
+    settingsDir
   };
 }
 

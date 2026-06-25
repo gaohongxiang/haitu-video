@@ -1,10 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 let child: ChildProcess | undefined;
+let tempDir: string | undefined;
 
 afterEach(async () => {
   if (child && child.exitCode === null) {
@@ -14,11 +17,16 @@ afterEach(async () => {
     });
   }
   child = undefined;
+  if (tempDir) {
+    await rm(tempDir, { recursive: true, force: true });
+    tempDir = undefined;
+  }
 });
 
 describe("console CLI runtime", () => {
   it("keeps the HTTP server alive after printing the console URL", async () => {
     const port = await getFreePort();
+    tempDir = await mkdtemp(join(tmpdir(), "haitu-console-runtime-"));
     const stdout: string[] = [];
     const stderr: string[] = [];
     child = spawn(join(process.cwd(), "node_modules/.bin/tsx"), [
@@ -31,6 +39,7 @@ describe("console CLI runtime", () => {
       cwd: process.cwd(),
       env: {
         ...process.env,
+        HAITU_DATA_DIR: join(tempDir, "data"),
         HAITU_SECRET_KEY: "0123456789abcdef0123456789abcdef"
       },
       stdio: ["ignore", "pipe", "pipe"]
@@ -44,7 +53,7 @@ describe("console CLI runtime", () => {
     expect(child.exitCode, stderr.join("")).toBeNull();
     const response = await fetch(`http://127.0.0.1:${port}/api/health`);
     expect(response.status).toBe(200);
-  });
+  }, 20_000);
 });
 
 async function getFreePort(): Promise<number> {

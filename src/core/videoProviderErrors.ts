@@ -41,8 +41,8 @@ export function readableVideoProviderError(input: ReadableVideoProviderErrorInpu
     );
   }
 
-  if (diagnosticMessage.includes("Missing SEEDANCE_API_KEY") || diagnosticMessage.includes("Missing ARK_API_KEY")) {
-    return "还没有配置视频模型 API Key。请先到 API 管理里配置 Seedance/火山视频模型密钥，再生成视频。";
+  if (diagnosticMessage.includes("API 管理配置视频模型 API Key")) {
+    return "还没有配置视频模型 API Key。请先到 API 管理里配置或选择视频模型服务，再生成视频。";
   }
 
   if (isSeedanceOutputDownloadFailure(diagnosticMessage, details)) {

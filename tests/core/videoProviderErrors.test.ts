@@ -78,6 +78,14 @@ describe("readableVideoProviderError", () => {
     expect(error).not.toContain("overdue bills");
   });
 
+  it("does not mention removed legacy environment key names for missing video credentials", () => {
+    const error = readableVideoProviderError("请先在 API 管理配置视频模型 API Key。");
+
+    expect(error).toBe("还没有配置视频模型 API Key。请先到 API 管理里配置或选择视频模型服务，再生成视频。");
+    expect(error).not.toContain("SEEDANCE_API_KEY");
+    expect(error).not.toContain("ARK_API_KEY");
+  });
+
   it("explains Seedance reference image download failures in user-facing Chinese", () => {
     const error = readableVideoProviderError({
       message: "视频平台拒绝了这次生成请求。请检查参考图、商品资料和视频模型配置后重试。",

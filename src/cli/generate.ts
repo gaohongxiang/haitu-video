@@ -33,6 +33,7 @@ interface GenerateArgs {
   cta: string;
   template: ScriptTemplate;
   providerName: VideoProviderName;
+  apiKey?: string;
   durationSeconds: number;
   confirmPaid: boolean;
 }
@@ -62,6 +63,7 @@ export async function runGenerateCli(
     );
   }
   const provider = createVideoProvider(args.providerName, {
+    apiKey: args.apiKey,
     fetchImpl: options.fetchImpl
   });
   const manifests = [];
@@ -127,6 +129,7 @@ function parseArgs(argv: string[], cwd: string): GenerateArgs {
     cta: values.get("cta") ?? "今すぐチェック",
     template: parseTemplate(values.get("template") ?? "pain-point"),
     providerName: parseProvider(values.get("provider") ?? "mock"),
+    apiKey: values.get("apiKey"),
     durationSeconds: parseDuration(values.get("duration") ?? "8"),
     confirmPaid: parseBoolean(values.get("confirmPaid") ?? "false")
   };
@@ -149,8 +152,8 @@ function parseTemplate(value: string): ScriptTemplate {
 }
 
 function parseProvider(value: string): VideoProviderName {
-  if (value !== "mock" && value !== "seedance" && value !== "volcengine-seedance") {
-    throw new Error("--provider must be one of: mock, seedance, volcengine-seedance");
+  if (value !== "mock" && value !== "volcengine-seedance") {
+    throw new Error("--provider must be one of: mock, volcengine-seedance");
   }
   return value as VideoProviderName;
 }

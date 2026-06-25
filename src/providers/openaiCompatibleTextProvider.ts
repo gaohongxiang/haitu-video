@@ -1,15 +1,19 @@
-export interface OpenAiCompatibleTextProviderOptions {
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-  fetchImpl?: typeof fetch;
-}
+import {
+  extractJsonObject,
+  openAiCompatibleBaseUrl,
+  trimTrailingSlash,
+  type TextJsonRequest,
+  type TextProvider,
+  type TextProviderOptions
+} from "./textProviderTypes.js";
+import {
+  defaultImageModelBaseUrl,
+  defaultImageModelId,
+  defaultTextModelBaseUrl,
+  defaultTextModelId
+} from "./modelCatalog.js";
 
-export interface TextJsonRequest {
-  system: string;
-  user: string;
-  temperature?: number;
-}
+export interface OpenAiCompatibleTextProviderOptions extends TextProviderOptions {}
 
 interface ChatCompletionResponse {
   choices?: Array<{
@@ -22,16 +26,16 @@ interface ChatCompletionResponse {
   };
 }
 
-export class OpenAiCompatibleTextProvider {
+export class OpenAiCompatibleTextProvider implements TextProvider {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: OpenAiCompatibleTextProviderOptions = {}) {
-    this.apiKey = options.apiKey ?? process.env.TEXT_MODEL_API_KEY ?? process.env.OPENAI_API_KEY ?? "";
-    this.baseUrl = chatCompletionsBaseUrl(options.baseUrl ?? process.env.TEXT_MODEL_BASE_URL ?? "https://api.openai.com");
-    this.model = options.model ?? process.env.TEXT_MODEL_MODEL ?? "gpt-5.5";
+    this.apiKey = options.apiKey ?? "";
+    this.baseUrl = openAiCompatibleBaseUrl(options.baseUrl ?? defaultTextModelBaseUrl());
+    this.model = options.model ?? defaultTextModelId();
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -69,39 +73,17 @@ export class OpenAiCompatibleTextProvider {
 }
 
 export function textModelBaseUrl(): string {
-  return trimTrailingSlash(process.env.TEXT_MODEL_BASE_URL ?? "https://api.openai.com");
+  return trimTrailingSlash(defaultTextModelBaseUrl());
 }
 
 export function textModelName(): string {
-  return process.env.TEXT_MODEL_MODEL ?? "gpt-5.5";
+  return defaultTextModelId();
 }
 
 export function imageModelBaseUrl(): string {
-  return trimTrailingSlash(process.env.IMAGE_MODEL_BASE_URL ?? "https://api.openai.com");
+  return trimTrailingSlash(defaultImageModelBaseUrl());
 }
 
 export function imageModelName(): string {
-  return process.env.IMAGE_MODEL_MODEL ?? "gpt-image-2";
-}
-
-function extractJsonObject(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    return trimmed;
-  }
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return trimmed.slice(start, end + 1);
-  }
-  throw new Error("文本模型返回内容不是 JSON。");
-}
-
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
-}
-
-function chatCompletionsBaseUrl(value: string): string {
-  const trimmed = trimTrailingSlash(value);
-  return trimmed.endsWith("/v1") || trimmed.endsWith("/api/v3") ? trimmed : `${trimmed}/v1`;
+  return defaultImageModelId();
 }

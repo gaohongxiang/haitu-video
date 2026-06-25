@@ -368,6 +368,37 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     }
   });
 
+  it("promotes an existing verified account when it matches HAITU_ADMIN_EMAIL later", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    delete process.env.HAITU_ADMIN_EMAIL;
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const ownerCookie = await registerUser(root, server, "owner@example.com");
+    const before = await server.fetch("/api/admin/overview", {
+      headers: { cookie: ownerCookie }
+    });
+    expect(before.status).toBe(403);
+
+    process.env.HAITU_ADMIN_EMAIL = "owner@example.com";
+    const after = await server.fetch("/api/admin/overview", {
+      headers: { cookie: ownerCookie }
+    });
+
+    expect(after.status).toBe(200);
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    try {
+      const row = handle.sqlite
+        .prepare("SELECT role FROM users WHERE email = ?")
+        .get("owner@example.com") as { role: string };
+      expect(row.role).toBe("admin");
+    } finally {
+      closeDatabase(handle);
+    }
+  });
+
   it("shows project admins one user's workspace products and video jobs", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
@@ -829,7 +860,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(afterDelete.jobs).toEqual([]);
   });
 
-  it("uses the logged-in workspace provider key when running queued paid video jobs", async () => {
+  it("uses the logged-in workspace video model config when running queued paid video jobs", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
     delete process.env.SEEDANCE_API_KEY;
@@ -867,7 +898,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     });
     const aliceCookie = await registerUser(root, server, "alice@example.com");
 
-    await server.fetchJson("/api/provider-keys/volcengine-seedance", {
+    await server.fetchJson("/api/model-configs/volcengine-seedance", {
       method: "PUT",
       headers: { cookie: aliceCookie },
       body: JSON.stringify({
@@ -880,6 +911,14 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       body: JSON.stringify({
         ...productFacts("PAID-001", "付费動画商品"),
         reference_images: ["https://cdn.example.com/paid.jpg"]
+      })
+    });
+    await server.fetchJson("/api/wallet/top-up", {
+      method: "POST",
+      headers: { cookie: aliceCookie },
+      body: JSON.stringify({
+        amountCny: 100,
+        description: "test paid video balance"
       })
     });
 
@@ -969,6 +1008,44 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       authenticated: true,
       user: {
         email: "alice@example.com"
+      }
+    });
+  });
+
+  it("keeps created accounts after the local console server restarts", async () => {
+    const root = await makeTempDir();
+    process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
+    const firstServer = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    await registerUser(root, firstServer, "alice@example.com", "correct horse battery staple");
+
+    const restartedServer = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const login = await restartedServer.fetch("/api/auth/enter", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "alice@example.com",
+        password: "correct horse battery staple"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") ?? "";
+    const session = await restartedServer.fetchJson("/api/auth/session", {
+      headers: { cookie }
+    });
+
+    expect(login.status).toBe(200);
+    expect(login.headers.get("set-cookie")).toContain("better-auth.session_token=");
+    expect(session).toMatchObject({
+      authenticated: true,
+      user: {
+        email: "alice@example.com"
+      },
+      workspace: {
+        id: "default"
       }
     });
   });

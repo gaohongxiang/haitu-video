@@ -7,13 +7,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runGenerateCli } from "../../src/cli/generate.js";
 
 let tempDirs: string[] = [];
-const originalArkApiKey = process.env.ARK_API_KEY;
-const originalSeedanceApiKey = process.env.SEEDANCE_API_KEY;
 
 afterEach(async () => {
   await Promise.all(tempDirs.map((dir) => rm(dir, { force: true, recursive: true })));
   tempDirs = [];
-  restoreEnv();
 });
 
 describe("runGenerateCli", () => {
@@ -137,8 +134,49 @@ describe("runGenerateCli", () => {
   });
 
   it("refuses paid providers unless the user explicitly confirms the paid request", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-paid-confirm-"));
+    tempDirs.push(tempDir);
+    const productPath = join(tempDir, "product.json");
+    await writeFile(
+      productPath,
+      JSON.stringify({
+        sku: "TK-001",
+        title_ja: "折りたたみ収納ボックス",
+        category: "収納用品",
+        materials: ["PP"],
+        dimensions: "36x25x19cm",
+        verified_selling_points: ["折りたたみ可能"],
+        usage_scenes: ["キッチン"],
+        forbidden_claims: ["防水未確認"],
+        reference_images: ["main.jpg"]
+      }),
+      "utf8"
+    );
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: "should-not-call" })) as unknown as typeof fetch;
+
+    await expect(
+      runGenerateCli(
+        [
+          "--product",
+          productPath,
+          "--versions",
+          "1",
+          "--outDir",
+          join(tempDir, "outputs"),
+          "--provider",
+          "volcengine-seedance"
+        ],
+        {
+          cwd: tempDir,
+          fetchImpl
+        }
+      )
+    ).rejects.toThrow(/--confirmPaid true/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects the old seedance provider alias", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-old-seedance-alias-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
     await writeFile(
@@ -175,13 +213,11 @@ describe("runGenerateCli", () => {
           fetchImpl
         }
       )
-    ).rejects.toThrow(/--confirmPaid true/);
+    ).rejects.toThrow(/--provider must be one of: mock, volcengine-seedance/);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("refuses the seedance provider when no API key is configured", async () => {
-    delete process.env.ARK_API_KEY;
-    delete process.env.SEEDANCE_API_KEY;
+  it("refuses the canonical Volcengine Seedance provider when no API key is configured", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-seedance-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
@@ -210,21 +246,20 @@ describe("runGenerateCli", () => {
         "--outDir",
         join(tempDir, "outputs"),
         "--provider",
-        "seedance",
+        "volcengine-seedance",
         "--confirmPaid",
         "true"
       ], {
         cwd: tempDir
       })
-    ).rejects.toThrow(/SEEDANCE_API_KEY|ARK_API_KEY/);
+    ).rejects.toThrow(/API 管理配置视频模型 API Key/);
   });
 
-  it("loads provider configuration from a local .env file", async () => {
+  it("uses an explicit provider API key", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-cli-env-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
     const outDir = join(tempDir, "outputs");
-    await writeFile(join(tempDir, ".env"), "ARK_API_KEY=from-env-file\n", "utf8");
     await writeFile(join(tempDir, "main.jpg"), Buffer.from("fake jpg bytes"));
     await writeFile(
       productPath,
@@ -268,7 +303,9 @@ describe("runGenerateCli", () => {
         "--outDir",
         outDir,
         "--provider",
-        "seedance",
+        "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "true"
       ],
@@ -291,7 +328,6 @@ describe("runGenerateCli", () => {
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
     const outDir = join(tempDir, "outputs");
-    await writeFile(join(tempDir, ".env"), "ARK_API_KEY=from-env-file\n", "utf8");
     await writeFile(join(tempDir, "main.jpg"), Buffer.from("fake jpg bytes"));
     await writeFile(
       productPath,
@@ -336,6 +372,8 @@ describe("runGenerateCli", () => {
         outDir,
         "--provider",
         "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "true"
       ],
@@ -396,20 +434,6 @@ describe("runGenerateCli", () => {
     expect(result.stdout).not.toContain("mock video job");
   });
 });
-
-function restoreEnv(): void {
-  if (originalArkApiKey === undefined) {
-    delete process.env.ARK_API_KEY;
-  } else {
-    process.env.ARK_API_KEY = originalArkApiKey;
-  }
-
-  if (originalSeedanceApiKey === undefined) {
-    delete process.env.SEEDANCE_API_KEY;
-  } else {
-    process.env.SEEDANCE_API_KEY = originalSeedanceApiKey;
-  }
-}
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

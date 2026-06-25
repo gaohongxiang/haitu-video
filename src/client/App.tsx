@@ -13,6 +13,7 @@ import {
   Database,
   Download,
   ExternalLink,
+  FileText,
   FileSpreadsheet,
   FileArchive,
   FileVideo,
@@ -40,6 +41,8 @@ import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input, Select, Textarea } from "./components/ui/field.js";
+import { ApiModelConfigPanel } from "./components/apiModelConfigPanel.js";
+import { CompactChoiceDropdown } from "./components/compactChoiceDropdown.js";
 import {
   consoleSectionFromUrl,
   consoleSectionUrl,
@@ -66,16 +69,61 @@ import {
   type ProductDraft
 } from "./productComposerText.js";
 import { readableVideoProviderError } from "../core/videoProviderErrors.js";
+import {
+  apiModeForProviderDraft,
+  defaultModelConfigPreset,
+  syncModelConfigDraftsFromLedger,
+  updateProviderConfigStatus,
+  type ModelConfigDraft,
+  type ModelConfigProviderId,
+  type ModelConfigTestStatus,
+  type ProviderConfigItem,
+  type ProviderConfigLedger
+} from "./components/modelServiceConfig.js";
+import {
+  buildModelSchemeOptions,
+  bundleIdFromModelSchemeId,
+  bundleModelConfigIds,
+  byokConfiguredModels,
+  compareCustomModelBundles,
+  compareModelBundles,
+  configuredModelOptions,
+  isCompleteModelBundle,
+  modelConfigChoiceExists,
+  modelConfigChoiceLabel,
+  modelSchemeChoiceLabel,
+  modelSchemeIdForBundle,
+  modelSchemeOptionExists,
+  modelSchemeOwner,
+  modelSchemeSummary,
+  normalizeModelBundleItem,
+  platformConfiguredModels,
+  sortSelectableModelBundles,
+  type ModelBundleItem,
+  type ModelConfigChoice,
+  type ModelSchemeChoice,
+  type ModelSchemeOption,
+  type ModelServicePreference
+} from "./modelServiceBundles.js";
+import {
+  modelLabelForId
+} from "../providers/modelCatalog.js";
 import { cn } from "./lib/utils.js";
+import {
+  modelPricingUpdatedAt,
+  modelPricingProviders,
+  pricingEntriesForProvider,
+  type ModelPricingEntry,
+  type ModelPricingKind,
+  type ModelPricingProviderId
+} from "./modelPricingCatalog.js";
 
 const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
 const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--field)] px-2.5 py-1.5 text-[11px] font-black text-[var(--muted)] opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.12)] transition";
 
-type ProviderName = "mock" | "seedance" | "volcengine-seedance";
-type VideoModelChoice = "mock" | "seedance-2-fast" | "seedance-2" | "seedance-1-5-pro";
-type ApiProviderId = "openai-compatible-text" | "openai-compatible-image" | "volcengine-seedance";
+type ProviderName = "mock" | "volcengine-seedance";
 type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
 type ProductComposerSource = "structured" | "freeform";
 type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";
@@ -443,7 +491,8 @@ interface VideoJobErrorDetails {
 }
 
 interface ProductVideoGenerationOptions {
-  provider: ProviderName;
+  provider?: ProviderName;
+  providerModelConfigId?: ModelConfigChoice;
   providerModel?: string;
 }
 
@@ -583,21 +632,6 @@ interface ProviderUsageReport {
   tokenPriceCnyPerMillion: number;
 }
 
-interface ProviderConfigItem {
-  id: ApiProviderId;
-  configId?: string;
-  label: string;
-  providerLabel?: string;
-  configured: boolean;
-  keySource?: string;
-  keyPreview?: string;
-  baseUrl: string;
-  model: string;
-  priority: number;
-  capabilities: string[];
-  modelKind: "text" | "image" | "video";
-}
-
 interface VideoProviderConfigItem extends ProviderConfigItem {
   id: "volcengine-seedance";
   modelKind: "video";
@@ -608,22 +642,49 @@ interface VideoProviderConfigItem extends ProviderConfigItem {
   docsUrl: string;
 }
 
-interface ProviderConfigLedger {
-  textModels: ProviderConfigItem[];
-  imageModels: ProviderConfigItem[];
-  videoModels: VideoProviderConfigItem[];
-  providers: VideoProviderConfigItem[];
+interface WalletTransaction {
+  id: string;
+  type: "recharge" | "reserve" | "charge" | "refund" | "adjustment" | "bonus";
+  amountCny: number;
+  description?: string;
+  createdAt: string;
 }
 
-interface ProviderKeyStatusResponse {
+interface WalletLedger {
+  balanceCny: number;
+  reservedCny: number;
+  availableCny: number;
+  transactions: WalletTransaction[];
+}
+
+interface ModelConfigStatusResponse {
   provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview">;
 }
 
 interface ProviderConfigTestResponse {
   ok: true;
-  provider: ApiProviderId;
+  provider: ModelConfigProviderId;
   model: string;
   message: string;
+}
+
+interface ProviderModelDiscoveryResponse {
+  ok: true;
+  provider: ModelConfigProviderId;
+  models: Array<{
+    id: string;
+    label?: string;
+    known: boolean;
+    source: "models_api" | "catalog";
+  }>;
+}
+
+interface ModelConfigKeyRevealResponse {
+  ok: true;
+  provider: ModelConfigProviderId;
+  configId: string;
+  apiKey: string;
+  keyPreview?: string;
 }
 
 interface VideoAsset {
@@ -743,16 +804,6 @@ interface QcSummaryLedger {
   items: QcSummaryItem[];
 }
 
-interface ModelConfigDraft {
-  configId?: string;
-  name: string;
-  vendor: string;
-  priority: number;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-}
-
 interface ConsoleToastState {
   id: number;
   title: string;
@@ -774,11 +825,6 @@ interface ConfirmActionState {
 
 type ConfirmActionRequest = Omit<ConfirmActionState, "id">;
 
-interface ModelConfigTestStatus {
-  tone: "neutral" | "ok" | "danger";
-  message: string;
-}
-
 type ProductEditorMode = "import" | "manual";
 type ProductLibraryDialogMode = ProductEditorMode | "edit" | undefined;
 
@@ -789,6 +835,8 @@ const primaryNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof L
 const managementNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "仪表盘", icon: LayoutDashboard },
   { id: "ledger", label: "任务记录", icon: WalletCards },
+  { id: "wallet", label: "充值中心", icon: CircleDollarSign },
+  { id: "pricing", label: "模型价格", icon: BadgeJapaneseYen },
   { id: "settings", label: "API 管理", icon: Settings }
 ];
 
@@ -803,6 +851,8 @@ const sectionSubtitles: Record<ConsoleSection, string> = {
   video: "选择商品、设置参数、编辑脚本分镜并生成视频。",
   dashboard: "查看生成数量、成本趋势、模型分布和最近使用。",
   ledger: "查看正在生成和已生成的视频任务。",
+  wallet: "查看余额、冻结金额和充值记录。",
+  pricing: "查看官方模型价格快照和供应商来源。",
   settings: "配置文本、图片和视频模型服务。"
 };
 
@@ -826,105 +876,8 @@ const defaultSettings: SettingsState = {
   exaggerationRules: ["商品资料未确认的销量、排名、功效、耐荷重、防水、UV 数值不得出现在脚本和字幕里。"]
 };
 
-const videoModelOptions: VideoModelChoice[] = ["seedance-2-fast", "seedance-2", "seedance-1-5-pro"];
 const defaultVideoDurationSeconds = 10;
-const defaultVideoModelChoice: VideoModelChoice = "seedance-2-fast";
 const defaultVideoTemplate: TemplateName = "scene";
-
-const videoModelConfigs: Record<VideoModelChoice, { provider: ProviderName; model?: string; label: string }> = {
-  mock: {
-    provider: "mock",
-    label: "内部任务"
-  },
-  "seedance-2-fast": {
-    provider: "volcengine-seedance",
-    model: "doubao-seedance-2-0-fast-260128",
-    label: "seedance2.0 fast"
-  },
-  "seedance-2": {
-    provider: "volcengine-seedance",
-    model: "doubao-seedance-2-0-260128",
-    label: "seedance2.0"
-  },
-  "seedance-1-5-pro": {
-    provider: "volcengine-seedance",
-    model: "doubao-seedance-1-5-pro-251215",
-    label: "seedance1.5 pro"
-  }
-};
-
-const modelConfigPresets: Record<ApiProviderId, ModelConfigDraft[]> = {
-  "openai-compatible-text": [
-    {
-      name: "OpenAI 推荐-文本",
-      vendor: "openai",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://api.openai.com",
-      model: "gpt-5.5"
-    },
-    {
-      name: "DeepSeek 推荐-文本",
-      vendor: "deepseek",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://api.deepseek.com",
-      model: "deepseek-v4-pro"
-    },
-    {
-      name: "豆包推荐-文本",
-      vendor: "doubao",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-      model: "doubao-seed-2-0-pro-260215"
-    }
-  ],
-  "openai-compatible-image": [
-    {
-      name: "Gemini 推荐-图片",
-      vendor: "gemini",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: "gemini-3-pro-image"
-    },
-    {
-      name: "OpenAI 推荐-图片",
-      vendor: "openai",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://api.openai.com",
-      model: "gpt-image-2"
-    }
-  ],
-  "volcengine-seedance": [
-    {
-      name: "豆包 seedance2.0 fast 推荐-视频",
-      vendor: "volcengine",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://ark.cn-beijing.volces.com",
-      model: "doubao-seedance-2-0-fast-260128"
-    },
-    {
-      name: "豆包 seedance2.0 推荐-视频",
-      vendor: "volcengine",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://ark.cn-beijing.volces.com",
-      model: "doubao-seedance-2-0-260128"
-    },
-    {
-      name: "豆包 seedance1.5 pro 推荐-视频",
-      vendor: "volcengine",
-      priority: 0,
-      apiKey: "",
-      baseUrl: "https://ark.cn-beijing.volces.com",
-      model: "doubao-seedance-1-5-pro-251215"
-    }
-  ]
-};
 
 const NEW_PRODUCT_SELECT_VALUE = "__new_product__";
 const storyboardTemplateNames: TemplateName[] = ["scene", "pain-point", "benefit", "ugc", "unboxing"];
@@ -959,8 +912,10 @@ export function App() {
   const [videoJobs, setVideoJobs] = useState<VideoJob[]>([]);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [productPath, setProductPath] = useState("");
-  const [provider, setProvider] = useState<ProviderName>(videoModelConfigs[defaultVideoModelChoice].provider);
-  const [videoModelChoice, setVideoModelChoice] = useState<VideoModelChoice>(defaultVideoModelChoice);
+  const [selectedModelSchemeId, setSelectedModelSchemeId] = useState<ModelSchemeChoice>("");
+  const [selectedTextModelConfigId, setSelectedTextModelConfigId] = useState<ModelConfigChoice>("auto");
+  const [selectedImageModelConfigId, setSelectedImageModelConfigId] = useState<ModelConfigChoice>("auto");
+  const [selectedVideoModelConfigId, setSelectedVideoModelConfigId] = useState<ModelConfigChoice>("auto");
   const [duration, setDuration] = useState(defaultVideoDurationSeconds);
   const [versionCount, setVersionCount] = useState(1);
   const [template, setTemplate] = useState<TemplateName>(defaultVideoTemplate);
@@ -1000,14 +955,30 @@ export function App() {
     textModels: [],
     imageModels: [],
     videoModels: [],
-    providers: []
+    providers: [],
+    runtime: {
+      textConfigured: false,
+      imageConfigured: false,
+      videoConfigured: false
+    }
   });
-  const [modelConfigDrafts, setModelConfigDrafts] = useState<Record<ApiProviderId, ModelConfigDraft>>(() => defaultModelConfigDrafts());
-  const [modelConfigTestStatus, setModelConfigTestStatus] = useState<Partial<Record<ApiProviderId, ModelConfigTestStatus>>>({});
+  const [wallet, setWallet] = useState<WalletLedger>({
+    balanceCny: 0,
+    reservedCny: 0,
+    availableCny: 0,
+    transactions: []
+  });
+  const [modelBundles, setModelBundles] = useState<ModelBundleItem[]>([]);
+  const [modelServicePreference, setModelServicePreference] = useState<ModelServicePreference>({
+    serviceMode: "byok"
+  });
+  const [modelConfigDrafts, setModelConfigDrafts] = useState<Record<ModelConfigProviderId, ModelConfigDraft>>(() => defaultModelConfigDrafts());
+  const [modelConfigTestStatus, setModelConfigTestStatus] = useState<Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>>({});
   const [videoAssets, setVideoAssets] = useState<VideoAssetLedger | undefined>();
   const [storageBackup, setStorageBackup] = useState<StorageBackupReport | undefined>();
   const [localBackups, setLocalBackups] = useState<LocalBackupLedger | undefined>();
   const [auditLog, setAuditLog] = useState<AuditLogLedger | undefined>();
+  const [consoleReady, setConsoleReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
@@ -1029,9 +1000,8 @@ export function App() {
   const productAutoSaveSignatureRef = useRef("");
   const productAutoSaveInFlightRef = useRef<Promise<ProductDetail | undefined> | undefined>(undefined);
 
-  const selectedVideoModelConfig = videoModelConfigs[videoModelChoice];
   const enabledTemplateOptions = settings.enabledTemplates;
-  const currentSignature = JSON.stringify({ productPath, provider: selectedVideoModelConfig.provider, providerModel: selectedVideoModelConfig.model, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
+  const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: selectedVideoModelConfigId, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
   const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
   const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
   const batchEstimatedCostCny = freshPreflight
@@ -1060,9 +1030,58 @@ export function App() {
   const activeSectionLabel = navItems.find((item) => item.id === activeSection)?.label ?? "视频创作";
   const activeSectionSubtitle = sectionSubtitles[activeSection];
   const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
-  const textModelConfigured = providerConfig.textModels.some((model) => model.configured);
-  const imageModelConfigured = providerConfig.imageModels.some((model) => model.configured);
-  const videoModelConfigured = selectedVideoModelConfig.provider === "mock" || providerConfig.videoModels.some((model) => model.configured);
+  const apiOwner = modelServicePreference.serviceMode;
+  const platformBundles = useMemo(
+    () => modelBundles.filter((bundle) => bundle.apiOwner === "platform" && bundle.enabled),
+    [modelBundles]
+  );
+  const byokBundles = useMemo(
+    () => modelBundles.filter((bundle) => bundle.apiOwner === "byok" && bundle.enabled).sort(compareCustomModelBundles),
+    [modelBundles]
+  );
+  const selectablePlatformBundles = platformBundles.filter(isCompleteModelBundle);
+  const selectableByokBundles = byokBundles.filter(isCompleteModelBundle);
+  const platformTextModelOptions = useMemo(
+    () => platformConfiguredModels(providerConfig.textModels),
+    [providerConfig.textModels]
+  );
+  const platformImageModelOptions = useMemo(
+    () => platformConfiguredModels(providerConfig.imageModels),
+    [providerConfig.imageModels]
+  );
+  const platformVideoModelOptions = useMemo(
+    () => platformConfiguredModels(providerConfig.videoModels),
+    [providerConfig.videoModels]
+  );
+  const byokTextModelOptions = useMemo(
+    () => byokConfiguredModels(providerConfig.textModels),
+    [providerConfig.textModels]
+  );
+  const byokImageModelOptions = useMemo(
+    () => byokConfiguredModels(providerConfig.imageModels),
+    [providerConfig.imageModels]
+  );
+  const byokVideoModelOptions = useMemo(
+    () => byokConfiguredModels(providerConfig.videoModels),
+    [providerConfig.videoModels]
+  );
+  const modelSchemeOptions = useMemo(
+    () => buildModelSchemeOptions({
+      platformBundles: selectablePlatformBundles,
+      byokBundles: selectableByokBundles
+    }),
+    [selectablePlatformBundles, selectableByokBundles]
+  );
+  const effectiveSelectedModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)
+    ? selectedModelSchemeId
+    : modelSchemeOptions[0]?.id;
+  const selectedSchemeOwner = effectiveSelectedModelSchemeId ? modelSchemeOwner(effectiveSelectedModelSchemeId, modelSchemeOptions) ?? apiOwner : apiOwner;
+  const textModelOptions = selectedSchemeOwner === "platform" ? platformTextModelOptions : byokTextModelOptions;
+  const imageModelOptions = selectedSchemeOwner === "platform" ? platformImageModelOptions : byokImageModelOptions;
+  const videoModelOptions = selectedSchemeOwner === "platform" ? platformVideoModelOptions : byokVideoModelOptions;
+  const textModelConfigured = textModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.textModelConfigId));
+  const imageModelConfigured = imageModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.imageModelConfigId));
+  const videoModelConfigured = videoModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.videoModelConfigId));
 
   consoleToastCloseRef.current = () => setConsoleToast(undefined);
   const handleConsoleToastClose = useMemo(
@@ -1219,8 +1238,9 @@ export function App() {
       const session = await getJson<AuthSession>("/api/auth/session");
       setAuthSession(session);
       if (session.authenticated) {
-        await refreshConsole({ applySettings: true });
+        await refreshConsole({ applySettings: true, showLoading: true });
       } else {
+        setConsoleReady(false);
         setAuthStatus("");
       }
     } catch (error) {
@@ -1349,6 +1369,7 @@ export function App() {
       setAuthNewPassword("");
       setAuthOtpCooldownSeconds(0);
       setForgotPasswordOtpSent(false);
+      setConsoleReady(false);
       setAuthStatus("");
     } catch (error) {
       showError(error);
@@ -1368,7 +1389,8 @@ export function App() {
     setForgotPasswordOtpSent(false);
     setActiveSection(defaultConsoleSection);
     setAuthStatus("正在载入控制台。");
-    await refreshConsole({ applySettings: true });
+    setConsoleReady(false);
+    await refreshConsole({ applySettings: true, showLoading: true });
   }
 
   function changeAuthFlowMode(mode: AuthFlowMode) {
@@ -1387,13 +1409,14 @@ export function App() {
     setAuthOtpCooldownSeconds(authOtpCooldownDurationSeconds);
   }
 
-  async function refreshConsole(options: { applySettings?: boolean; reason?: RefreshConsoleReason } = {}) {
+  async function refreshConsole(options: { applySettings?: boolean; reason?: RefreshConsoleReason; showLoading?: boolean } = {}) {
     const polling = options.reason === "polling";
-    if (!polling) {
+    const showLoading = options.showLoading === true && !polling;
+    if (showLoading) {
       setIsLoading(true);
     }
     try {
-      const [productsResponse, reportsResponse, ledgerResponse, qcSummaryResponse, videoAssetsResponse, storageBackupResponse, localBackupsResponse, auditLogResponse, providerConfigResponse, settingsResponse, videoJobsResponse] =
+      const [productsResponse, reportsResponse, ledgerResponse, qcSummaryResponse, videoAssetsResponse, storageBackupResponse, localBackupsResponse, auditLogResponse, providerConfigResponse, settingsResponse, videoJobsResponse, walletResponse, modelBundlesResponse, modelServicePreferenceResponse] =
         await Promise.all([
           getJson<{ products: ProductSummary[] }>("/api/products"),
           getJson<{ reports: Report[] }>("/api/reports"),
@@ -1405,7 +1428,10 @@ export function App() {
           getJson<AuditLogLedger>("/api/audit-log"),
           getJson<ProviderConfigLedger>("/api/provider-config"),
           getJson<{ settings: SettingsState }>("/api/settings"),
-          getJson<{ jobs: VideoJob[] }>("/api/video-jobs")
+          getJson<{ jobs: VideoJob[] }>("/api/video-jobs"),
+          getJson<WalletLedger>("/api/wallet"),
+          getJson<{ bundles: ModelBundleItem[] }>("/api/model-bundles"),
+          getJson<{ preference: ModelServicePreference }>("/api/model-service-preference")
         ]);
       const ledgerWithQc = attachQcToLedger(ledgerResponse, qcSummaryResponse);
       const completedTransitions = polling
@@ -1419,6 +1445,24 @@ export function App() {
       setLocalBackups(localBackupsResponse);
       setAuditLog(auditLogResponse);
       setProviderConfig(providerConfigResponse);
+      setWallet(walletResponse);
+      const normalizedBundles = modelBundlesResponse.bundles.map(normalizeModelBundleItem);
+      setModelBundles(normalizedBundles);
+      setModelServicePreference(modelServicePreferenceResponse.preference);
+      const selectedBundleId = modelServicePreferenceResponse.preference.serviceMode === "platform"
+        ? modelServicePreferenceResponse.preference.platformBundleId
+        : modelServicePreferenceResponse.preference.byokBundleId;
+      const selectableBundles = sortSelectableModelBundles(normalizedBundles)
+        .filter((bundle) => bundle.enabled && isCompleteModelBundle(bundle));
+      const selectedBundle = selectedBundleId ? selectableBundles.find((bundle) => bundle.bundleId === selectedBundleId) : undefined;
+      const fallbackBundle = selectedBundle ?? selectableBundles[0];
+      setSelectedModelSchemeId(fallbackBundle ? modelSchemeIdForBundle(fallbackBundle.bundleId) : "");
+      if (fallbackBundle) {
+        const { textModelConfigId, imageModelConfigId, videoModelConfigId } = bundleModelConfigIds(fallbackBundle);
+        setSelectedTextModelConfigId(textModelConfigId);
+        setSelectedImageModelConfigId(imageModelConfigId);
+        setSelectedVideoModelConfigId(videoModelConfigId);
+      }
       setModelConfigDrafts((current) => syncModelConfigDraftsFromLedger(providerConfigResponse, current));
       setSettings(settingsResponse.settings);
       setVideoJobs(videoJobsResponse.jobs);
@@ -1447,18 +1491,17 @@ export function App() {
       if (options.applySettings) {
         applySettings(settingsResponse.settings);
       }
+      setConsoleReady(true);
     } catch (error) {
       showError(error);
     } finally {
-      if (!polling) {
+      if (showLoading) {
         setIsLoading(false);
       }
     }
   }
 
   function applySettings(nextSettings = settings) {
-    setProvider(videoModelConfigs[defaultVideoModelChoice].provider);
-    setVideoModelChoice(defaultVideoModelChoice);
     setDuration(defaultVideoDurationSeconds);
     setTemplate(defaultVideoTemplate);
     setFinalLanguage(nextSettings.defaultLanguage);
@@ -1524,7 +1567,8 @@ export function App() {
       setStatusText("预检中...");
       const response = await postJson<{ preflight: Preflight }>("/api/preflight", {
         productPath,
-        provider,
+        provider: "volcengine-seedance",
+        providerModelConfigId: selectedVideoModelConfigId,
         duration,
         template,
         finalLanguage,
@@ -1555,19 +1599,18 @@ export function App() {
     setIsBusy(true);
     try {
       setStatusText("生成任务创建中...");
-      const videoModelConfig = videoModelConfigs[videoModelChoice];
       const requestBody = {
         productPath,
         outDirName: `${selectedProductSummary.sku}-${Date.now()}`,
-        provider: videoModelConfig.provider,
-        providerModel: videoModelConfig.model,
+        provider: "volcengine-seedance",
+        providerModelConfigId: selectedVideoModelConfigId,
         duration,
         template,
         finalLanguage,
         cta,
         scriptLines: splitDraftLines(studioScriptDraft),
         storyboardLines: splitDraftLines(studioStoryboardDraft),
-        confirmPaid: videoModelConfig.provider !== "mock",
+        confirmPaid: true,
         reuseManifest: reuseManifest.trim() || undefined
       };
       if (safeVersionCount > 1) {
@@ -1616,29 +1659,36 @@ export function App() {
     }
   }
 
-  async function saveModelConfig(providerId: ApiProviderId, event: FormEvent<HTMLFormElement>) {
+  async function saveModelConfig(providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const draft = modelConfigDrafts[providerId];
     if (!draft.configId && !draft.apiKey.trim()) {
       setStatusText("请先填写 API Key。");
       return;
     }
+    if (draft.models.length === 0) {
+      setStatusText("请至少选择一个模型版本。");
+      return;
+    }
     setIsBusy(true);
     try {
-      const response = await putJson<ProviderKeyStatusResponse>(`/api/provider-keys/${providerId}`, {
+      const response = await putJson<ModelConfigStatusResponse>(`/api/model-configs/${providerId}`, {
         configId: draft.configId,
         apiKey: draft.apiKey.trim() || undefined,
         name: draft.name.trim(),
         vendor: draft.vendor.trim(),
         priority: draft.priority,
         baseUrl: draft.baseUrl.trim(),
-        model: draft.model.trim()
+        model: draft.models,
+        apiMode: apiModeForProviderDraft(providerId, draft),
+        enabled: draft.enabled
       });
       setModelConfigDrafts((current) => ({
         ...current,
         [providerId]: {
           ...current[providerId],
-          apiKey: ""
+          apiKey: "",
+          keyPreview: response.provider.keyPreview ?? current[providerId].keyPreview
         }
       }));
       setProviderConfig((current) => updateProviderConfigStatus(current, response.provider));
@@ -1651,7 +1701,138 @@ export function App() {
     }
   }
 
-  async function testModelConfig(providerId: ApiProviderId) {
+  async function saveModelServicePreference(patch: Partial<ModelServicePreference>) {
+    setIsBusy(true);
+    try {
+      const preference = await persistModelServicePreference(patch);
+      const selectedBundleId = preference.serviceMode === "platform" ? preference.platformBundleId : preference.byokBundleId;
+      const selectedBundle = selectedBundleId ? modelBundles.find((bundle) => bundle.bundleId === selectedBundleId) : undefined;
+      if (selectedBundle) {
+        applyModelBundleSelection(selectedBundle);
+        setSelectedModelSchemeId(modelSchemeIdForBundle(selectedBundle.bundleId));
+      }
+      setStatusText(preference.serviceMode === "platform" ? "已切换为平台模型模式。" : "已切换为自带 API 模式。");
+      await refreshConsole();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function saveModelBundle(input: Partial<ModelBundleItem> & {
+    apiOwner: ModelBundleItem["apiOwner"];
+    label: string;
+    statusText?: string;
+    activate?: boolean;
+  }) {
+    setIsBusy(true);
+    try {
+      const nextBundleInput = {
+        bundleId: input.bundleId,
+        apiOwner: input.apiOwner,
+        label: input.label,
+        description: input.description,
+        textModelConfigId: input.textModelConfigId,
+        imageModelConfigId: input.imageModelConfigId,
+        videoModelConfigId: input.videoModelConfigId,
+        enabled: input.enabled ?? true,
+        priority: input.priority ?? 0
+      };
+      const savedBundleResponse = await putJson<{ bundle: ModelBundleItem }>("/api/model-bundles", nextBundleInput);
+      const savedBundle = normalizeModelBundleItem(savedBundleResponse.bundle);
+      setModelBundles((current) => [
+        savedBundle,
+        ...current.filter((bundle) => bundle.bundleId !== savedBundle.bundleId)
+      ].sort(compareModelBundles));
+      if (input.activate !== false) {
+        applyModelBundleSelection(savedBundle);
+        await persistModelServicePreference({
+          serviceMode: input.apiOwner === "platform" ? "platform" : "byok",
+          ...(input.apiOwner === "platform" ? { platformBundleId: savedBundle.bundleId } : { byokBundleId: savedBundle.bundleId })
+        });
+        setSelectedModelSchemeId(modelSchemeIdForBundle(savedBundle.bundleId));
+      }
+      setStatusText(input.statusText ?? "模型组合已保存。");
+      await refreshConsole();
+      return savedBundle;
+    } catch (error) {
+      showError(error);
+      return undefined;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function deleteModelBundle(bundleId: string) {
+    setIsBusy(true);
+    try {
+      await deleteJson<{ ok: true }>(`/api/model-bundles/${encodeURIComponent(bundleId)}`);
+      setModelBundles((current) => current.filter((bundle) => bundle.bundleId !== bundleId));
+      const clearsSelectedByok = modelServicePreference.byokBundleId === bundleId;
+      const clearsSelectedPlatform = modelServicePreference.platformBundleId === bundleId;
+      if (clearsSelectedByok || clearsSelectedPlatform) {
+        await persistModelServicePreference({
+          ...(clearsSelectedByok ? { byokBundleId: null } : {}),
+          ...(clearsSelectedPlatform ? { platformBundleId: null } : {})
+        });
+        setSelectedModelSchemeId("");
+        setSelectedTextModelConfigId("auto");
+        setSelectedImageModelConfigId("auto");
+        setSelectedVideoModelConfigId("auto");
+      }
+      setStatusText("模型组合已删除。");
+      await refreshConsole();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function persistModelServicePreference(patch: Partial<ModelServicePreference>): Promise<ModelServicePreference> {
+    const nextPreference = {
+      ...modelServicePreference,
+      ...patch
+    };
+    const response = await putJson<{ preference: ModelServicePreference }>("/api/model-service-preference", nextPreference);
+    setModelServicePreference(response.preference);
+    if (!patch.platformBundleId && !patch.byokBundleId) {
+      setSelectedTextModelConfigId("auto");
+      setSelectedImageModelConfigId("auto");
+      setSelectedVideoModelConfigId("auto");
+    }
+    markPreflightStale();
+    return response.preference;
+  }
+
+  function applyModelBundleSelection(bundle: ModelBundleItem) {
+    const { textModelConfigId, imageModelConfigId, videoModelConfigId } = bundleModelConfigIds(bundle);
+    setSelectedTextModelConfigId(textModelConfigId);
+    setSelectedImageModelConfigId(imageModelConfigId);
+    setSelectedVideoModelConfigId(videoModelConfigId);
+    markPreflightStale();
+  }
+
+  async function applyModelSchemeSelection(nextSchemeId: ModelSchemeChoice) {
+    setSelectedModelSchemeId(nextSchemeId);
+    const bundleId = bundleIdFromModelSchemeId(nextSchemeId);
+    if (!bundleId) {
+      return;
+    }
+    const bundle = modelBundles.find((item) => item.bundleId === bundleId);
+    if (bundle) {
+      applyModelBundleSelection(bundle);
+      await saveModelServicePreference(
+        bundle.apiOwner === "platform"
+          ? { serviceMode: "platform", platformBundleId: bundle.bundleId }
+          : { serviceMode: "byok", byokBundleId: bundle.bundleId }
+      );
+      return;
+    }
+  }
+
+  async function testModelConfig(providerId: ModelConfigProviderId) {
     const draft = modelConfigDrafts[providerId];
     if (!draft.configId && !draft.apiKey.trim()) {
       setModelConfigTestStatus((current) => ({
@@ -1674,11 +1855,12 @@ export function App() {
         }
       }));
       setStatusText("测试配置中...");
-      const response = await postJson<ProviderConfigTestResponse>(`/api/provider-keys/${providerId}/test`, {
+      const response = await postJson<ProviderConfigTestResponse>(`/api/model-configs/${providerId}/test`, {
         configId: draft.configId,
         apiKey: draft.apiKey.trim() || undefined,
         baseUrl: draft.baseUrl.trim(),
-        model: draft.model.trim()
+        model: draft.models,
+        apiMode: apiModeForProviderDraft(providerId, draft)
       });
       setModelConfigTestStatus((current) => ({
         ...current,
@@ -1703,14 +1885,68 @@ export function App() {
     }
   }
 
-  async function clearModelConfig(providerId: ApiProviderId, configId?: string) {
+  async function refreshModelCatalog(providerId: ModelConfigProviderId) {
+    const draft = modelConfigDrafts[providerId];
+    if (!draft.configId && !draft.apiKey.trim()) {
+      setModelConfigTestStatus((current) => ({
+        ...current,
+        [providerId]: {
+          tone: "danger",
+          message: "刷新失败：请先填写 API Key。"
+        }
+      }));
+      setStatusText("请先填写 API Key。");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      setModelConfigTestStatus((current) => ({
+        ...current,
+        [providerId]: {
+          tone: "neutral",
+          message: "刷新可用模型中..."
+        }
+      }));
+      const response = await postJson<ProviderModelDiscoveryResponse>(`/api/model-configs/${providerId}/models`, {
+        configId: draft.configId,
+        apiKey: draft.apiKey.trim() || undefined,
+        baseUrl: draft.baseUrl.trim(),
+        model: draft.models,
+        apiMode: apiModeForProviderDraft(providerId, draft)
+      });
+      const knownCount = response.models.filter((model) => model.known).length;
+      const message = `刷新完成：发现 ${response.models.length} 个可用模型，其中 ${knownCount} 个已在官方目录中。`;
+      setModelConfigTestStatus((current) => ({
+        ...current,
+        [providerId]: {
+          tone: "ok",
+          message
+        }
+      }));
+      setStatusText(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setModelConfigTestStatus((current) => ({
+        ...current,
+        [providerId]: {
+          tone: "danger",
+          message: `刷新失败：${message}`
+        }
+      }));
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function clearModelConfig(providerId: ModelConfigProviderId, configId?: string) {
     setIsBusy(true);
     try {
       const suffix = configId ? `?configId=${encodeURIComponent(configId)}` : "";
-      const response = await fetch(`/api/provider-keys/${providerId}${suffix}`, {
+      const response = await fetch(`/api/model-configs/${providerId}${suffix}`, {
         method: "DELETE"
       });
-      const body = await readJsonResponse<ProviderKeyStatusResponse>(response);
+      const body = await readJsonResponse<ModelConfigStatusResponse>(response);
       setProviderConfig((current) => updateProviderConfigStatus(current, body.provider));
       setModelConfigDrafts((current) => ({
         ...current,
@@ -1728,7 +1964,37 @@ export function App() {
     }
   }
 
-  function updateModelConfigDraft(providerId: ApiProviderId, patch: Partial<ModelConfigDraft>) {
+  async function topUpWallet(amountCny = 50) {
+    setIsBusy(true);
+    try {
+      const response = await postJson<{ wallet: WalletLedger }>("/api/wallet/top-up", {
+        amountCny,
+        description: "手动充值"
+      });
+      setWallet(response.wallet);
+      showConsoleToast(`已充值 ¥${money(amountCny)}。`, "ok");
+    } catch (error) {
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function revealModelConfigApiKey(providerId: ModelConfigProviderId, configId: string) {
+    const response = await getJson<ModelConfigKeyRevealResponse>(
+      `/api/model-configs/${providerId}/key?configId=${encodeURIComponent(configId)}`
+    );
+    setModelConfigDrafts((current) => ({
+      ...current,
+      [providerId]: {
+        ...current[providerId],
+        keyPreview: response.keyPreview ?? current[providerId].keyPreview
+      }
+    }));
+    return response.apiKey;
+  }
+
+  function updateModelConfigDraft(providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) {
     setModelConfigTestStatus((current) => ({
       ...current,
       [providerId]: undefined
@@ -1742,7 +2008,7 @@ export function App() {
     }));
   }
 
-  function applyModelPreset(providerId: ApiProviderId, preset: ModelConfigDraft) {
+  function applyModelPreset(providerId: ModelConfigProviderId, preset: ModelConfigDraft) {
     setModelConfigTestStatus((current) => ({
       ...current,
       [providerId]: undefined
@@ -2037,7 +2303,8 @@ export function App() {
     setIsBusy(true);
     try {
       const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
-        text: importText
+        text: importText,
+        textModelConfigId: selectedTextModelConfigId
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       await applyProductToCreationComposerWithStoryboards(response.product);
@@ -2093,10 +2360,9 @@ export function App() {
     if (!ensureVideoModelConfigured()) {
       throw new Error("请先配置视频模型，再生成视频。");
     }
-    const selectedVideoModel = videoModelConfigs[videoModelChoice];
     const videoGenerationOptions: ProductVideoGenerationOptions = options ?? {
-      provider: selectedVideoModel.provider,
-      providerModel: selectedVideoModel.model
+      provider: "volcengine-seedance",
+      providerModelConfigId: selectedVideoModelConfigId
     };
     const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
     const selectedVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
@@ -2108,13 +2374,14 @@ export function App() {
       setPreflightSignature("");
       const response = await postJson<{ productSku: string; jobs: VideoJob[] }>(`/api/products/${encodeURIComponent(product.sku)}/video-jobs`, {
         provider: videoGenerationOptions.provider,
+        providerModelConfigId: videoGenerationOptions.providerModelConfigId,
         providerModel: videoGenerationOptions.providerModel,
         duration: selectedDuration,
         template,
         finalLanguage,
         cta,
         storyboardLines: splitDraftLines(studioStoryboardDraft),
-        confirmPaid: videoGenerationOptions.provider !== "mock",
+        confirmPaid: (videoGenerationOptions.provider ?? "volcengine-seedance") !== "mock",
         versions: selectedVersionCount
       });
       setVideoJobs((current) => mergeVideoJobs(response.jobs, current));
@@ -2169,7 +2436,8 @@ export function App() {
     setIsBusy(true);
     try {
       const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
-        text: productImportText
+        text: productImportText,
+        textModelConfigId: selectedTextModelConfigId
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       if (activeSection === "video") {
@@ -2326,7 +2594,8 @@ export function App() {
         `/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`,
         {
           duration,
-          template
+          template,
+          textModelConfigId: selectedTextModelConfigId
         },
         controller.signal
       );
@@ -2503,7 +2772,9 @@ export function App() {
       const response = await postJson<{
         generated: Array<{ reference: string }>;
         product: ProductDetail;
-      }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {});
+      }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {
+        imageModelConfigId: selectedImageModelConfigId
+      });
       await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
         `AI 已生成参考图: ${response.generated.length}`,
@@ -2722,6 +2993,9 @@ export function App() {
   }
 
   function renderActiveSection() {
+    if (!consoleReady) {
+      return <ConsoleSectionLoadingState label={activeSectionLabel} />;
+    }
     switch (activeSection) {
       case "dashboard":
         return (
@@ -2783,10 +3057,19 @@ export function App() {
               onGenerateReferenceImages={generateProductReferenceImages}
               onDeleteReferenceImage={deleteProductReferenceImage}
               onReorderReferenceImage={reorderProductReferenceImages}
-              videoModelChoice={videoModelChoice}
-              onVideoModelChoiceChange={(nextVideoModelChoice) => {
-                setVideoModelChoice(nextVideoModelChoice);
-                setProvider(videoModelConfigs[nextVideoModelChoice].provider);
+              modelSchemeOptions={modelSchemeOptions}
+              selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
+              onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
+              textModelOptions={textModelOptions}
+              selectedTextModelConfigId={selectedTextModelConfigId}
+              onTextModelConfigChange={setSelectedTextModelConfigId}
+              imageModelOptions={imageModelOptions}
+              selectedImageModelConfigId={selectedImageModelConfigId}
+              onImageModelConfigChange={setSelectedImageModelConfigId}
+              videoModelOptions={videoModelOptions}
+              selectedVideoModelConfigId={selectedVideoModelConfigId}
+              onVideoModelConfigChange={(nextConfigId) => {
+                setSelectedVideoModelConfigId(nextConfigId);
                 markPreflightStale();
               }}
               duration={duration}
@@ -2833,18 +3116,38 @@ export function App() {
             <VideoAssetsPanel assets={videoAssets} onDelete={deleteVideoAsset} isBusy={isBusy} />
           </section>
         );
+      case "wallet":
+        return (
+          <section className="grid gap-4" aria-label="充值中心">
+            <WalletRechargePanel wallet={wallet} onTopUpWallet={topUpWallet} isBusy={isBusy} />
+          </section>
+        );
+      case "pricing":
+        return (
+          <section className="grid gap-4" aria-label="模型价格">
+            <ModelPricingPanel />
+          </section>
+        );
       case "settings":
         return (
           <section className="grid gap-4" aria-label="API 管理">
             <ApiModelConfigPanel
               config={providerConfig}
+              modelBundles={modelBundles}
+              servicePreference={modelServicePreference}
               drafts={modelConfigDrafts}
               testStatuses={modelConfigTestStatus}
               onDraftChange={updateModelConfigDraft}
               onApplyPreset={applyModelPreset}
               onSave={saveModelConfig}
               onTest={testModelConfig}
+              onRefreshModels={refreshModelCatalog}
+              onRevealApiKey={revealModelConfigApiKey}
               onClear={clearModelConfig}
+              onServicePreferenceChange={saveModelServicePreference}
+              onApplyBundleSelection={applyModelBundleSelection}
+              onSaveBundle={saveModelBundle}
+              onDeleteBundle={deleteModelBundle}
               isBusy={isBusy}
             />
           </section>
@@ -3591,8 +3894,18 @@ function ProductCreationWorkspace({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onReorderReferenceImage,
-  videoModelChoice,
-  onVideoModelChoiceChange,
+  modelSchemeOptions,
+  selectedModelSchemeId,
+  onModelSchemeChange,
+  textModelOptions,
+  selectedTextModelConfigId,
+  onTextModelConfigChange,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
+  videoModelOptions,
+  selectedVideoModelConfigId,
+  onVideoModelConfigChange,
   duration,
   onDurationChange,
   versionCount,
@@ -3645,8 +3958,18 @@ function ProductCreationWorkspace({
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
-  videoModelChoice: VideoModelChoice;
-  onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
+  modelSchemeOptions: ModelSchemeOption[];
+  selectedModelSchemeId: ModelSchemeChoice;
+  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
+  textModelOptions: ProviderConfigItem[];
+  selectedTextModelConfigId: ModelConfigChoice;
+  onTextModelConfigChange: (configId: ModelConfigChoice) => void;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  videoModelOptions: ProviderConfigItem[];
+  selectedVideoModelConfigId: ModelConfigChoice;
+  onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
   versionCount: number;
@@ -3723,8 +4046,18 @@ function ProductCreationWorkspace({
       onGenerateReferenceImages={onGenerateReferenceImages}
       onDeleteReferenceImage={onDeleteReferenceImage}
       onReorderReferenceImage={onReorderReferenceImage}
-      videoModelChoice={videoModelChoice}
-      onVideoModelChoiceChange={onVideoModelChoiceChange}
+      modelSchemeOptions={modelSchemeOptions}
+      selectedModelSchemeId={modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions) ? selectedModelSchemeId : modelSchemeOptions[0]?.id ?? ""}
+      onModelSchemeChange={onModelSchemeChange}
+      textModelOptions={textModelOptions}
+      selectedTextModelConfigId={selectedTextModelConfigId}
+      onTextModelConfigChange={onTextModelConfigChange}
+      imageModelOptions={imageModelOptions}
+      selectedImageModelConfigId={selectedImageModelConfigId}
+      onImageModelConfigChange={onImageModelConfigChange}
+      videoModelOptions={videoModelOptions}
+      selectedVideoModelConfigId={selectedVideoModelConfigId}
+      onVideoModelConfigChange={onVideoModelConfigChange}
       duration={duration}
       onDurationChange={onDurationChange}
       versionCount={versionCount}
@@ -3779,8 +4112,18 @@ function ProductCreationComposer({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onReorderReferenceImage,
-  videoModelChoice,
-  onVideoModelChoiceChange,
+  modelSchemeOptions,
+  selectedModelSchemeId,
+  onModelSchemeChange,
+  textModelOptions,
+  selectedTextModelConfigId,
+  onTextModelConfigChange,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
+  videoModelOptions,
+  selectedVideoModelConfigId,
+  onVideoModelConfigChange,
   duration,
   onDurationChange,
   versionCount,
@@ -3831,8 +4174,18 @@ function ProductCreationComposer({
   onGenerateReferenceImages: (sku: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
-  videoModelChoice: VideoModelChoice;
-  onVideoModelChoiceChange: (choice: VideoModelChoice) => void;
+  modelSchemeOptions: ModelSchemeOption[];
+  selectedModelSchemeId: ModelSchemeChoice;
+  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
+  textModelOptions: ProviderConfigItem[];
+  selectedTextModelConfigId: ModelConfigChoice;
+  onTextModelConfigChange: (configId: ModelConfigChoice) => void;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  videoModelOptions: ProviderConfigItem[];
+  selectedVideoModelConfigId: ModelConfigChoice;
+  onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
   versionCount: number;
@@ -3878,7 +4231,19 @@ function ProductCreationComposer({
   const previewableReferenceImages = selectedProduct
     ? previewReferenceImages.length > 0 ? previewReferenceImages : draftReferenceImages
     : draftReferenceImages.length > 0 ? draftReferenceImages : pendingReferenceImageStatuses;
-  const videoModelConfig = videoModelConfigs[videoModelChoice];
+  const activeModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)
+    ? selectedModelSchemeId
+    : modelSchemeOptions[0]?.id ?? "";
+  const schemeSummary = modelSchemeSummary({
+    schemeId: activeModelSchemeId,
+    options: modelSchemeOptions,
+    textModels: textModelOptions,
+    imageModels: imageModelOptions,
+    videoModels: videoModelOptions,
+    selectedTextModelConfigId,
+    selectedImageModelConfigId,
+    selectedVideoModelConfigId
+  });
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
   const languageOptions: FinalVideoLanguage[] = ["ja", "zh"];
@@ -3912,7 +4277,7 @@ function ProductCreationComposer({
     templateLabel(template),
     formatDuration(duration),
     finalLanguageLabel(finalLanguage),
-    videoModelChoiceLabel(videoModelChoice)
+    modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)
   ].join(" · ");
 
   useEffect(() => {
@@ -3982,8 +4347,8 @@ function ProductCreationComposer({
       const savedProduct = autoSavedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct), {
-        provider: videoModelConfig.provider,
-        providerModel: videoModelConfig.model
+        provider: "volcengine-seedance",
+        providerModelConfigId: selectedVideoModelConfigId
       });
       onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok");
     } catch (error) {
@@ -4132,6 +4497,13 @@ function ProductCreationComposer({
               onImportFile={() => setFileImportOpen(true)}
             />
             <CompactChoiceDropdown
+              label="模型方案"
+              value={activeModelSchemeId}
+              options={modelSchemeOptions.map((option) => option.id)}
+              formatOption={(option) => modelSchemeChoiceLabel(option, modelSchemeOptions)}
+              onChange={onModelSchemeChange}
+            />
+            <CompactChoiceDropdown
               label="视频风格"
               value={template}
               options={templateOptions}
@@ -4153,19 +4525,15 @@ function ProductCreationComposer({
               onChange={onFinalLanguageChange}
             />
             <CompactChoiceDropdown
-              label="生成模型"
-              value={videoModelChoice}
-              options={videoModelOptions}
-              formatOption={videoModelChoiceLabel}
-              onChange={onVideoModelChoiceChange}
-            />
-            <CompactChoiceDropdown
               label="生成视频"
               value={String(versionCount)}
               options={versionCountOptions}
               formatOption={(option) => `${option} 个`}
               onChange={(option) => onVersionCountChange(Number(option))}
             />
+          </div>
+          <div className="grid gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--card2)] px-3 py-2">
+            <div className="min-w-0 truncate text-[12px] font-black text-[var(--muted)]">{schemeSummary}</div>
           </div>
         </div>
 
@@ -4185,6 +4553,9 @@ function ProductCreationComposer({
               pendingImages={pendingReferenceImageStatuses}
               onImportAssets={onImportAssets}
               onGenerateReferenceImages={onGenerateReferenceImages}
+              imageModelOptions={imageModelOptions}
+              selectedImageModelConfigId={selectedImageModelConfigId}
+              onImageModelConfigChange={onImageModelConfigChange}
               onToast={onToast}
               onPreviewReferenceImage={setPreviewReferenceIndex}
               onPendingPreview={(index) => setPreviewReferenceIndex(index)}
@@ -4234,6 +4605,7 @@ function ProductCreationComposer({
               storyboardDraft={storyboardDraft}
               storyboardDraftIsGuidance={storyboardDraftIsGuidance}
               storyboardHistory={storyboardHistory}
+              textModelLabel={modelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions)}
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
               onDeleteStoryboardHistory={onDeleteStoryboardHistory}
@@ -4322,89 +4694,6 @@ function ProductCreationComposer({
   );
 }
 
-function CompactChoiceDropdown<T extends string>({
-  label,
-  value,
-  options,
-  formatOption,
-  onChange
-}: {
-  label: string;
-  value: T;
-  options: T[];
-  formatOption: (option: T) => string;
-  onChange: (option: T) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const activeLabel = formatOption(value);
-
-  return (
-    <div
-      className="compact-choice-dropdown relative grid min-w-0 gap-1.5"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setOpen(false);
-        }
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          setOpen(false);
-        }
-      }}
-    >
-      <div className="truncate text-xs font-black text-[var(--muted)]">{label}</div>
-      <button
-        type="button"
-        className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
-          open
-            ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
-            : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
-        )}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="min-w-0 truncate">{activeLabel}</span>
-        <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--muted)] transition", open && "rotate-180 text-[var(--accent)]")} />
-      </button>
-      {open ? (
-        <div
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
-          role="listbox"
-        >
-          {options.map((option) => {
-            const active = option === value;
-            return (
-              <button
-                key={option}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={cn(
-                  "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black transition",
-                  active
-                    ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))] text-[var(--text)]"
-                    : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-                )}
-                onClick={() => {
-                  onChange(option);
-                  setOpen(false);
-                }}
-              >
-                <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
-                  <CheckCircle2 size={14} />
-                </span>
-                <span className="min-w-0 truncate">{formatOption(option)}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function ProductComposerReferenceTray({
   className,
   product,
@@ -4413,6 +4702,9 @@ function ProductComposerReferenceTray({
   pendingImages,
   onImportAssets,
   onGenerateReferenceImages,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
   onToast,
   onPreviewReferenceImage,
   onPendingPreview,
@@ -4428,6 +4720,9 @@ function ProductComposerReferenceTray({
   pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   onToast: ConsoleToastFn;
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
@@ -4441,7 +4736,6 @@ function ProductComposerReferenceTray({
   const [dragOver, setDragOver] = useState(false);
   const [draggedReferenceIndex, setDraggedReferenceIndex] = useState<number | undefined>();
   const [dragOverReferenceIndex, setDragOverReferenceIndex] = useState<number | undefined>();
-
   function acceptReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
     onFilesChange(files);
@@ -4503,6 +4797,9 @@ function ProductComposerReferenceTray({
           }}
         />
       </label>
+      <div className="truncate text-[11px] font-black text-[var(--muted)]">
+        图片模型 {modelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions)}
+      </div>
       <Button
         className={cn("w-full justify-center", !product && "opacity-55")}
         size="sm"
@@ -4681,6 +4978,7 @@ function StoryboardComposerPanel({
   storyboardDraft,
   storyboardDraftIsGuidance,
   storyboardHistory,
+  textModelLabel,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
@@ -4693,6 +4991,7 @@ function StoryboardComposerPanel({
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
+  textModelLabel: string;
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
@@ -4707,6 +5006,7 @@ function StoryboardComposerPanel({
         <div className="min-w-0">
           <div className="text-base font-black text-[var(--text)]">脚本分镜</div>
           <div className="mt-1 text-xs font-bold text-[var(--muted)]">可选；留空会按商品资料生成。</div>
+          <div className="mt-1 truncate text-[11px] font-black text-[var(--muted)]">文本模型: {textModelLabel}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Badge>{templateLabel(template)}</Badge>
@@ -6627,313 +6927,212 @@ function ChartBlock({ option, height, empty }: { option: EChartsOption; height: 
   );
 }
 
-function ApiModelConfigPanel({
-  config,
-  drafts,
-  testStatuses,
-  onDraftChange,
-  onApplyPreset,
-  onSave,
-  onTest,
-  onClear,
+function WalletRechargePanel({
+  wallet,
+  onTopUpWallet,
   isBusy
 }: {
-  config: ProviderConfigLedger;
-  drafts: Record<ApiProviderId, ModelConfigDraft>;
-  testStatuses: Partial<Record<ApiProviderId, ModelConfigTestStatus>>;
-  onDraftChange: (providerId: ApiProviderId, patch: Partial<ModelConfigDraft>) => void;
-  onApplyPreset: (providerId: ApiProviderId, preset: ModelConfigDraft) => void;
-  onSave: (providerId: ApiProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onTest: (providerId: ApiProviderId) => Promise<void>;
-  onClear: (providerId: ApiProviderId, configId?: string) => Promise<void>;
+  wallet: WalletLedger;
+  onTopUpWallet: (amountCny?: number) => Promise<void>;
   isBusy: boolean;
 }) {
-  const [editingProviderId, setEditingProviderId] = useState<ApiProviderId | undefined>();
-  const groups = [
-    {
-      kind: "text" as const,
-      title: "文本模型",
-      description: "商品整理、脚本分镜等文字推理能力。",
-      models: config.textModels,
-      providerId: "openai-compatible-text" as const,
-      badge: "文本"
-    },
-    {
-      kind: "image" as const,
-      title: "图片模型",
-      description: "商品图和参考图能力。",
-      models: config.imageModels,
-      providerId: "openai-compatible-image" as const,
-      badge: "图片"
-    },
-    {
-      kind: "video" as const,
-      title: "视频模型",
-      description: "最终成片生成能力。",
-      models: config.videoModels,
-      providerId: "volcengine-seedance" as const,
-      badge: "视频"
-    }
-  ];
-  const editingGroup = groups.find((group) => group.providerId === editingProviderId);
-  const configuredCount = [...config.textModels, ...config.imageModels, ...config.videoModels].filter((model) => model.configured).length;
+  const quickAmounts = [50, 100, 300];
   return (
-    <Card id="API Key" className="bg-[var(--card)]">
-      <PanelTitle icon={<KeyRound size={16} />} right={<Badge>{configuredCount} 条已配置</Badge>}>
-        API Key
+    <Card className="bg-[var(--card)]">
+      <PanelTitle icon={<CircleDollarSign size={16} />} right={<Badge tone={wallet.availableCny > 0 ? "ok" : "warn"}>可用 ¥{money(wallet.availableCny)}</Badge>}>
+        充值中心
       </PanelTitle>
-      <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 py-2 text-xs font-bold leading-5 text-[var(--muted)]">
-        这里配置的是你自己的模型 API Key，系统会按你的配置调用文本、图片和视频模型。
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3">
+          <div className="text-xs font-bold text-[var(--muted)]">账户余额</div>
+          <div className="mt-1 text-2xl font-black text-[var(--text)]">¥{money(wallet.balanceCny)}</div>
+        </div>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3">
+          <div className="text-xs font-bold text-[var(--muted)]">冻结金额</div>
+          <div className="mt-1 text-2xl font-black text-[var(--text)]">¥{money(wallet.reservedCny)}</div>
+        </div>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3">
+          <div className="text-xs font-bold text-[var(--muted)]">可用余额</div>
+          <div className="mt-1 text-2xl font-black text-[var(--text)]">¥{money(wallet.availableCny)}</div>
+        </div>
       </div>
-      <div className="grid gap-3">
-        {groups.map((group) => (
-          <ApiModelConfigGroup
-            key={group.providerId}
-            title={group.title}
-            badge={group.badge}
-            description={group.description}
-            providerId={group.providerId}
-            models={group.models}
-            draft={drafts[group.providerId]}
-            presets={modelConfigPresets[group.providerId]}
-            onDraftChange={onDraftChange}
-            onApplyPreset={onApplyPreset}
-            onClear={onClear}
-            onAdd={() => {
-              onDraftChange(group.providerId, resetModelConfigDraft(group.providerId));
-              setEditingProviderId(group.providerId);
-            }}
-            onEdit={(model) => {
-              onDraftChange(group.providerId, draftFromProviderConfig(group.providerId, model));
-              setEditingProviderId(group.providerId);
-            }}
-            isBusy={isBusy}
-          />
+      <div className="mt-4 flex flex-wrap gap-2">
+        {quickAmounts.map((amount) => (
+          <Button key={amount} size="sm" type="button" disabled={isBusy} onClick={() => void onTopUpWallet(amount)}>
+            <CircleDollarSign size={14} />
+            充值 ¥{money(amount)}
+          </Button>
         ))}
       </div>
-      {editingGroup ? (
-        <ApiModelConfigDialog
-          title={`添加${editingGroup.badge}服务`}
-          badge={editingGroup.badge}
-          providerId={editingGroup.providerId}
-          draft={drafts[editingGroup.providerId]}
-          testStatus={testStatuses[editingGroup.providerId]}
-          presets={modelConfigPresets[editingGroup.providerId]}
-          onDraftChange={onDraftChange}
-          onApplyPreset={onApplyPreset}
-          onClose={() => setEditingProviderId(undefined)}
-          onTest={onTest}
-          onSave={async (providerId, event) => {
-            await onSave(providerId, event);
-            setEditingProviderId(undefined);
-          }}
-          isBusy={isBusy}
-        />
-      ) : null}
+      <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 py-2 text-xs font-bold leading-5 text-[var(--muted)]">
+        平台托管模型会扣官方成本和服务费；自带 Key 只扣平台服务费。
+      </div>
+      <div className="mt-4 grid gap-2">
+        {wallet.transactions.slice(0, 8).map((transaction) => (
+          <div key={transaction.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-2 text-xs md:grid-cols-[120px_minmax(0,1fr)_96px_150px] md:items-center">
+            <Badge tone={transaction.amountCny >= 0 ? "ok" : "warn"}>{walletTransactionTypeLabel(transaction.type)}</Badge>
+            <span className="min-w-0 truncate font-bold text-[var(--text)]">{transaction.description ?? "-"}</span>
+            <strong className={transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]"}>
+              {transaction.amountCny >= 0 ? "+" : ""}¥{money(transaction.amountCny)}
+            </strong>
+            <span className="text-[var(--muted)]">{formatDateTime(transaction.createdAt)}</span>
+          </div>
+        ))}
+        {wallet.transactions.length === 0 ? <EmptyState icon={<WalletCards size={28} />} text="还没有充值或扣费记录" /> : null}
+      </div>
     </Card>
   );
 }
 
-function ApiModelConfigGroup({
-  title,
-  badge,
-  description,
-  providerId,
-  models,
-  draft,
-  presets,
-  onDraftChange,
-  onApplyPreset,
-  onClear,
-  onAdd,
-  onEdit,
-  isBusy
-}: {
-  title: string;
-  badge: string;
-  description: string;
-  providerId: ApiProviderId;
-  models: ProviderConfigItem[];
-  draft: ModelConfigDraft;
-  presets: ModelConfigDraft[];
-  onDraftChange: (providerId: ApiProviderId, patch: Partial<ModelConfigDraft>) => void;
-  onApplyPreset: (providerId: ApiProviderId, preset: ModelConfigDraft) => void;
-  onClear: (providerId: ApiProviderId, configId?: string) => Promise<void>;
-  onAdd: () => void;
-  onEdit: (model: ProviderConfigItem) => void;
-  isBusy: boolean;
-}) {
-  const configuredCount = models.filter((model) => model.configured).length;
+function ModelPricingPanel() {
+  const [activeProviderId, setActiveProviderId] = useState<ModelPricingProviderId>("openai");
+  const activeProvider = modelPricingProviders.find((provider) => provider.id === activeProviderId) ?? modelPricingProviders[0];
+  const activeEntries = pricingEntriesForProvider(activeProvider.id);
+  const activeVerifiedCount = activeEntries.filter((entry) => entry.status === "verified").length;
+  const verifiedCount = modelPricingProviders.reduce((count, provider) => (
+    count + pricingEntriesForProvider(provider.id).filter((entry) => entry.status === "verified").length
+  ), 0);
+
   return (
-    <section className="grid gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-[12px]">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="m-0 text-[15px] font-black leading-5 text-[var(--text)]">{title}</h3>
-            <Badge className="min-h-5 px-1.5 text-[10px]">{badge}</Badge>
-            <Badge className="min-h-5 px-1.5 text-[10px]" tone={configuredCount > 0 ? "ok" : "danger"}>{configuredCount > 0 ? `${configuredCount} 条可用` : "未配置"}</Badge>
+    <div className="grid gap-4">
+      <Card className="grid gap-3 bg-[var(--card)] p-4">
+        <div className="grid gap-3 min-[900px]:grid-cols-[minmax(0,1fr)_auto] min-[900px]:items-center">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="ok">{verifiedCount} 条官方单价</Badge>
+              <Badge>更新 {modelPricingUpdatedAt}</Badge>
+            </div>
+            <h2 className="m-0 mt-2 text-[20px] font-black leading-7 text-[var(--text)]">官方模型价格快照</h2>
+            <p className="m-0 mt-1 max-w-[780px] text-[12px] font-semibold leading-5 text-[var(--muted)]">
+              切换供应商查看 token、图片和视频生成单价；动态定价项保留官方入口，避免把活动价或控制台专属价写死。
+            </p>
           </div>
-          <div className="mt-0.5 text-[12px] font-medium leading-5 text-[var(--muted)]">{description}</div>
+          <div className="flex min-w-0 items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] px-3 py-2 text-[11px] font-semibold leading-5 text-[var(--muted)]">
+            <ShieldCheck className="mt-0.5 shrink-0 text-[var(--accent)]" size={14} />
+            <span>价格会受区域、套餐、缓存命中和促销影响，正式成本以官方页面和账单为准。</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="primary" type="button" disabled={isBusy} onClick={onAdd}>
-            <Plus size={12} />
-            {`添加${badge}服务`}
-          </Button>
+      </Card>
+
+      <Card className="grid gap-4 bg-[var(--panel)]">
+        <div className="flex flex-wrap gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] p-1" role="tablist" aria-label="模型价格供应商">
+          {modelPricingProviders.map((provider) => {
+            const active = provider.id === activeProvider.id;
+            const providerEntries = pricingEntriesForProvider(provider.id);
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls={`model-pricing-panel-${provider.id}`}
+                className={cn(
+                  "min-h-9 flex-1 rounded-[7px] border px-3 text-left text-[12px] font-black transition min-[760px]:flex-none",
+                  active
+                    ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border))] bg-[var(--card)] text-[var(--accent)] shadow-[0_8px_18px_rgba(96,64,43,.08)]"
+                    : "border-transparent bg-transparent text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+                )}
+                onClick={() => setActiveProviderId(provider.id)}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span>{provider.name}</span>
+                  <span className="text-[10px] font-black text-[var(--muted)]">{providerEntries.length}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-      <div className="grid gap-1.5">
-        {models.map((model, index) => (
-          <div key={model.configId ?? `${model.id}-${index}`} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 min-[980px]:grid-cols-[minmax(180px,1.1fr)_120px_minmax(180px,1fr)_72px_auto] min-[980px]:items-center">
+
+        <div id={`model-pricing-panel-${activeProvider.id}`} role="tabpanel" className="grid gap-4">
+          <div className="grid gap-3 min-[780px]:grid-cols-[minmax(0,1fr)_auto] min-[780px]:items-start">
             <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5">
-                {index === 0 && model.configured ? <Badge className="min-h-5 px-1.5 text-[10px]" tone="ok">默认</Badge> : null}
-                <strong className="truncate text-[13px] font-black text-[var(--text)]">{model.label}</strong>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h3 className="m-0 text-[18px] font-black leading-6 text-[var(--text)]">{activeProvider.name}</h3>
+                <Badge tone={activeVerifiedCount > 0 ? "ok" : "warn"}>
+                  {activeVerifiedCount > 0 ? `${activeVerifiedCount} 条已核价` : "官方页核验"}
+                </Badge>
               </div>
-              <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--muted)]">{model.baseUrl}</div>
+              <p className="m-0 mt-1 text-[12px] font-semibold leading-5 text-[var(--muted)]">{activeProvider.summary}</p>
             </div>
-            <div className="text-[12px] font-bold text-[var(--muted)]">{model.providerLabel || draft.vendor || "-"}</div>
-            <div className="truncate text-[12px] font-bold text-[var(--text)]" title={model.model}>{model.model || draft.model || "-"}</div>
-            <div className="text-[12px] font-black text-[var(--text)]">优先级 {model.priority ?? 0}</div>
-            <div className="flex flex-wrap justify-end gap-1.5">
-              <Button className="min-h-7 px-2 text-[12px]" size="sm" type="button" disabled={isBusy} onClick={() => onEdit(model)}>
-                编辑
-              </Button>
-              <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="danger" type="button" disabled={isBusy || !model.configured} onClick={() => void onClear(providerId, model.configId)}>
-                删除
-              </Button>
-            </div>
+            <Button asChild className="justify-self-start" size="sm" variant="soft">
+              <a href={activeProvider.sourceUrl} target="_blank" rel="noreferrer">
+                <ExternalLink size={13} />
+                官方来源
+              </a>
+            </Button>
           </div>
-        ))}
-      </div>
-    </section>
+
+          <div className="grid gap-3 min-[980px]:grid-cols-2">
+            {activeEntries.map((entry) => (
+              <ModelPricingRow key={`${entry.providerId}-${entry.model}`} entry={entry} />
+            ))}
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 }
 
-function ApiModelConfigDialog({
-  title,
-  badge,
-  providerId,
-  draft,
-  testStatus,
-  presets,
-  onDraftChange,
-  onApplyPreset,
-  onClose,
-  onTest,
-  onSave,
-  isBusy
-}: {
-  title: string;
-  badge: string;
-  providerId: ApiProviderId;
-  draft: ModelConfigDraft;
-  testStatus?: ModelConfigTestStatus;
-  presets: ModelConfigDraft[];
-  onDraftChange: (providerId: ApiProviderId, patch: Partial<ModelConfigDraft>) => void;
-  onApplyPreset: (providerId: ApiProviderId, preset: ModelConfigDraft) => void;
-  onClose: () => void;
-  onTest: (providerId: ApiProviderId) => Promise<void>;
-  onSave: (providerId: ApiProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
-  isBusy: boolean;
-}) {
-  const endpointPrefix = endpointPrefixPreview(draft.baseUrl, providerId);
-  const isEditingExisting = Boolean(draft.configId);
-  const isTesting = testStatus?.message === "测试配置中...";
+function ModelPricingRow({ entry }: { entry: ModelPricingEntry }) {
+  const Icon = modelPricingKindIcon(entry.kind);
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(42,33,27,.35)] p-4">
-      <section className="max-h-[min(860px,calc(100vh-32px))] w-full max-w-[860px] overflow-auto rounded-[18px] border border-[var(--border-strong)] bg-[var(--panel)] p-6 shadow-[0_24px_72px_rgba(96,64,43,.20)]">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-[.16em] text-[var(--muted)]">{isEditingExisting ? "EDIT CONFIG" : "NEW CONFIG"}</div>
-            <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[var(--text)]">{isEditingExisting ? title.replace("添加", "编辑") : title}</h3>
-            <div className="mt-2 text-[13px] font-semibold leading-5 text-[var(--muted)]">
-              {isEditingExisting ? "不填写 API Key 时会保留原 Key；优先级越高越先使用。" : "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。"}
-            </div>
-          </div>
-          <Badge>{badge}</Badge>
+    <article className="grid content-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 shadow-none">
+      <div className="grid min-w-0 grid-cols-[34px_minmax(0,1fr)_auto] items-start gap-2">
+        <div className="grid h-8 w-8 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_9%,var(--panel2))] text-[var(--accent)]">
+          <Icon size={15} />
         </div>
-        <form className="grid gap-3" onSubmit={(event) => void onSave(providerId, event)}>
-          <div className="flex flex-wrap gap-2">
-            {presets.map((preset) => (
-              <Button
-                key={`${providerId}-${preset.name}-${preset.model}`}
-                type="button"
-                onClick={() => onApplyPreset(providerId, preset)}
-              >
-                {preset.name}
-              </Button>
-            ))}
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <strong className="truncate text-[13px] font-black text-[var(--text)]">{entry.model}</strong>
+            <Badge className="min-h-5 px-1.5 text-[10px]">{entry.label}</Badge>
           </div>
-          <Field label="配置名称">
-            <Input value={draft.name} onChange={(event) => onDraftChange(providerId, { name: event.target.value })} />
-          </Field>
-          <Field label="服务商">
-            <Select value={draft.vendor} onChange={(event) => onDraftChange(providerId, { vendor: event.target.value })}>
-              {vendorOptions(providerId).map((vendor) => (
-                <option key={vendor.value} value={vendor.value}>{vendor.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="优先级">
-            <Input
-              type="number"
-              min={0}
-              value={draft.priority}
-              onChange={(event) => onDraftChange(providerId, { priority: Number(event.target.value) })}
-            />
-          </Field>
-          <div className="text-[12px] font-semibold leading-5 text-[var(--muted)]">
-            数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。
-          </div>
-          <Field label="API Key">
-            <Input
-              type="password"
-              autoComplete="off"
-              value={draft.apiKey}
-              onChange={(event) => onDraftChange(providerId, { apiKey: event.target.value })}
-              placeholder={isEditingExisting ? "留空则保留原 Key" : "sk-..."}
-            />
-          </Field>
-          <Field label="Base URL">
-            <Input value={draft.baseUrl} onChange={(event) => onDraftChange(providerId, { baseUrl: event.target.value })} />
-          </Field>
-          <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] font-semibold text-[var(--muted)]">
-            实际端点前缀: <span className="font-mono text-[var(--text)]">{endpointPrefix}</span>
-          </div>
-          <Field label="模型（逗号分隔）">
-            <Input value={draft.model} onChange={(event) => onDraftChange(providerId, { model: event.target.value })} />
-          </Field>
-          {!isTesting && testStatus ? (
-            <div
-              className={cn(
-                "whitespace-pre-wrap rounded-lg border px-3 py-2 text-[12px] font-bold leading-5",
-                testStatus.tone === "ok"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : testStatus.tone === "danger"
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-[var(--border)] bg-[var(--card)] text-[var(--muted)]"
-              )}
-            >
-              {testStatus.message}
-            </div>
-          ) : null}
-          <div className="flex flex-wrap justify-end gap-2 pt-3">
-            <Button type="button" variant="ghost" disabled={isBusy} onClick={() => void onTest(providerId)}>
-              {isTesting ? <RefreshCcw className="h-4 w-4 animate-spin" /> : null}
-              {isTesting ? "测试中" : "测试配置"}
-            </Button>
-            <Button type="button" disabled={isBusy} onClick={onClose}>
-              取消
-            </Button>
-            <Button variant="primary" type="submit" disabled={isBusy}>
-              保存
-            </Button>
-          </div>
-        </form>
-      </section>
+          <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{entry.unit}</div>
+        </div>
+        <Button asChild className="h-7 w-7" size="icon" variant="ghost" title="查看官方来源" aria-label={`${entry.model} 官方来源`}>
+          <a href={entry.sourceUrl} target="_blank" rel="noreferrer">
+            <ExternalLink size={12} />
+          </a>
+        </Button>
+      </div>
+
+      <div className="grid gap-2 min-[520px]:grid-cols-3">
+        <PriceMetric label={entry.kind === "video" ? "计费入口" : "输入"} value={entry.input} />
+        <PriceMetric label={secondaryPriceMetricLabel(entry.kind)} value={entry.cachedInput ?? "-"} />
+        <PriceMetric label={entry.kind === "image" || entry.kind === "video" ? "生成输出" : "输出"} value={entry.output} />
+      </div>
+      {entry.note ? (
+        <details className="group rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)] px-2.5 py-2 text-[11px] font-semibold leading-5 text-[var(--muted)]">
+          <summary className="cursor-pointer list-none font-black text-[var(--text)] marker:hidden">
+            说明
+            <span className="ml-1 text-[var(--muted)] group-open:hidden">展开</span>
+            <span className="ml-1 hidden text-[var(--muted)] group-open:inline">收起</span>
+          </summary>
+          <div className="mt-1">{entry.note}</div>
+        </details>
+      ) : null}
+    </article>
+  );
+}
+
+function PriceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-2.5 py-2">
+      <div className="text-[10px] font-black uppercase tracking-[.08em] text-[var(--muted)]">{label}</div>
+      <div className="mt-1 break-words text-[13px] font-black leading-5 text-[var(--text)]">{value}</div>
     </div>
   );
+}
+
+function secondaryPriceMetricLabel(kind: ModelPricingKind): string {
+  if (kind === "video") return "含输入视频";
+  if (kind === "image") return "计费基准";
+  return "缓存输入";
+}
+
+function modelPricingKindIcon(kind: ModelPricingKind): typeof FileText {
+  if (kind === "image") return ImageIcon;
+  if (kind === "video") return FileVideo;
+  return FileText;
 }
 
 function VideoJobsPanel({
@@ -7567,6 +7766,22 @@ function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
+function ConsoleSectionLoadingState({ label }: { label: string }) {
+  return (
+    <Card className="grid min-h-[260px] place-items-center bg-[var(--card)]">
+      <div className="grid justify-items-center gap-3 text-center">
+        <span className="grid h-10 w-10 place-items-center rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] text-[var(--accent)]">
+          <RefreshCcw size={18} className="animate-spin" />
+        </span>
+        <div className="text-[15px] font-black text-[var(--text)]">正在载入{label}</div>
+        <div className="max-w-[320px] text-[12px] font-semibold leading-5 text-[var(--muted)]">
+          正在同步模型服务、任务和账户数据。
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 const chartPalette = ["#6f442c", "#0aa394", "#c65a36", "#b7791f", "#d87955", "#738a66"];
 const chartAxisColor = "#8a7665";
 const chartGridLineColor = "#ead7c4";
@@ -7957,20 +8172,15 @@ function toneClass(tone: KpiTone) {
 
 function providerLabel(value?: string): string {
   if (value === "mock") return "内部任务";
-  if (value === "volcengine-seedance" || value === "seedance") return "seedance2.0 fast";
+  if (value === "volcengine-seedance") return "seedance-2.0-fast";
   return value || "-";
-}
-
-function videoModelChoiceLabel(value: VideoModelChoice): string {
-  return videoModelConfigs[value]?.label ?? value;
 }
 
 function videoModelLabel(provider?: string, model?: string): string {
   if (provider === "mock") return "内部任务";
-  if (model === "doubao-seedance-1-5-pro-251215") return "seedance1.5 pro";
-  if (model === "doubao-seedance-2-0-260128") return "seedance2.0";
-  if (model === "doubao-seedance-2-0-fast-260128") return "seedance2.0 fast";
-  if (provider === "volcengine-seedance" || provider === "seedance") return "seedance2.0 fast";
+  if (provider === "volcengine-seedance") {
+    return model ? modelLabelForId("volcengine-seedance", model) : "seedance-2.0-fast";
+  }
   return provider || "-";
 }
 
@@ -8366,8 +8576,8 @@ function auditActionLabel(action: string): string {
     "auth.password_reset_requested": "请求重置密码",
     "auth.password_reset": "重置密码",
     "auth.logout": "退出登录",
-    "provider_key.saved": "保存 Key",
-    "provider_key.deleted": "清除 Key",
+    "model_config.saved": "保存模型配置",
+    "model_config.deleted": "清除模型配置",
     "video_asset.deleted": "删除视频文件",
     "video_history.deleted": "删除历史视频",
     "video_job.cancelled": "取消任务",
@@ -8475,113 +8685,12 @@ function formatProductFacts(product: ProductDetail) {
   ].join("\n");
 }
 
-function defaultModelConfigDrafts(): Record<ApiProviderId, ModelConfigDraft> {
+function defaultModelConfigDrafts(): Record<ModelConfigProviderId, ModelConfigDraft> {
   return {
-    "openai-compatible-text": { ...modelConfigPresets["openai-compatible-text"][0] },
-    "openai-compatible-image": { ...modelConfigPresets["openai-compatible-image"][0] },
-    "volcengine-seedance": { ...modelConfigPresets["volcengine-seedance"][0] }
+    "openai-compatible-text": { ...defaultModelConfigPreset("openai-compatible-text") },
+    "openai-compatible-image": { ...defaultModelConfigPreset("openai-compatible-image") },
+    "volcengine-seedance": { ...defaultModelConfigPreset("volcengine-seedance") }
   };
-}
-
-function resetModelConfigDraft(providerId: ApiProviderId): ModelConfigDraft {
-  return {
-    ...modelConfigPresets[providerId][0],
-    configId: undefined,
-    apiKey: ""
-  };
-}
-
-function draftFromProviderConfig(providerId: ApiProviderId, model: ProviderConfigItem): ModelConfigDraft {
-  return {
-    ...modelConfigPresets[providerId][0],
-    configId: model.configId,
-    name: model.label,
-    vendor: model.providerLabel || modelConfigPresets[providerId][0].vendor,
-    priority: model.priority ?? 0,
-    apiKey: "",
-    baseUrl: model.baseUrl,
-    model: model.model
-  };
-}
-
-function syncModelConfigDraftsFromLedger(
-  ledger: ProviderConfigLedger,
-  current: Record<ApiProviderId, ModelConfigDraft>
-): Record<ApiProviderId, ModelConfigDraft> {
-  const next = { ...current };
-  for (const model of [ledger.textModels[0], ledger.imageModels[0], ledger.videoModels[0]].filter(Boolean)) {
-    next[model.id] = {
-      ...next[model.id],
-      configId: undefined,
-      name: model.label || next[model.id].name,
-      vendor: model.providerLabel || next[model.id].vendor,
-      priority: model.priority ?? next[model.id].priority,
-      baseUrl: model.baseUrl || next[model.id].baseUrl,
-      model: model.model || next[model.id].model
-    };
-  }
-  return next;
-}
-
-function updateProviderConfigStatus(
-  ledger: ProviderConfigLedger,
-  status: ProviderKeyStatusResponse["provider"]
-): ProviderConfigLedger {
-  const update = <T extends ProviderConfigItem>(items: T[]): T[] =>
-    items.map((model) => {
-      const sameConfig = status.configId ? model.configId === status.configId : model.id === status.id;
-      return sameConfig ? { ...model, ...status } : model;
-    });
-  const textModels = update(ledger.textModels);
-  const imageModels = update(ledger.imageModels);
-  const videoModels = update(ledger.videoModels);
-  return {
-    textModels,
-    imageModels,
-    videoModels,
-    providers: videoModels
-  };
-}
-
-function endpointPrefixPreview(baseUrl: string, providerId: ApiProviderId): string {
-  const trimmed = baseUrl.trim().replace(/\/+$/, "");
-  if (!trimmed) {
-    return "-";
-  }
-  if (providerId === "volcengine-seedance") {
-    return `${trimmed}/api/v3`;
-  }
-  if (trimmed.endsWith("/v1") || trimmed.endsWith("/api/v3") || trimmed.endsWith("/v1beta/openai")) {
-    return trimmed;
-  }
-  return `${trimmed}/v1`;
-}
-
-function vendorOptions(providerId: ApiProviderId): Array<{ value: string; label: string }> {
-  if (providerId === "volcengine-seedance") {
-    return [
-      { value: "volcengine", label: "volcengine" },
-      { value: "doubao", label: "doubao" },
-      { value: "vidu", label: "vidu" },
-      { value: "alibaba", label: "alibaba" },
-      { value: "chatfire", label: "chatfire" }
-    ];
-  }
-  if (providerId === "openai-compatible-image") {
-    return [
-      { value: "chatfire", label: "chatfire" },
-      { value: "gemini", label: "gemini" },
-      { value: "volcengine", label: "volcengine" },
-      { value: "openai", label: "openai" }
-    ];
-  }
-  return [
-    { value: "openai", label: "openai" },
-    { value: "deepseek", label: "deepseek" },
-    { value: "doubao", label: "doubao" },
-    { value: "chatfire", label: "chatfire" },
-    { value: "openrouter", label: "openrouter" }
-  ];
 }
 
 function formatPreflightStatus(preflight: Preflight) {
@@ -8698,6 +8807,23 @@ function formatDateTime(value?: string) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function walletTransactionTypeLabel(type: WalletTransaction["type"]) {
+  switch (type) {
+    case "recharge":
+      return "充值";
+    case "reserve":
+      return "冻结";
+    case "charge":
+      return "扣费";
+    case "refund":
+      return "释放";
+    case "bonus":
+      return "赠送";
+    case "adjustment":
+      return "调整";
+  }
 }
 
 function formatProviderUnixTime(value?: number) {

@@ -108,7 +108,7 @@ function normalizeTemplate(value: unknown): ScriptTemplate {
 }
 
 function normalizeProvider(value: unknown): VideoProviderName {
-  return ["mock", "seedance", "volcengine-seedance"].includes(String(value))
+  return ["mock", "volcengine-seedance"].includes(String(value))
     ? (value as VideoProviderName)
     : defaultConsoleSettings.defaultProvider;
 }

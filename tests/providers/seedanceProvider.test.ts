@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SeedanceProvider } from "../../src/providers/seedanceProvider.js";
+import { VolcengineSeedanceProvider } from "../../src/providers/volcengine/seedanceProvider.js";
 
 let tempDirs: string[] = [];
 
@@ -13,7 +13,7 @@ afterEach(async () => {
   tempDirs = [];
 });
 
-describe("SeedanceProvider", () => {
+describe("VolcengineSeedanceProvider", () => {
   it("creates a task, polls until success, downloads the video, and records estimated cost", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-provider-"));
     tempDirs.push(outDir);
@@ -39,7 +39,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.ap-southeast.bytepluses.com",
       model: "dreamina-seedance-2-0-fast-260128",
@@ -111,7 +111,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -167,7 +167,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -228,7 +228,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -263,7 +263,7 @@ describe("SeedanceProvider", () => {
     tempDirs.push(outDir);
     const resolverCalls: string[] = [];
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "seedance-key",
       baseUrl: "https://ark.example.test",
       model: "doubao-seedance-2-0-fast-260128",
@@ -316,7 +316,7 @@ describe("SeedanceProvider", () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-remote-inline-reference-"));
     tempDirs.push(outDir);
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "seedance-key",
       baseUrl: "https://ark.example.test",
       model: "doubao-seedance-2-0-fast-260128",
@@ -373,7 +373,7 @@ describe("SeedanceProvider", () => {
     tempDirs.push(outDir);
     const resolverCalls: string[] = [];
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "seedance-key",
       baseUrl: "https://ark.example.test",
       model: "doubao-seedance-2-0-fast-260128",
@@ -428,7 +428,7 @@ describe("SeedanceProvider", () => {
     const cause = Object.assign(new Error("Headers Timeout Error"), {
       code: "UND_ERR_HEADERS_TIMEOUT"
     });
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "seedance-key",
       baseUrl: "https://ark.example.test",
       model: "doubao-seedance-2-0-fast-260128",
@@ -486,7 +486,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -536,7 +536,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -604,7 +604,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -652,7 +652,7 @@ describe("SeedanceProvider", () => {
       }
       throw new Error(`Unexpected URL: ${String(url)}`);
     };
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "test-key",
       baseUrl: "https://ark.cn-beijing.volces.com",
       model: "doubao-seedance-2-0-fast-260128",
@@ -689,7 +689,7 @@ describe("SeedanceProvider", () => {
   });
 
   it("throws before making a paid request when the API key is missing", async () => {
-    const provider = new SeedanceProvider({
+    const provider = new VolcengineSeedanceProvider({
       apiKey: "",
       fetchImpl: async () => {
         throw new Error("fetch should not be called");
@@ -706,9 +706,49 @@ describe("SeedanceProvider", () => {
         aspectRatio: "9:16",
         outputDir: "outputs"
       })
-    ).rejects.toThrow(/SEEDANCE_API_KEY|ARK_API_KEY/);
+    ).rejects.toThrow(/API 管理配置视频模型 API Key/);
+  });
+
+  it("does not fall back to legacy Seedance API key environment variables", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    process.env.SEEDANCE_API_KEY = "legacy-seedance-key";
+    process.env.ARK_API_KEY = "legacy-ark-key";
+    let called = false;
+    try {
+      const provider = new VolcengineSeedanceProvider({
+        fetchImpl: async () => {
+          called = true;
+          return jsonResponse({ id: "should-not-call" });
+        }
+      });
+
+      await expect(
+        provider.generateVideo({
+          jobId: "job-1",
+          productSku: "TK-001",
+          prompt: "Create a product ad.",
+          script: "今すぐチェック",
+          durationSeconds: 15,
+          aspectRatio: "9:16",
+          outputDir: "outputs"
+        })
+      ).rejects.toThrow(/API 管理配置视频模型 API Key/);
+      expect(called).toBe(false);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
   });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

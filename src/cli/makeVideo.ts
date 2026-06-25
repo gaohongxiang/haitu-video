@@ -18,6 +18,7 @@ interface MakeVideoArgs {
   productPath: string;
   outDir: string;
   providerName: VideoProviderName;
+  apiKey?: string;
   durationSeconds: number;
   cta: string;
   template: ScriptTemplate;
@@ -42,6 +43,7 @@ export async function runMakeVideoCli(
     productPath: args.productPath,
     outDir: args.outDir,
     providerName: args.providerName,
+    apiKey: args.apiKey,
     durationSeconds: args.durationSeconds,
     cta: args.cta,
     template: args.template,
@@ -75,6 +77,7 @@ function parseArgs(argv: string[], cwd: string): MakeVideoArgs {
     productPath,
     outDir: values.get("outDir") ?? join(defaultJobsDir(cwd), "make-video"),
     providerName: parseProvider(values.get("provider") ?? "mock"),
+    apiKey: values.get("apiKey"),
     durationSeconds: parseDuration(values.get("duration") ?? "8"),
     cta: values.get("cta") ?? "今すぐチェック",
     template: parseTemplate(values.get("template") ?? "scene"),
@@ -99,8 +102,8 @@ function defaultJobsDir(cwd: string): string {
 }
 
 function parseProvider(value: string): VideoProviderName {
-  if (value !== "mock" && value !== "seedance" && value !== "volcengine-seedance") {
-    throw new Error("--provider must be one of: mock, seedance, volcengine-seedance");
+  if (value !== "mock" && value !== "volcengine-seedance") {
+    throw new Error("--provider must be one of: mock, volcengine-seedance");
   }
   return value;
 }

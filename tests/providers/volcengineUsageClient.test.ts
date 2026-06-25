@@ -1,6 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { VolcengineUsageClient } from "../../src/providers/volcengine/usageClient.js";
+
+const originalSeedanceApiKey = process.env.SEEDANCE_API_KEY;
+const originalArkApiKey = process.env.ARK_API_KEY;
+
+afterEach(() => {
+  restoreEnv("SEEDANCE_API_KEY", originalSeedanceApiKey);
+  restoreEnv("ARK_API_KEY", originalArkApiKey);
+});
 
 describe("VolcengineUsageClient", () => {
   it("lists content generation tasks with usage and summarizes billable tokens", async () => {
@@ -123,7 +131,27 @@ describe("VolcengineUsageClient", () => {
     );
     expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.method).toBe("DELETE");
   });
+
+  it("does not fall back to legacy Seedance API key environment variables", async () => {
+    process.env.SEEDANCE_API_KEY = "legacy-seedance-key";
+    process.env.ARK_API_KEY = "legacy-ark-key";
+    const fetchImpl = vi.fn(async () => jsonResponse({ total: 0, items: [] })) as unknown as typeof fetch;
+    const client = new VolcengineUsageClient({
+      fetchImpl
+    });
+
+    await expect(client.listTasks()).rejects.toThrow(/API 管理配置视频模型 API Key/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

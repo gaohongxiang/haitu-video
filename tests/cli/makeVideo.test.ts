@@ -85,7 +85,6 @@ describe("runMakeVideoCli", () => {
     const outDir = join(tempDir, "outputs");
     await writeProduct(productPath);
     await writeReferenceImages(tempDir);
-    await writeFile(join(tempDir, ".env"), "ARK_API_KEY=from-env-file\n", "utf8");
     const fetchImpl = vi.fn(async (url: string | URL | Request) => {
       const value = String(url);
       if (value.endsWith("/api/v3/contents/generations/tasks")) {
@@ -116,6 +115,8 @@ describe("runMakeVideoCli", () => {
         outDir,
         "--provider",
         "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "true",
         "--tokenPriceCnyPerMillion",
@@ -143,7 +144,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("reuses a completed raw manifest by default to avoid duplicate paid generation", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-reuse-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
@@ -223,7 +223,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("adopts an explicit existing manifest without calling the paid provider", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-adopt-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
@@ -267,7 +266,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("recovers a missing raw mp4 from the provider task instead of regenerating", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
@@ -301,6 +299,8 @@ describe("runMakeVideoCli", () => {
         outDir,
         "--provider",
         "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "true",
         "--reuseManifest",
@@ -323,7 +323,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("recovers an existing provider task without requiring a fresh paid confirmation", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-unpaid-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");
@@ -357,6 +356,8 @@ describe("runMakeVideoCli", () => {
         outDir,
         "--provider",
         "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "false",
         "--reuseManifest",
@@ -380,7 +381,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("recovers a reusable provider task after the original product JSON was deleted", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-missing-product-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "products", "deleted-product.json");
@@ -413,6 +413,8 @@ describe("runMakeVideoCli", () => {
         outDir,
         "--provider",
         "volcengine-seedance",
+        "--apiKey",
+        "from-explicit-key",
         "--confirmPaid",
         "false",
         "--reuseManifest",
@@ -438,7 +440,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("reports an unavailable reusable manifest instead of blaming a missing product JSON", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-recover-missing-manifest-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "products", "deleted-product.json");
@@ -469,7 +470,6 @@ describe("runMakeVideoCli", () => {
   });
 
   it("refuses paid providers unless explicitly confirmed", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const tempDir = await mkdtemp(join(tmpdir(), "haitu-make-video-paid-"));
     tempDirs.push(tempDir);
     const productPath = join(tempDir, "product.json");

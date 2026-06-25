@@ -1,6 +1,6 @@
 import type { ProductStudioStepKey } from "./productStudioFlow.js";
 
-export const consoleSections = ["dashboard", "video", "ledger", "settings"] as const;
+export const consoleSections = ["dashboard", "video", "ledger", "wallet", "pricing", "settings"] as const;
 
 export type ConsoleSection = (typeof consoleSections)[number];
 

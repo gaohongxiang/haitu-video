@@ -16,6 +16,7 @@ export interface UsageCliOptions {
 }
 
 interface UsageArgs extends ListUsageTasksRequest {
+  apiKey?: string;
   tokenPriceCnyPerMillion: number;
   taskId?: string;
   cancelTaskId?: string;
@@ -34,6 +35,7 @@ export async function runUsageCli(
   });
   const args = parseArgs(argv);
   const client = new VolcengineUsageClient({
+    apiKey: args.apiKey,
     fetchImpl: options.fetchImpl,
     tokenPriceCnyPerMillion: args.tokenPriceCnyPerMillion
   });
@@ -80,6 +82,7 @@ function parseArgs(argv: string[]): UsageArgs {
     taskIds: parseTaskIds(values.get("taskIds")),
     model: values.get("model"),
     serviceTier: parseServiceTier(values.get("serviceTier")),
+    apiKey: values.get("apiKey"),
     taskId: values.get("taskId"),
     cancelTaskId: values.get("cancelTaskId"),
     deleteTaskId: values.get("deleteTaskId"),

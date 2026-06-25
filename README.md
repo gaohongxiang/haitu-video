@@ -1,6 +1,6 @@
 # Haitu Video
 
-Haitu is an internal validation prototype for an AI product video generation platform. The first phase is intentionally low-cost: no Docker, no database, no Redis, and no paid SaaS beyond the future Seedance-style video API.
+Haitu is an internal validation prototype for an AI product video generation platform. It now uses a unified model-service architecture for text, image, and video providers.
 
 ## Phase 1 Flow
 
@@ -37,7 +37,27 @@ npm run generate -- \
 
 Generated files are written under `data/workspaces/default/jobs/generate/` by default and ignored by git. Set `HAITU_DATA_DIR` to move runtime data outside the repository.
 
-## Generate With Seedance
+## API Modes
+
+Haitu supports two API billing modes:
+
+- Platform models: the server owns provider keys via `HAITU_PLATFORM_*` environment variables. Users pick a preset text/image/video bundle and pay official upstream cost plus the platform service fee from their wallet balance.
+- BYOK: users save their own API keys in API 管理. Upstream cost is paid by their provider account; Haitu only charges the service fee from wallet balance.
+
+Platform keys are server-only. They should live in `.env`, `/etc/haitu-video.env`, or a deployment secret manager, never in frontend code or API responses.
+
+```env
+HAITU_PLATFORM_OPENAI_API_KEY=
+HAITU_PLATFORM_DEEPSEEK_API_KEY=
+HAITU_PLATFORM_DOUBAO_API_KEY=
+HAITU_PLATFORM_GEMINI_API_KEY=
+HAITU_PLATFORM_VOLCENGINE_API_KEY=
+HAITU_PLATFORM_DEFAULT_TEXT_MODEL=deepseek-v4-pro
+HAITU_PLATFORM_DEFAULT_IMAGE_MODEL=gpt-image-2
+HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast
+```
+
+## Generate With Seedance CLI
 
 The CLI defaults to the free `mock` provider. It will not call Seedance unless you explicitly choose it.
 
@@ -49,18 +69,9 @@ The current real provider is the domestic Volcengine Ark Seedance adapter, based
 - Cancel or delete task: https://www.volcengine.com/docs/82379/1521720?lang=zh
 - Pricing / billing reference: https://www.volcengine.com/docs/82379/1541595?lang=zh
 
-Create a local `.env` file:
+For local CLI smoke tests, pass the provider key explicitly:
 
 ```bash
-cp .env.example .env
-```
-
-Then edit `.env`:
-
-```env
-ARK_API_KEY=your-modelark-api-key
-```
-
 Run one paid smoke test only after checking the estimated cost:
 
 ```bash
@@ -69,15 +80,13 @@ npm run generate -- \
   --versions 1 \
   --duration 8 \
   --provider volcengine-seedance \
+  --apiKey your-volcengine-key \
   --confirmPaid true
 ```
 
 Optional environment variables:
 
 ```bash
-export SEEDANCE_API_KEY="your-modelark-api-key"
-export SEEDANCE_BASE_URL="https://ark.cn-beijing.volces.com"
-export SEEDANCE_MODEL="doubao-seedance-2-0-260128"
 export SEEDANCE_RESOLUTION="480p"
 export SEEDANCE_WATERMARK="false"
 export SEEDANCE_POLL_MS="5000"
@@ -86,7 +95,7 @@ export SEEDANCE_ESTIMATED_COST_CNY_PER_SECOND="0.8"
 export SEEDANCE_ESTIMATED_COST_CURRENCY="CNY"
 ```
 
-Use `ARK_API_KEY` or `SEEDANCE_API_KEY`; either is accepted. The default product-job duration is 8 seconds and the default Seedance resolution is 480p for low-cost TikTok Shop traffic videos. Based on the first real 15 second run, 8 seconds is estimated at about 6.4 CNY per video. Keep `--versions 1` and `--duration 8` for the first paid smoke test; 15 seconds should be treated as an expensive polished-export option. Paid providers require `--confirmPaid true` so accidental CLI runs do not call the API. `--provider seedance` is kept as a legacy alias, but manifests use the canonical provider name `volcengine-seedance`.
+The default product-job duration is 8 seconds and the default Seedance resolution is 480p for low-cost TikTok Shop traffic videos. Based on the first real 15 second run, 8 seconds is estimated at about 6.4 CNY per video. Keep `--versions 1` and `--duration 8` for the first paid smoke test; 15 seconds should be treated as an expensive polished-export option. Paid providers require `--confirmPaid true` so accidental CLI runs do not call the API. The canonical provider name is `volcengine-seedance`.
 
 ## Query Seedance Usage
 
@@ -153,7 +162,6 @@ Scripts and prompts must use verified facts only:
 
 - `mock`: implemented, free local placeholder provider.
 - `volcengine-seedance`: implemented as an async Volcengine Ark provider. It creates a generation task, polls for completion, downloads the result, and records estimated cost.
-- `seedance`: legacy CLI alias for `volcengine-seedance`.
 
 ## Provider Architecture
 

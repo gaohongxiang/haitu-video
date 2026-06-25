@@ -4,7 +4,6 @@ import { runUsageCli } from "../../src/cli/usage.js";
 
 describe("runUsageCli", () => {
   it("prints a support-friendly usage table and totals", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () =>
       jsonResponse({
         total: 2,
@@ -36,7 +35,7 @@ describe("runUsageCli", () => {
     ) as unknown as typeof fetch;
 
     const output = await runUsageCli(
-      ["--status", "succeeded", "--pageSize", "20"],
+      ["--status", "succeeded", "--pageSize", "20", "--apiKey", "from-explicit-key"],
       { fetchImpl }
     );
 
@@ -51,10 +50,9 @@ describe("runUsageCli", () => {
   });
 
   it("passes task ids as repeated filter parameters", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () => jsonResponse({ total: 0, items: [] })) as unknown as typeof fetch;
 
-    await runUsageCli(["--taskIds", "cgt-1,cgt-2"], { fetchImpl });
+    await runUsageCli(["--taskIds", "cgt-1,cgt-2", "--apiKey", "from-explicit-key"], { fetchImpl });
 
     const url = String(vi.mocked(fetchImpl).mock.calls[0]?.[0]);
     expect(url).toContain("filter.task_ids=cgt-1");
@@ -62,7 +60,6 @@ describe("runUsageCli", () => {
   });
 
   it("prints one task detail when taskId is provided", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () =>
       jsonResponse({
         id: "cgt-one",
@@ -75,7 +72,7 @@ describe("runUsageCli", () => {
       })
     ) as unknown as typeof fetch;
 
-    const output = await runUsageCli(["--taskId", "cgt-one"], { fetchImpl });
+    const output = await runUsageCli(["--taskId", "cgt-one", "--apiKey", "from-explicit-key"], { fetchImpl });
 
     expect(output).toContain("Volcengine Seedance Task");
     expect(output).toContain("cgt-one");
@@ -84,13 +81,12 @@ describe("runUsageCli", () => {
   });
 
   it("cancels only queued tasks after checking the current status", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ id: "cgt-queued", status: "queued" }))
       .mockResolvedValueOnce(jsonResponse({ id: "cgt-queued" })) as unknown as typeof fetch;
 
-    const output = await runUsageCli(["--cancelTaskId", "cgt-queued"], { fetchImpl });
+    const output = await runUsageCli(["--cancelTaskId", "cgt-queued", "--apiKey", "from-explicit-key"], { fetchImpl });
 
     expect(output).toContain("Cancelled queued task: cgt-queued");
     expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.method).toBe("GET");
@@ -98,39 +94,59 @@ describe("runUsageCli", () => {
   });
 
   it("refuses to cancel a running or succeeded task", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () =>
       jsonResponse({ id: "cgt-running", status: "running" })
     ) as unknown as typeof fetch;
 
-    await expect(runUsageCli(["--cancelTaskId", "cgt-running"], { fetchImpl })).rejects.toThrow(
+    await expect(runUsageCli(["--cancelTaskId", "cgt-running", "--apiKey", "from-explicit-key"], { fetchImpl })).rejects.toThrow(
       /only queued/
     );
     expect(vi.mocked(fetchImpl)).toHaveBeenCalledTimes(1);
   });
 
   it("requires explicit confirmation before deleting a completed task", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () => jsonResponse({ id: "cgt-done" })) as unknown as typeof fetch;
 
-    await expect(runUsageCli(["--deleteTaskId", "cgt-done"], { fetchImpl })).rejects.toThrow(
+    await expect(runUsageCli(["--deleteTaskId", "cgt-done", "--apiKey", "from-explicit-key"], { fetchImpl })).rejects.toThrow(
       /--confirm true/
     );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("deletes a task when confirmation is explicit", async () => {
-    process.env.ARK_API_KEY = "from-env";
     const fetchImpl = vi.fn(async () => jsonResponse({ id: "cgt-done" })) as unknown as typeof fetch;
 
-    const output = await runUsageCli(["--deleteTaskId", "cgt-done", "--confirm", "true"], {
+    const output = await runUsageCli(["--deleteTaskId", "cgt-done", "--confirm", "true", "--apiKey", "from-explicit-key"], {
       fetchImpl
     });
 
     expect(output).toContain("Deleted task: cgt-done");
     expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.method).toBe("DELETE");
   });
+
+  it("does not use legacy Seedance environment keys", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    process.env.SEEDANCE_API_KEY = "legacy-seedance-key";
+    process.env.ARK_API_KEY = "legacy-ark-key";
+    const fetchImpl = vi.fn(async () => jsonResponse({ total: 0, items: [] })) as unknown as typeof fetch;
+    try {
+      await expect(runUsageCli(["--status", "succeeded"], { fetchImpl })).rejects.toThrow(/API 管理配置视频模型 API Key/);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
 });
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

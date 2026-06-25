@@ -13,6 +13,8 @@ import {
 describe("console navigation", () => {
   it("restores a valid console section from the URL", () => {
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=ledger")).toBe("ledger");
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=wallet")).toBe("wallet");
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=pricing")).toBe("pricing");
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=video")).toBe("video");
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=templates")).toBe("settings");
   });
@@ -50,7 +52,7 @@ describe("console navigation", () => {
     expect(productStudioProductUrl("http://127.0.0.1:4173/?section=video&step=generate&productSku=TK-001", "")).toBe("http://127.0.0.1:4173/?section=video&step=generate");
   });
 
-  it.each<ConsoleSection>(["dashboard", "video", "ledger", "settings"])(
+  it.each<ConsoleSection>(["dashboard", "video", "ledger", "wallet", "pricing", "settings"])(
     "accepts %s as a known console section",
     (section) => {
       expect(consoleSectionFromUrl(`http://127.0.0.1:4173/?section=${section}`)).toBe(section);
