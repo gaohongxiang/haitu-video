@@ -46,6 +46,10 @@ Haitu supports two API billing modes:
 
 Platform keys are server-only and must never appear in frontend code or API responses. Keep `HAITU_SECRET_KEY` stable because it decrypts both platform keys and user BYOK keys stored in the database.
 
+## Public SEO Site
+
+The production server uses `/` as the Chinese acquisition homepage, `/en/` as the English international site, and `/app` for the logged-in creative console. Marketing pages are rendered as server HTML with canonical links, `hreflang`, structured data, `robots.txt`, and `sitemap.xml`; the app/admin shells are marked `noindex`.
+
 ## Generate With Seedance CLI
 
 The CLI defaults to the free `mock` provider. It will not call Seedance unless you explicitly choose it.

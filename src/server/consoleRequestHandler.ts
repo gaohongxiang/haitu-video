@@ -18,6 +18,7 @@ import {
 import {
   handleConsoleAssetRoutes,
   handleHealthRoutes,
+  handleMarketingRoutes,
   handleMediaRoutes,
   handlePublicAssetRoutes
 } from "./consolePublicRoutes.js";
@@ -68,6 +69,13 @@ export function createConsoleRequestHandler(input: {
       });
       if (publicAssetRouteResponse) {
         return publicAssetRouteResponse;
+      }
+      const marketingRouteResponse = handleMarketingRoutes({
+        request,
+        url
+      });
+      if (marketingRouteResponse) {
+        return marketingRouteResponse;
       }
       const paymentWebhookRouteResponse = await handlePaymentWebhookRoutes({
         request,

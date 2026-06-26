@@ -207,7 +207,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(oldSessionProducts.status).toBe(401);
   });
 
-  it("serves the console shell before SQLite login so users can sign in", async () => {
+  it("serves the app console shell before SQLite login so users can sign in", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
     const server = createConsoleServer({
@@ -215,7 +215,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       autoStartSavedJobs: false
     });
 
-    const response = await server.fetch("/");
+    const response = await server.fetch("/app");
     const body = await response.text();
 
     expect(response.status).toBe(200);

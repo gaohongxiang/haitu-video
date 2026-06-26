@@ -73,7 +73,7 @@ export function isPublicConsoleRoute(request: Request): boolean {
   if (request.method === "POST" && url.pathname === "/api/payments/infini/webhook") {
     return true;
   }
-  if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console" || url.pathname === "/admin")) {
+  if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/app" || url.pathname === "/console" || url.pathname === "/admin")) {
     return true;
   }
   if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/favicon.svg") {

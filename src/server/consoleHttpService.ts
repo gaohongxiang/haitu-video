@@ -63,7 +63,7 @@ export async function nodeRequestToFetch(request: IncomingMessage): Promise<Requ
     chunks.push(Buffer.from(chunk));
   }
   const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
-  return new Request(`http://localhost${request.url ?? "/"}`, {
+  return new Request(`${requestOrigin(request)}${request.url ?? "/"}`, {
     method: request.method,
     headers: request.headers as HeadersInit,
     body
@@ -81,4 +81,20 @@ function isMissingFileError(error: unknown): boolean {
 
 function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "run";
+}
+
+function requestOrigin(request: IncomingMessage): string {
+  const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"]);
+  const proto = forwardedProto?.split(",")[0]?.trim() || (isEncryptedSocket(request.socket) ? "https" : "http");
+  const forwardedHost = firstHeaderValue(request.headers["x-forwarded-host"]);
+  const host = forwardedHost?.split(",")[0]?.trim() || request.headers.host || "localhost";
+  return `${proto}://${host}`;
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isEncryptedSocket(socket: IncomingMessage["socket"]): boolean {
+  return "encrypted" in socket && socket.encrypted === true;
 }

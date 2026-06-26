@@ -1,6 +1,6 @@
 # VPS 无 Docker 部署
 
-这份步骤用于把 Haitu console 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。第二阶段使用本机 SQLite 保存用户、工作区、权限、索引和 API 管理配置；图片、视频、字幕、manifest 和 report 等大文件仍保存在 `HAITU_DATA_DIR` 文件系统里。不使用 Docker/PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
+这份步骤用于把 Haitu 跑在已有 VPS 上，通过 Cloudflare Tunnel 免费入口绑定 `haitu.online`。`/` 是中文 SEO 获客首页，`/en/` 是英文国际站，`/app` 是登录后的创作控制台，`/admin` 是项目方后台。第二阶段使用本机 SQLite 保存用户、工作区、权限、索引和 API 管理配置；图片、视频、字幕、manifest 和 report 等大文件仍保存在 `HAITU_DATA_DIR` 文件系统里。不使用 Docker/PostgreSQL/Redis，不使用 Cloudflare Pages、Cloudflare Stream，也不把 Cloudflare R2 作为本阶段默认依赖。
 
 ## 适用范围
 
@@ -88,7 +88,7 @@ SEEDANCE_WATERMARK=false
 
 充值中心支持 Stripe Checkout 和 Infini Hosted Checkout。支付平台密钥放在服务器 env；后台只负责启用或停用支付方式。Infini 的 webhook 地址配置为 `https://haitu.online/api/payments/infini/webhook`，订阅 `order.update`，收到 `order.completed` 后才会写入钱包充值流水。
 
-`HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin` 查看项目方后台。第一版后台只给项目方查看全站用户增长、活跃和用户列表，不开放普通用户访问。
+`HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin` 查看项目方后台。普通用户从 `https://haitu.online/app` 进入创作控制台。第一版后台只给项目方查看全站用户增长、活跃和用户列表，不开放普通用户访问。
 
 初始化或升级 SQLite 表结构：
 
@@ -153,7 +153,7 @@ sudo systemctl enable --now cloudflared
 sudo systemctl status cloudflared
 ```
 
-把 `deploy/cloudflare/tunnel-config.example.yml` 里的 `<你的隧道编号>` 替换为实际 tunnel id。浏览器访问 `https://haitu.online` 验证控制台。
+把 `deploy/cloudflare/tunnel-config.example.yml` 里的 `<你的隧道编号>` 替换为实际 tunnel id。浏览器访问 `https://haitu.online` 验证中文获客首页，访问 `https://haitu.online/app` 验证控制台。
 
 Cloudflare Quick Tunnel 只能临时测试，不能作为生产入口。Cloudflare Pages 不适合本阶段默认方案，因为控制台依赖 Node API、文件存储和视频生成队列。Cloudflare Stream 不作为本阶段方案，当前只需要用户下载视频。Cloudflare R2 只是后续可选备份/对象存储，不作为本阶段默认依赖。
 

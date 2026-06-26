@@ -497,7 +497,7 @@ describe("console API", () => {
     await writeFile(join(consoleDistDir, "favicon.svg"), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>', "utf8");
     const server = createConsoleServer({ rootDir: root, consoleDistDir });
 
-    const htmlResponse = await server.fetch("/");
+    const htmlResponse = await server.fetch("/app");
     const jsResponse = await server.fetch("/assets/index-test.js");
     const faviconResponse = await server.raw.fetch("/favicon.svg");
     const html = await htmlResponse.text();
@@ -11626,6 +11626,7 @@ async function importDefaultWorkspaceFiles(dataDir: string, workspaceId: string)
 function isAuthOrPublicPath(path: string): boolean {
   const pathname = path.startsWith("http") ? new URL(path).pathname : path.split("?")[0] ?? path;
   return pathname === "/" ||
+    pathname === "/app" ||
     pathname === "/console" ||
     pathname === "/favicon.svg" ||
     pathname.startsWith("/assets/") ||
