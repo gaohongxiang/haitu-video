@@ -41,8 +41,9 @@ describe("no-Docker VPS deployment package", () => {
     expect(envExample).toContain("HAITU_AUTH_EMAIL_FROM=");
     expect(envExample).toContain("RESEND_API_KEY=");
     expect(envExample).not.toContain("HAITU_AUTH_PASSWORD");
-    expect(envExample).toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
-    expect(envExample).toContain("HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast");
+    expect(envExample).not.toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
+    expect(envExample).not.toContain("HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast");
+    expect(envExample).toContain("Platform model API keys are configured in /admin");
     expect(envExample).toContain("SEEDANCE_RESOLUTION=480p");
     expect(envExample).not.toContain("ARK_API_KEY");
     expect(envExample).not.toContain("SEEDANCE_API_KEY");
@@ -93,7 +94,8 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("HAITU_ADMIN_EMAIL=you@haitu.online");
     expect(guide).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(guide).toContain("HAITU_AUTH_EMAIL_FROM=login@haitu.online");
-    expect(guide).toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
+    expect(guide).not.toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
+    expect(guide).toContain("平台 API Key 在 `/admin` 的平台模型页面配置并加密写入 SQLite");
     expect(guide).toContain("RESEND_API_KEY=");
     expect(guide).toContain("账号注册和忘记密码使用邮箱验证码");
     expect(guide).toContain("`HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin`");

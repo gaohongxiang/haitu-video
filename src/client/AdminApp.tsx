@@ -5,6 +5,7 @@ import {
   Clock3,
   CreditCard,
   Database,
+  DollarSign,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -13,6 +14,7 @@ import {
   RefreshCcw,
   Settings2,
   ShieldAlert,
+  SlidersHorizontal,
   Users,
   Video,
   X
@@ -24,7 +26,7 @@ import { FormEvent, type ComponentType, useEffect, useMemo, useState } from "rea
 import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
-import { Field, Input } from "./components/ui/field.js";
+import { Field, Input, Select, Textarea } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
 import {
   apiModeForProviderDraft,
@@ -37,6 +39,7 @@ import {
   type ModelConfigProviderId,
   type ModelConfigTestStatus,
   type ModelServiceGroup,
+  type ProviderConfigServiceItem,
   type ProviderConfigItem,
   type ProviderConfigLedger
 } from "./components/modelServiceConfig.js";
@@ -198,6 +201,47 @@ interface AdminUserVideoJobSummary {
 
 type PlatformModelAdminConfigResponse = Pick<ProviderConfigLedger, "textModels" | "imageModels" | "videoModels">;
 
+interface PaymentMethodView {
+  id: "stripe" | "infini";
+  label: string;
+  kind: "rmb" | "crypto";
+  enabled: boolean;
+  configured: boolean;
+  available: boolean;
+  description: string;
+  unavailableReason?: string;
+}
+
+interface AdminPaymentMethodsResponse {
+  methods: PaymentMethodView[];
+}
+
+interface AdminWalletSummary {
+  workspaceId: string;
+  workspaceName: string;
+  ownerEmail?: string;
+  memberCount: number;
+  balanceCny: number;
+  reservedCny: number;
+  availableCny: number;
+  transactionCount: number;
+  lastTransactionAt?: string;
+  lastTransactionType?: string;
+}
+
+interface AdminWalletsResponse {
+  wallets: AdminWalletSummary[];
+}
+
+interface AdminWalletAdjustmentResponse {
+  wallet: {
+    workspaceId: string;
+    balanceCny: number;
+    reservedCny: number;
+    availableCny: number;
+  };
+}
+
 interface ModelConfigKeyRevealResponse {
   ok: true;
   provider: ModelConfigProviderId;
@@ -297,6 +341,8 @@ export function AdminApp() {
   const [platformDrafts, setPlatformDrafts] = useState<Record<ModelConfigProviderId, ModelConfigDraft>>(() => defaultPlatformModelDrafts());
   const [platformTestStatus] = useState<Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>>({});
   const [editingPlatformProviderId, setEditingPlatformProviderId] = useState<ModelConfigProviderId | undefined>();
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodView[]>([]);
+  const [adminWallets, setAdminWallets] = useState<AdminWalletSummary[]>([]);
 
   useEffect(() => {
     void bootstrap();
@@ -331,12 +377,16 @@ export function AdminApp() {
     setBusy(true);
     setForbidden(false);
     try {
-      const [nextOverview, platformModels] = await Promise.all([
+      const [nextOverview, platformModels, paymentMethodsResponse, walletsResponse] = await Promise.all([
         getJson<AdminOverview>("/api/admin/overview"),
-        getJson<PlatformModelAdminConfigResponse>("/api/platform/model-configs")
+        getJson<PlatformModelAdminConfigResponse>("/api/platform/model-configs"),
+        getJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods"),
+        getJson<AdminWalletsResponse>("/api/admin/wallets")
       ]);
       setOverview(nextOverview);
       setPlatformConfig(platformConfigLedgerFromResponse(platformModels));
+      setPaymentMethods(paymentMethodsResponse.methods);
+      setAdminWallets(walletsResponse.wallets);
       setStatus("");
     } catch (error) {
       if (error instanceof HttpError && error.status === 403) {
@@ -498,12 +548,33 @@ export function AdminApp() {
         baseUrl: draft.baseUrl.trim(),
         model: draft.models,
         apiMode: apiModeForProviderDraft(providerId, draft),
-        priority: Number.isFinite(draft.priority) ? draft.priority : 0,
         enabled: draft.enabled
       });
       await refreshOverview();
       setEditingPlatformProviderId(undefined);
       setStatus("平台模型已保存，Key 已加密写入数据库，并已更新平台模型配置。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePlatformModelConfigEnabled(providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) {
+    setBusy(true);
+    setStatus("");
+    try {
+      await putJson(platformModelAdminEndpoint(providerId), {
+        configId: service.configId,
+        name: service.label || service.serviceLabel,
+        vendor: service.providerLabel,
+        baseUrl: service.baseUrl,
+        model: service.models.map((model) => model.model).filter(Boolean),
+        apiMode: service.apiMode,
+        enabled
+      });
+      await refreshOverview();
+      setStatus(enabled ? "平台模型服务已启用。" : "平台模型服务已停用。");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -537,6 +608,40 @@ export function AdminApp() {
       keyPreview: response.keyPreview
     });
     return response.apiKey;
+  }
+
+  async function togglePaymentMethodEnabled(methodId: PaymentMethodView["id"], enabled: boolean) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await putJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods", {
+        methods: paymentMethods.map((method) => ({
+          id: method.id,
+          enabled: method.id === methodId ? enabled : method.enabled
+        }))
+      });
+      setPaymentMethods(response.methods);
+      setStatus(enabled ? "支付方式已启用。" : "支付方式已停用。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitWalletAdjustment(input: { workspaceId: string; amountCny: number; reason: string }) {
+    setBusy(true);
+    setStatus("");
+    try {
+      await postJson<AdminWalletAdjustmentResponse>("/api/admin/wallet-adjustments", input);
+      const walletsResponse = await getJson<AdminWalletsResponse>("/api/admin/wallets");
+      setAdminWallets(walletsResponse.wallets);
+      setStatus("余额调整已写入流水。");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (session && !session.authenticated) {
@@ -581,10 +686,15 @@ export function AdminApp() {
       onEditPlatformModelService={editPlatformModelService}
       onSavePlatformModelConfig={savePlatformModelConfig}
       onClearPlatformModelConfig={clearPlatformModelConfig}
+      onTogglePlatformModelConfigEnabled={togglePlatformModelConfigEnabled}
       onRevealPlatformModelConfigKey={revealPlatformModelConfigApiKey}
       editingPlatformProviderId={editingPlatformProviderId}
       platformTestStatus={platformTestStatus}
       onClosePlatformModelDialog={() => setEditingPlatformProviderId(undefined)}
+      paymentMethods={paymentMethods}
+      adminWallets={adminWallets}
+      onTogglePaymentMethodEnabled={togglePaymentMethodEnabled}
+      onSubmitWalletAdjustment={submitWalletAdjustment}
     />
   );
 }
@@ -718,6 +828,7 @@ function AdminDashboard({
   isBusy,
   onAddPlatformModelService,
   onClearPlatformModelConfig,
+  onTogglePlatformModelConfigEnabled,
   onClosePlatformModelDialog,
   onEditPlatformModelService,
   onLogout,
@@ -726,7 +837,11 @@ function AdminDashboard({
   onRevealPlatformModelConfigKey,
   onRefresh,
   onSavePlatformModelConfig,
+  onSubmitWalletAdjustment,
+  onTogglePaymentMethodEnabled,
   overview,
+  adminWallets,
+  paymentMethods,
   platformConfig,
   platformDrafts,
   platformTestStatus,
@@ -742,11 +857,16 @@ function AdminDashboard({
   onAddPlatformModelService: (providerId: ModelConfigProviderId) => void;
   onEditPlatformModelService: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
   onClearPlatformModelConfig: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onTogglePlatformModelConfigEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onRevealPlatformModelConfigKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
   onClosePlatformModelDialog: () => void;
   onRefresh: () => void;
   onSavePlatformModelConfig: (providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
+  onSubmitWalletAdjustment: (input: { workspaceId: string; amountCny: number; reason: string }) => Promise<void>;
   overview?: AdminOverview;
+  adminWallets: AdminWalletSummary[];
+  paymentMethods: PaymentMethodView[];
   platformConfig: ProviderConfigLedger;
   platformDrafts: Record<ModelConfigProviderId, ModelConfigDraft>;
   platformTestStatus: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
@@ -829,6 +949,7 @@ function AdminDashboard({
             onAdd={onAddPlatformModelService}
             onApplyPreset={onPlatformPresetApply}
             onClear={onClearPlatformModelConfig}
+            onToggleEnabled={onTogglePlatformModelConfigEnabled}
             onCloseDialog={onClosePlatformModelDialog}
             onDraftChange={onPlatformDraftChange}
             onEdit={onEditPlatformModelService}
@@ -840,11 +961,12 @@ function AdminDashboard({
     }
     if (activeSection === "billing") {
       return (
-        <AdminPlaceholderSection
-          icon={<CreditCard size={18} />}
-          title="充值账单"
-          badge="待接入"
-          items={["余额管理", "充值记录", "平台调用收费"]}
+        <AdminBillingPanel
+          paymentMethods={paymentMethods}
+          wallets={adminWallets}
+          isBusy={isBusy}
+          onTogglePaymentMethodEnabled={onTogglePaymentMethodEnabled}
+          onSubmitWalletAdjustment={onSubmitWalletAdjustment}
         />
       );
     }
@@ -972,6 +1094,7 @@ function PlatformModelAdminPanel({
   onAdd,
   onApplyPreset,
   onClear,
+  onToggleEnabled,
   onCloseDialog,
   onDraftChange,
   onEdit,
@@ -986,6 +1109,7 @@ function PlatformModelAdminPanel({
   onAdd: (providerId: ModelConfigProviderId) => void;
   onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
   onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onCloseDialog: () => void;
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
   onEdit: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
@@ -1030,6 +1154,7 @@ function PlatformModelAdminPanel({
             onAdd={() => onAdd(group.providerId)}
             onEdit={(model) => onEdit(group.providerId, model, group.models)}
             onClear={onClear}
+            onToggleEnabled={onToggleEnabled}
           />
         ))}
       </div>
@@ -1042,7 +1167,6 @@ function PlatformModelAdminPanel({
           testStatus={testStatuses[editingGroup.providerId]}
           presets={modelConfigPresets[editingGroup.providerId]}
           apiKeyLabel="平台 API Key"
-          enableLabel="启用"
           onDraftChange={onDraftChange}
           onApplyPreset={onApplyPreset}
           onClose={onCloseDialog}
@@ -1052,6 +1176,197 @@ function PlatformModelAdminPanel({
         />
       ) : null}
     </Card>
+  );
+}
+
+function AdminBillingPanel({
+  isBusy,
+  onSubmitWalletAdjustment,
+  onTogglePaymentMethodEnabled,
+  paymentMethods,
+  wallets
+}: {
+  isBusy: boolean;
+  onSubmitWalletAdjustment: (input: { workspaceId: string; amountCny: number; reason: string }) => Promise<void>;
+  onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
+  paymentMethods: PaymentMethodView[];
+  wallets: AdminWalletSummary[];
+}) {
+  const [adjustWorkspaceId, setAdjustWorkspaceId] = useState("");
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const selectedWallet = wallets.find((wallet) => wallet.workspaceId === adjustWorkspaceId) ?? wallets[0];
+  const totalBalanceCny = wallets.reduce((total, wallet) => total + wallet.balanceCny, 0);
+  const totalReservedCny = wallets.reduce((total, wallet) => total + wallet.reservedCny, 0);
+  const enabledPaymentCount = paymentMethods.filter((method) => method.enabled).length;
+
+  useEffect(() => {
+    if (adjustWorkspaceId && wallets.some((wallet) => wallet.workspaceId === adjustWorkspaceId)) {
+      return;
+    }
+    setAdjustWorkspaceId(wallets[0]?.workspaceId ?? "");
+  }, [adjustWorkspaceId, wallets]);
+
+  async function submitAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedWallet) {
+      return;
+    }
+    await onSubmitWalletAdjustment({
+      workspaceId: selectedWallet.workspaceId,
+      amountCny: Number(adjustAmount),
+      reason: adjustReason
+    });
+    setAdjustAmount("");
+    setAdjustReason("");
+  }
+
+  return (
+    <section className="grid gap-4" aria-label="充值账单">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <AdminCompactMetric label="总余额" value={totalBalanceCny} hint={`${wallets.length} 个工作区`} />
+        <AdminCompactMetric label="冻结金额" value={totalReservedCny} hint="正在生成任务占用" />
+        <AdminCompactMetric label="支付方式" value={enabledPaymentCount} hint={`${paymentMethods.length} 个后台配置`} />
+      </div>
+
+      <Card className="bg-[var(--card)]">
+        <CardHeader heading="支付方式" icon={<SlidersHorizontal size={16} />} right={<Badge>{enabledPaymentCount}/{paymentMethods.length} 启用</Badge>} />
+        <div className="grid gap-2">
+          {paymentMethods.map((method) => (
+            <div key={method.id} className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong className="text-sm">{method.label}</strong>
+                  <Badge tone={method.kind === "rmb" ? "ok" : "neutral"}>{method.kind === "rmb" ? "RMB支付" : "数字货币支付"}</Badge>
+                  <Badge tone={method.configured ? "ok" : "warn"}>{method.configured ? "已配置" : "未配置"}</Badge>
+                </div>
+                <p className="m-0 mt-1 text-[12px] font-semibold leading-5 text-[var(--muted)]">{method.description}</p>
+                {method.unavailableReason ? (
+                  <p className="m-0 mt-1 text-[11px] font-black text-[var(--warn)]">{method.unavailableReason}</p>
+                ) : null}
+              </div>
+              <AdminToggle
+                checked={method.enabled}
+                disabled={isBusy}
+                onChange={(enabled) => void onTogglePaymentMethodEnabled(method.id, enabled)}
+              />
+            </div>
+          ))}
+          {paymentMethods.length === 0 ? <EmptyAdminDetail text="暂无支付方式" /> : null}
+        </div>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="overflow-hidden bg-[var(--card)] p-0">
+          <div className="border-b border-[var(--border)] p-4">
+            <CardHeader className="m-0" heading="用户余额" icon={<DollarSign size={16} />} right={<Badge>{wallets.length} 个工作区</Badge>} />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-xs">
+              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                <tr>
+                  <AdminTh>工作区</AdminTh>
+                  <AdminTh>用户</AdminTh>
+                  <AdminTh>余额</AdminTh>
+                  <AdminTh>冻结</AdminTh>
+                  <AdminTh>可用</AdminTh>
+                  <AdminTh>流水</AdminTh>
+                  <AdminTh>最后变动</AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {wallets.map((wallet) => (
+                  <tr key={wallet.workspaceId} className="bg-[var(--card)]">
+                    <AdminTd>
+                      <div className="font-black text-[var(--text)]">{wallet.workspaceName}</div>
+                      <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{wallet.workspaceId}</div>
+                    </AdminTd>
+                    <AdminTd>{wallet.ownerEmail ?? "-"}</AdminTd>
+                    <AdminTd>¥{money(wallet.balanceCny)}</AdminTd>
+                    <AdminTd>¥{money(wallet.reservedCny)}</AdminTd>
+                    <AdminTd>
+                      <strong className={wallet.availableCny > 0 ? "text-[var(--ok)]" : "text-[var(--muted)]"}>¥{money(wallet.availableCny)}</strong>
+                    </AdminTd>
+                    <AdminTd>{formatNumber(wallet.transactionCount)}</AdminTd>
+                    <AdminTd>
+                      <div>{formatDateTime(wallet.lastTransactionAt)}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{adminWalletTransactionTypeLabel(wallet.lastTransactionType)}</div>
+                    </AdminTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {wallets.length === 0 ? <div className="p-4"><EmptyAdminDetail text="暂无余额数据" /></div> : null}
+        </Card>
+
+        <Card className="bg-[var(--card)]">
+          <CardHeader heading="余额调整" icon={<CreditCard size={16} />} right={<Badge>写入流水</Badge>} />
+          <form className="grid gap-3" onSubmit={submitAdjustment}>
+            <Field label="工作区">
+              <Select value={selectedWallet?.workspaceId ?? ""} onChange={(event) => setAdjustWorkspaceId(event.target.value)} disabled={isBusy || wallets.length === 0}>
+                {wallets.map((wallet) => (
+                  <option key={wallet.workspaceId} value={wallet.workspaceId}>{wallet.ownerEmail ?? wallet.workspaceName} / ¥{money(wallet.availableCny)}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="调整金额">
+              <Input
+                inputMode="decimal"
+                placeholder="例如 10 或 -3.5"
+                value={adjustAmount}
+                onChange={(event) => setAdjustAmount(event.target.value)}
+                disabled={isBusy || !selectedWallet}
+              />
+            </Field>
+            <Field label="原因">
+              <Textarea
+                placeholder="例如：补偿充值手续费、扣回误发余额"
+                value={adjustReason}
+                onChange={(event) => setAdjustReason(event.target.value)}
+                disabled={isBusy || !selectedWallet}
+              />
+            </Field>
+            <Button variant="primary" type="submit" disabled={isBusy || !selectedWallet || !adjustAmount.trim() || !adjustReason.trim()}>
+              <CreditCard size={14} />
+              提交调整
+            </Button>
+          </form>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function AdminToggle({
+  checked,
+  disabled,
+  onChange
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "relative inline-flex h-7 w-[62px] items-center rounded-full border px-1 transition focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
+        checked ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--border)] bg-[var(--field)]"
+      )}
+      aria-pressed={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+    >
+      <span
+        className={cn(
+          "grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black shadow-[0_4px_10px_rgba(42,33,27,.16)] transition-transform",
+          checked ? "translate-x-[33px] text-[var(--accent)]" : "translate-x-0 text-[var(--muted)]"
+        )}
+      >
+        {checked ? "开" : "关"}
+      </span>
+    </button>
   );
 }
 
@@ -1613,8 +1928,23 @@ function formatNumber(value?: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
 }
 
+function money(value?: number) {
+  return Number(value || 0).toFixed(2);
+}
+
 function formatDuration(value?: number) {
   return value === undefined ? "-" : `${value}s`;
+}
+
+function adminWalletTransactionTypeLabel(type?: string) {
+  return ({
+    adjustment: "后台调整",
+    bonus: "赠送",
+    charge: "扣费",
+    recharge: "充值",
+    refund: "释放",
+    reserve: "冻结"
+  } as Record<string, string>)[type ?? ""] ?? "-";
 }
 
 function adminJobStatusTone(status: string): "neutral" | "ok" | "danger" | "warn" {

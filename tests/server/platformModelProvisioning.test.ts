@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ensurePlatformBundles, ensurePlatformModelProvisioning } from "../../src/server/platformModelProvisioning.js";
+import { ensurePlatformBundles } from "../../src/server/platformModelProvisioning.js";
 import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
 import { ensureDefaultWorkspace, runMigrations } from "../../src/server/db/migrate.js";
 import { SqliteModelConfigStore } from "../../src/server/db/sqliteModelConfigStore.js";
@@ -17,8 +17,8 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-describe("ensurePlatformModelProvisioning", () => {
-  it("creates platform configs and a workspace platform bundle from server-only env keys", async () => {
+describe("ensurePlatformBundles", () => {
+  it("ignores legacy platform model env keys and only uses admin-saved platform configs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-platform-models-"));
     tempDirs.push(root);
     const handle = openDatabase({ dataDir: join(root, "data"), env: {} });
@@ -46,15 +46,7 @@ describe("ensurePlatformModelProvisioning", () => {
         now: () => new Date("2026-01-02T00:00:00.000Z")
       });
 
-      await ensurePlatformModelProvisioning({
-        env: {
-          HAITU_PLATFORM_DEEPSEEK_API_KEY: "platform-deepseek-key",
-          HAITU_PLATFORM_OPENAI_API_KEY: "platform-openai-key",
-          HAITU_PLATFORM_VOLCENGINE_API_KEY: "platform-volcengine-key",
-          HAITU_PLATFORM_DEFAULT_TEXT_MODEL: "deepseek-v4-pro",
-          HAITU_PLATFORM_DEFAULT_IMAGE_MODEL: "gpt-image-2",
-          HAITU_PLATFORM_DEFAULT_VIDEO_MODEL: "seedance-2.0-fast"
-        },
+      await ensurePlatformBundles({
         platformModelConfigStore,
         modelBundleStore,
         modelServicePreferenceStore
@@ -63,39 +55,17 @@ describe("ensurePlatformModelProvisioning", () => {
       const textConfigs = await platformModelConfigStore.listConfigs("openai-compatible-text");
       const imageConfigs = await platformModelConfigStore.listConfigs("openai-compatible-image");
       const videoConfigs = await platformModelConfigStore.listConfigs("volcengine-seedance");
-      expect(textConfigs.find((config) => config.model === "deepseek-v4-pro")).toEqual(expect.objectContaining({
-        apiOwner: "platform",
-        apiKey: "platform-deepseek-key",
-        vendor: "deepseek"
-      }));
-      expect(imageConfigs.find((config) => config.model === "gpt-image-2")).toEqual(expect.objectContaining({
-        apiOwner: "platform",
-        apiKey: "platform-openai-key",
-        vendor: "openai"
-      }));
-      expect(videoConfigs.find((config) => config.model === "doubao-seedance-2-0-fast-260128")).toEqual(expect.objectContaining({
-        apiOwner: "platform",
-        apiKey: "platform-volcengine-key",
-        vendor: "volcengine"
-      }));
-
-      const bundles = modelBundleStore.list();
-      expect(bundles).toEqual(expect.arrayContaining([expect.objectContaining({
-        bundleId: "platform-quality-bundle",
-        apiOwner: "platform",
-        label: "高质量",
-        enabled: true
-      })]));
-      expect(modelServicePreferenceStore.get()).toEqual(expect.objectContaining({
-        serviceMode: "byok",
-        platformBundleId: "platform-quality-bundle"
-      }));
+      expect(textConfigs).toEqual([]);
+      expect(imageConfigs).toEqual([]);
+      expect(videoConfigs).toEqual([]);
+      expect(modelBundleStore.list()).toEqual([]);
+      expect(modelServicePreferenceStore.get().platformBundleId).toBeUndefined();
     } finally {
       closeDatabase(handle);
     }
   });
 
-  it("creates built-in platform bundles for quality and low-cost combinations", async () => {
+  it("creates built-in platform bundles for admin-saved quality and low-cost combinations", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-platform-model-bundles-"));
     tempDirs.push(root);
     const handle = openDatabase({ dataDir: join(root, "data"), env: {} });
@@ -123,13 +93,74 @@ describe("ensurePlatformModelProvisioning", () => {
         now: () => new Date("2026-01-02T00:00:00.000Z")
       });
 
-      await ensurePlatformModelProvisioning({
-        env: {
-          HAITU_PLATFORM_OPENAI_API_KEY: "platform-openai-secret",
-          HAITU_PLATFORM_DEEPSEEK_API_KEY: "platform-deepseek-secret",
-          HAITU_PLATFORM_GEMINI_API_KEY: "platform-gemini-secret",
-          HAITU_PLATFORM_VOLCENGINE_API_KEY: "platform-volcengine-secret"
-        },
+      await platformModelConfigStore.set("openai-compatible-text", {
+        configId: "platform-text-low-cost",
+        apiKey: "platform-deepseek-secret",
+        apiOwner: "platform",
+        name: "DeepSeek",
+        vendor: "deepseek",
+        model: "deepseek-v4-flash",
+        enabled: true,
+        priority: 100,
+        tags: ["低成本"]
+      });
+      await platformModelConfigStore.set("openai-compatible-text", {
+        configId: "platform-text-quality",
+        apiKey: "platform-openai-secret",
+        apiOwner: "platform",
+        name: "OpenAI",
+        vendor: "openai",
+        model: "gpt-5.5",
+        enabled: true,
+        priority: 90,
+        tags: ["高质量"]
+      });
+      await platformModelConfigStore.set("openai-compatible-image", {
+        configId: "platform-image-low-cost",
+        apiKey: "platform-gemini-secret",
+        apiOwner: "platform",
+        name: "Gemini",
+        vendor: "gemini",
+        model: "gemini-2.5-flash-image",
+        enabled: true,
+        priority: 100,
+        tags: ["低成本"]
+      });
+      await platformModelConfigStore.set("openai-compatible-image", {
+        configId: "platform-image-quality",
+        apiKey: "platform-openai-secret",
+        apiOwner: "platform",
+        name: "OpenAI",
+        vendor: "openai",
+        model: "gpt-image-2",
+        enabled: true,
+        priority: 90,
+        tags: ["高质量"]
+      });
+      await platformModelConfigStore.set("volcengine-seedance", {
+        configId: "platform-video-low-cost",
+        apiKey: "platform-volcengine-secret",
+        apiOwner: "platform",
+        name: "Seedance",
+        vendor: "volcengine",
+        model: "seedance-2.0-fast",
+        enabled: true,
+        priority: 100,
+        tags: ["低成本"]
+      });
+      await platformModelConfigStore.set("volcengine-seedance", {
+        configId: "platform-video-quality",
+        apiKey: "platform-volcengine-secret",
+        apiOwner: "platform",
+        name: "Seedance",
+        vendor: "volcengine",
+        model: "seedance-2.0",
+        enabled: true,
+        priority: 90,
+        tags: ["高质量"]
+      });
+
+      await ensurePlatformBundles({
         platformModelConfigStore,
         modelBundleStore,
         modelServicePreferenceStore
@@ -137,6 +168,10 @@ describe("ensurePlatformModelProvisioning", () => {
 
       const bundles = modelBundleStore.list();
 
+      expect(bundles.map((bundle) => bundle.bundleId).slice(0, 2)).toEqual([
+        "platform-low-cost-bundle",
+        "platform-quality-bundle"
+      ]);
       expect(bundles).toEqual(expect.arrayContaining([
         expect.objectContaining({ bundleId: "platform-quality-bundle", label: "高质量" }),
         expect.objectContaining({ bundleId: "platform-low-cost-bundle", label: "低成本" })

@@ -171,6 +171,31 @@ export function removeReferenceFromComposerText(value: string, reference: string
     .join("\n");
 }
 
+export function updateComposerReferenceOrder(value: string, referenceImages: string[]): string {
+  const references = referenceImages.map((item) => item.trim()).filter(Boolean);
+  const referenceBlock = references.length > 0 ? references.join("\n") : "";
+  const lines = value.split(/\r?\n/);
+  const referenceLabelPattern = /^\s*(参考图|图片|主图|画像)\s*[：:]/;
+  const sectionLabelPattern = /^\s*(标题|分类|材质|尺寸|尺寸\/重量|卖点|使用场景|不可用卖点|禁止|商品ID|商品名|商品名称|产品名称|カテゴリ|素材|サイズ|规格选项|规格|商品説明|商品描述|描述|参考图|图片|主图|画像)\s*[：:]/;
+  const referenceStart = lines.findIndex((line) => referenceLabelPattern.test(line));
+  if (referenceStart < 0) {
+    const trimmed = value.trim();
+    const suffix = `参考图：${referenceBlock}`;
+    return trimmed ? `${trimmed}\n\n${suffix}` : suffix;
+  }
+  const labelMatch = lines[referenceStart]?.match(/^\s*([^：:]+)\s*[：:]/);
+  const label = labelMatch?.[1]?.trim() || "参考图";
+  const nextSectionOffset = lines
+    .slice(referenceStart + 1)
+    .findIndex((line) => sectionLabelPattern.test(line));
+  const referenceEnd = nextSectionOffset >= 0 ? referenceStart + 1 + nextSectionOffset : lines.length;
+  return [
+    ...lines.slice(0, referenceStart),
+    `${label}：${referenceBlock}`,
+    ...lines.slice(referenceEnd)
+  ].join("\n").trim();
+}
+
 function splitReferenceText(value: string): string[] {
   return value
     .split(/[,\n，]/)

@@ -72,21 +72,21 @@ HAITU_ADMIN_EMAIL=you@haitu.online
 BETTER_AUTH_URL=https://haitu.online
 HAITU_AUTH_EMAIL_FROM=login@haitu.online
 RESEND_API_KEY=
-HAITU_PLATFORM_OPENAI_API_KEY=
-HAITU_PLATFORM_DEEPSEEK_API_KEY=
-HAITU_PLATFORM_DOUBAO_API_KEY=
-HAITU_PLATFORM_GEMINI_API_KEY=
-HAITU_PLATFORM_VOLCENGINE_API_KEY=
-HAITU_PLATFORM_DEFAULT_TEXT_MODEL=deepseek-v4-pro
-HAITU_PLATFORM_DEFAULT_IMAGE_MODEL=gpt-image-2
-HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+INFINI_ENV=sandbox
+INFINI_PUBLIC_KEY=
+INFINI_PRIVATE_KEY=
+INFINI_WEBHOOK_SECRET=
 SEEDANCE_RESOLUTION=480p
 SEEDANCE_WATERMARK=false
 ```
 
-`HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系并加密数据库里的 BYOK 模型 API Key，生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。平台 API Key 用 `HAITU_PLATFORM_*` 放在 `/etc/haitu-video.env` 或密钥管理里；用户自带 Key 由用户在 API 管理保存，两者都不写进仓库。
+`HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系，并加密数据库里的平台模型 API Key 和用户自带 API Key。生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。平台 API Key 在 `/admin` 的平台模型页面配置并加密写入 SQLite；用户自带 Key 由用户在 API 管理保存，两者都不写进仓库或 env 文件。
 
 账号注册和忘记密码使用邮箱验证码。配置 `RESEND_API_KEY` 和 `HAITU_AUTH_EMAIL_FROM` 后会发送真实邮件；未配置时验证码会写入 `/var/lib/haitu-video/system/auth-email-outbox.jsonl`，只适合本地调试。
+
+充值中心支持 Stripe Checkout 和 Infini Hosted Checkout。支付平台密钥放在服务器 env；后台只负责启用或停用支付方式。Infini 的 webhook 地址配置为 `https://haitu.online/api/payments/infini/webhook`，订阅 `order.update`，收到 `order.completed` 后才会写入钱包充值流水。
 
 `HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin` 查看项目方后台。第一版后台只给项目方查看全站用户增长、活跃和用户列表，不开放普通用户访问。
 

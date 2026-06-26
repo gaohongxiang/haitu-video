@@ -74,11 +74,14 @@ describe("admin app source", () => {
     expect(panelSource).toContain('keyBadgeLabel="平台托管"');
     expect(panelSource).toContain('addButtonLabel={(badge) => `添加${badge}服务`}');
     expect(panelSource).toContain("platformModelsForProvider(config, provider.providerId)");
-    expect(panelSource).toContain("启用");
+    expect(panelSource).toContain("onToggleEnabled={onToggleEnabled}");
+    expect(source).toContain("togglePlatformModelConfigEnabled");
     expect(panelSource).toContain("添加${badge}服务");
     expect(sharedSource).toContain("baseUrl");
     expect(sharedSource).toContain("实际端点前缀");
-    expect(sharedSource).toContain("优先级");
+    expect(sharedSource).not.toContain("优先级");
+    expect(sharedSource).not.toContain("priority:");
+    expect(sharedSource).not.toContain("draft.priority");
     expect(sharedSource).toContain("showApiKey");
     expect(sharedSource).toContain("toggleCatalogModel");
   });
@@ -94,5 +97,26 @@ describe("admin app source", () => {
     expect(dashboardSource).toContain("grid h-dvh grid-cols-[260px_minmax(0,1fr)]");
     expect(dashboardSource).toContain("activeSection");
     expect(dashboardSource).not.toContain("<AdminMetricGrid overview={overview} />\n            <div className=\"grid gap-4 xl:grid-cols-2\">");
+  });
+
+  it("connects recharge billing to payment method switches and audited wallet adjustments", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+    const billingStart = source.indexOf('activeSection === "billing"');
+    const billingSection = source.slice(
+      billingStart,
+      source.indexOf('return (\n      <AdminPlaceholderSection', billingStart)
+    );
+
+    expect(source).toContain("AdminBillingPanel");
+    expect(source).toContain('getJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods")');
+    expect(source).toContain('getJson<AdminWalletsResponse>("/api/admin/wallets")');
+    expect(source).toContain('putJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods"');
+    expect(source).toContain('postJson<AdminWalletAdjustmentResponse>("/api/admin/wallet-adjustments"');
+    expect(source).toContain("togglePaymentMethodEnabled");
+    expect(source).toContain("submitWalletAdjustment");
+    expect(source).toContain("支付方式");
+    expect(source).toContain("余额调整");
+    expect(billingSection).toContain("<AdminBillingPanel");
+    expect(billingSection).not.toContain("<AdminPlaceholderSection");
   });
 });

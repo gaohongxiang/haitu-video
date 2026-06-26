@@ -1,17 +1,17 @@
-import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 
 import {
   bundleIdForPreference,
   bundleModelLabel,
   byokConfiguredModels,
-  compareCustomModelBundles,
-  compareModelBundles,
   isCompleteModelBundle,
   isPlatformPresetBundle,
   nextModelBundleLabel,
   ownerModelsForGroup,
   platformConfiguredModels,
+  sortByokModelBundlesForDisplay,
+  sortPlatformModelBundlesForDisplay,
   type ModelBundleItem,
   type ModelBundleSaveInput,
   type ModelServicePreference
@@ -26,24 +26,37 @@ import {
   draftFromProviderConfig,
   modelConfigPresets,
   resetModelConfigDraft,
+  EnabledSwitchButton,
   SharedModelConfigDialog,
   SharedModelServiceGroup,
   type ModelConfigDraft,
   type ModelConfigProviderId,
   type ModelConfigTestStatus,
   type ModelServiceGroup,
+  type ProviderConfigServiceItem,
   type ProviderConfigItem,
   type ProviderConfigLedger
 } from "./modelServiceConfig.js";
 
-const bundleTitleInputClass = "min-w-0 border-0 bg-transparent p-0 text-[14px] font-black text-[var(--text)] shadow-none outline-none focus-visible:ring-0";
+const bundleTitleInputClass = "h-7 min-h-0 min-w-0 border-0 bg-transparent p-0 text-[14px] font-black text-[var(--text)] shadow-none outline-none focus-visible:ring-0";
 const bundleGridClass = "grid gap-2 min-[760px]:grid-cols-2 min-[1180px]:grid-cols-3";
 const bundleCardClass = "byok-bundle-card flex min-h-[190px] flex-col gap-3 rounded-lg border bg-[var(--card2)] p-3";
+const bundleHeaderClass = "flex h-8 min-w-0 items-center justify-between gap-2";
+const bundleModelRowsClass = "grid min-w-0 content-start gap-2";
+const bundleModelRowClass = "grid min-h-11 min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-[13px] border border-[var(--border-strong)] bg-[var(--field)] px-3 text-[13px] shadow-[0_8px_18px_rgba(96,64,43,.05)]";
 type BundleModelSelectionDraft = Partial<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">>;
 
 function bundleTitleInputWidth(value: string) {
   const visualWidth = Array.from(value || "组合").reduce((total, char) => total + (char.charCodeAt(0) > 127 ? 2 : 1), 0);
   return `${Math.min(Math.max(visualWidth + 1, 6), 20)}ch`;
+}
+
+function isCompleteBundleDraft(draft: BundleModelSelectionDraft): boolean {
+  return Boolean(draft.textModelConfigId && draft.imageModelConfigId && draft.videoModelConfigId);
+}
+
+function hasAnyBundleDraftModel(draft: BundleModelSelectionDraft): boolean {
+  return Boolean(draft.textModelConfigId || draft.imageModelConfigId || draft.videoModelConfigId);
 }
 
 function PanelTitle({ children, icon, right }: { children: ReactNode; icon?: ReactNode; right?: ReactNode }) {
@@ -63,6 +76,7 @@ export function ApiModelConfigPanel({
   onRefreshModels,
   onRevealApiKey,
   onClear,
+  onToggleEnabled,
   onServicePreferenceChange,
   onApplyBundleSelection,
   onSaveBundle,
@@ -81,6 +95,7 @@ export function ApiModelConfigPanel({
   onRefreshModels: (providerId: ModelConfigProviderId) => Promise<void>;
   onRevealApiKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
   onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onServicePreferenceChange: (patch: Partial<ModelServicePreference>) => Promise<void>;
   onApplyBundleSelection: (bundle: ModelBundleItem) => void;
   onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
@@ -149,6 +164,7 @@ export function ApiModelConfigPanel({
         onDraftChange={onDraftChange}
         onApplyPreset={onApplyPreset}
         onClear={onClear}
+        onToggleEnabled={onToggleEnabled}
         onAdd={(providerId) => {
           onDraftChange(providerId, resetModelConfigDraft(providerId));
           setEditingProviderId(providerId);
@@ -259,6 +275,7 @@ function ModelServiceOwnerPanel({
   onDraftChange,
   onApplyPreset,
   onClear,
+  onToggleEnabled,
   onAdd,
   onEdit,
   onSaveBundle,
@@ -275,6 +292,7 @@ function ModelServiceOwnerPanel({
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
   onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
   onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onAdd: (providerId: ModelConfigProviderId) => void;
   onEdit: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
   onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
@@ -313,6 +331,7 @@ function ModelServiceOwnerPanel({
           onClear={canManageServices ? onClear : undefined}
           onAdd={canManageServices ? () => onAdd(group.providerId) : undefined}
           onEdit={canManageServices ? (model) => onEdit(group.providerId, model, group.models) : undefined}
+          onToggleEnabled={canManageServices ? onToggleEnabled : undefined}
           canManageServices={canManageServices}
           isBusy={isBusy}
         />
@@ -345,8 +364,8 @@ function ModelBundleSummary({
   isBusy?: boolean;
 }) {
   const allModels = [...config.textModels, ...config.imageModels, ...config.videoModels];
-  const presetBundles = bundles.filter(isPlatformPresetBundle).sort(compareModelBundles);
-  const customBundles = bundles.filter((bundle) => !isPlatformPresetBundle(bundle)).sort(compareCustomModelBundles);
+  const presetBundles = sortPlatformModelBundlesForDisplay(bundles.filter(isPlatformPresetBundle));
+  const customBundles = sortByokModelBundlesForDisplay(bundles.filter((bundle) => !isPlatformPresetBundle(bundle)));
   return (
     <section className="grid gap-3">
       <div className={bundleGridClass}>
@@ -359,7 +378,7 @@ function ModelBundleSummary({
           return (
             <div key={bundle.bundleId} className={cn(bundleCardClass, "border-[var(--border)]")}>
               <BundleCardHeader bundle={bundle} />
-              <div className="grid min-w-0 content-start gap-2">
+              <div className={bundleModelRowsClass}>
                 <BundleModelRow kindLabel="文本" modelLabel={bundleModelLabel(allModels, bundle.textModelConfigId)} />
                 <BundleModelRow kindLabel="图片" modelLabel={bundleModelLabel(allModels, bundle.imageModelConfigId)} />
                 <BundleModelRow kindLabel="视频" modelLabel={bundleModelLabel(allModels, bundle.videoModelConfigId)} />
@@ -398,19 +417,15 @@ function PlatformBundleManager({
   const customTextModels = platformConfiguredModels(config.textModels);
   const customImageModels = platformConfiguredModels(config.imageModels);
   const customVideoModels = platformConfiguredModels(config.videoModels);
-  const sortedBundles = [...bundles].sort(compareCustomModelBundles);
+  const sortedBundles = sortByokModelBundlesForDisplay(bundles);
   const defaultDraftLabel = nextModelBundleLabel(bundles);
   const [platformBundleDraftLabel, setPlatformBundleDraftLabel] = useState(defaultDraftLabel);
   const [draftLabelEdited, setDraftLabelEdited] = useState(false);
   const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
   const [showDraft, setShowDraft] = useState(false);
-  const canCreateBundle = Boolean(
-    platformBundleDraftLabel.trim()
-    && draft.textModelConfigId
-    && draft.imageModelConfigId
-    && draft.videoModelConfigId
-  );
-  const canAddBundle = customTextModels.length > 0 && customImageModels.length > 0 && customVideoModels.length > 0;
+  const draftComplete = isCompleteBundleDraft(draft);
+  const canCreateBundle = Boolean(platformBundleDraftLabel.trim() && hasAnyBundleDraftModel(draft));
+  const canAddBundle = customTextModels.length > 0 || customImageModels.length > 0 || customVideoModels.length > 0;
 
   useEffect(() => {
     if (!draftLabelEdited) {
@@ -428,7 +443,6 @@ function PlatformBundleManager({
       imageModelConfigId: draft.imageModelConfigId,
       videoModelConfigId: draft.videoModelConfigId,
       enabled: true,
-      priority: 80,
       statusText: "平台自定义组合已保存。"
     });
     if (saved) {
@@ -465,6 +479,7 @@ function PlatformBundleManager({
           imageModels={customImageModels}
           videoModels={customVideoModels}
           canCreateBundle={canCreateBundle}
+          complete={draftComplete}
           isBusy={isBusy}
           onLabelChange={(label) => {
             setPlatformBundleDraftLabel(label);
@@ -504,18 +519,14 @@ function ByokBundleManager({
   const textModels = byokConfiguredModels(config.textModels);
   const imageModels = byokConfiguredModels(config.imageModels);
   const videoModels = byokConfiguredModels(config.videoModels);
-  const sortedBundles = [...bundles].sort(compareCustomModelBundles);
+  const sortedBundles = sortByokModelBundlesForDisplay(bundles);
   const defaultDraftLabel = nextModelBundleLabel(bundles);
   const [byokBundleDraftLabel, setByokBundleDraftLabel] = useState(defaultDraftLabel);
   const [draftLabelEdited, setDraftLabelEdited] = useState(false);
   const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
   const [showDraft, setShowDraft] = useState(false);
-  const canCreateBundle = Boolean(
-    byokBundleDraftLabel.trim()
-    && draft.textModelConfigId
-    && draft.imageModelConfigId
-    && draft.videoModelConfigId
-  );
+  const draftComplete = isCompleteBundleDraft(draft);
+  const canCreateBundle = Boolean(byokBundleDraftLabel.trim() && hasAnyBundleDraftModel(draft));
 
   useEffect(() => {
     if (!draftLabelEdited) {
@@ -532,7 +543,6 @@ function ByokBundleManager({
       imageModelConfigId: draft.imageModelConfigId,
       videoModelConfigId: draft.videoModelConfigId,
       enabled: true,
-      priority: 60,
       statusText: "自带 API 组合已保存。"
     });
     if (saved) {
@@ -570,6 +580,7 @@ function ByokBundleManager({
             imageModels={imageModels}
             videoModels={videoModels}
             canCreateBundle={canCreateBundle}
+            complete={draftComplete}
             isBusy={isBusy}
             onLabelChange={(label) => {
               setByokBundleDraftLabel(label);
@@ -622,6 +633,20 @@ function EditableBundleCard({
   const [imageModelConfigId, setImageModelConfigId] = useState(bundle.imageModelConfigId);
   const [videoModelConfigId, setVideoModelConfigId] = useState(bundle.videoModelConfigId);
   const complete = Boolean(textModelConfigId && imageModelConfigId && videoModelConfigId);
+  const saveCurrentBundle = (enabled = bundle.enabled, statusText = saveStatusText) => onSaveBundle({
+    ...bundle,
+    label: label.trim(),
+    textModelConfigId,
+    imageModelConfigId,
+    videoModelConfigId,
+    enabled,
+    statusText,
+    activate: false
+  });
+  const toggleBundleEnabled = () => {
+    const nextEnabled = !bundle.enabled;
+    return saveCurrentBundle(nextEnabled, nextEnabled ? enabledStatusText : disabledStatusText);
+  };
 
   useEffect(() => {
     setLabel(bundle.label);
@@ -635,13 +660,23 @@ function EditableBundleCard({
       bundleCardClass,
       selected ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]" : "border-[var(--border)]"
     )}>
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <BundleTitleField value={label} onChange={setLabel} disabled={isBusy} />
-        <Badge className="shrink-0" tone={bundle.enabled ? complete ? "ok" : "warn" : "neutral"}>
-          {bundle.enabled ? complete ? "启用" : "未完成" : "停用"}
-        </Badge>
+      <div className={bundleHeaderClass}>
+        <BundleTitleActions
+          label={label}
+          originalLabel={bundle.label}
+          isBusy={isBusy}
+          canSave={Boolean(label.trim())}
+          onLabelChange={setLabel}
+          onSave={() => void saveCurrentBundle()}
+          onDelete={() => void onDeleteBundle(bundle.bundleId)}
+        />
+        <BundleStatusToggle
+          enabled={bundle.enabled}
+          isBusy={isBusy}
+          onToggle={() => void toggleBundleEnabled()}
+        />
       </div>
-      <div className="grid min-w-0 content-start gap-2">
+      <div className={bundleModelRowsClass}>
         <CustomBundleModelSelect
           label="文本"
           value={textModelConfigId}
@@ -664,53 +699,75 @@ function EditableBundleCard({
           onChange={setVideoModelConfigId}
         />
       </div>
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-[12px] font-black text-[var(--muted)]">
-          <input
-            type="checkbox"
-            checked={bundle.enabled}
-            disabled={isBusy}
-            onChange={(event) => void onSaveBundle({
-              ...bundle,
-              enabled: event.target.checked,
-              statusText: event.target.checked ? enabledStatusText : disabledStatusText,
-              activate: false
-            })}
-          />
-          启用
-        </label>
-        <div className="flex items-center gap-2">
-          <Button
-            className="w-fit"
-            size="sm"
-            type="button"
-            disabled={isBusy || !label.trim()}
-            onClick={() => void onSaveBundle({
-              ...bundle,
-              label: label.trim(),
-              textModelConfigId,
-              imageModelConfigId,
-              videoModelConfigId,
-              statusText: saveStatusText,
-              activate: false
-            })}
-          >
-            保存
-          </Button>
-          <Button
-            className="w-fit"
-            size="icon"
-            variant="ghost"
-            type="button"
-            aria-label={`删除${bundle.label}`}
-            disabled={isBusy}
-            onClick={() => void onDeleteBundle(bundle.bundleId)}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </div>
-      </div>
     </div>
+  );
+}
+
+function BundleTitleActions({
+  label,
+  originalLabel,
+  isBusy,
+  canSave,
+  onLabelChange,
+  onSave,
+  onDelete
+}: {
+  label: string;
+  originalLabel: string;
+  isBusy?: boolean;
+  canSave: boolean;
+  onLabelChange: (value: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      <BundleTitleField value={label} onChange={onLabelChange} disabled={isBusy} />
+      <Button
+        className="h-7 w-7 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+        size="icon"
+        variant="ghost"
+        type="button"
+        aria-label="保存"
+        title="保存"
+        disabled={isBusy || !canSave}
+        onClick={onSave}
+      >
+        <Save size={14} />
+      </Button>
+      <Button
+        className="h-7 w-7 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+        size="icon"
+        variant="ghost"
+        type="button"
+        aria-label={`删除${originalLabel}`}
+        title="删除"
+        disabled={isBusy}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} />
+      </Button>
+    </div>
+  );
+}
+
+function BundleStatusToggle({
+  enabled,
+  isBusy,
+  onToggle
+}: {
+  enabled: boolean;
+  isBusy?: boolean;
+  onToggle: () => void;
+}) {
+  const label = enabled ? "启用" : "停用";
+  return (
+    <EnabledSwitchButton
+      enabled={enabled}
+      label={label}
+      disabled={isBusy}
+      onClick={onToggle}
+    />
   );
 }
 
@@ -721,6 +778,7 @@ function BundleDraftCard({
   imageModels,
   videoModels,
   canCreateBundle,
+  complete,
   isBusy,
   onLabelChange,
   onDraftChange,
@@ -733,6 +791,7 @@ function BundleDraftCard({
   imageModels: ProviderConfigItem[];
   videoModels: ProviderConfigItem[];
   canCreateBundle: boolean;
+  complete: boolean;
   isBusy?: boolean;
   onLabelChange: (label: string) => void;
   onDraftChange: (patch: BundleModelSelectionDraft) => void;
@@ -741,11 +800,11 @@ function BundleDraftCard({
 }) {
   return (
     <div className={cn(bundleCardClass, "border-dashed border-[var(--border)]")}>
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      <div className={bundleHeaderClass}>
         <BundleTitleField value={label} onChange={onLabelChange} disabled={isBusy} />
-        <Badge tone={canCreateBundle ? "ok" : "neutral"}>{canCreateBundle ? "可保存" : "未完成"}</Badge>
+        <Badge tone={complete ? "ok" : canCreateBundle ? "warn" : "neutral"}>{complete ? "可启用" : canCreateBundle ? "草稿" : "未完成"}</Badge>
       </div>
-      <div className="grid min-w-0 content-start gap-2">
+      <div className={bundleModelRowsClass}>
         <CustomBundleModelSelect
           label="文本"
           value={draft.textModelConfigId}
@@ -810,7 +869,7 @@ function BundleTitleField({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex min-w-0 max-w-[calc(100%-64px)] items-center gap-1">
+    <label className="flex min-w-0 items-center gap-1">
       <Input
         className={bundleTitleInputClass}
         style={{ width: bundleTitleInputWidth(value) }}
@@ -818,14 +877,16 @@ function BundleTitleField({
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
       />
-      <Pencil className="shrink-0 text-[var(--muted)]" size={13} />
+      <span className="grid h-7 w-7 shrink-0 place-items-center text-[var(--muted)]">
+        <Pencil size={13} />
+      </span>
     </label>
   );
 }
 
 function BundleModelRow({ kindLabel, modelLabel }: { kindLabel: string; modelLabel: string }) {
   return (
-    <div className="grid min-h-11 min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-[13px] border border-[var(--border-strong)] bg-[var(--field)] px-3 text-[13px] shadow-[0_8px_18px_rgba(96,64,43,.05)]">
+    <div className={bundleModelRowClass}>
       <span className="font-black text-[var(--muted)]">{kindLabel}</span>
       <span className="min-w-0 truncate font-black text-[var(--text)]">{modelLabel}</span>
     </div>
@@ -835,7 +896,7 @@ function BundleModelRow({ kindLabel, modelLabel }: { kindLabel: string; modelLab
 function BundleCardHeader({ bundle }: { bundle: ModelBundleItem }) {
   const complete = isCompleteModelBundle(bundle);
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
+    <div className={bundleHeaderClass}>
       <div className="min-w-0 truncate text-[14px] font-black text-[var(--text)]">{bundle.label}</div>
       <Badge className="shrink-0" tone={bundle.enabled ? complete ? "ok" : "warn" : "neutral"}>
         {bundle.enabled ? complete ? "启用" : "未完成" : "停用"}

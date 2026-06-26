@@ -33,6 +33,9 @@ export function generateJapaneseAdScript(
   if (finalLanguage === "zh") {
     return generateChineseAdScript(product, options);
   }
+  if (finalLanguage === "en") {
+    return generateEnglishAdScript(product, options);
+  }
 
   const scenes = product.usage_scenes.slice(0, 2).join("や");
   const sellingPoints = product.verified_selling_points.slice(0, 3);
@@ -76,6 +79,26 @@ function generateChineseAdScript(product: ProductFacts, options: ScriptOptions):
   };
 }
 
+function generateEnglishAdScript(product: ProductFacts, options: ScriptOptions): GeneratedScript {
+  const scenes = product.usage_scenes.slice(0, 2).join(" and ") || "everyday use";
+  const sellingPoints = product.verified_selling_points.slice(0, 3);
+  const subtitleLines = [
+    options.template === "ugc"
+      ? "Here is a natural way to show this item."
+      : buildEnglishOpening(product.category, scenes),
+    `Show ${sellingPoints[0] || "the main verified product benefit"} first.`,
+    `Then highlight ${sellingPoints.slice(1).join(", ") || "the confirmed product details"} with simple hand movement.`,
+    formatEnglishDetailLine(product.dimensions, product.materials),
+    options.cta
+  ];
+
+  return {
+    voiceover: subtitleLines.join(" "),
+    subtitleLines,
+    cta: options.cta
+  };
+}
+
 function normalizeEditedLines(lines?: string[]): string[] {
   return (lines ?? []).map((line) => line.trim()).filter(Boolean);
 }
@@ -95,6 +118,15 @@ function formatChineseDetailLine(dimensions: string, materials: string[]): strin
   }
   const dimensionText = dimensions ? `和${dimensions}` : "";
   return `补充展示${materialsText}${dimensionText}。`;
+}
+
+function formatEnglishDetailLine(dimensions: string, materials: string[]): string {
+  const materialsText = materials.length > 0 ? materials.join(", ") : "the material details";
+  if (/梱包|包装|重量|発送|配送|包[装裹]|物流|发货|shipping|package|weight/i.test(dimensions)) {
+    return `Use close-up shots to show ${materialsText}.`;
+  }
+  const dimensionText = dimensions ? ` and ${dimensions}` : "";
+  return `Add close-up shots of ${materialsText}${dimensionText}.`;
 }
 
 function formatMaterials(materials: string[]): string {
@@ -117,4 +149,11 @@ function buildChineseOpening(category: string, scenes: string): string {
     return `面向想让${scenes}更整齐的用户。`;
   }
   return `面向${scenes}场景中需要这类商品的用户。`;
+}
+
+function buildEnglishOpening(category: string, scenes: string): string {
+  if (/収納|收纳|storage/i.test(category)) {
+    return `For everyday use in ${scenes}, show how this keeps things organized.`;
+  }
+  return `For everyday use in ${scenes}, introduce the product clearly.`;
 }

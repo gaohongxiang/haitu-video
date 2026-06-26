@@ -77,4 +77,16 @@ describe("generateVideoPrompt", () => {
     expect(prompt).toContain("Final video language: Simplified Chinese");
     expect(prompt).toContain("Do not use Japanese or English text in the final video");
   });
+
+  it("can target English as the final video language", () => {
+    const prompt = generateVideoPrompt(product, {
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      template: "scene",
+      finalLanguage: "en"
+    });
+
+    expect(prompt).toContain("Final video language: English");
+    expect(prompt).toContain("Do not use Japanese or Chinese text in the final video");
+  });
 });

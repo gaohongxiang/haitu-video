@@ -67,6 +67,12 @@ export function isPublicConsoleRoute(request: Request): boolean {
   if (url.pathname.startsWith("/api/auth/")) {
     return true;
   }
+  if (request.method === "POST" && url.pathname === "/api/payments/stripe/webhook") {
+    return true;
+  }
+  if (request.method === "POST" && url.pathname === "/api/payments/infini/webhook") {
+    return true;
+  }
   if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/console" || url.pathname === "/admin")) {
     return true;
   }

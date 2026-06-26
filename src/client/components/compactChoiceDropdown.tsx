@@ -10,7 +10,8 @@ export function CompactChoiceDropdown<T extends string>({
   formatOption,
   onChange,
   disabled = false,
-  layout = "stacked"
+  layout = "stacked",
+  density = "comfortable"
 }: {
   label: string;
   value: T;
@@ -19,10 +20,12 @@ export function CompactChoiceDropdown<T extends string>({
   onChange: (option: T) => void;
   disabled?: boolean;
   layout?: "stacked" | "inline";
+  density?: "comfortable" | "compact";
 }) {
   const [open, setOpen] = useState(false);
   const activeLabel = formatOption(value);
   const dropdownDisabled = disabled || options.length === 0;
+  const compact = density === "compact";
 
   return (
     <div
@@ -46,12 +49,13 @@ export function CompactChoiceDropdown<T extends string>({
     >
       <div className={cn(
         "truncate font-black text-[var(--muted)]",
-        layout === "inline" ? "text-[13px]" : "text-xs"
+        layout === "inline" ? "text-[13px]" : compact ? "text-[11px]" : "text-xs"
       )}>{label}</div>
       <button
         type="button"
         className={cn(
           "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
+          compact && "min-h-9 rounded-[10px] px-2.5 text-[13px] shadow-none",
           layout === "inline" && "h-full min-h-11 border-0 bg-transparent px-0 shadow-none hover:border-0 hover:bg-transparent",
           dropdownDisabled && "cursor-not-allowed opacity-60 shadow-none",
           layout === "stacked" && (open

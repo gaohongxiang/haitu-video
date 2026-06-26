@@ -13,7 +13,7 @@ import {
 import { defaultFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import type { BasicQcReport } from "../qc/basicQc.js";
 import { runBasicQc } from "../qc/basicQc.js";
-import type { MoneyAmount, VideoProvider, VideoProviderResult } from "../providers/types.js";
+import type { MoneyAmount, VideoProvider, VideoProviderResult, VideoResolution } from "../providers/types.js";
 
 export interface ProductJobManifest {
   jobId: string;
@@ -56,6 +56,7 @@ export async function runProductJob(input: {
   cta: string;
   template: ScriptTemplate;
   durationSeconds?: number;
+  resolution?: VideoResolution;
   scriptLines?: string[];
   storyboardLines?: string[];
   finalLanguage?: FinalVideoLanguage;
@@ -90,6 +91,7 @@ export async function runProductJob(input: {
     script: script.voiceover,
     durationSeconds,
     aspectRatio: "9:16",
+    resolution: input.resolution,
     outputDir,
     referenceImages: generationProduct.reference_images,
     finalLanguage

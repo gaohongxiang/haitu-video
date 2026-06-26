@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const appPath = "src/client/App.tsx";
+const apiClientPath = "src/client/consoleApiClient.ts";
 
 describe("console refresh source", () => {
   it("keeps manual refreshes silent so API management does not flicker", async () => {
@@ -14,6 +15,8 @@ describe("console refresh source", () => {
     expect(refreshSource).toContain("showLoading?: boolean");
     expect(refreshSource).toContain("const showLoading = options.showLoading === true && !polling;");
     expect(refreshSource).toContain("if (showLoading) {");
+    expect(refreshSource).toContain("await fetchConsoleSnapshot<");
+    expect(refreshSource).not.toContain("Promise.all([");
     expect(refreshSource).not.toContain("if (!polling) {\n      setIsLoading(true);");
     expect(refreshSource).not.toContain("if (!polling) {\n        setIsLoading(false);");
     expect(bootSource).toContain("await refreshConsole({ applySettings: true, showLoading: true });");
@@ -33,5 +36,20 @@ describe("console refresh source", () => {
     expect(renderSource).toContain("if (!consoleReady) {");
     expect(renderSource).toContain("<ConsoleSectionLoadingState");
     expect(renderSource).toContain('case "settings":');
+  });
+
+  it("keeps JSON fetch helpers outside the App component file", async () => {
+    const source = await readFile(appPath, "utf8");
+    const apiClientSource = await readFile(apiClientPath, "utf8");
+
+    expect(source).toContain('from "./consoleApiClient.js"');
+    expect(source).not.toContain("async function getJson");
+    expect(source).not.toContain("async function readJsonResponse");
+    expect(apiClientSource).toContain("export async function fetchConsoleSnapshot");
+    expect(apiClientSource).toContain("export async function getJson");
+    expect(apiClientSource).toContain("export async function postJsonWithSignal");
+    expect(apiClientSource).toContain("export async function readJsonResponse");
+    expect(apiClientSource).toContain('getJson<T["productsResponse"]>("/api/products")');
+    expect(apiClientSource).toContain('getJson<T["videoJobsResponse"]>("/api/video-jobs")');
   });
 });

@@ -88,6 +88,51 @@ describe("SqliteModelConfigStore", () => {
     }
   });
 
+  it("chooses the most recently saved enabled config without using priority", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-config-store-order-"));
+    tempDirs.push(root);
+    const handle = openDatabase({ dataDir: join(root, "data"), env: process.env });
+    runMigrations(handle);
+    ensureDefaultWorkspace(handle);
+    try {
+      const store = new SqliteModelConfigStore({
+        handle,
+        secretKey: "test-secret-key-with-more-than-32-bytes",
+        workspaceId: "default"
+      });
+
+      await store.set("openai-compatible-text", {
+        apiKey: "older-text-secret",
+        name: "旧文本服务",
+        vendor: "openai",
+        baseUrl: "https://old.example.test",
+        model: "old-text-model",
+        priority: 100
+      });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await store.set("openai-compatible-text", {
+        apiKey: "newer-text-secret",
+        name: "新文本服务",
+        vendor: "openai",
+        baseUrl: "https://new.example.test",
+        model: "new-text-model",
+        priority: 1
+      });
+
+      expect((await store.listConfigs("openai-compatible-text")).map((config) => config.label)).toEqual([
+        "新文本服务",
+        "旧文本服务"
+      ]);
+      await expect(store.getConfig("openai-compatible-text")).resolves.toEqual(expect.objectContaining({
+        label: "新文本服务",
+        apiKey: "newer-text-secret",
+        model: "new-text-model"
+      }));
+    } finally {
+      closeDatabase(handle);
+    }
+  });
+
   it("canonicalizes catalog labels to real model IDs before saving variants", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-model-config-labels-"));
     tempDirs.push(root);

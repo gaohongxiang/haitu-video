@@ -60,7 +60,14 @@ export class ModelBundleStore {
       SELECT *
       FROM model_bundles
       WHERE workspace_id = ?
-      ORDER BY enabled DESC, priority DESC, updated_at DESC
+      ORDER BY
+        enabled DESC,
+        CASE bundle_id
+          WHEN 'platform-low-cost-bundle' THEN 0
+          WHEN 'platform-quality-bundle' THEN 1
+          ELSE 2
+        END ASC,
+        updated_at DESC
     `).all(this.input.workspaceId) as ModelBundleRow[];
     return rows.map(modelBundleFromRow);
   }

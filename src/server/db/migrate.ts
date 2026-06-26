@@ -37,6 +37,10 @@ const migrations: Migration[] = [
   {
     id: "0008_model_service_preferences",
     sql: readMigrationSql("0008_model_service_preferences.sql")
+  },
+  {
+    id: "0009_wallet_recharge_orders",
+    sql: readMigrationSql("0009_wallet_recharge_orders.sql")
   }
 ];
 

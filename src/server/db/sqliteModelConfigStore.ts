@@ -66,6 +66,8 @@ interface JoinedModelRow extends ModelVariantRow {
   base_url: string | null;
   api_mode: string | null;
   credential_enabled: number;
+  credential_created_at: string;
+  credential_updated_at: string;
 }
 
 export class SqliteModelConfigStore implements ModelConfigStore {
@@ -87,13 +89,15 @@ export class SqliteModelConfigStore implements ModelConfigStore {
         credential.vendor,
         credential.base_url,
         credential.api_mode,
-        credential.enabled AS credential_enabled
+        credential.enabled AS credential_enabled,
+        credential.created_at AS credential_created_at,
+        credential.updated_at AS credential_updated_at
       FROM model_variants AS variant
       INNER JOIN model_credentials AS credential
         ON credential.workspace_id = variant.workspace_id
         AND credential.credential_id = variant.credential_id
       WHERE variant.workspace_id = ? AND variant.provider_id = ?
-      ORDER BY variant.priority DESC, variant.variant_order ASC, variant.updated_at DESC, variant.created_at DESC
+      ORDER BY credential.updated_at DESC, credential.created_at DESC, variant.variant_order ASC, variant.updated_at DESC, variant.created_at DESC
     `).all(this.input.workspaceId, providerId) as JoinedModelRow[];
     return rows.map((row) => this.configFromJoinedRow(row));
   }
@@ -113,7 +117,9 @@ export class SqliteModelConfigStore implements ModelConfigStore {
         credential.vendor,
         credential.base_url,
         credential.api_mode,
-        credential.enabled AS credential_enabled
+        credential.enabled AS credential_enabled,
+        credential.created_at AS credential_created_at,
+        credential.updated_at AS credential_updated_at
       FROM model_variants AS variant
       INNER JOIN model_credentials AS credential
         ON credential.workspace_id = variant.workspace_id
@@ -122,7 +128,7 @@ export class SqliteModelConfigStore implements ModelConfigStore {
         AND variant.provider_id = ?
         AND variant.enabled = 1
         AND credential.enabled = 1
-      ORDER BY variant.priority DESC, variant.variant_order ASC, variant.updated_at DESC, variant.created_at DESC
+      ORDER BY credential.updated_at DESC, credential.created_at DESC, variant.variant_order ASC, variant.updated_at DESC, variant.created_at DESC
       LIMIT 1
     `).get(this.input.workspaceId, providerId) as JoinedModelRow | undefined;
     return row ? this.configFromJoinedRow(row) : undefined;
@@ -436,7 +442,9 @@ export class SqliteModelConfigStore implements ModelConfigStore {
         credential.vendor,
         credential.base_url,
         credential.api_mode,
-        credential.enabled AS credential_enabled
+        credential.enabled AS credential_enabled,
+        credential.created_at AS credential_created_at,
+        credential.updated_at AS credential_updated_at
       FROM model_variants AS variant
       INNER JOIN model_credentials AS credential
         ON credential.workspace_id = variant.workspace_id

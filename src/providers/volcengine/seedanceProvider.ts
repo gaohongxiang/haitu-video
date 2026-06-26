@@ -11,7 +11,8 @@ import type {
   VideoOutput,
   VideoProvider,
   VideoProviderRequest,
-  VideoProviderResult
+  VideoProviderResult,
+  VideoResolution
 } from "../types.js";
 
 interface VolcengineSeedanceProviderOptions {
@@ -20,7 +21,7 @@ interface VolcengineSeedanceProviderOptions {
   model?: string;
   pollIntervalMs?: number;
   maxPolls?: number;
-  resolution?: "480p" | "720p" | "1080p";
+  resolution?: VideoResolution;
   watermark?: boolean;
   estimatedCostAmount?: number;
   estimatedCostPerSecond?: number;
@@ -111,7 +112,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly model: string;
   private readonly pollIntervalMs: number;
   private readonly maxPolls: number;
-  private readonly resolution: "480p" | "720p" | "1080p";
+  private readonly resolution: VideoResolution;
   private readonly watermark: boolean;
   private readonly estimatedCostAmount?: number;
   private readonly estimatedCostPerSecond: number;
@@ -132,7 +133,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     this.maxPolls = options.maxPolls ?? Number(process.env.SEEDANCE_MAX_POLLS ?? 120);
     this.resolution =
       options.resolution ??
-      ((process.env.SEEDANCE_RESOLUTION as "480p" | "720p" | "1080p" | undefined) ?? "480p");
+      normalizeSeedanceResolution(process.env.SEEDANCE_RESOLUTION);
     this.watermark = options.watermark ?? parseBoolean(process.env.SEEDANCE_WATERMARK ?? "false");
     this.estimatedCostAmount = options.estimatedCostAmount ?? parseOptionalNumber(
       process.env.SEEDANCE_ESTIMATED_COST_CNY
@@ -165,7 +166,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
         {
           model: this.model,
           content: await this.buildContent(request),
-          resolution: this.resolution,
+          resolution: request.resolution ?? this.resolution,
           ratio: request.aspectRatio,
           duration: request.durationSeconds,
           watermark: this.watermark
@@ -540,6 +541,13 @@ function contentRangeTotal(value: string | null): number | undefined {
 
 function parseBoolean(value: string): boolean {
   return ["1", "true", "yes"].includes(value.toLowerCase());
+}
+
+function normalizeSeedanceResolution(value: string | undefined): VideoResolution {
+  if (value === "720p" || value === "1080p" || value === "4k") {
+    return value;
+  }
+  return "480p";
 }
 
 function parseOptionalNumber(value: string | undefined): number | undefined {

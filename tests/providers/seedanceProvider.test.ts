@@ -139,6 +139,53 @@ describe("VolcengineSeedanceProvider", () => {
     expect(result.cost).toEqual({ amount: 6.4, currency: "CNY" });
   });
 
+  it("accepts 4k resolution when requested", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-4k-"));
+    tempDirs.push(outDir);
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "four-k-task", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/four-k-task")) {
+        return jsonResponse({
+          id: "four-k-task",
+          status: "succeeded",
+          content: { video_url: "https://cdn.example.com/4k.mp4" }
+        });
+      }
+      if (String(url) === "https://cdn.example.com/4k.mp4") {
+        return new Response(Buffer.from("mp4"), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new VolcengineSeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.cn-beijing.volces.com",
+      model: "doubao-seedance-2-0-260128",
+      resolution: "4k",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      fetchImpl
+    });
+
+    await provider.generateVideo({
+      jobId: "job-1",
+      productSku: "TK-001",
+      prompt: "Create a product ad.",
+      script: "今すぐチェック",
+      durationSeconds: 8,
+      aspectRatio: "9:16",
+      outputDir: outDir
+    });
+
+    const createBody = JSON.parse(String(calls[0]?.init?.body)) as {
+      resolution: string;
+    };
+    expect(createBody.resolution).toBe("4k");
+  });
+
   it("sends product reference images as Seedance reference_image content", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-reference-"));
     tempDirs.push(outDir);

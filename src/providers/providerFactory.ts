@@ -1,5 +1,5 @@
 import { MockVideoProvider } from "./mockVideoProvider.js";
-import type { ReferenceImageUrlResolver, VideoProvider } from "./types.js";
+import type { ReferenceImageUrlResolver, VideoProvider, VideoResolution } from "./types.js";
 import { VolcengineSeedanceProvider } from "./volcengine/seedanceProvider.js";
 
 export type VideoProviderName = "mock" | "volcengine-seedance";
@@ -8,6 +8,7 @@ export interface ProviderFactoryOptions {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  resolution?: VideoResolution;
   fetchImpl?: typeof fetch;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
 }
@@ -24,6 +25,7 @@ export function createVideoProvider(
         apiKey: options.apiKey,
         baseUrl: options.baseUrl,
         model: options.model,
+        resolution: options.resolution,
         fetchImpl: options.fetchImpl,
         referenceImageUrlResolver: options.referenceImageUrlResolver
       });

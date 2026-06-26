@@ -9,8 +9,11 @@ coverage/
 .env.*
 !.env.example
 /outputs/
+/output/
 /data/
 !/data/.gitkeep
+/canvas/
+/.superpowers/
 .DS_Store
 *.log
 *.pid

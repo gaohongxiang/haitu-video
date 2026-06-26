@@ -6,6 +6,7 @@ export interface MoneyAmount {
 }
 
 export type ReferenceImageUrlResolver = (reference: string) => Promise<string>;
+export type VideoResolution = "480p" | "720p" | "1080p" | "4k";
 
 export interface VideoProviderRequest {
   jobId: string;
@@ -14,6 +15,7 @@ export interface VideoProviderRequest {
   script: string;
   durationSeconds: number;
   aspectRatio: "9:16";
+  resolution?: VideoResolution;
   outputDir: string;
   referenceImages?: string[];
   finalLanguage?: FinalVideoLanguage;

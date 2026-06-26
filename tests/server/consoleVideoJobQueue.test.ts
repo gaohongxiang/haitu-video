@@ -166,6 +166,44 @@ describe("LocalVideoJobQueue", () => {
     }));
   });
 
+  it("persists the requested video resolution and passes it to the pipeline", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-resolution-"));
+    tempDirs.push(root);
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const resolutions: Array<string | undefined> = [];
+    const queue = new LocalVideoJobQueue({
+      rootDir: root,
+      outputsDir,
+      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      now: () => new Date("2026-06-07T09:00:00.000Z"),
+      runMakeVideoPipeline: async (input) => {
+        resolutions.push(input.resolution);
+        const report = makeReport(input);
+        await mkdir(join(report.reportPath, ".."), { recursive: true });
+        await writeFile(report.reportPath, JSON.stringify(report, null, 2), "utf8");
+        return report;
+      }
+    });
+
+    const enqueued = await queue.enqueue({
+      productPath,
+      provider: "mock",
+      duration: 8,
+      resolution: "1080p",
+      confirmPaid: false
+    });
+    const completed = await queue.waitForIdle(enqueued.id);
+    const stored = JSON.parse(await readFile(join(outputsDir, enqueued.id, "job.json"), "utf8"));
+
+    expect(enqueued.resolution).toBe("1080p");
+    expect(completed.resolution).toBe("1080p");
+    expect(stored.resolution).toBe("1080p");
+    expect(resolutions).toEqual(["1080p"]);
+  });
+
   it("stores provider error details when a video job fails", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-video-job-error-"));
     tempDirs.push(root);

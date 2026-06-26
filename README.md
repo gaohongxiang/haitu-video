@@ -41,21 +41,10 @@ Generated files are written under `data/workspaces/default/jobs/generate/` by de
 
 Haitu supports two API billing modes:
 
-- Platform models: the server owns provider keys via `HAITU_PLATFORM_*` environment variables. Users pick a preset text/image/video bundle and pay official upstream cost plus the platform service fee from their wallet balance.
+- Platform models: admins configure provider keys in `/admin`; keys are encrypted in SQLite and users pick the platform text/image/video bundle from the creation UI. Users pay official upstream cost plus the platform service fee from their wallet balance.
 - BYOK: users save their own API keys in API 管理. Upstream cost is paid by their provider account; Haitu only charges the service fee from wallet balance.
 
-Platform keys are server-only. They should live in `.env`, `/etc/haitu-video.env`, or a deployment secret manager, never in frontend code or API responses.
-
-```env
-HAITU_PLATFORM_OPENAI_API_KEY=
-HAITU_PLATFORM_DEEPSEEK_API_KEY=
-HAITU_PLATFORM_DOUBAO_API_KEY=
-HAITU_PLATFORM_GEMINI_API_KEY=
-HAITU_PLATFORM_VOLCENGINE_API_KEY=
-HAITU_PLATFORM_DEFAULT_TEXT_MODEL=deepseek-v4-pro
-HAITU_PLATFORM_DEFAULT_IMAGE_MODEL=gpt-image-2
-HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast
-```
+Platform keys are server-only and must never appear in frontend code or API responses. Keep `HAITU_SECRET_KEY` stable because it decrypts both platform keys and user BYOK keys stored in the database.
 
 ## Generate With Seedance CLI
 

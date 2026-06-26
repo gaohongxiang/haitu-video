@@ -32,7 +32,7 @@ export interface ModelServicePreference {
   byokBundleId?: string | null;
 }
 
-export type ModelBundleSaveInput = Partial<ModelBundleItem> & {
+export type ModelBundleSaveInput = Partial<Omit<ModelBundleItem, "priority">> & {
   apiOwner: ModelBundleItem["apiOwner"];
   label: string;
   statusText?: string;
@@ -72,7 +72,15 @@ export function ownerModelsForGroup(models: ProviderConfigItem[], apiOwner: Mode
 }
 
 export function isCompleteModelBundle(bundle: ModelBundleItem): boolean {
-  return Boolean(bundle.textModelConfigId && bundle.imageModelConfigId && bundle.videoModelConfigId);
+  return Boolean(
+    normalizeBundleConfigId(bundle.textModelConfigId)
+    && normalizeBundleConfigId(bundle.imageModelConfigId)
+    && normalizeBundleConfigId(bundle.videoModelConfigId)
+  );
+}
+
+export function isSelectableModelBundle(bundle: ModelBundleItem): boolean {
+  return bundle.enabled && isCompleteModelBundle(bundle);
 }
 
 export function isPlatformPresetBundle(bundle: ModelBundleItem): boolean {
@@ -83,13 +91,13 @@ export function buildModelSchemeOptions(input: {
   platformBundles: ModelBundleItem[];
   byokBundles: ModelBundleItem[];
 }): ModelSchemeOption[] {
-  const platformOptions = [...input.platformBundles].sort(comparePlatformModelBundles).map((bundle) => ({
+  const platformOptions = sortPlatformModelBundlesForDisplay(input.platformBundles.filter(isSelectableModelBundle)).map((bundle) => ({
     id: modelSchemeIdForBundle(bundle.bundleId),
     label: modelSchemeBundleLabel(bundle),
     apiOwner: "platform" as const,
     bundleId: bundle.bundleId
   }));
-  const byokOptions = [...input.byokBundles].sort(compareCustomModelBundles).map((bundle) => ({
+  const byokOptions = sortByokModelBundlesForDisplay(input.byokBundles.filter(isSelectableModelBundle)).map((bundle) => ({
     id: modelSchemeIdForBundle(bundle.bundleId),
     label: modelSchemeBundleLabel(bundle),
     apiOwner: "byok" as const,
@@ -99,12 +107,12 @@ export function buildModelSchemeOptions(input: {
 }
 
 export function sortSelectableModelBundles(bundles: ModelBundleItem[]): ModelBundleItem[] {
-  const platformBundles = bundles
-    .filter((bundle) => bundle.apiOwner === "platform")
-    .sort(comparePlatformModelBundles);
-  const byokBundles = bundles
-    .filter((bundle) => bundle.apiOwner === "byok")
-    .sort(compareCustomModelBundles);
+  const platformBundles = sortPlatformModelBundlesForDisplay(
+    bundles.filter((bundle) => bundle.apiOwner === "platform" && isSelectableModelBundle(bundle))
+  );
+  const byokBundles = sortByokModelBundlesForDisplay(
+    bundles.filter((bundle) => bundle.apiOwner === "byok" && isSelectableModelBundle(bundle))
+  );
   return [...platformBundles, ...byokBundles];
 }
 
@@ -159,10 +167,16 @@ export function modelSchemeSummary(input: {
 }
 
 export function bundleModelConfigIds(bundle: ModelBundleItem): Required<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">> {
+  const textModelConfigId = normalizeBundleConfigId(bundle.textModelConfigId);
+  const imageModelConfigId = normalizeBundleConfigId(bundle.imageModelConfigId);
+  const videoModelConfigId = normalizeBundleConfigId(bundle.videoModelConfigId);
+  if (!textModelConfigId || !imageModelConfigId || !videoModelConfigId) {
+    throw new Error("模型组合未配置完整。");
+  }
   return {
-    textModelConfigId: bundle.textModelConfigId ?? "auto",
-    imageModelConfigId: bundle.imageModelConfigId ?? "auto",
-    videoModelConfigId: bundle.videoModelConfigId ?? "auto"
+    textModelConfigId,
+    imageModelConfigId,
+    videoModelConfigId
   };
 }
 
@@ -171,10 +185,10 @@ export function modelConfigChoiceExists(value: ModelConfigChoice, models: Provid
 }
 
 export function bundleIdForPreference(bundles: ModelBundleItem[], preferredBundleId?: string | null): string | undefined {
-  if (preferredBundleId && bundles.some((bundle) => bundle.bundleId === preferredBundleId && bundle.enabled)) {
+  if (preferredBundleId && bundles.some((bundle) => bundle.bundleId === preferredBundleId && isSelectableModelBundle(bundle))) {
     return preferredBundleId;
   }
-  return bundles.find((bundle) => bundle.enabled)?.bundleId;
+  return bundles.find(isSelectableModelBundle)?.bundleId;
 }
 
 export function nextModelBundleLabel(bundles: ModelBundleItem[]): string {
@@ -206,9 +220,28 @@ export function comparePlatformModelBundles(left: ModelBundleItem, right: ModelB
   if (leftPreset !== rightPreset) {
     return leftPreset ? -1 : 1;
   }
-  return leftPreset
-    ? platformPresetRank(left.bundleId) - platformPresetRank(right.bundleId) || compareModelBundles(left, right)
-    : compareCustomModelBundles(left, right);
+  return leftPreset ? 0 : compareCustomModelBundles(left, right);
+}
+
+export function sortPlatformModelBundlesForDisplay(bundles: ModelBundleItem[]): ModelBundleItem[] {
+  return bundles
+    .map((bundle, index) => ({ bundle, index }))
+    .sort((left, right) => {
+      const leftPreset = isPlatformPresetBundle(left.bundle);
+      const rightPreset = isPlatformPresetBundle(right.bundle);
+      if (leftPreset !== rightPreset) {
+        return leftPreset ? -1 : 1;
+      }
+      if (leftPreset && rightPreset) {
+        return platformPresetDisplayRank(left.bundle) - platformPresetDisplayRank(right.bundle);
+      }
+      return compareCustomModelBundles(left.bundle, right.bundle);
+    })
+    .map((item) => item.bundle);
+}
+
+export function sortByokModelBundlesForDisplay(bundles: ModelBundleItem[]): ModelBundleItem[] {
+  return [...bundles].sort(compareCustomModelBundles);
 }
 
 export function normalizeModelBundleItem(bundle: ModelBundleItem): ModelBundleItem {
@@ -220,8 +253,12 @@ export function normalizeModelBundleItem(bundle: ModelBundleItem): ModelBundleIt
 
 export function compareModelBundles(left: ModelBundleItem, right: ModelBundleItem): number {
   return Number(right.enabled) - Number(left.enabled)
-    || right.priority - left.priority
     || left.label.localeCompare(right.label);
+}
+
+function normalizeBundleConfigId(value: unknown): string | undefined {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text && text !== "auto" ? text : undefined;
 }
 
 function numberedModelBundleLabelIndex(label: string): number {
@@ -229,8 +266,8 @@ function numberedModelBundleLabelIndex(label: string): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
-function platformPresetRank(bundleId: string): number {
-  if (bundleId === platformQualityBundleId) return 1;
-  if (bundleId === platformLowCostBundleId) return 2;
-  return Number.MAX_SAFE_INTEGER;
+function platformPresetDisplayRank(bundle: ModelBundleItem): number {
+  if (bundle.bundleId === platformLowCostBundleId) return 0;
+  if (bundle.bundleId === platformQualityBundleId) return 1;
+  return 2;
 }

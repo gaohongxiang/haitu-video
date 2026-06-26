@@ -22,7 +22,6 @@ export interface ModelConfigDraft {
   configId?: string;
   name: string;
   vendor: string;
-  priority: number;
   apiKey: string;
   keyPreview?: string;
   baseUrl: string;
@@ -45,13 +44,17 @@ export interface ProviderConfigItem {
   baseUrl: string;
   model: string;
   apiMode?: string;
-  priority: number;
   capabilities: string[];
   modelKind: "text" | "image" | "video";
   enabled?: boolean;
   taskScopes?: string[];
   tags?: string[];
 }
+
+export type ProviderConfigServiceItem = ProviderConfigItem & {
+  serviceLabel: string;
+  models: ProviderConfigItem[];
+};
 
 export interface ModelServiceGroup {
   kind: "text" | "image" | "video";
@@ -89,7 +92,6 @@ export function modelConfigDraftFromCatalogEntry(entry: ModelCatalogEntry, name 
   return {
     name,
     vendor: entry.vendor,
-    priority: entry.priority,
     apiKey: "",
     baseUrl: entry.baseUrl,
     models: [entry.modelId],
@@ -134,7 +136,6 @@ export function draftFromProviderConfig(providerId: ModelConfigProviderId, model
     configId: model.configId,
     name: model.label,
     vendor,
-    priority: model.priority ?? 0,
     apiKey: "",
     keyPreview: model.keyPreview,
     baseUrl: model.baseUrl,
@@ -159,7 +160,6 @@ export function syncModelConfigDraftsFromLedger(
       configId: undefined,
       name: model.label || next[model.id].name,
       vendor: model.providerLabel || next[model.id].vendor,
-      priority: model.priority ?? next[model.id].priority,
       baseUrl: model.baseUrl || next[model.id].baseUrl,
       models: model.model ? [model.model] : next[model.id].models,
       apiMode: model.apiMode ?? next[model.id].apiMode,
@@ -187,10 +187,7 @@ export function updateProviderConfigStatus<T extends ProviderConfigLedger>(
   };
 }
 
-export function groupConfiguredModelServices(providerId: ModelConfigProviderId, models: ProviderConfigItem[]): Array<ProviderConfigItem & {
-  serviceLabel: string;
-  models: ProviderConfigItem[];
-}> {
+export function groupConfiguredModelServices(providerId: ModelConfigProviderId, models: ProviderConfigItem[]): ProviderConfigServiceItem[] {
   const groups = new Map<string, ProviderConfigItem[]>();
   for (const model of models) {
     const groupId = model.credentialId || model.configId || `${model.id}-${model.providerLabel || model.baseUrl}`;
@@ -278,7 +275,8 @@ export function SharedModelServiceGroup({
   emptyText,
   onAdd,
   onEdit,
-  onClear
+  onClear,
+  onToggleEnabled
 }: {
   title: string;
   badge: string;
@@ -294,6 +292,7 @@ export function SharedModelServiceGroup({
   onAdd?: () => void;
   onEdit?: (model: ProviderConfigItem) => void;
   onClear?: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onToggleEnabled?: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
 }) {
   const configuredModels = models.filter((model) => model.configured);
   const configuredServices = groupConfiguredModelServices(providerId, configuredModels);
@@ -325,7 +324,7 @@ export function SharedModelServiceGroup({
           </div>
         ) : null}
         {configuredServices.map((service, index) => (
-          <div key={service.configId ?? `${service.id}-${index}`} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 min-[980px]:grid-cols-[minmax(220px,1.1fr)_minmax(220px,1fr)_96px_auto] min-[980px]:items-center">
+          <div key={service.configId ?? `${service.id}-${index}`} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 min-[980px]:grid-cols-[minmax(220px,1.1fr)_minmax(220px,1fr)_auto] min-[980px]:items-center">
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-1.5">
                 {index === 0 && service.configured ? <Badge className="min-h-5 px-1.5 text-[10px]" tone="ok">默认</Badge> : null}
@@ -343,9 +342,16 @@ export function SharedModelServiceGroup({
                 ))}
               </div>
             </div>
-            <div className="text-[12px] font-black text-[var(--text)]">优先级 {service.priority ?? 0}</div>
-            {canManageServices && (onEdit || onClear) ? (
+            {canManageServices && (onEdit || onClear || onToggleEnabled) ? (
               <div className="flex flex-wrap justify-end gap-1.5">
+                {onToggleEnabled ? (
+                  <EnabledSwitchButton
+                    enabled={service.enabled !== false}
+                    label={service.enabled === false ? "停用" : "启用"}
+                    disabled={isBusy || !service.configured}
+                    onClick={() => void onToggleEnabled(providerId, service, service.enabled === false)}
+                  />
+                ) : null}
                 {onEdit ? (
                   <Button className="min-h-7 px-2 text-[12px]" size="sm" type="button" disabled={isBusy} onClick={() => onEdit(service)}>
                     编辑
@@ -365,6 +371,46 @@ export function SharedModelServiceGroup({
   );
 }
 
+export function EnabledSwitchButton({
+  enabled,
+  label,
+  disabled,
+  onClick
+}: {
+  enabled: boolean;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-1 pr-2 text-[12px] font-black transition focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)]",
+        enabled
+          ? "border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_9%,var(--field))] text-[var(--accent)] hover:border-[var(--accent)]"
+          : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+        disabled && "cursor-not-allowed opacity-55"
+      )}
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className={cn(
+        "relative h-3.5 w-7 rounded-full border transition",
+        enabled ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--border-strong)] bg-[var(--panel2)]"
+      )}>
+        <span className={cn(
+          "absolute left-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(96,64,43,.24)] transition-transform",
+          enabled && "translate-x-3.5"
+        )} />
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export function SharedModelConfigDialog({
   title,
   badge,
@@ -373,7 +419,6 @@ export function SharedModelConfigDialog({
   testStatus,
   presets,
   apiKeyLabel = "API Key",
-  enableLabel = "启用服务",
   onDraftChange,
   onApplyPreset,
   onClose,
@@ -390,7 +435,6 @@ export function SharedModelConfigDialog({
   testStatus?: ModelConfigTestStatus;
   presets: ModelConfigDraft[];
   apiKeyLabel?: string;
-  enableLabel?: string;
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
   onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
   onClose: () => void;
@@ -478,7 +522,7 @@ export function SharedModelConfigDialog({
             <div className="text-[11px] font-black uppercase tracking-[.16em] text-[var(--muted)]">{isEditingExisting ? "EDIT CONFIG" : "NEW CONFIG"}</div>
             <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[var(--text)]">{isEditingExisting ? title.replace("添加", "编辑") : title}</h3>
             <div className="mt-2 text-[13px] font-semibold leading-5 text-[var(--muted)]">
-              {isEditingExisting ? "不填写 API Key 时会保留原 Key；优先级越高越先使用。" : "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。"}
+              {isEditingExisting ? "不填写 API Key 时会保留原 Key。" : "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。"}
             </div>
           </div>
           <Badge>{badge}</Badge>
@@ -496,19 +540,9 @@ export function SharedModelConfigDialog({
               </Button>
             ))}
           </div>
-          <div className="grid gap-3 min-[760px]:grid-cols-[minmax(0,1fr)_160px] min-[760px]:items-start">
-            <Field label="配置名称">
-              <Input value={draft.name} onChange={(event) => onDraftChange(providerId, { name: event.target.value })} />
-            </Field>
-            <label className="self-end inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-black text-[var(--muted)]">
-              <input
-                type="checkbox"
-                checked={draft.enabled}
-                onChange={(event) => onDraftChange(providerId, { enabled: event.target.checked })}
-              />
-              {enableLabel}
-            </label>
-          </div>
+          <Field label="配置名称">
+            <Input value={draft.name} onChange={(event) => onDraftChange(providerId, { name: event.target.value })} />
+          </Field>
           <Field label="模型商">
             <Select value={draft.vendor} onChange={(event) => applyVendor(event.target.value)}>
               {vendorOptions(providerId).map((vendor) => (
@@ -516,17 +550,6 @@ export function SharedModelConfigDialog({
               ))}
             </Select>
           </Field>
-          <Field label="优先级">
-            <Input
-              type="number"
-              min={0}
-              value={draft.priority}
-              onChange={(event) => onDraftChange(providerId, { priority: Number(event.target.value) })}
-            />
-          </Field>
-          <div className="text-[12px] font-semibold leading-5 text-[var(--muted)]">
-            数值越高越优先。工作台默认会优先使用同类型里优先级最高的启用配置。
-          </div>
           <Field label={apiKeyLabel}>
             <div className="relative">
               <Input

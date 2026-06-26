@@ -6,7 +6,8 @@ import {
   extractProductComposerImageReferences,
   productComposerTextToDraft,
   removeDraftReferenceImage,
-  removeReferenceFromComposerText
+  removeReferenceFromComposerText,
+  updateComposerReferenceOrder
 } from "../../src/client/productComposerText.js";
 
 describe("productComposerTextToDraft", () => {
@@ -98,5 +99,24 @@ describe("productComposerTextToDraft", () => {
       "参考图：",
       mediaReference
     ].join("\n"))).toEqual([mediaReference]);
+  });
+
+  it("updates the reference image block without rewriting unrelated product text", () => {
+    expect(updateComposerReferenceOrder([
+      "标题：商品 A",
+      "参考图：old-a.jpg",
+      "old-b.jpg",
+      "卖点：轻便"
+    ].join("\n"), [" new-b.webp ", "new-a.jpg"])).toBe([
+      "标题：商品 A",
+      "参考图：new-b.webp\nnew-a.jpg",
+      "卖点：轻便"
+    ].join("\n"));
+
+    expect(updateComposerReferenceOrder("标题：商品 B", ["b.jpg"])).toBe([
+      "标题：商品 B",
+      "",
+      "参考图：b.jpg"
+    ].join("\n"));
   });
 });

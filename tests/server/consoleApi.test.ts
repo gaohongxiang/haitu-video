@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHmac } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -503,6 +504,7 @@ describe("console API", () => {
     const js = await jsResponse.text();
     const favicon = await faviconResponse.text();
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
+    const consoleApiClientSource = await readFile(join(process.cwd(), "src", "client", "consoleApiClient.ts"), "utf8");
     const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
     const stylesSource = await readFile(join(process.cwd(), "src", "client", "styles.css"), "utf8");
     const staticConsoleHtml = await readFile(join(process.cwd(), "src", "server", "static", "console.html"), "utf8");
@@ -517,7 +519,13 @@ describe("console API", () => {
     expect(faviconResponse.headers.get("content-type")).toBe("image/svg+xml");
     expect(favicon).toContain("<svg");
     expect(appSource).toContain("from \"lucide-react\"");
-    expect(appSource).toContain("echarts-for-react");
+    expect(appSource).toContain("echarts-for-react/esm/core.js");
+    expect(appSource).toContain('from "echarts/core"');
+    expect(appSource).toContain('from "echarts/charts"');
+    expect(appSource).toContain('from "echarts/components"');
+    expect(appSource).toContain('from "echarts/renderers"');
+    expect(appSource).toContain("echartsCore.use");
+    expect(appSource).not.toContain('import * as EChartsForReact from "echarts-for-react"');
     expect(appSource).toContain("from \"./components/ui/button.js\"");
     expect(appSource).toContain("from \"./components/ui/card.js\"");
     expect(appSource).toContain("from \"./components/ui/field.js\"");
@@ -582,22 +590,29 @@ describe("console API", () => {
     expect(appSource).toContain("renderActiveSection");
     expect(appSource).toContain("consoleSectionFromUrl");
     expect(appSource).toContain("consoleSectionUrl");
+    expect(appSource).toContain("dashboardNavItems");
     expect(appSource).toContain("primaryNavItems");
     expect(appSource).toContain("managementNavItems");
-    expect(appSource).toContain("sectionSubtitles");
     expect(appSource).toContain("主流程");
     expect(appSource).toContain("管理");
+    const dashboardNavSource = appSource.slice(appSource.indexOf("const dashboardNavItems"), appSource.indexOf("const primaryNavItems"));
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
     const managementNavSource = appSource.slice(appSource.indexOf("const managementNavItems"), appSource.indexOf("const navItems"));
+    expect(dashboardNavSource).toContain("仪表盘");
+    expect(primaryNavSource).not.toContain("仪表盘");
     expect(primaryNavSource).toContain("视频创作");
+    expect(primaryNavSource).toContain("图片创作");
+    expect(primaryNavSource).toContain("任务记录");
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
     expect(primaryNavSource).not.toContain("生成记录");
     expect(managementNavSource).not.toContain("生成记录");
-    expect(managementNavSource).toContain("仪表盘");
+    expect(managementNavSource).not.toContain("仪表盘");
     expect(managementNavSource).not.toContain("模板管理");
-    expect(managementNavSource).toContain("任务记录");
+    expect(managementNavSource).not.toContain("任务记录");
+    expect(managementNavSource).toContain("充值中心");
+    expect(managementNavSource).toContain("模型价格");
     expect(managementNavSource).not.toContain("成本台账");
     expect(managementNavSource).toContain("API 管理");
     expect(managementNavSource).not.toContain("审核发布");
@@ -611,7 +626,6 @@ describe("console API", () => {
     expect(appSource).not.toContain("当前模式");
     expect(appSource).not.toContain("运行状态");
     expect(appSource).not.toContain('aria-label="当前模块"');
-    expect(appSource).toContain('aria-label="切换模块"');
     expect(appSource).toContain('aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}');
     expect(appSource).toContain("sidebarCollapsed");
     expect(appSource).toContain("setSidebarCollapsed");
@@ -620,22 +634,25 @@ describe("console API", () => {
     expect(appSource).toContain("min-[900px]:grid-cols-[56px_minmax(0,1fr)]");
     expect(appSource).toContain("min-[900px]:grid-cols-[184px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[72px_minmax(0,1fr)]");
-    expect(appSource).not.toContain("min-[900px]:grid-cols-[232px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[64px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[196px_minmax(0,1fr)]");
-    expect(appSource).toContain("app-sidebar-toggle");
-    expect(appSource).toContain("app-sidebar-collapse-edge");
-    expect(appSource).toContain("app-sidebar-collapse-thumb");
+    expect(appSource).toContain("app-sidebar-collapse-rail");
+    expect(appSource).toContain("app-sidebar-collapse-button");
     expect(appSource).toContain("absolute inset-y-0 right-[-10px]");
-    expect(appSource).toContain("app-sidebar-collapse-edge pointer-events-none grid h-40 w-5");
-    expect(appSource).toContain("app-sidebar-collapse-thumb grid h-36 w-3.5");
+    expect(appSource).not.toContain("app-sidebar-collapse-hitbox");
+    expect(appSource).toContain("app-sidebar-collapse-button pointer-events-none grid h-8 w-8");
+    expect(appSource).toContain("cursor-pointer");
+    expect(appSource).not.toContain("MoveHorizontal");
+    expect(appSource).toContain("opacity-0");
+    expect(appSource).toContain("group-hover:opacity-100");
     expect(appSource).not.toContain("right-[-17px]");
     expect(appSource).not.toContain("top-5");
     expect(appSource).not.toContain("h-[34px] w-[34px] rounded-full");
     expect(appSource).not.toContain("left-[232px] top-[84px]");
     expect(appSource).not.toContain("mx-auto h-10 w-10 rounded-full");
     expect(appSource).toContain('sidebarCollapsed ? "w-[56px]" : "w-[184px]"');
-    expect(appSource).toContain("h-[72px] items-center border-b");
+    expect(appSource).toContain("h-[72px] items-center");
+    expect(appSource).not.toContain("h-[72px] items-center border-b");
     expect(appSource).not.toContain("h-[84px] items-center border-b");
     expect(appSource).toContain('sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-3.5"');
     expect(appSource).toContain('sidebarCollapsed ? "px-1.5" : "px-2.5"');
@@ -660,9 +677,13 @@ describe("console API", () => {
     expect(appShell).not.toContain("refresh-tooltip");
     expect(appShell).not.toContain("重新拉取最新数据");
     expect(appShell).not.toContain(">刷新<");
-    expect(appShell).toContain("min-h-[72px]");
+    expect(appShell).toContain("app-sidebar-account");
+    expect(appShell).toContain("grid-rows-[auto_minmax(0,1fr)_auto]");
+    expect(appShell).toContain('activeSection === "video"');
+    expect(appShell).toContain("overflow-hidden p-0");
+    expect(appShell).not.toContain("sticky top-0");
+    expect(appShell).not.toContain("activeSectionSubtitle");
     expect(appShell).not.toContain("min-h-[84px]");
-    expect(appShell).toContain("px-4 py-3");
     expect(appShell).not.toContain("px-5 py-4");
     expect(appShell).toContain("overflow-y-auto px-4 py-4");
     expect(appShell).not.toContain("overflow-y-auto px-4 py-5");
@@ -713,10 +734,12 @@ describe("console API", () => {
     expect(appSource).toContain("操作提示");
     expect(appSource).toContain("readableVideoJobError");
     const providerErrorSource = await readFile(join(import.meta.dirname, "../../src/core/videoProviderErrors.ts"), "utf8");
-    expect(appSource).toContain("errorDetails?: VideoJobErrorDetails");
+    const creativeVersionsSource = await readFile(join(import.meta.dirname, "../../src/client/videoCreativeVersions.ts"), "utf8");
+    const videoDisplayViewModelSource = await readFile(join(import.meta.dirname, "../../src/client/videoDisplayViewModel.ts"), "utf8");
+    expect(creativeVersionsSource).toContain("errorDetails?: VideoJobErrorDetails");
     expect(appSource).toContain("readableVideoJobError(job.error, job.errorDetails)");
-    expect(appSource).toContain("readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails)");
-    expect(appSource).toContain("rawMessage: details.message");
+    expect(videoDisplayViewModelSource).toContain("readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails)");
+    expect(videoDisplayViewModelSource).toContain("rawMessage: details.message");
     expect(providerErrorSource).toContain("参考图太多：Seedance 最多支持");
     expect(providerErrorSource).toContain("参考图里可能包含真人、人脸或隐私信息");
     expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
@@ -746,10 +769,14 @@ describe("console API", () => {
     expect(appSource).not.toContain("onOpenAdvancedVideoParams");
     expect(appSource).toContain("ProductCreationWorkspace");
     expect(appSource).toContain("ProductCreationComposer");
-    expect(appSource).toContain("video-creation-frame");
-    expect(appSource).toContain("product-creation-picker");
-    expect(appSource).toContain("product-creation-product-menu");
-    expect(appSource).toContain("product-control-bar");
+    expect(appSource).toContain("video-workspace-shell");
+    expect(appSource).toContain("video-product-library-column");
+    expect(appSource).toContain("video-operation-column");
+    expect(appSource).toContain("ProductCreationProductLibrary");
+    expect(appSource).toContain("ProductCreationOperationWorkspace");
+    expect(appSource).not.toContain("ProductCreationProductPicker");
+    expect(appSource).not.toContain("product-creation-product-menu");
+    expect(appSource).not.toContain("product-control-bar");
     expect(appSource).not.toContain("creation-parameter-dock");
     expect(appSource).not.toContain("product-studio-shell");
     expect(appSource).not.toContain("product-studio-topbar");
@@ -840,8 +867,13 @@ describe("console API", () => {
     expect(productDraftFormSource).toContain("参考图路径");
     expect(productDraftFormSource).toContain('<form className="grid gap-5"');
     expect(productDraftFormSource).not.toContain('<form className="grid gap-3"');
-    expect(appSource).toContain("internalProductIdFromTitle");
-    expect(appSource).toContain("sku: draft.sku.trim() || internalProductIdFromTitle(draft.title_ja)");
+    const productDraftFactsSource = await readFile(join(import.meta.dirname, "../../src/client/productDraftFacts.ts"), "utf8");
+    expect(appSource).toContain('from "./productDraftFacts.js"');
+    expect(appSource).not.toContain("function productDraftToFacts(");
+    expect(appSource).not.toContain("function internalProductIdFromTitle(");
+    expect(productDraftFactsSource).toContain("export function productDraftToFacts");
+    expect(productDraftFactsSource).toContain("export function internalProductIdFromTitle");
+    expect(productDraftFactsSource).toContain("sku: draft.sku.trim() || internalProductIdFromTitle(draft.title_ja");
     expect(appSource).not.toContain("商品 SKU:");
     expect(appSource).not.toContain("`SKU: ${product.sku}`");
     expect(appSource).not.toContain("productsResponse.products[0]");
@@ -854,7 +886,7 @@ describe("console API", () => {
     expect(appSource).not.toContain('aria-label="商品管理"');
     expect(appSource).toContain("历史记录");
     expect(appSource).not.toContain("高级新建任务");
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
     expect(videoCase).not.toContain("<VideoJobsPanel");
     expect(videoCase).not.toContain("<ReportsPanel");
@@ -867,20 +899,24 @@ describe("console API", () => {
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
     const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
-    const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
+    const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
-    const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function productDraftToProductDetail"));
-    const buildLatestCreativeJobsSource = appSource.slice(
-      appSource.indexOf("function buildLatestCreativeJobs"),
-      appSource.indexOf("function videoJobToCreativeVersion")
+    const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function ProductLibraryHome"));
+    const productWorkflowSource = await readFile(join(import.meta.dirname, "../../src/client/productWorkflowViewModel.ts"), "utf8");
+    const storyboardDraftsSource = await readFile(join(import.meta.dirname, "../../src/client/storyboardDrafts.ts"), "utf8");
+    const referenceMediaFilesSource = await readFile(join(import.meta.dirname, "../../src/client/referenceMediaFiles.ts"), "utf8");
+    const videoCreativeVersionsSource = await readFile(join(import.meta.dirname, "../../src/client/videoCreativeVersions.ts"), "utf8");
+    const buildLatestCreativeJobsSource = videoCreativeVersionsSource.slice(
+      videoCreativeVersionsSource.indexOf("export function buildLatestCreativeJobs"),
+      videoCreativeVersionsSource.indexOf("export function videoJobToCreativeVersion")
     );
-    const formatCreativeVersionTimeSource = appSource.slice(
-      appSource.indexOf("function formatCreativeVersionTime"),
-      appSource.indexOf("function creativeVersionSortTime")
+    const formatCreativeVersionTimeSource = videoDisplayViewModelSource.slice(
+      videoDisplayViewModelSource.indexOf("export function formatCreativeVersionTime"),
+      videoDisplayViewModelSource.indexOf("function splitLines")
     );
-    const formatDeletionTimeSource = appSource.slice(
-      appSource.indexOf("function formatDeletionTime"),
-      appSource.indexOf("function removeLedgerJob")
+    const formatDeletionTimeSource = videoDisplayViewModelSource.slice(
+      videoDisplayViewModelSource.indexOf("export function formatDeletionTime"),
+      videoDisplayViewModelSource.indexOf("export function formatAbsoluteMinuteTime")
     );
     const queueProductVideoJobsSource = appSource.slice(
       appSource.indexOf("async function queueProductVideoJobs"),
@@ -923,22 +959,107 @@ describe("console API", () => {
     expect(appSource).toContain('setSelectedImageModelConfigId("auto")');
     expect(appSource).toContain('setSelectedVideoModelConfigId("auto")');
     expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
-    expect(appSource).toContain('type StoryboardDraftSource = "default" | "ai" | "manual";');
+    expect(appSource).toContain("type StoryboardDraftSource");
+    expect(productWorkflowSource).toContain('export type StoryboardDraftSource = "default" | "ai" | "manual";');
     expect(appSource).toContain('useState<StoryboardDraftSource>("default")');
     expect(appSource).toContain('setStoryboardDraftSource("ai")');
     expect(appSource).toContain('setStoryboardDraftSource("manual")');
-    expect(appSource).toContain("defaultStoryboardDraftForTemplate");
+    expect(storyboardDraftsSource).toContain("export function defaultStoryboardDraftForTemplate");
+    expect(appSource).not.toContain("function defaultStoryboardDraftForTemplate");
     expect(appSource).toContain("defaultStoryboardDraft(template, duration)");
     expect(appSource).toContain("用户已手动编辑分镜时不覆盖");
     expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
-    expect(creationComposerSource).toContain("product-creation-canvas");
-    expect(creationComposerSource).toContain("product-control-bar");
-    expect(creationComposerSource).toContain("video-parameter-row grid");
-    expect(creationComposerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))]");
+    expect(creationComposerSource).toContain("video-workspace-shell");
+    expect(creationComposerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
+    expect(creationComposerSource).toContain("transition-[grid-template-columns] duration-200");
+    expect(creationComposerSource).toContain("min-[900px]:grid-cols-[var(--product-library-column-width)_minmax(0,1fr)]");
+    expect(creationComposerSource).toContain('style={{ "--product-library-column-width": `${productLibraryColumnWidth}px` } as CSSProperties}');
+    expect(creationComposerSource).toContain("PRODUCT_LIBRARY_DEFAULT_WIDTH");
+    expect(creationComposerSource).toContain("PRODUCT_LIBRARY_COLLAPSED_WIDTH");
+    expect(creationComposerSource).not.toContain("PRODUCT_LIBRARY_COLLAPSE_SNAP_WIDTH");
+    expect(creationComposerSource).not.toContain("PRODUCT_LIBRARY_MIN_WIDTH");
+    expect(creationComposerSource).not.toContain("PRODUCT_LIBRARY_MAX_WIDTH");
+    expect(creationComposerSource).toContain("productLibraryCollapsed");
+    expect(creationComposerSource).toContain("productLibraryColumnWidth");
+    expect(creationComposerSource).not.toContain("const [productLibraryWidth");
+    expect(creationComposerSource).not.toContain("handleProductLibraryResizeStart");
+    expect(creationComposerSource).not.toContain("handleProductLibraryResizeKeyDown");
+    expect(creationComposerSource).not.toContain('role="separator"');
+    expect(creationComposerSource).not.toContain('aria-orientation="vertical"');
+    expect(creationComposerSource).not.toContain("aria-valuenow={productLibraryColumnWidth}");
+    expect(creationComposerSource).toContain("video-product-library-collapse-rail");
+    expect(creationComposerSource).toContain("video-product-library-collapse-button");
+    expect(creationComposerSource).toContain("transition-[left,color]");
+    expect(creationComposerSource).not.toContain("video-product-library-resizer");
+    expect(creationComposerSource).not.toContain("productLibraryResizing");
+    expect(creationComposerSource).not.toContain("setProductLibraryResizing");
+    expect(creationComposerSource).not.toContain("MoveHorizontal");
+    expect(creationComposerSource).toContain("cursor-pointer");
+    expect(creationComposerSource).toContain("opacity-0");
+    expect(creationComposerSource).toContain("group-hover:opacity-100");
+    expect(creationComposerSource).toContain('aria-label={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(creationComposerSource).toContain('title={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(creationComposerSource).toContain("onClick={() => setProductLibraryCollapsed((collapsed) => !collapsed)}");
+    expect(creationComposerSource).not.toContain("拖动调整商品库宽度");
+    expect(creationComposerSource).toContain("ProductCreationProductLibrary");
+    expect(creationComposerSource).toContain("ProductCreationOperationWorkspace");
+    expect(creationComposerSource).toContain("collapsed={productLibraryCollapsed}");
+    expect(creationComposerSource).toContain("video-product-library-column");
+    expect(creationComposerSource).toContain("video-operation-column");
+    expect(creationComposerSource).not.toContain("product-control-bar");
+    expect(creationComposerSource).not.toContain("video-parameter-row grid");
+    expect(creationComposerSource).not.toContain("<ProductCreationProductPicker");
+    expect(creationComposerSource).toContain("grid content-start gap-3");
+    expect(creationComposerSource).not.toContain("grid min-h-full content-start gap-3");
+    expect(creationComposerSource).toContain("video-generation-controls compact-generation-controls");
+    expect(creationComposerSource).toContain("px-3 py-2");
+    expect(creationComposerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(98px,.72fr))]");
+    expect(creationComposerSource).toContain("model-scheme-control");
+    expect(creationComposerSource).toContain("model-scheme-chip-row");
+    expect(creationComposerSource).toContain("min-[1180px]:col-span-6");
+    expect(creationComposerSource).toContain("overflow-visible");
+    expect(creationComposerSource).toContain("ModelSchemeChip");
+    expect(creationComposerSource).toContain("{schemeSummary}");
+    expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
+    expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 truncate");
+    expect(creationComposerSource).toContain('label="视频分辨率"');
+    expect(creationComposerSource).toContain("videoResolutionOptions");
+    expect(creationComposerSource).toContain("selectedVideoResolution");
+    expect(creationComposerSource).toContain("resolution: selectedVideoResolution");
+    expect(creationComposerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
+    expect(appSource).toContain('if (value === "en") return "英语";');
+    expect(queueProductVideoJobsSource).toContain("resolution: videoGenerationOptions.resolution ?? selectedVideoResolution");
+    expect(creationComposerSource).toContain('density="compact"');
+    expect(creationComposerSource).toContain("video-generate-summary");
+    expect(creationComposerSource).toContain("{generateVideoSummary}");
+    expect(creationComposerSource).toContain("tracking-0");
+    expect(creationComposerSource).toContain("whitespace-normal");
+    expect(creationComposerSource).toContain("break-words");
+    expect(creationComposerSource).not.toContain("video-generate-summary min-w-0 truncate");
+    expect(creationComposerSource).not.toContain("generateVideoSummaryItems.map");
+    expect(creationComposerSource).not.toContain("video-generate-summary-item");
+    expect(creationComposerSource).not.toContain("video-generate-summary-separator");
+    expect(creationComposerSource).not.toContain("gap-x-2 gap-y-1");
+    expect(creationComposerSource).toContain("video-generate-status-center");
+    expect(creationComposerSource).toContain("justify-center text-center");
+    expect(creationComposerSource).toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
+    expect(creationComposerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(creationComposerSource).toContain("video-generate-bar");
-    expect(appSource).toContain("function productGenerationReadiness");
-    expect(appSource).toContain("function productFactsStatusLabel");
-    expect(appSource).toContain("function storyboardStatusLabel");
+    expect(creationComposerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
+    expect(creationComposerSource).not.toContain("footer={");
+    expect(creationComposerSource.indexOf("video-generate-bar")).toBeLessThan(creationComposerSource.indexOf("<VideoHistoryPanel"));
+    expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
+    expect(productLibraryColumnSource).toContain("collapsed");
+    expect(productLibraryColumnSource).toContain("onExpand");
+    expect(productLibraryColumnSource).toContain("productLibraryStatus(product)");
+    expect(productLibraryColumnSource).toContain("onDeleteProduct(product.sku)");
+    expect(productLibraryColumnSource).toContain("onSelectProduct(product)");
+    expect(productWorkflowSource).toContain("export function productGenerationReadiness");
+    expect(productWorkflowSource).toContain("export function productFactsStatusLabel");
+    expect(productWorkflowSource).toContain("export function storyboardStatusLabel");
+    expect(appSource).not.toContain("function productGenerationReadiness");
+    expect(appSource).not.toContain("function productFactsStatusLabel");
+    expect(appSource).not.toContain("function storyboardStatusLabel");
     expect(creationComposerSource).toContain("const generationReadiness = productGenerationReadiness({");
     expect(creationComposerSource).toContain("const generateVideoDisabled = packingDisabled || !generationReadiness.ready");
     expect(creationComposerSource).toContain("const storyboardProductReady = Boolean(selectedProduct || importText.trim())");
@@ -949,8 +1070,9 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("const generateVideoButtonClass = cn(");
     expect(creationComposerSource).toContain('generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"');
     expect(creationComposerSource).toContain('const generationReadinessMessageClass = cn(');
-    expect(creationComposerSource).toContain("min-h-12 w-full max-w-[360px]");
-    expect(creationComposerSource).toContain("justify-self-center");
+    expect(creationComposerSource).toContain("generation-status-message video-generate-status-center flex min-h-12 w-full items-center justify-center text-center");
+    expect(creationComposerSource).not.toContain("min-h-12 w-full max-w-[360px]");
+    expect(creationComposerSource).not.toContain("justify-self-center");
     expect(creationComposerSource).not.toContain("rounded-[14px] border px-4");
     expect(creationComposerSource).toContain("if (!generationReadiness.ready) {");
     expect(creationComposerSource).toContain("onToast(generationReadiness.label);");
@@ -962,20 +1084,20 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}");
     expect(creationComposerSource).not.toContain('className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"');
     expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
-    expect(creationComposerSource).toContain("generation-readiness-message");
+    expect(creationComposerSource).toContain("generation-status-message");
     expect(creationComposerSource).toContain("text-[var(--danger)]");
     expect(creationComposerSource).toContain('generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"');
     expect(creationComposerSource).toContain("{generationReadiness.label}");
     expect(creationComposerSource).toContain("productFactsStatusLabel({");
     expect(creationComposerSource).toContain("storyboardStatusLabel(storyboardDraftSource)");
-    expect(appSource).toContain('return "原始资料"');
-    expect(appSource).toContain('return "已整理资料包"');
-    expect(appSource).not.toContain('return "资料待补"');
-    expect(appSource).toContain('return "默认分镜"');
-    expect(appSource).toContain('return "AI 生成分镜"');
-    expect(appSource).toContain('return "手动分镜"');
-    expect(appSource).toContain('return { ready: true, label: "资料已保存，可生成视频。" };');
-    expect(appSource).toContain('return { ready: true, label: "将先整理资料包，再生成视频。" };');
+    expect(productWorkflowSource).toContain('return "原始资料"');
+    expect(productWorkflowSource).toContain('return "已整理资料包"');
+    expect(productWorkflowSource).not.toContain('return "资料待补"');
+    expect(productWorkflowSource).toContain('return "默认分镜"');
+    expect(productWorkflowSource).toContain('return "AI 生成分镜"');
+    expect(productWorkflowSource).toContain('return "手动分镜"');
+    expect(productWorkflowSource).toContain('return { ready: true, label: "资料已保存，可生成视频。" };');
+    expect(productWorkflowSource).toContain('return { ready: true, label: "将先整理资料包，再生成视频。" };');
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
     expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
@@ -1020,7 +1142,7 @@ describe("console API", () => {
     expect(appSource).toContain("ProductFileImportDialog");
     expect(appSource).toContain("/api/products/import-file-preview");
     expect(appSource).toContain("/api/products/import-file-commit");
-    expect(productPickerSource).toContain("导入 CSV/Excel");
+    expect(productLibraryColumnSource).toContain("导入 CSV/Excel");
     expect(creationComposerSource).not.toContain("导入文件");
     expect(appSource).toContain("默认选择 1 个，单选会填入当前商品资料，勾选多个会保存到商品列表。");
     expect(appSource).toContain("const nextText = row.sourceText.trim() || productDraftToComposerText(nextDraft);");
@@ -1028,13 +1150,17 @@ describe("console API", () => {
     expect(appSource).toContain("填入当前商品");
     expect(appSource).toContain("默认选 1 个");
     expect(appSource).not.toContain("ProductFileImportMode");
-    expect(appSource).toContain('ready: "未导入"');
-    expect(appSource).toContain('duplicate: "已导入"');
-    expect(appSource).toContain('failed: "不可导入"');
+    expect(productWorkflowSource).toContain('ready: "未导入"');
+    expect(productWorkflowSource).toContain('duplicate: "已导入"');
+    expect(productWorkflowSource).toContain('failed: "不可导入"');
+    expect(appSource).toContain("fileImportRowLabel(row.status)");
+    expect(appSource).toContain("fileImportCanSelect(row)");
     expect(appSource).toContain("全选可导入商品");
     expect(appSource).toContain("whitespace-nowrap");
     expect(creationComposerSource).toContain("acceptReferenceFiles");
     expect(creationComposerSource).toContain("isReferenceImageFile");
+    expect(referenceMediaFilesSource).toContain("export function isReferenceImageFile");
+    expect(appSource).not.toContain("function isReferenceImageFile(");
     expect(creationComposerSource).toContain("onDrop=");
     expect(creationComposerSource).toContain("onPaste=");
     expect(creationComposerSource).toContain("clipboardData.files");
@@ -1058,6 +1184,10 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('event.clipboardData.getData("text/html")');
     expect(creationComposerSource).toContain("copyPastedMediaReferencesToProduct");
     expect(creationComposerSource).toContain("isSameOriginMediaReference");
+    expect(referenceMediaFilesSource).toContain("export function isSameOriginMediaReference");
+    expect(referenceMediaFilesSource).toContain("export async function mediaReferenceToFile");
+    expect(appSource).not.toContain("function isSameOriginMediaReference(");
+    expect(appSource).not.toContain("async function mediaReferenceToFile(");
     expect(creationComposerSource).toContain("onPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
@@ -1114,7 +1244,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
     expect(creationComposerSource).toContain("productAutoSaveStatus");
     expect(creationComposerSource).toContain("productAutoSaveStatusLabel(productAutoSaveStatus)");
-    expect(appSource).toContain('type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";');
+    expect(productWorkflowSource).toContain('export type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";');
     expect(appSource).toContain("const productAutoSaveTimerRef = useRef<number | undefined>(undefined);");
     expect(appSource).toContain("async function autoSaveProductFacts");
     expect(appSource).toContain("async function flushProductFactsAutoSave");
@@ -1152,19 +1282,30 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]");
     expect(creationComposerSource).not.toContain("上一步");
     expect(creationComposerSource).not.toContain("下一步");
-    expect(productPickerSource).toContain("创作商品");
-    expect(productPickerSource).toContain("product-creation-product-menu");
-    expect(productPickerSource).toContain("min-h-11");
-    expect(productPickerSource).not.toContain("已保存商品");
-    expect(productPickerSource).not.toContain("直接填写新商品资料");
-    expect(productPickerSource).toContain('aria-haspopup="listbox"');
-    expect(productPickerSource).toContain('role="listbox"');
-    expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
-    expect(productPickerSource).toContain("新商品");
-    expect(productPickerSource).toContain("dedupeProductSummaries(products)");
-    expect(productPickerSource).toContain("draftTitle");
-    expect(productPickerSource).toContain("const selectedProductLabel = draftProductTitle ||");
-    expect(productPickerSource).not.toContain("+ 新建商品");
+    expect(productLibraryColumnSource).toContain("商品库");
+    expect(productLibraryColumnSource).toContain("video-product-library-column");
+    expect(productLibraryColumnSource).toContain("min-h-[68px]");
+    expect(productLibraryColumnSource).not.toContain("已保存商品");
+    expect(productLibraryColumnSource).not.toContain("直接填写新商品资料");
+    expect(productLibraryColumnSource).not.toContain('aria-haspopup="listbox"');
+    expect(productLibraryColumnSource).not.toContain('role="listbox"');
+    expect(productLibraryColumnSource).not.toContain("handleProductPickerSelect");
+    expect(productLibraryColumnSource).toContain("新商品");
+    expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
+    expect(productLibraryColumnSource).toContain("draftTitle");
+    expect(productLibraryColumnSource).toContain('const draftProductTitle = draftTitle?.trim() ?? "";');
+    expect(productLibraryColumnSource).toContain("productLibrarySearchQuery");
+    expect(productLibraryColumnSource).toContain("filterProductLibraryProducts(productOptions, productLibrarySearchQuery");
+    expect(productLibraryColumnSource).toContain("product-library-search");
+    expect(productLibraryColumnSource).toContain('aria-label="搜索商品"');
+    expect(productLibraryColumnSource).toContain('placeholder="搜索商品"');
+    expect(productLibraryColumnSource).not.toContain("搜索商品 / SKU");
+    expect(productLibraryColumnSource).toContain("product-library-scroll min-h-0 overflow-y-auto");
+    expect(productLibraryColumnSource).toContain("filteredProductOptions.map");
+    expect(productLibraryColumnSource).toContain("没有匹配的商品");
+    expect(productLibraryColumnSource).toContain("清空搜索");
+    expect(productLibraryColumnSource).not.toContain("手动填写或粘贴商品资料");
+    expect(productLibraryColumnSource).not.toContain("+ 新建商品");
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
     expect(referenceFigureSource).toContain("reference-image-actions");
@@ -1221,12 +1362,13 @@ describe("console API", () => {
     expect(videoHistorySource).toContain("videoLabel(index)");
     expect(videoHistorySource).toContain("hasPlayableVideo(job)");
     expect(videoHistorySource).toContain("creativeVersionLifecycleHint(job)");
-    expect(appSource).toContain("function creativeVersionLifecycleHint");
+    expect(videoDisplayViewModelSource).toContain("export function creativeVersionLifecycleHint");
+    expect(appSource).not.toContain("function creativeVersionLifecycleHint");
     expect(videoHistorySource).not.toContain("playableVideo ? videoExpiryLabel(job) : creativeVersionDisplayStatus(job)");
-    expect(appSource).toContain('if (value === "failed") return "生成失败";');
-    expect(appSource).toContain("formatDeletionTime");
-    expect(appSource).toContain("将于");
-    expect(appSource).toContain("function formatAbsoluteMinuteTime");
+    expect(videoDisplayViewModelSource).toContain('if (value === "failed") return "生成失败";');
+    expect(videoDisplayViewModelSource).toContain("formatDeletionTime");
+    expect(videoDisplayViewModelSource).toContain("将于");
+    expect(videoDisplayViewModelSource).toContain("export function formatAbsoluteMinuteTime");
     expect(appSource).not.toContain('return "刚刚"');
     expect(videoHistorySource).toContain("const failureReason = creativeVersionFailureReason(job);");
     expect(videoHistorySource).toContain("{[...metaParts, failureReason ? \"\" : lifecycleLabel].filter(Boolean).join(\" · \")}");
@@ -1236,7 +1378,7 @@ describe("console API", () => {
     expect(formatCreativeVersionTimeSource).toContain('job.status !== "completed" && job.status !== "succeeded" && !hasPlayableVideo(job)');
     expect(formatCreativeVersionTimeSource).toContain("job.completedAt ?? job.createdAt");
     expect(formatCreativeVersionTimeSource).not.toContain('"刚刚"');
-    expect(formatDeletionTimeSource).toContain("formatAbsoluteMinuteTime(value)");
+    expect(formatDeletionTimeSource).toContain("formatAbsoluteMinuteTime(value");
     expect(formatDeletionTimeSource).not.toContain("今天");
     expect(formatDeletionTimeSource).not.toContain("明天");
     expect(appSource).not.toContain("剩余 ${remainingHours} 小时");
@@ -1343,15 +1485,15 @@ describe("console API", () => {
     expect(appSource).toContain("打开成片");
     expect(appSource).toContain("下载成片");
     expect(appSource).toContain("查看报告");
-    expect(appSource).toContain("任务失败，可直接重试原任务");
-    const videoJobsPanelSource = appSource.slice(appSource.indexOf("function VideoJobsPanel"), appSource.indexOf("function videoJobResultHint"));
+    expect(videoDisplayViewModelSource).toContain("任务失败，可直接重试原任务");
+    const videoJobsPanelSource = appSource.slice(appSource.indexOf("function VideoJobsPanel"), appSource.indexOf("function AuditLogPanel"));
     expect(videoJobsPanelSource).toContain("xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)]");
     expect(videoJobsPanelSource).not.toContain("_auto");
     expect(appSource).toContain("estimatedCostCny");
     expect(appSource).toContain("模型分布");
     expect(appSource).toContain("Token / 成本趋势");
     expect(appSource).toContain("最近使用");
-    expect(appSource).toContain("/api/qc-summary");
+    expect(consoleApiClientSource).toContain("/api/qc-summary");
     expect(appSource).toContain("检查失败");
     expect(appSource).toContain("qcTone");
     expect(appSource).toContain("官方用量");
@@ -1370,6 +1512,7 @@ describe("console API", () => {
     const dashboardCase = appSource.slice(appSource.indexOf('case "dashboard"'), appSource.indexOf('case "video"'));
     expect(dashboardCase).toContain('aria-label="仪表盘"');
     expect(appSource).toContain('{ id: "dashboard", label: "仪表盘"');
+    expect(appSource.indexOf("dashboardNavItems")).toBeLessThan(appSource.indexOf("primaryNavItems"));
     expect(appSource).not.toContain("运营概览");
     const feeSummaryPanelSource = appSource.slice(appSource.indexOf("function FeeSummaryPanel"), appSource.indexOf("function ReportsPanel"));
     expect(feeSummaryPanelSource).toContain("费用汇总");
@@ -1381,19 +1524,19 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<StorageBackupPanel");
     expect(videoCase).not.toContain("<AuditLogPanel");
     expect(videoCase).not.toContain("<VideoAssetsPanel");
-    expect(appSource).toContain("/api/storage-backup");
-    expect(appSource).toContain("/api/backups");
+    expect(consoleApiClientSource).toContain("/api/storage-backup");
+    expect(consoleApiClientSource).toContain("/api/backups");
     expect(appSource).toContain("StorageBackupPanel");
     expect(appSource).toContain("存储与备份");
     expect(appSource).toContain("长期保存");
     expect(appSource).toContain("备份命令");
     expect(appSource).toContain("生成备份包");
     expect(appSource).toContain("下载备份");
-    expect(appSource).toContain("/api/audit-log");
+    expect(consoleApiClientSource).toContain("/api/audit-log");
     expect(appSource).toContain("AuditLogPanel");
     expect(appSource).toContain("操作审计");
     expect(appSource).toContain("最近操作");
-    expect(appSource).toContain("/api/video-assets");
+    expect(consoleApiClientSource).toContain("/api/video-assets");
     expect(appSource).toContain("VideoAssetsPanel");
     expect(appSource).toContain("formatBytes");
     expect(appSource).toContain("视频资产");
@@ -1422,7 +1565,31 @@ describe("console API", () => {
     expect(settingsCase).not.toContain("onTopUpWallet");
     expect(walletCase).toContain("<WalletRechargePanel");
     expect(walletCase).toContain("wallet={wallet}");
-    expect(walletCase).toContain("onTopUpWallet={topUpWallet}");
+    expect(walletCase).toContain("onRequestRecharge={openRechargeDialog}");
+    expect(walletCase).not.toContain("onTopUpWallet={topUpWallet}");
+    expect(consoleApiClientSource).toContain("/api/payment-methods");
+    expect(appSource).toContain("paymentMethodsResponse");
+    expect(appSource).toContain("setPaymentMethods(paymentMethodsResponse.methods)");
+    expect(appSource).toContain("PaymentMethodDialog");
+    expect(appSource).toContain("pendingRechargeAmountCny");
+    expect(appSource).toContain("选择支付方式");
+    expect(appSource).toContain("RMB支付");
+    expect(appSource).toContain("数字货币支付");
+    expect(appSource).toContain('if (id === "infini") return "Infini";');
+    expect(appSource).toContain("selectedPaymentKind");
+    expect(appSource).toContain("payment-kind-card-grid");
+    expect(appSource).toContain("payment-kind-card");
+    expect(appSource).toContain("payment-kind-card-heading-icon");
+    expect(appSource).not.toContain('className="grid grid-cols-2 rounded-[10px] border border-[var(--border)] bg-[var(--field)] p-1 text-xs font-black"');
+    expect(appSource).not.toContain("继续支付");
+    expect(appSource).toContain("fixed right-5 top-[86px] z-[100]");
+    expect(appSource).not.toContain("fixed right-5 top-[86px] z-[70]");
+    expect(appSource).toContain("recharge-transaction-type-badge");
+    expect(appSource).toContain("md:grid-cols-[68px_minmax(0,1fr)_96px_150px]");
+    expect(appSource).not.toContain("disabled={cryptoMethods.length === 0}");
+    expect(appSource).not.toContain("disabled={rmbMethods.length === 0}");
+    expect(appSource).toContain("Stripe");
+    expect(appSource).toContain("continueWalletRecharge");
     expect(settingsCase).not.toContain("<SettingsPanel");
     const apiManagementSource = await readFile(join(process.cwd(), "src", "client", "components", "apiModelConfigPanel.tsx"), "utf8");
     const sharedModelConfigSource = await readFile(join(process.cwd(), "src", "client", "components", "modelServiceConfig.tsx"), "utf8");
@@ -1439,7 +1606,9 @@ describe("console API", () => {
     expect(apiManagementSource).toContain("视频模型");
     expect(apiManagementSource).not.toContain("默认生成设置");
     expect(sharedModelConfigSource).toContain("Base URL");
-    expect(sharedModelConfigSource).toContain("优先级");
+    expect(sharedModelConfigSource).not.toContain("优先级");
+    expect(sharedModelConfigSource).not.toContain("draft.priority");
+    expect(sharedModelConfigSource).not.toContain('label="优先级"');
     expect(sharedModelConfigSource).toContain('label={<ModelVersionFieldLabel testStatus={testStatus} isTesting={isTesting} />}');
     expect(sharedModelConfigSource).toContain("function ModelVersionFieldLabel");
     expect(sharedModelConfigSource).toContain('type="checkbox"');
@@ -1485,10 +1654,10 @@ describe("console API", () => {
     expect(appSource).not.toContain("paidRunBlockedReason");
     expect(appSource).toContain("商品资料暂不可付费生成");
     expect(appSource).not.toContain("剩余测试额度不足");
-    expect(appSource).toContain("/api/provider-config");
-    expect(appSource).toContain("/api/wallet");
-    expect(appSource).toContain("/api/model-bundles");
-    expect(appSource).toContain("/api/model-service-preference");
+    expect(consoleApiClientSource).toContain("/api/provider-config");
+    expect(consoleApiClientSource).toContain("/api/wallet");
+    expect(consoleApiClientSource).toContain("/api/model-bundles");
+    expect(consoleApiClientSource).toContain("/api/model-service-preference");
     expect(apiManagementSource).not.toContain("钱包余额");
     expect(apiManagementSource).not.toContain("充值 ¥50");
     expect(appSource).toContain("充值中心");
@@ -1590,7 +1759,8 @@ describe("console API", () => {
     expect(appSource).not.toContain('label="生成模型"');
     expect(appSource).not.toContain("InlineProductFactsFields");
     expect(appSource).toContain("ProductComposerReferenceTray");
-    expect(appSource).toContain("ProductCreationProductPicker");
+    expect(appSource).toContain("ProductCreationProductLibrary");
+    expect(appSource).not.toContain("ProductCreationProductPicker");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
     expect(appSource).not.toContain("ProductNarrativeList");
     expect(appSource).not.toContain("ProductSceneTags");
@@ -1622,6 +1792,14 @@ describe("console API", () => {
     });
     expect(stylesSource).toContain('@import "tailwindcss"');
     expect(viteConfig).toContain("@tailwindcss/vite");
+    expect(viteConfig).toContain("manualChunks");
+    expect(viteConfig).toContain("vendor-react");
+    expect(viteConfig).toContain("vendor-echarts-core");
+    expect(viteConfig).toContain("vendor-echarts-line");
+    expect(viteConfig).toContain("vendor-echarts-bar");
+    expect(viteConfig).toContain("vendor-echarts-pie");
+    expect(viteConfig).toContain("vendor-echarts-components");
+    expect(viteConfig).toContain("vendor-zrender");
   });
 
   it("keeps provider configuration lists empty until users save model configs", async () => {
@@ -1687,7 +1865,7 @@ describe("console API", () => {
     }
   });
 
-  it("lists platform-provided bundles from server-only platform keys without exposing secrets", async () => {
+  it("does not import platform model keys from legacy environment variables", async () => {
     const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
     const previousDeepSeekPlatformKey = process.env.HAITU_PLATFORM_DEEPSEEK_API_KEY;
     const previousVolcenginePlatformKey = process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY;
@@ -1711,54 +1889,26 @@ describe("console API", () => {
         server.fetchJson("/api/model-service-preference")
       ]);
       const serialized = JSON.stringify({ providerConfig, bundlesResponse, preferenceResponse });
+      const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
+      const rows = database.sqlite.prepare(`
+        SELECT api_owner, encrypted_key, key_preview
+        FROM model_credentials
+        WHERE api_owner = 'platform'
+      `).all() as Array<{ api_owner: string; encrypted_key: string; key_preview: string }>;
+      closeDatabase(database);
 
       expect(serialized).not.toContain("platform-openai-secret-9999");
       expect(serialized).not.toContain("platform-deepseek-secret-8888");
       expect(serialized).not.toContain("platform-volcengine-secret-7777");
-      expect(providerConfig.textModels).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          apiOwner: "platform",
-          configured: true,
-          model: "deepseek-v4-pro",
-          providerLabel: "deepseek"
-        })
-      ]));
-      expect(providerConfig.imageModels).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          apiOwner: "platform",
-          configured: true,
-          model: "gpt-image-2",
-          providerLabel: "openai"
-        })
-      ]));
-      expect(providerConfig.videoModels).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          apiOwner: "platform",
-          configured: true,
-          model: "doubao-seedance-2-0-fast-260128",
-          providerLabel: "volcengine"
-        })
-      ]));
-      expect(bundlesResponse.bundles).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          bundleId: "platform-quality-bundle",
-          apiOwner: "platform",
-          label: "高质量",
-          enabled: true
-        }),
-        expect.objectContaining({
-          bundleId: "platform-low-cost-bundle",
-          apiOwner: "platform",
-          label: "低成本",
-          enabled: true
-        })
-      ]));
+      expect(providerConfig.textModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
+      expect(providerConfig.imageModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
+      expect(providerConfig.videoModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
+      expect(bundlesResponse.bundles.filter((bundle: { apiOwner: string }) => bundle.apiOwner === "platform")).toEqual([]);
       expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-custom-bundle");
       expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-default-bundle");
       expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-fast-bundle");
-      expect(preferenceResponse.preference).toEqual(expect.objectContaining({
-        platformBundleId: "platform-quality-bundle"
-      }));
+      expect(preferenceResponse.preference.platformBundleId).toBeUndefined();
+      expect(rows).toEqual([]);
     } finally {
       restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
       restoreEnv("HAITU_PLATFORM_DEEPSEEK_API_KEY", previousDeepSeekPlatformKey);
@@ -1770,10 +1920,8 @@ describe("console API", () => {
   });
 
   it("removes legacy fixed platform custom bundles across saved workspaces", async () => {
-    const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
-    const previousVolcenginePlatformKey = process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY;
-    process.env.HAITU_PLATFORM_OPENAI_API_KEY = "platform-openai-legacy-cleanup-secret";
-    process.env.HAITU_PLATFORM_VOLCENGINE_API_KEY = "platform-volcengine-legacy-cleanup-secret";
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-platform-legacy-bundle-cleanup-"));
       tempDirs.push(root);
@@ -1816,7 +1964,14 @@ describe("console API", () => {
       closeDatabase(database);
 
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-      await server.fetchJson("/api/provider-config");
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-cleanup-text-key",
+          vendor: "deepseek",
+          model: "deepseek-v4-pro"
+        })
+      });
 
       const verifiedDatabase = openDatabase({ dataDir, env: process.env });
       const bundleIds = verifiedDatabase.sqlite.prepare(`
@@ -1832,21 +1987,26 @@ describe("console API", () => {
         "platform-quality-bundle"
       ]);
     } finally {
-      restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
-      restoreEnv("HAITU_PLATFORM_VOLCENGINE_API_KEY", previousVolcenginePlatformKey);
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
   });
 
-  it("stores server-only platform keys encrypted in model credentials", async () => {
-    const previousOpenAiPlatformKey = process.env.HAITU_PLATFORM_OPENAI_API_KEY;
-    const previousDefaultTextModel = process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL;
-    process.env.HAITU_PLATFORM_OPENAI_API_KEY = "platform-openai-db-secret-123456";
-    process.env.HAITU_PLATFORM_DEFAULT_TEXT_MODEL = "gpt-5.5";
+  it("stores admin-saved platform keys encrypted in model credentials", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-platform-key-db-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
 
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-openai-db-secret-123456",
+          vendor: "openai",
+          model: "gpt-5.5"
+        })
+      });
       const providerConfig = await server.fetchJson("/api/provider-config");
       const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
       const rows = database.sqlite.prepare(`
@@ -1868,8 +2028,7 @@ describe("console API", () => {
       ]));
       expect(serialized).not.toContain("platform-openai-db-secret-123456");
     } finally {
-      restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
-      restoreEnv("HAITU_PLATFORM_DEFAULT_TEXT_MODEL", previousDefaultTextModel);
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
   });
 
@@ -1893,42 +2052,79 @@ describe("console API", () => {
   });
 
   it("clears a stale platform bundle selection when switching to platform mode without a bundle", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-stale-bundle-"));
     tempDirs.push(root);
-    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-    await server.fetchJson("/api/model-bundles", {
-      method: "PUT",
-      body: JSON.stringify({
-        bundleId: "platform-stale-bundle",
-        apiOwner: "platform",
-        label: "旧平台组合",
-        enabled: true,
-        priority: 1
-      })
-    });
-    await server.fetchJson("/api/model-service-preference", {
-      method: "PUT",
-      body: JSON.stringify({
-        serviceMode: "platform",
-        platformBundleId: "platform-stale-bundle"
-      })
-    });
-    await server.fetchJson("/api/model-bundles/platform-stale-bundle", {
-      method: "DELETE"
-    });
+    try {
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-stale-text-key",
+          vendor: "deepseek",
+          model: "deepseek-v4-pro"
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-stale-image-key",
+          vendor: "openai",
+          model: "gpt-image-2"
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-stale-video-key",
+          vendor: "volcengine",
+          model: "seedance-2.0-fast"
+        })
+      });
+      const providerConfig = await server.fetchJson("/api/provider-config");
+      const platformText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      const platformImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      const platformVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      await server.fetchJson("/api/model-bundles", {
+        method: "PUT",
+        body: JSON.stringify({
+          bundleId: "platform-stale-bundle",
+          apiOwner: "platform",
+          label: "旧平台组合",
+          textModelConfigId: platformText.configId,
+          imageModelConfigId: platformImage.configId,
+          videoModelConfigId: platformVideo.configId,
+          enabled: true,
+          priority: 1
+        })
+      });
+      await server.fetchJson("/api/model-service-preference", {
+        method: "PUT",
+        body: JSON.stringify({
+          serviceMode: "platform",
+          platformBundleId: "platform-stale-bundle"
+        })
+      });
+      await server.fetchJson("/api/model-bundles/platform-stale-bundle", {
+        method: "DELETE"
+      });
 
-    const savedPreference = await server.fetchJson("/api/model-service-preference", {
-      method: "PUT",
-      body: JSON.stringify({
-        serviceMode: "platform",
-        platformBundleId: ""
-      })
-    });
+      const savedPreference = await server.fetchJson("/api/model-service-preference", {
+        method: "PUT",
+        body: JSON.stringify({
+          serviceMode: "platform",
+          platformBundleId: ""
+        })
+      });
 
-    expect(savedPreference.preference).toEqual(expect.objectContaining({
-      serviceMode: "platform"
-    }));
-    expect(savedPreference.preference.platformBundleId).toBeUndefined();
+      expect(savedPreference.preference).toEqual(expect.objectContaining({
+        serviceMode: "platform"
+      }));
+      expect(savedPreference.preference.platformBundleId).toBeUndefined();
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
   });
 
   it("stores a local BYOK video model config without exposing the secret", async () => {
@@ -2080,6 +2276,1212 @@ describe("console API", () => {
     ]);
   });
 
+  it("lets admins inspect wallet balances and append audited balance adjustments", async () => {
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
+    const root = await mkdtemp(join(tmpdir(), "haitu-admin-wallet-adjustment-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/top-up", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 20,
+        description: "user recharge before adjustment"
+      })
+    });
+
+    const before = await server.fetchJson("/api/admin/wallets");
+    const adjusted = await server.fetchJson("/api/admin/wallet-adjustments", {
+      method: "POST",
+      body: JSON.stringify({
+        workspaceId: server.workspaceId,
+        amountCny: -3.5,
+        reason: "测试扣减误发余额"
+      })
+    });
+    const after = await server.fetchJson("/api/admin/wallets");
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(before.wallets).toEqual([
+      expect.objectContaining({
+        workspaceId: server.workspaceId,
+        ownerEmail: "console-test@example.com",
+        balanceCny: 20,
+        reservedCny: 0,
+        availableCny: 20
+      })
+    ]);
+    expect(adjusted.wallet).toEqual(expect.objectContaining({
+      workspaceId: server.workspaceId,
+      balanceCny: 16.5,
+      availableCny: 16.5
+    }));
+    expect(after.wallets[0]).toEqual(expect.objectContaining({
+      balanceCny: 16.5,
+      availableCny: 16.5,
+      lastTransactionType: "adjustment"
+    }));
+    expect(wallet.transactions[0]).toEqual(expect.objectContaining({
+      type: "adjustment",
+      amountCny: -3.5,
+      description: "后台余额调整：测试扣减误发余额"
+    }));
+  });
+
+  it("creates Stripe recharge orders without crediting the wallet until webhook completion", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_recharge_order");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_recharge_order");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-recharge-order-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe("https://api.stripe.com/v1/checkout/sessions");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer sk_test_recharge_order",
+        "content-type": "application/x-www-form-urlencoded",
+        "idempotency-key": expect.stringMatching(/^wallet-recharge-/)
+      }));
+      const params = new URLSearchParams(String(init?.body));
+      expect(params.get("mode")).toBe("payment");
+      expect(params.get("currency")).toBe("hkd");
+      expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5000");
+      expect(params.get("line_items[0][price_data][currency]")).toBe("hkd");
+      expect(params.has("automatic_payment_methods[enabled]")).toBe(false);
+      expect(params.get("metadata[walletCreditCents]")).toBe("5000");
+      expect(params.get("success_url")).toContain("payment=stripe-success");
+      expect(params.get("cancel_url")).toContain("payment=stripe-cancel");
+      return jsonResponse({
+        id: "cs_test_wallet_recharge",
+        url: "https://checkout.stripe.com/c/pay/cs_test_wallet_recharge",
+        payment_intent: "pi_test_wallet_recharge",
+        expires_at: 1790000000
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50 })
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(created).toEqual(expect.objectContaining({
+      checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_wallet_recharge",
+      order: expect.objectContaining({
+        provider: "stripe",
+        providerSessionId: "cs_test_wallet_recharge",
+        amountCny: 50,
+        currency: "hkd",
+        status: "pending"
+      })
+    }));
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 0,
+      reservedCny: 0,
+      availableCny: 0,
+      transactions: []
+    }));
+  });
+
+  it("lets admins control which recharge payment methods users can choose", async () => {
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_admin");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_admin");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_payment_method_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_webhook_secret");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-admin-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_disabled_should_not_call",
+        url: "https://checkout.stripe.com/c/pay/cs_test_disabled_should_not_call"
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const initialUserMethods = await server.fetchJson("/api/payment-methods");
+    const initialAdminMethods = await server.fetchJson("/api/admin/payment-methods");
+    await server.fetchJson("/api/admin/payment-methods", {
+      method: "PUT",
+      body: JSON.stringify({
+        methods: [
+          { id: "stripe", enabled: false },
+          { id: "infini", enabled: false }
+        ]
+      })
+    });
+    const afterDisable = await server.fetchJson("/api/payment-methods");
+    const blocked = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 50,
+        paymentMethodId: "stripe"
+      })
+    });
+
+    expect(initialUserMethods.methods).toEqual([
+      expect.objectContaining({
+        id: "stripe",
+        kind: "rmb",
+        enabled: true,
+        configured: true,
+        available: true
+      }),
+      expect.objectContaining({
+        id: "infini",
+        kind: "crypto",
+        enabled: true,
+        configured: true,
+        available: true
+      })
+    ]);
+    expect(initialAdminMethods.methods).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "stripe", enabled: true, configured: true }),
+      expect.objectContaining({ id: "infini", enabled: true, configured: true })
+    ]));
+    expect(afterDisable.methods).toEqual([]);
+    expect(blocked.status).toBe(422);
+    await expect(blocked.json()).resolves.toEqual({
+      error: "该支付方式已停用，请在后台启用后再充值。"
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("shows enabled recharge payment methods to users even when server secrets are incomplete", async () => {
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_visible");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_visible");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-unconfigured-visible-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    const methods = await server.fetchJson("/api/payment-methods");
+    const blocked = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 50,
+        paymentMethodId: "infini"
+      })
+    });
+
+    expect(methods.methods).toEqual([
+      expect.objectContaining({
+        id: "stripe",
+        enabled: true,
+        configured: true,
+        available: true
+      }),
+      expect.objectContaining({
+        id: "infini",
+        kind: "crypto",
+        enabled: true,
+        configured: false,
+        available: false,
+        unavailableReason: "缺少 INFINI_PUBLIC_KEY、INFINI_PRIVATE_KEY 或 INFINI_WEBHOOK_SECRET"
+      })
+    ]);
+    expect(blocked.status).toBe(422);
+    await expect(blocked.json()).resolves.toEqual({
+      error: "该支付方式尚未配置完成，请先在服务器环境变量中配置。"
+    });
+  });
+
+  it("rejects unknown recharge payment method ids instead of falling back to Stripe", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_unknown_payment_method");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_unknown_payment_method");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-unknown-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_unknown_should_not_call",
+        url: "https://checkout.stripe.com/c/pay/cs_test_unknown_should_not_call"
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const response = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 50,
+        paymentMethodId: "paypal"
+      })
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "暂不支持该支付方式。"
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("creates Infini recharge orders without crediting the wallet until webhook completion", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_create_order_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_create_order_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_create_order_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-recharge-order-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order");
+      expect(init?.method).toBe("POST");
+      expect(init?.headers).toEqual(expect.objectContaining({
+        "content-type": "application/json"
+      }));
+      expect(Object.fromEntries(new Headers(init?.headers).entries())).toEqual(expect.objectContaining({
+        authorization: expect.stringContaining('keyId="infini_create_order_key"'),
+        date: expect.any(String),
+        digest: expect.stringMatching(/^SHA-256=/)
+      }));
+      const payload = JSON.parse(String(init?.body));
+      expect(payload).toEqual(expect.objectContaining({
+        amount: "50.00",
+        currency: "HKD",
+        client_reference: expect.stringMatching(/^wallet-recharge-/),
+        request_id: payload.client_reference,
+        order_desc: "Haitu 余额充值",
+        merchant_alias: "Haitu",
+        pay_methods: [1]
+      }));
+      expect(payload.success_url).toContain("payment=infini-success");
+      expect(payload.failure_url).toContain("payment=infini-cancel");
+      return jsonResponse({
+        order_id: "infini_order_wallet_recharge",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_wallet_recharge",
+        client_reference: payload.client_reference
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(created).toEqual(expect.objectContaining({
+      checkoutUrl: "https://checkout-sandbox.infini.money/pay/infini_order_wallet_recharge",
+      order: expect.objectContaining({
+        provider: "infini",
+        providerSessionId: "infini_order_wallet_recharge",
+        amountCny: 50,
+        currency: "hkd",
+        status: "pending"
+      })
+    }));
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 0,
+      reservedCny: 0,
+      availableCny: 0,
+      transactions: []
+    }));
+  });
+
+  it("returns a clear error when Stripe checkout session creation cannot reach Stripe", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_recharge_network_error");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_recharge_network_error");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-recharge-network-error-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const response = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50 })
+    });
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    let orderStatus: { status: string; failure_reason: string | null } | undefined;
+    try {
+      orderStatus = handle.sqlite.prepare(`
+        SELECT status, failure_reason
+        FROM wallet_recharge_orders
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get() as { status: string; failure_reason: string | null } | undefined;
+    } finally {
+      closeDatabase(handle);
+    }
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "Stripe 支付订单请求失败，请稍后重试。原因: fetch failed"
+    });
+    expect(orderStatus).toEqual({
+      status: "failed",
+      failure_reason: "Stripe 支付订单请求失败，请稍后重试。原因: fetch failed"
+    });
+  });
+
+  it("returns a clear error when Infini checkout order creation cannot reach Infini", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_network_error_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_network_error_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_network_error_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-recharge-network-error-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const response = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    let orderStatus: { provider: string; status: string; failure_reason: string | null } | undefined;
+    try {
+      orderStatus = handle.sqlite.prepare(`
+        SELECT provider, status, failure_reason
+        FROM wallet_recharge_orders
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get() as { provider: string; status: string; failure_reason: string | null } | undefined;
+    } finally {
+      closeDatabase(handle);
+    }
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "Infini 支付订单请求失败，请稍后重试。原因: fetch failed"
+    });
+    expect(orderStatus).toEqual({
+      provider: "infini",
+      status: "failed",
+      failure_reason: "Infini 支付订单请求失败，请稍后重试。原因: fetch failed"
+    });
+  });
+
+  it("accepts Infini checkout orders returned inside a data envelope", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_enveloped_order_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_enveloped_order_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_enveloped_order_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-recharge-envelope-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        code: 0,
+        message: "success",
+        data: {
+          order_id: "infini_order_enveloped_wallet",
+          request_id: payload.request_id,
+          checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_enveloped_wallet",
+          client_reference: payload.client_reference
+        }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 100, paymentMethodId: "infini" })
+    });
+
+    expect(created).toEqual(expect.objectContaining({
+      checkoutUrl: "https://checkout-sandbox.infini.money/pay/infini_order_enveloped_wallet",
+      order: expect.objectContaining({
+        provider: "infini",
+        providerSessionId: "infini_order_enveloped_wallet",
+        amountCny: 100,
+        status: "pending"
+      })
+    }));
+  });
+
+  it("credits Stripe recharge orders once and only after a signed checkout webhook", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_recharge");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_recharge");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-recharge-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_webhook_wallet",
+        url: "https://checkout.stripe.com/c/pay/cs_test_webhook_wallet",
+        payment_intent: "pi_test_webhook_wallet",
+        expires_at: 1790000000
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_checkout_completed",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_webhook_wallet",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 8800,
+          currency: "hkd",
+          payment_intent: "pi_test_webhook_wallet"
+        }
+      }
+    });
+    const signature = stripeTestSignature(payload, "whsec_webhook_recharge");
+
+    const first = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature
+      },
+      body: payload
+    });
+    const duplicate = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    await expect(first.json()).resolves.toEqual({ received: true });
+    await expect(duplicate.json()).resolves.toEqual({ received: true, duplicate: true });
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 88,
+      reservedCny: 0,
+      availableCny: 88
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 88,
+        description: "Stripe 充值到账"
+      })
+    ]);
+  });
+
+  it("credits Infini recharge orders once and only after a signed order.completed webhook", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_webhook_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_webhook_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_webhook_signing_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-webhook-recharge-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_webhook_wallet",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_webhook_wallet",
+        client_reference: payload.client_reference
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88, paymentMethodId: "infini" })
+    });
+    const processingPayload = JSON.stringify({
+      event: "order.processing",
+      order_id: "infini_order_webhook_wallet",
+      client_reference: "",
+      amount: "88.00",
+      currency: "HKD",
+      status: "processing",
+      amount_confirmed: "0",
+      amount_confirming: "88.00",
+      created_at: 1800000000,
+      updated_at: 1800000001
+    });
+    const completedPayload = JSON.stringify({
+      event: "order.completed",
+      order_id: "infini_order_webhook_wallet",
+      client_reference: "",
+      amount: "88.00",
+      currency: "HKD",
+      status: "paid",
+      amount_confirmed: "88.00",
+      amount_confirming: "0",
+      created_at: 1800000000,
+      updated_at: 1800000002
+    });
+
+    const processing = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(processingPayload, "infini_webhook_signing_secret", "evt_infini_processing"),
+      body: processingPayload
+    });
+    const beforeCompleted = await server.fetchJson("/api/wallet");
+    const first = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(completedPayload, "infini_webhook_signing_secret", "evt_infini_completed"),
+      body: completedPayload
+    });
+    const duplicate = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(completedPayload, "infini_webhook_signing_secret", "evt_infini_completed"),
+      body: completedPayload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(processing.status).toBe(200);
+    await expect(processing.json()).resolves.toEqual({ received: true });
+    expect(beforeCompleted.balanceCny).toBe(0);
+    await expect(first.json()).resolves.toEqual({ received: true });
+    await expect(duplicate.json()).resolves.toEqual({ received: true, duplicate: true });
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 88,
+      reservedCny: 0,
+      availableCny: 88
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 88,
+        description: "Infini 数字货币充值到账"
+      })
+    ]);
+  });
+
+  it("syncs paid Infini recharge orders by querying Infini when local webhooks cannot be delivered", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_sync_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_sync_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_sync_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-sync-recharge-"));
+    tempDirs.push(root);
+    let clientReference = "";
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://openapi-sandbox.infini.money/v1/acquiring/order" && init?.method === "POST") {
+        const payload = JSON.parse(String(init?.body));
+        clientReference = payload.client_reference;
+        return jsonResponse({
+          order_id: "infini_order_sync_wallet",
+          request_id: payload.request_id,
+          checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_sync_wallet",
+          client_reference: payload.client_reference
+        });
+      }
+      if (String(url) === "https://openapi-sandbox.infini.money/v1/acquiring/order?order_id=infini_order_sync_wallet" && init?.method === "GET") {
+        expect(Object.fromEntries(new Headers(init.headers).entries())).toEqual(expect.objectContaining({
+          authorization: expect.stringContaining('keyId="infini_sync_key"'),
+          date: expect.any(String)
+        }));
+        return jsonResponse({
+          code: 0,
+          message: "",
+          data: {
+            order_id: "infini_order_sync_wallet",
+            client_reference: clientReference,
+            order_currency: "HKD",
+            order_amount: "50",
+            amount_confirmed: "50",
+            amount_confirming: "0",
+            status: "paid",
+            updated_at: 1800000002
+          }
+        });
+      }
+      throw new Error(`Unexpected Infini request ${String(url)}`);
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    const beforeSync = await server.fetchJson("/api/wallet");
+    const firstSync = await server.fetchJson(`/api/wallet/recharge-orders/${encodeURIComponent(created.order.id)}/sync`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    const duplicateSync = await server.fetchJson(`/api/wallet/recharge-orders/${encodeURIComponent(created.order.id)}/sync`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(beforeSync.balanceCny).toBe(0);
+    expect(firstSync).toEqual(expect.objectContaining({
+      synced: true,
+      order: expect.objectContaining({
+        provider: "infini",
+        providerSessionId: "infini_order_sync_wallet",
+        status: "paid"
+      }),
+      wallet: expect.objectContaining({
+        balanceCny: 50,
+        availableCny: 50
+      })
+    }));
+    expect(duplicateSync).toEqual(expect.objectContaining({
+      synced: false,
+      order: expect.objectContaining({
+        status: "paid"
+      })
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 50,
+        description: "Infini 数字货币充值到账"
+      })
+    ]);
+  });
+
+  it("waits for async Stripe checkout success before crediting delayed payment methods", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_async_webhook_recharge");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_async_webhook_recharge");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-async-webhook-recharge-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_async_webhook_wallet",
+        url: "https://checkout.stripe.com/c/pay/cs_test_async_webhook_wallet",
+        payment_intent: "pi_test_async_webhook_wallet",
+        expires_at: 1790000000
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88 })
+    });
+    const completedPayload = JSON.stringify({
+      id: "evt_test_async_checkout_completed",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_async_webhook_wallet",
+          object: "checkout.session",
+          payment_status: "unpaid",
+          amount_total: 8800,
+          currency: "hkd",
+          payment_intent: "pi_test_async_webhook_wallet"
+        }
+      }
+    });
+    const succeededPayload = JSON.stringify({
+      id: "evt_test_async_checkout_succeeded",
+      type: "checkout.session.async_payment_succeeded",
+      data: {
+        object: {
+          id: "cs_test_async_webhook_wallet",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 8800,
+          currency: "hkd",
+          payment_intent: "pi_test_async_webhook_wallet"
+        }
+      }
+    });
+
+    const completed = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(completedPayload, "whsec_async_webhook_recharge")
+      },
+      body: completedPayload
+    });
+    const walletBeforeAsyncSuccess = await server.fetchJson("/api/wallet");
+    const succeeded = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(succeededPayload, "whsec_async_webhook_recharge")
+      },
+      body: succeededPayload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(completed.status).toBe(200);
+    await expect(completed.json()).resolves.toEqual({ received: true });
+    expect(walletBeforeAsyncSuccess.balanceCny).toBe(0);
+    expect(succeeded.status).toBe(200);
+    await expect(succeeded.json()).resolves.toEqual({ received: true });
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 88,
+      reservedCny: 0,
+      availableCny: 88
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 88,
+        description: "Stripe 充值到账"
+      })
+    ]);
+  });
+
+  it("marks Stripe async checkout failures without crediting the wallet", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_async_webhook_failure");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_async_webhook_failure");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-async-webhook-failure-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_async_webhook_failure",
+        url: "https://checkout.stripe.com/c/pay/cs_test_async_webhook_failure",
+        payment_intent: "pi_test_async_webhook_failure",
+        expires_at: 1790000000
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 66 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_async_checkout_failed",
+      type: "checkout.session.async_payment_failed",
+      data: {
+        object: {
+          id: "cs_test_async_webhook_failure",
+          object: "checkout.session",
+          payment_status: "unpaid",
+          amount_total: 6600,
+          currency: "hkd",
+          payment_intent: "pi_test_async_webhook_failure"
+        }
+      }
+    });
+
+    const response = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(payload, "whsec_async_webhook_failure")
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    let orderStatus: { status: string; failure_reason: string | null } | undefined;
+    try {
+      orderStatus = handle.sqlite.prepare(`
+        SELECT status, failure_reason
+        FROM wallet_recharge_orders
+        WHERE provider_session_id = ?
+      `).get("cs_test_async_webhook_failure") as { status: string; failure_reason: string | null } | undefined;
+    } finally {
+      closeDatabase(handle);
+    }
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+    expect(orderStatus).toEqual({
+      status: "failed",
+      failure_reason: "Stripe 异步支付失败"
+    });
+  });
+
+  it("rejects Stripe checkout webhooks whose amount does not match the recharge order", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_mismatch");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_mismatch");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-mismatch-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_webhook_mismatch",
+        url: "https://checkout.stripe.com/c/pay/cs_test_webhook_mismatch",
+        payment_intent: "pi_test_webhook_mismatch",
+        expires_at: 1790000000
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_checkout_mismatch",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_webhook_mismatch",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 9900,
+          currency: "hkd",
+          payment_intent: "pi_test_webhook_mismatch"
+        }
+      }
+    });
+    const response = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(payload, "whsec_webhook_mismatch")
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      error: expect.stringContaining("Stripe 充值金额不匹配")
+    }));
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+  });
+
+  it("rejects Stripe checkout webhooks signed outside the replay tolerance", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_old_signature");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_old_signature");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const nowSeconds = 1_800_000_000;
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-old-signature-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        id: "cs_test_webhook_old_signature",
+        url: "https://checkout.stripe.com/c/pay/cs_test_webhook_old_signature",
+        payment_intent: "pi_test_webhook_old_signature",
+        expires_at: 1790000000
+      })
+    ) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date(nowSeconds * 1000)
+    });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_checkout_old_signature",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_webhook_old_signature",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 8800,
+          currency: "hkd",
+          payment_intent: "pi_test_webhook_old_signature"
+        }
+      }
+    });
+
+    const response = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(payload, "whsec_webhook_old_signature", nowSeconds - 301)
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      error: expect.stringContaining("Stripe webhook 签名时间")
+    }));
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+  });
+
+  it("rejects Infini checkout webhooks signed outside the replay tolerance", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_old_signature_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_old_signature_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_old_signature_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const nowSeconds = 1_800_000_000;
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-webhook-old-signature-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_old_signature",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_old_signature",
+        client_reference: payload.client_reference
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date(nowSeconds * 1000)
+    });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88, paymentMethodId: "infini" })
+    });
+    const payload = JSON.stringify({
+      event: "order.completed",
+      order_id: "infini_order_old_signature",
+      client_reference: "",
+      amount: "88.00",
+      currency: "HKD",
+      status: "paid",
+      amount_confirmed: "88.00",
+      amount_confirming: "0",
+      created_at: nowSeconds,
+      updated_at: nowSeconds
+    });
+
+    const response = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(payload, "infini_old_signature_webhook_secret", "evt_infini_old_signature", nowSeconds - 1201),
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      error: expect.stringContaining("Infini webhook 签名时间")
+    }));
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+  });
+
+  it("rejects Infini checkout webhooks whose decimal amount has unsupported precision", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_precision_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_precision_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_precision_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-webhook-precision-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_precision",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_precision",
+        client_reference: payload.client_reference
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88, paymentMethodId: "infini" })
+    });
+    const payload = JSON.stringify({
+      event: "order.completed",
+      order_id: "infini_order_precision",
+      client_reference: "",
+      amount: "88.001",
+      currency: "HKD",
+      status: "paid",
+      amount_confirmed: "88.001",
+      amount_confirming: "0"
+    });
+
+    const response = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(payload, "infini_precision_webhook_secret", "evt_infini_precision"),
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      error: expect.stringContaining("Infini 充值金额不匹配")
+    }));
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+  });
+
+  it("marks Infini late payments for manual confirmation without crediting the wallet", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_late_payment_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_late_payment_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_late_payment_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-late-payment-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_late_payment",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_late_payment",
+        client_reference: payload.client_reference
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88, paymentMethodId: "infini" })
+    });
+    const payload = JSON.stringify({
+      event: "order.late_payment",
+      order_id: "infini_order_late_payment",
+      client_reference: "",
+      amount: "88.00",
+      currency: "HKD",
+      status: "expired",
+      amount_confirmed: "88.00",
+      amount_confirming: "0"
+    });
+
+    const response = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(payload, "infini_late_payment_webhook_secret", "evt_infini_late_payment"),
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    let orderStatus: { status: string; failure_reason: string | null } | undefined;
+    try {
+      orderStatus = handle.sqlite.prepare(`
+        SELECT status, failure_reason
+        FROM wallet_recharge_orders
+        WHERE provider_session_id = ?
+      `).get("infini_order_late_payment") as { status: string; failure_reason: string | null } | undefined;
+    } finally {
+      closeDatabase(handle);
+    }
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+    expect(wallet.balanceCny).toBe(0);
+    expect(wallet.transactions).toEqual([]);
+    expect(orderStatus).toEqual({
+      status: "failed",
+      failure_reason: "Infini 订单超时后收到付款，请后台人工确认"
+    });
+  });
+
+  it("keeps webhook idempotency scoped per payment provider", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_provider_scoped_webhook");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_provider_scoped_webhook");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_provider_scoped_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_provider_scoped_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_provider_scoped_webhook_secret");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-provider-scoped-webhooks-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
+        return jsonResponse({
+          id: "cs_test_provider_scoped",
+          url: "https://checkout.stripe.com/c/pay/cs_test_provider_scoped",
+          payment_intent: "pi_test_provider_scoped",
+          expires_at: 1790000000
+        });
+      }
+      if (String(url) === "https://openapi-sandbox.infini.money/v1/acquiring/order" && init?.method === "POST") {
+        const payload = JSON.parse(String(init.body));
+        return jsonResponse({
+          order_id: "infini_order_provider_scoped",
+          request_id: payload.request_id,
+          checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_provider_scoped",
+          client_reference: payload.client_reference
+        });
+      }
+      throw new Error(`Unexpected payment request ${String(url)}`);
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "stripe" })
+    });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 60, paymentMethodId: "infini" })
+    });
+    const sharedEventId = "evt_shared_provider_scoped";
+    const stripePayload = JSON.stringify({
+      id: sharedEventId,
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_provider_scoped",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 5000,
+          currency: "hkd",
+          payment_intent: "pi_test_provider_scoped"
+        }
+      }
+    });
+    const infiniPayload = JSON.stringify({
+      event: "order.completed",
+      order_id: "infini_order_provider_scoped",
+      client_reference: "",
+      amount: "60.00",
+      currency: "HKD",
+      status: "paid",
+      amount_confirmed: "60.00",
+      amount_confirming: "0"
+    });
+
+    const stripeResponse = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(stripePayload, "whsec_provider_scoped_webhook")
+      },
+      body: stripePayload
+    });
+    const infiniResponse = await server.raw.fetch("/api/payments/infini/webhook", {
+      method: "POST",
+      headers: infiniWebhookHeaders(infiniPayload, "infini_provider_scoped_webhook_secret", sharedEventId),
+      body: infiniPayload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(stripeResponse.status).toBe(200);
+    expect(infiniResponse.status).toBe(200);
+    await expect(stripeResponse.json()).resolves.toEqual({ received: true });
+    await expect(infiniResponse.json()).resolves.toEqual({ received: true });
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 110,
+      availableCny: 110
+    }));
+    expect(wallet.transactions.map((transaction: { description?: string; amountCny: number }) => [
+      transaction.description,
+      transaction.amountCny
+    ])).toEqual([
+      ["Infini 数字货币充值到账", 60],
+      ["Stripe 充值到账", 50]
+    ]);
+  });
+
   it("saves model bundles that combine text, image, and video model configs", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-model-bundles-"));
     tempDirs.push(root);
@@ -2151,6 +3553,64 @@ describe("console API", () => {
     ]);
   });
 
+  it("saves incomplete model bundles as drafts but rejects enabling or selecting them", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-bundle-drafts-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+    await server.fetchJson("/api/model-configs/openai-compatible-text", {
+      method: "PUT",
+      body: JSON.stringify({
+        apiKey: "text-draft-key",
+        name: "DeepSeek 草稿",
+        vendor: "deepseek",
+        model: "deepseek-v4-pro",
+        baseUrl: "https://api.deepseek.com"
+      })
+    });
+    const providerConfig = await server.fetchJson("/api/provider-config");
+    const textConfigId = providerConfig.textModels[0].configId;
+
+    const draft = await server.fetchJson("/api/model-bundles", {
+      method: "PUT",
+      body: JSON.stringify({
+        label: "只选了文本的草稿",
+        apiOwner: "byok",
+        textModelConfigId: textConfigId,
+        enabled: false
+      })
+    });
+    await expect(server.fetchJson("/api/model-bundles", {
+      method: "PUT",
+      body: JSON.stringify({
+        bundleId: draft.bundle.bundleId,
+        label: "只选了文本的草稿",
+        apiOwner: "byok",
+        textModelConfigId: textConfigId,
+        enabled: true
+      })
+    })).rejects.toThrow("启用模型组合必须同时选择文本、图片和视频模型。");
+    await expect(server.fetchJson("/api/model-service-preference", {
+      method: "PUT",
+      body: JSON.stringify({
+        serviceMode: "byok",
+        byokBundleId: draft.bundle.bundleId
+      })
+    })).rejects.toThrow("选择的自带 API 组合尚未配置完整。");
+
+    const listed = await server.fetchJson("/api/model-bundles");
+    expect(draft.bundle).toEqual(expect.objectContaining({
+      label: "只选了文本的草稿",
+      textModelConfigId: textConfigId,
+      enabled: false
+    }));
+    expect(listed.bundles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        bundleId: draft.bundle.bundleId,
+        enabled: false
+      })
+    ]));
+  });
+
   it("persists model service mode and uses the selected platform bundle for AI calls", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     const previousTextFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
@@ -2198,8 +3658,32 @@ describe("console API", () => {
           priority: 10
         })
       });
+      await server.fetchJson("/api/platform/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-image-secret-9999",
+          name: "平台图片",
+          vendor: "openai",
+          baseUrl: "https://platform-image.example.test",
+          model: "gpt-image-2",
+          priority: 10
+        })
+      });
+      await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-video-secret-9999",
+          name: "平台视频",
+          vendor: "volcengine",
+          baseUrl: "https://platform-video.example.test",
+          model: "doubao-seedance-2-0-fast-260128",
+          priority: 10
+        })
+      });
       const providerConfig = await server.fetchJson("/api/provider-config");
       const platformText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      const platformImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
+      const platformVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
       expect(platformText).toEqual(expect.objectContaining({
         apiOwner: "platform",
         model: "deepseek-v4-pro"
@@ -2211,6 +3695,8 @@ describe("console API", () => {
           description: "平台文本 + 平台图片 + 平台视频",
           apiOwner: "platform",
           textModelConfigId: platformText.configId,
+          imageModelConfigId: platformImage.configId,
+          videoModelConfigId: platformVideo.configId,
           enabled: true,
           priority: 100
         })
@@ -2319,14 +3805,40 @@ describe("console API", () => {
           priority: 10
         })
       });
+      await server.fetchJson("/api/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-image-secret-2222",
+          name: "用户图片",
+          vendor: "openai",
+          baseUrl: "https://byok-image.example.test",
+          model: "gpt-image-2",
+          priority: 10
+        })
+      });
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-video-secret-2222",
+          name: "用户视频",
+          vendor: "volcengine",
+          baseUrl: "https://byok-video.example.test",
+          model: "doubao-seedance-2-0-fast-260128",
+          priority: 10
+        })
+      });
       const providerConfig = await server.fetchJson("/api/provider-config");
       const byokText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
+      const byokImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
+      const byokVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
       const savedBundle = await server.fetchJson("/api/model-bundles", {
         method: "PUT",
         body: JSON.stringify({
           label: "自带 API 组合",
           apiOwner: "byok",
           textModelConfigId: byokText.configId,
+          imageModelConfigId: byokImage.configId,
+          videoModelConfigId: byokVideo.configId,
           enabled: true,
           priority: 50
         })
@@ -3191,7 +4703,6 @@ describe("console API", () => {
       expect(config.textModels[0]).toEqual(expect.objectContaining({
         label: "ChatFire 推荐-文本",
         providerLabel: "chatfire",
-        priority: 8,
         baseUrl: "https://api.chatfire.site",
         model: "gemini-3-pro-preview",
         apiMode: "chat_completions",
@@ -3280,7 +4791,6 @@ describe("console API", () => {
         keyPreview: "text...3456",
         baseUrl: "https://api.deepseek.com",
         apiMode: "chat_completions",
-        priority: 7,
         modelKind: "text"
       })));
       expect(new Set(config.textModels.map((item: { configId: string }) => item.configId)).size).toBe(3);
@@ -3648,7 +5158,7 @@ describe("console API", () => {
     }
   });
 
-  it("keeps multiple model configs per type and uses the highest priority enabled text config", async () => {
+  it("keeps multiple model configs per type and uses the most recently saved text config by default", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.TEXT_MODEL_API_KEY;
@@ -3685,21 +5195,22 @@ describe("console API", () => {
       await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "low-priority-text-secret-0001",
-          name: "低优先级文本",
+          apiKey: "older-text-secret-0001",
+          name: "旧文本服务",
           vendor: "openai",
-          priority: 1,
+          priority: 100,
           baseUrl: "https://low.example.test",
           model: "low-model"
         })
       });
+      await sleep(5);
       await server.fetchJson("/api/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "high-priority-text-secret-9999",
-          name: "高优先级文本",
+          apiKey: "newer-text-secret-9999",
+          name: "新文本服务",
           vendor: "chatfire",
-          priority: 9,
+          priority: 1,
           baseUrl: "https://high.example.test/",
           model: "high-model"
         })
@@ -3707,10 +5218,12 @@ describe("console API", () => {
 
       const config = await server.fetchJson("/api/provider-config");
       expect(config.textModels).toHaveLength(2);
-      expect(config.textModels.map((item: { label: string }) => item.label)).toEqual(["高优先级文本", "低优先级文本"]);
-      expect(config.textModels.map((item: { priority: number }) => item.priority)).toEqual([9, 1]);
-      expect(JSON.stringify(config)).not.toContain("high-priority-text-secret-9999");
-      expect(JSON.stringify(config)).not.toContain("low-priority-text-secret-0001");
+      expect(config.textModels.map((item: { label: string }) => item.label)).toEqual(["新文本服务", "旧文本服务"]);
+      expect(config.textModels).toEqual(config.textModels.map((item: Record<string, unknown>) => expect.not.objectContaining({
+        priority: expect.any(Number)
+      })));
+      expect(JSON.stringify(config)).not.toContain("newer-text-secret-9999");
+      expect(JSON.stringify(config)).not.toContain("older-text-secret-0001");
 
       await topUpWalletForAiUsage(server);
       await server.fetchJson("/api/products/import-ai-preview", {
@@ -3722,7 +5235,7 @@ describe("console API", () => {
 
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://high.example.test/v1/chat/completions");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
-        authorization: "Bearer high-priority-text-secret-9999"
+        authorization: "Bearer newer-text-secret-9999"
       }));
       const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
       expect(body.model).toBe("high-model");
@@ -3777,6 +5290,8 @@ describe("console API", () => {
 
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
     expect(primaryNavSource).toContain("视频创作");
+    expect(primaryNavSource).toContain("图片创作");
+    expect(primaryNavSource).toContain("任务记录");
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
@@ -3786,7 +5301,7 @@ describe("console API", () => {
     expect(appSource).not.toContain('case "products"');
     expect(appSource).not.toContain('aria-label="商品管理"');
 
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
     expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
     expect(videoCase).not.toContain("<VideoJobsPanel");
@@ -3795,6 +5310,10 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<StorageBackupPanel");
     expect(videoCase).not.toContain("<AuditLogPanel");
     expect(videoCase).not.toContain("<VideoAssetsPanel");
+
+    const imageCase = appSource.slice(appSource.indexOf('case "image"'), appSource.indexOf('case "ledger"'));
+    expect(imageCase).toContain('aria-label="图片创作"');
+    expect(imageCase).toContain("图片创作待上线");
 
     const productCreationWorkspace = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     expect(productCreationWorkspace).toContain("<ProductCreationComposer");
@@ -3812,36 +5331,47 @@ describe("console API", () => {
 
     expect(appSource).not.toContain("function ProductCreationStartPanel");
     expect(appSource).not.toContain("product-creation-start");
-    expect(appSource).toContain("product-creation-picker");
+    expect(appSource).toContain("video-product-library-column");
     expect(appSource).not.toContain("选择商品开始创作");
     expect(appSource).not.toContain("开始创作");
 
-    const productPickerSource = appSource.slice(appSource.indexOf("function ProductCreationProductPicker"), appSource.indexOf("function ReferenceImageFigure"));
+    const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     expect(appSource).not.toContain("product-studio-topbar");
     expect(appSource).not.toContain("ProductStudioProductPicker");
-    expect(productPickerSource).toContain("创作商品");
-    expect(productPickerSource).toContain("product-creation-product-menu");
-    expect(productPickerSource).toContain("handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)");
-    expect(productPickerSource).toContain("新商品");
-    expect(productPickerSource).toContain("dedupeProductSummaries(products)");
-    expect(productPickerSource).toContain("onDeleteProduct");
-    expect(productPickerSource).toContain("删除商品");
-    expect(productPickerSource).toContain("onDeleteProduct(option.sku)");
-    expect(productPickerSource).toContain("event.stopPropagation()");
-    expect(productPickerSource).not.toContain("删除当前商品");
-    expect(productPickerSource).toContain("setProductPickerOpen(false)");
-    expect(productPickerSource).not.toContain("+ 新建商品");
-    expect(productPickerSource).not.toContain("<Select");
-    expect(productPickerSource).not.toContain("切换商品");
-    expect(productPickerSource).not.toContain("返回视频创作");
-    expect(productPickerSource).not.toContain("返回商品项目");
+    expect(productLibraryColumnSource).toContain("商品库");
+    expect(productLibraryColumnSource).toContain("新商品");
+    expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
+    expect(productLibraryColumnSource).toContain("productLibrarySearchQuery");
+    expect(productLibraryColumnSource).toContain("filterProductLibraryProducts(productOptions, productLibrarySearchQuery");
+    expect(productLibraryColumnSource).toContain("product-library-search");
+    expect(productLibraryColumnSource).toContain('aria-label="搜索商品"');
+    expect(productLibraryColumnSource).toContain('placeholder="搜索商品"');
+    expect(productLibraryColumnSource).not.toContain("搜索商品 / SKU");
+    expect(productLibraryColumnSource).toContain("product-library-scroll min-h-0 overflow-y-auto");
+    expect(productLibraryColumnSource).toContain("filteredProductOptions.map");
+    expect(productLibraryColumnSource).toContain("没有匹配的商品");
+    expect(productLibraryColumnSource).toContain("清空搜索");
+    expect(productLibraryColumnSource).toContain("productLibraryStatus(product)");
+    expect(productLibraryColumnSource).toContain("onDeleteProduct");
+    expect(productLibraryColumnSource).toContain("删除商品");
+    expect(productLibraryColumnSource).toContain("onDeleteProduct(product.sku)");
+    expect(productLibraryColumnSource).toContain("event.stopPropagation()");
+    expect(productLibraryColumnSource).not.toContain("删除当前商品");
+    expect(productLibraryColumnSource).not.toContain("setProductPickerOpen(false)");
+    expect(productLibraryColumnSource).not.toContain("+ 新建商品");
+    expect(productLibraryColumnSource).not.toContain("<Select");
+    expect(productLibraryColumnSource).not.toContain("切换商品");
+    expect(productLibraryColumnSource).not.toContain("返回视频创作");
+    expect(productLibraryColumnSource).not.toContain("返回商品项目");
+    expect(productLibraryColumnSource).not.toContain("手动填写或粘贴商品资料");
   });
 
   it("renders video creation as one composer with inline product packing, controls, storyboard, and video history", async () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
     const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
+    const storyboardDraftsSource = await readFile(join(process.cwd(), "src", "client", "storyboardDrafts.ts"), "utf8");
 
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
     expect(videoCase).toContain("onOrganizeProductPackage");
     expect(videoCase).toContain("onStartNewProduct");
@@ -3850,7 +5380,7 @@ describe("console API", () => {
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
     const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
-    const defaultStoryboardSource = appSource.slice(appSource.indexOf("function defaultStoryboardDraft"), appSource.indexOf("function defaultStudioScriptDraft"));
+    const defaultStoryboardSource = storyboardDraftsSource.slice(storyboardDraftsSource.indexOf("export function defaultStoryboardDraft"), storyboardDraftsSource.indexOf("export function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
     expect(workspaceSource).toContain("selectedProductStoryboardHistory");
     expect(workspaceSource).not.toContain("<ProductStudio");
@@ -3877,15 +5407,89 @@ describe("console API", () => {
     expect(defaultStoryboardSource).toContain("unboxing");
     expect(defaultStoryboardSource).toContain("storyboardTimeRanges(durationSeconds)");
     expect(defaultStoryboardSource).toContain("`0-${firstEnd}s`");
+    expect(appSource).toContain('from "./storyboardDrafts.js"');
+    expect(appSource).not.toContain("function defaultStoryboardDraft(");
     expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
-    expect(composerSource).toContain("video-creation-frame");
-    expect(composerSource).toContain("product-creation-canvas");
-    expect(composerSource).toContain("product-control-bar");
-    expect(composerSource).toContain("video-parameter-row grid");
-    expect(composerSource).toContain("min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))]");
+    expect(composerSource).toContain("video-workspace-shell");
+    expect(composerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
+    expect(composerSource).toContain("transition-[grid-template-columns] duration-200");
+    expect(composerSource).toContain("min-[900px]:grid-cols-[var(--product-library-column-width)_minmax(0,1fr)]");
+    expect(composerSource).toContain('style={{ "--product-library-column-width": `${productLibraryColumnWidth}px` } as CSSProperties}');
+    expect(composerSource).toContain("PRODUCT_LIBRARY_DEFAULT_WIDTH");
+    expect(composerSource).toContain("PRODUCT_LIBRARY_COLLAPSED_WIDTH");
+    expect(composerSource).not.toContain("PRODUCT_LIBRARY_COLLAPSE_SNAP_WIDTH");
+    expect(composerSource).not.toContain("PRODUCT_LIBRARY_MIN_WIDTH");
+    expect(composerSource).not.toContain("PRODUCT_LIBRARY_MAX_WIDTH");
+    expect(composerSource).toContain("productLibraryCollapsed");
+    expect(composerSource).toContain("productLibraryColumnWidth");
+    expect(composerSource).not.toContain("const [productLibraryWidth");
+    expect(composerSource).not.toContain("handleProductLibraryResizeStart");
+    expect(composerSource).not.toContain("handleProductLibraryResizeKeyDown");
+    expect(composerSource).not.toContain('role="separator"');
+    expect(composerSource).not.toContain('aria-orientation="vertical"');
+    expect(composerSource).not.toContain("aria-valuenow={productLibraryColumnWidth}");
+    expect(composerSource).toContain("video-product-library-collapse-rail");
+    expect(composerSource).toContain("video-product-library-collapse-button");
+    expect(composerSource).toContain("transition-[left,color]");
+    expect(composerSource).not.toContain("video-product-library-resizer");
+    expect(composerSource).not.toContain("productLibraryResizing");
+    expect(composerSource).not.toContain("setProductLibraryResizing");
+    expect(composerSource).not.toContain("MoveHorizontal");
+    expect(composerSource).toContain("cursor-pointer");
+    expect(composerSource).toContain("opacity-0");
+    expect(composerSource).toContain("group-hover:opacity-100");
+    expect(composerSource).toContain('aria-label={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(composerSource).toContain('title={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(composerSource).toContain("onClick={() => setProductLibraryCollapsed((collapsed) => !collapsed)}");
+    expect(composerSource).not.toContain("拖动调整商品库宽度");
+    expect(composerSource).toContain("ProductCreationProductLibrary");
+    expect(composerSource).toContain("ProductCreationOperationWorkspace");
+    expect(composerSource).toContain("collapsed={productLibraryCollapsed}");
+    expect(composerSource).toContain("video-product-library-column");
+    expect(composerSource).toContain("video-operation-column");
+    expect(composerSource).not.toContain("product-control-bar");
+    expect(composerSource).not.toContain("video-parameter-row grid");
+    expect(composerSource).not.toContain("<ProductCreationProductPicker");
+    expect(composerSource).toContain("grid content-start gap-3");
+    expect(composerSource).not.toContain("grid min-h-full content-start gap-3");
+    expect(composerSource).toContain("video-generation-controls compact-generation-controls");
+    expect(composerSource).toContain("px-3 py-2");
+    expect(composerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(98px,.72fr))]");
+    expect(composerSource).toContain("model-scheme-control");
+    expect(composerSource).toContain("model-scheme-chip-row");
+    expect(composerSource).toContain("min-[1180px]:col-span-6");
+    expect(composerSource).toContain("overflow-visible");
+    expect(composerSource).toContain("ModelSchemeChip");
+    expect(composerSource).toContain("{schemeSummary}");
+    expect(composerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
+    expect(composerSource).not.toContain("model-scheme-summary min-w-0 truncate");
+    expect(composerSource).toContain('label="视频分辨率"');
+    expect(composerSource).toContain("videoResolutionOptions");
+    expect(composerSource).toContain("selectedVideoResolution");
+    expect(composerSource).toContain("resolution: selectedVideoResolution");
+    expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
+    expect(appSource).toContain('if (value === "en") return "英语";');
+    expect(composerSource).toContain('density="compact"');
+    expect(composerSource).toContain("video-generate-summary");
+    expect(composerSource).toContain("{generateVideoSummary}");
+    expect(composerSource).toContain("tracking-0");
+    expect(composerSource).toContain("whitespace-normal");
+    expect(composerSource).toContain("break-words");
+    expect(composerSource).not.toContain("video-generate-summary min-w-0 truncate");
+    expect(composerSource).not.toContain("generateVideoSummaryItems.map");
+    expect(composerSource).not.toContain("video-generate-summary-item");
+    expect(composerSource).not.toContain("video-generate-summary-separator");
+    expect(composerSource).not.toContain("gap-x-2 gap-y-1");
+    expect(composerSource).toContain("video-generate-status-center");
+    expect(composerSource).toContain("justify-center text-center");
+    expect(composerSource).toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
+    expect(composerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(composerSource).toContain("video-generate-bar");
+    expect(composerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
+    expect(composerSource).not.toContain("footer={");
+    expect(composerSource.indexOf("video-generate-bar")).toBeLessThan(composerSource.indexOf("<VideoHistoryPanel"));
     expect(composerSource).toContain("generateVideoButtonLabel");
     expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
@@ -3994,7 +5598,8 @@ describe("console API", () => {
     expect(composerSource).toContain("AI 生成分镜");
     expect(composerSource).toContain("历史记录");
     expect(composerSource).toContain("creativeVersionLifecycleHint(job)");
-    expect(appSource).toContain('if (value === "failed") return "生成失败";');
+    const videoDisplayViewModelSource = await readFile(join(process.cwd(), "src", "client", "videoDisplayViewModel.ts"), "utf8");
+    expect(videoDisplayViewModelSource).toContain('if (value === "failed") return "生成失败";');
     expect(composerSource).toContain("预览视频");
     expect(composerSource).toContain("下载视频");
     expect(appSource).toContain("VideoHashtagChips");
@@ -5115,6 +6720,10 @@ describe("console API", () => {
         forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],
         exaggerationRules: [
           "商品资料未确认的销量、排名、功效、耐荷重、防水、UV 数值不得出现在脚本和字幕里。"
+        ],
+        paymentMethods: [
+          expect.objectContaining({ id: "stripe", enabled: true, kind: "rmb" }),
+          expect.objectContaining({ id: "infini", enabled: true, kind: "crypto" })
         ]
       }
     });
@@ -5144,7 +6753,11 @@ describe("console API", () => {
       maxEstimatedCostCnyPerVideo: 12.5,
       testCreditBalanceCny: 20,
       forbiddenWords: ["絶対痩せる", "医療用"],
-      exaggerationRules: ["未确认功效不写入视频。"]
+      exaggerationRules: ["未确认功效不写入视频。"],
+      paymentMethods: [
+        expect.objectContaining({ id: "stripe", enabled: true, kind: "rmb" }),
+        expect.objectContaining({ id: "infini", enabled: true, kind: "crypto" })
+      ]
     });
     await expect(readFile(join(testSystemDir(root), "console-settings.json"), "utf8")).resolves.toContain(
       "\"maxEstimatedCostCnyPerVideo\": 12.5"
@@ -5706,7 +7319,7 @@ describe("console API", () => {
     await expect(readFile(productPath, "utf8")).resolves.toContain('"reference_images": [\n    "use.jpg",\n    "main.jpg",\n    "detail.jpg"\n  ]');
   });
 
-  it("uses the highest priority enabled image model config to generate product reference images", async () => {
+  it("uses a manually selected image model config to generate product reference images", async () => {
     const previousImageKey = process.env.IMAGE_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.IMAGE_MODEL_API_KEY;
@@ -5735,21 +7348,22 @@ describe("console API", () => {
       await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "low-priority-image-secret-0001",
-          name: "低优先级图片",
+          apiKey: "selected-image-secret-0001",
+          name: "手动选择图片",
           vendor: "openai",
-          priority: 1,
+          priority: 100,
           baseUrl: "https://low-image.example.test",
           model: "low-image-model"
         })
       });
+      await sleep(5);
       await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "high-priority-image-secret-9999",
-          name: "高优先级图片",
+          apiKey: "default-image-secret-9999",
+          name: "默认图片",
           vendor: "chatfire",
-          priority: 9,
+          priority: 1,
           baseUrl: "https://high-image.example.test/",
           model: "high-image-model"
         })
@@ -5779,7 +7393,7 @@ describe("console API", () => {
       expect(response.product.reference_images).toEqual(["main.jpg", generatedReference]);
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://low-image.example.test/v1/images/generations");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
-        authorization: "Bearer low-priority-image-secret-0001"
+        authorization: "Bearer selected-image-secret-0001"
       }));
       const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
       expect(body.model).toBe("low-image-model");
@@ -7883,6 +9497,7 @@ describe("console API", () => {
         productPath,
         provider: "mock",
         duration: 8,
+        resolution: "1080p",
         template: "scene",
         cta: "今すぐチェック"
       })
@@ -7893,6 +9508,7 @@ describe("console API", () => {
       status: "queued",
       provider: "mock",
       durationSeconds: 8,
+      resolution: "1080p",
       confirmPaid: false
     }));
 
@@ -7909,14 +9525,18 @@ describe("console API", () => {
       id: queued.job.id,
       status: "completed",
       productSku: "TK-001",
+      resolution: "1080p",
       reportPath: join(outputsDir, queued.job.id, "make-video-report.json")
     }));
     await expect(readFile(jobFilePath(outputsDir, queued.job.id), "utf8")).resolves.toContain(
       "\"status\": \"completed\""
     );
+    await expect(readFile(jobFilePath(outputsDir, queued.job.id), "utf8")).resolves.toContain(
+      "\"resolution\": \"1080p\""
+    );
   });
 
-  it("passes the highest priority enabled video model config into queued video generation", async () => {
+  it("passes the most recently saved enabled video model config into queued video generation by default", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
     delete process.env.SEEDANCE_API_KEY;
@@ -7961,21 +9581,22 @@ describe("console API", () => {
       await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "low-priority-video-secret-0001",
-          name: "低优先级视频",
+          apiKey: "older-video-secret-0001",
+          name: "旧视频服务",
           vendor: "volcengine",
-          priority: 1,
+          priority: 100,
           baseUrl: "https://low-video.example.test",
           model: "low-video-model"
         })
       });
+      await sleep(5);
       await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "high-priority-video-secret-9999",
-          name: "高优先级视频",
+          apiKey: "newer-video-secret-9999",
+          name: "新视频服务",
           vendor: "volcengine",
-          priority: 9,
+          priority: 1,
           baseUrl: "https://high-video.example.test/",
           model: "high-video-model"
         })
@@ -8004,7 +9625,7 @@ describe("console API", () => {
 
       expect(capturedInputs).toHaveLength(1);
       expect(capturedInputs[0]).toEqual(expect.objectContaining({
-        apiKey: "high-priority-video-secret-9999",
+        apiKey: "newer-video-secret-9999",
         providerBaseUrl: "https://high-video.example.test",
         providerModel: "high-video-model",
         finalLanguage: "ja"
@@ -9496,6 +11117,141 @@ describe("console API", () => {
     });
   });
 
+  it("reserves and charges wallet again when retrying confirmed paid video jobs", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1.5";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-retry-wallet-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet-retry");
+      await writeProduct(productPath, {
+        sku: "WALLET-RETRY-001",
+        title_ja: "リトライ課金 ミニ財布",
+        reference_images: ["main.jpg"]
+      });
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      const calls: string[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          calls.push(input.outDir);
+          if (calls.length === 1) {
+            throw new Error("temporary paid provider failure");
+          }
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "WALLET-RETRY-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            billing: {
+              tokenPriceCnyPerMillion: 37,
+              totalTokens: 100000,
+              estimatedCostCny: 3.7
+            },
+            totalCost: {
+              amount: 3.7,
+              currency: "CNY"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "byok-video-retry-secret",
+          name: "用户自带视频重试",
+          vendor: "volcengine",
+          baseUrl: "https://byok-video-retry.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+      await server.fetchJson("/api/wallet/top-up", {
+        method: "POST",
+        body: JSON.stringify({
+          amountCny: 5,
+          description: "retry paid video balance"
+        })
+      });
+      const first = await server.fetchJson("/api/video-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          outDirName: "wallet-retry-video",
+          provider: "volcengine-seedance",
+          duration: 8,
+          template: "scene",
+          confirmPaid: true
+        })
+      });
+      const failed = await waitForJobStatus(server, first.job.id, "failed");
+
+      const retried = await server.fetchJson(`/api/video-jobs/${first.job.id}/retry`, {
+        method: "POST",
+        body: JSON.stringify({
+          confirmPaid: true
+        })
+      });
+      const completedRetry = await waitForJobStatus(server, first.job.id, "completed");
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(failed.job).toEqual(expect.objectContaining({
+        id: first.job.id,
+        status: "failed",
+        error: "temporary paid provider failure"
+      }));
+      expect(retried.job).toEqual(expect.objectContaining({
+        id: first.job.id,
+        status: "queued",
+        provider: "volcengine-seedance",
+        confirmPaid: true
+      }));
+      expect(completedRetry.job).toEqual(expect.objectContaining({
+        id: first.job.id,
+        status: "completed",
+        apiBillingMode: "byok",
+        platformFeeCny: 1.5,
+        upstreamEstimatedCostCny: 0
+      }));
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 3.5,
+        reservedCny: 0,
+        availableCny: 3.5
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number }) => [tx.type, tx.amountCny])).toEqual([
+        ["charge", -1.5],
+        ["reserve", -1.5],
+        ["refund", 1.5],
+        ["reserve", -1.5],
+        ["recharge", 5]
+      ]);
+      expect(calls).toEqual([
+        join(outputsDir, "wallet-retry-video"),
+        join(outputsDir, "wallet-retry-video")
+      ]);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
+    }
+  });
+
   it("recovers a generated paid video download without requiring a paid retry confirmation", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-recover-download-"));
     tempDirs.push(root);
@@ -9875,6 +11631,8 @@ function isAuthOrPublicPath(path: string): boolean {
     pathname.startsWith("/assets/") ||
     pathname.startsWith("/static/") ||
     pathname === "/api/health" ||
+    pathname === "/api/payments/stripe/webhook" ||
+    pathname === "/api/payments/infini/webhook" ||
     pathname.startsWith("/api/auth/");
 }
 
@@ -9886,6 +11644,24 @@ function withCookie(init: RequestInit, cookie: string): RequestInit {
   return {
     ...init,
     headers
+  };
+}
+
+function stripeTestSignature(payload: string, secret: string, timestamp = Math.floor(Date.now() / 1000)): string {
+  const signature = createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+  return `t=${timestamp},v1=${signature}`;
+}
+
+function infiniWebhookHeaders(payload: string, secret: string, eventId: string, timestamp = Math.floor(Date.now() / 1000)): HeadersInit {
+  return {
+    "content-type": "application/json",
+    "x-webhook-timestamp": String(timestamp),
+    "x-webhook-event-id": eventId,
+    "x-webhook-signature": createHmac("sha256", secret)
+      .update(`${timestamp}.${eventId}.${payload}`)
+      .digest("hex")
   };
 }
 
@@ -9974,7 +11750,7 @@ async function readStoredModelCredential(root: string, provider: string): Promis
         ON credential.workspace_id = variant.workspace_id
         AND credential.credential_id = variant.credential_id
       WHERE variant.provider_id = ?
-      ORDER BY variant.priority DESC, variant.variant_order ASC, variant.updated_at DESC
+      ORDER BY credential.updated_at DESC, credential.created_at DESC, variant.variant_order ASC, variant.updated_at DESC
       LIMIT 1
     `).get(provider) as {
       key_preview: string;
@@ -10026,7 +11802,7 @@ async function readStoredTextModelRows(root: string): Promise<{
       SELECT credential_id, config_id, label, model, priority
       FROM model_variants
       WHERE provider_id = 'openai-compatible-text'
-      ORDER BY priority DESC, variant_order ASC, updated_at DESC
+      ORDER BY updated_at DESC, created_at DESC, variant_order ASC
     `).all() as Array<{
       credential_id: string;
       config_id: string;

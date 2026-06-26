@@ -144,4 +144,18 @@ describe("generateJapaneseAdScript", () => {
     expect(script.voiceover).not.toContain("の収納");
     expect(script.voiceover).not.toContain("で使いやすい");
   });
+
+  it("can build an English fallback script for English final videos", () => {
+    const script = generateJapaneseAdScript(product, {
+      cta: "Check it now",
+      template: "scene",
+      finalLanguage: "en"
+    });
+
+    expect(script.voiceover).toContain("For everyday use");
+    expect(script.voiceover).toContain("折りたたみ可能");
+    expect(script.voiceover).toContain("Check it now");
+    expect(script.voiceover).not.toContain("の収納");
+    expect(script.voiceover).not.toContain("面向");
+  });
 });

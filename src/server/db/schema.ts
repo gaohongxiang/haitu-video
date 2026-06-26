@@ -177,6 +177,37 @@ export const walletTransactions = sqliteTable("wallet_transactions", {
   jobIndex: index("wallet_transactions_job_idx").on(table.workspaceId, table.jobId)
 }));
 
+export const walletRechargeOrders = sqliteTable("wallet_recharge_orders", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  providerSessionId: text("provider_session_id"),
+  providerPaymentIntentId: text("provider_payment_intent_id"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull(),
+  creditCents: integer("credit_cents").notNull(),
+  status: text("status").notNull(),
+  checkoutUrl: text("checkout_url"),
+  failureReason: text("failure_reason"),
+  metadataJson: text("metadata_json"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  completedAt: text("completed_at"),
+  expiresAt: text("expires_at")
+}, (table) => ({
+  workspaceIndex: index("wallet_recharge_orders_workspace_id_idx").on(table.workspaceId, table.createdAt),
+  statusIndex: index("wallet_recharge_orders_status_idx").on(table.workspaceId, table.status),
+  providerSessionUnique: uniqueIndex("wallet_recharge_orders_provider_session_unique").on(table.provider, table.providerSessionId)
+}));
+
+export const paymentWebhookEvents = sqliteTable("payment_webhook_events", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  eventType: text("event_type").notNull(),
+  processedAt: text("processed_at").notNull(),
+  payloadJson: text("payload_json")
+});
+
 export const modelBundles = sqliteTable("model_bundles", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

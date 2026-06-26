@@ -17,7 +17,36 @@ export interface ConsoleSettings {
   testCreditBalanceCny: number;
   forbiddenWords: string[];
   exaggerationRules: string[];
+  paymentMethods: PaymentMethodSettings[];
 }
+
+export type PaymentMethodId = "stripe" | "infini";
+export type PaymentMethodKind = "rmb" | "crypto";
+
+export interface PaymentMethodSettings {
+  id: PaymentMethodId;
+  label: string;
+  kind: PaymentMethodKind;
+  enabled: boolean;
+  description: string;
+}
+
+export const defaultPaymentMethods: PaymentMethodSettings[] = [
+  {
+    id: "stripe",
+    label: "Stripe",
+    kind: "rmb",
+    enabled: true,
+    description: "支持银行卡、支付宝、微信支付等 Stripe Checkout 可用方式。"
+  },
+  {
+    id: "infini",
+    label: "Infini",
+    kind: "crypto",
+    enabled: true,
+    description: "通过 Infini Checkout 支持 USDT、USDC 等稳定币及多条主流网络。"
+  }
+];
 
 export const defaultConsoleSettings: ConsoleSettings = {
   defaultLanguage: defaultFinalVideoLanguage,
@@ -31,7 +60,8 @@ export const defaultConsoleSettings: ConsoleSettings = {
   forbiddenWords: ["日本で大人気", "ランキング1位", "完全防水", "医療用"],
   exaggerationRules: [
     "商品资料未确认的销量、排名、功效、耐荷重、防水、UV 数值不得出现在脚本和字幕里。"
-  ]
+  ],
+  paymentMethods: defaultPaymentMethods
 };
 
 export class FileConsoleSettingsStore {
@@ -73,8 +103,24 @@ export function normalizeConsoleSettings(value: unknown): ConsoleSettings {
     maxEstimatedCostCnyPerVideo: normalizeBudgetCap(raw.maxEstimatedCostCnyPerVideo),
     testCreditBalanceCny: normalizeTestCreditBalance(raw.testCreditBalanceCny),
     forbiddenWords: normalizeStringList(raw.forbiddenWords, defaultConsoleSettings.forbiddenWords),
-    exaggerationRules: normalizeStringList(raw.exaggerationRules, defaultConsoleSettings.exaggerationRules)
+    exaggerationRules: normalizeStringList(raw.exaggerationRules, defaultConsoleSettings.exaggerationRules),
+    paymentMethods: normalizePaymentMethods(raw.paymentMethods)
   };
+}
+
+function normalizePaymentMethods(value: unknown): PaymentMethodSettings[] {
+  const rawItems = Array.isArray(value)
+    ? value.filter(isPlainObject)
+    : [];
+  return defaultPaymentMethods.map((fallback) => {
+    const raw = rawItems.find((item) => item.id === fallback.id);
+    return {
+      ...fallback,
+      label: normalizeText(raw?.label, fallback.label),
+      description: normalizeText(raw?.description, fallback.description),
+      enabled: typeof raw?.enabled === "boolean" ? raw.enabled : fallback.enabled
+    };
+  });
 }
 
 function normalizeTestCreditBalance(value: unknown): number {

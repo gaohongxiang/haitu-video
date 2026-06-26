@@ -106,6 +106,30 @@ describe("runProductJob", () => {
     expect(manifest.prompt).not.toContain("ref-10.jpg");
   });
 
+  it("passes the requested video resolution to the provider", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-resolution-"));
+    tempDirs.push(outDir);
+    let providerRequest: VideoProviderRequest | undefined;
+    const provider: VideoProvider = {
+      async generateVideo(request) {
+        providerRequest = request;
+        return new MockVideoProvider().generateVideo(request);
+      }
+    };
+
+    await runProductJob({
+      product,
+      version: 1,
+      outputRoot: outDir,
+      provider,
+      cta: "今すぐチェック",
+      template: "pain-point",
+      resolution: "1080p"
+    });
+
+    expect(providerRequest?.resolution).toBe("1080p");
+  });
+
   it("keeps product core hashtags stable while varying discovery tags by video version", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-hashtag-rotation-"));
     tempDirs.push(outDir);

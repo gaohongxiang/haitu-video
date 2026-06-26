@@ -10,6 +10,7 @@ import {
   Clapperboard,
   ClipboardCheck,
   Copy,
+  CreditCard,
   Database,
   Download,
   ExternalLink,
@@ -26,6 +27,7 @@ import {
   MailCheck,
   Play,
   RefreshCcw,
+  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -33,9 +35,17 @@ import {
   WalletCards,
   X
 } from "lucide-react";
-import * as EChartsForReact from "echarts-for-react";
-import type { EChartsOption, EChartsReactProps } from "echarts-for-react";
-import { FormEvent, ReactNode, type ClipboardEvent, type ComponentType, type Dispatch, type DragEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import ReactEChartsCore from "echarts-for-react/esm/core.js";
+import * as echartsCore from "echarts/core";
+import type { EChartsOption } from "echarts";
+import { BarChart, LineChart, PieChart } from "echarts/charts";
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+import { FormEvent, ReactNode, type CSSProperties, type ClipboardEvent, type ComponentType, type Dispatch, type DragEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
@@ -56,7 +66,86 @@ import {
   isActiveVideoJobStatus,
   type CompletedVideoJobTransitions
 } from "./videoJobRefresh.js";
+import {
+  buildLatestCreativeJobs,
+  hasPlayableVideo,
+  isActiveCreativeVersion,
+  isExpiredVideo,
+  mergeLedgerJobs,
+  mergeVideoJobs,
+  removeLedgerJob,
+  type CreativeVersionItem,
+  type JobContentReviewSnapshot,
+  type Ledger,
+  type LedgerJob,
+  type ProductGroup,
+  type VideoJob
+} from "./videoCreativeVersions.js";
+import {
+  buildDashboardAnalytics,
+  type DashboardAnalytics,
+  type DashboardGranularity,
+  type DashboardRange,
+} from "./dashboardAnalytics.js";
+import {
+  buildProviderChartOption,
+  buildRecentChartOption,
+  buildTrendChartOption
+} from "./dashboardChartOptions.js";
+import {
+  dedupeProductSummaries,
+  fileImportCanSelect,
+  fileImportProductIdLabel,
+  fileImportRowLabel,
+  fileImportRowTone,
+  fileImportSourceRowsLabel,
+  isProductImportFile,
+  productActionSummary,
+  productAutoSaveStatusLabel,
+  productFactsStatusLabel,
+  productGenerationReadiness,
+  productReferenceCount,
+  storyboardStatusLabel,
+  type ProductAutoSaveStatus,
+  type ProductDetail,
+  type ProductFactsResponse,
+  type ProductFileImportRow,
+  type ProductFileImportRowStatus,
+  type ProductImportQuality,
+  type ProductSummary,
+  type ReferenceImageStatus,
+  type StoryboardDraftSource
+} from "./productWorkflowViewModel.js";
+import {
+  defaultStoryboardDraft,
+  isStoryboardTemplateName,
+  splitDraftLines,
+  storyboardTemplateNames,
+  templateLabel,
+  type StoryboardTemplateName
+} from "./storyboardDrafts.js";
+import {
+  isReferenceImageFile,
+  isSameOriginMediaReference,
+  mediaReferenceToFile
+} from "./referenceMediaFiles.js";
 import { videoDownloadFileName, type VideoDownloadProductContext } from "./videoDownloadName.js";
+import {
+  creativeVersionDisplayStatus,
+  creativeVersionFailureReason,
+  creativeVersionLifecycleHint,
+  formatCreativeVersionTime,
+  formatHistoryTime,
+  historyPreview,
+  readableVideoJobError,
+  statusLabel,
+  videoDownloadProductContext,
+  videoJobDownloadProductContext,
+  videoJobResultHint,
+  videoLabel
+} from "./videoDisplayViewModel.js";
+import { filterProductLibraryProducts } from "./productLibrarySearch.js";
+import { deleteJson, fetchConsoleSnapshot, getJson, postJson, postJsonWithSignal, putJson, readJsonResponse } from "./consoleApiClient.js";
 import {
   defaultProductDraft,
   draftReferenceImageStatuses,
@@ -66,9 +155,15 @@ import {
   extractProductComposerImageReferences,
   removeDraftReferenceImage,
   removeReferenceFromComposerText,
+  updateComposerReferenceOrder,
   type ProductDraft
 } from "./productComposerText.js";
-import { readableVideoProviderError } from "../core/videoProviderErrors.js";
+import {
+  productDraftToFacts,
+  productDraftToProductDetail,
+  productFactsToDraft,
+  splitLines
+} from "./productDraftFacts.js";
 import {
   apiModeForProviderDraft,
   defaultModelConfigPreset,
@@ -77,6 +172,7 @@ import {
   type ModelConfigDraft,
   type ModelConfigProviderId,
   type ModelConfigTestStatus,
+  type ProviderConfigServiceItem,
   type ProviderConfigItem,
   type ProviderConfigLedger
 } from "./components/modelServiceConfig.js";
@@ -85,10 +181,9 @@ import {
   bundleIdFromModelSchemeId,
   bundleModelConfigIds,
   byokConfiguredModels,
-  compareCustomModelBundles,
-  compareModelBundles,
   configuredModelOptions,
   isCompleteModelBundle,
+  isSelectableModelBundle,
   modelConfigChoiceExists,
   modelConfigChoiceLabel,
   modelSchemeChoiceLabel,
@@ -98,6 +193,7 @@ import {
   modelSchemeSummary,
   normalizeModelBundleItem,
   platformConfiguredModels,
+  sortByokModelBundlesForDisplay,
   sortSelectableModelBundles,
   type ModelBundleItem,
   type ModelConfigChoice,
@@ -118,16 +214,33 @@ import {
   type ModelPricingProviderId
 } from "./modelPricingCatalog.js";
 
-const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? EChartsForReact) as ComponentType<EChartsReactProps>;
+echartsCore.use([
+  BarChart,
+  LineChart,
+  PieChart,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  CanvasRenderer
+]);
+
+const ReactECharts = ReactEChartsCore as unknown as ComponentType<{
+  className?: string;
+  echarts: typeof echartsCore;
+  option: EChartsOption;
+  notMerge?: boolean;
+  lazyUpdate?: boolean;
+  style?: CSSProperties;
+}>;
+
 const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--field)] px-2.5 py-1.5 text-[11px] font-black text-[var(--muted)] opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.12)] transition";
 
 type ProviderName = "mock" | "volcengine-seedance";
-type TemplateName = "scene" | "pain-point" | "benefit" | "ugc" | "unboxing";
+type TemplateName = StoryboardTemplateName;
+type VideoResolution = "480p" | "720p" | "1080p" | "4k";
 type ProductComposerSource = "structured" | "freeform";
-type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";
-type StoryboardDraftSource = "default" | "ai" | "manual";
 type AuthFlowMode = "entry" | "verify-email" | "forgot-password";
 interface AuthSession {
   authEnabled: boolean;
@@ -146,33 +259,6 @@ interface AuthEntryResponse extends AuthSession {
   verificationRequired?: boolean;
   email?: string;
 }
-
-interface ProductSummary {
-  path: string;
-  sku: string;
-  title_ja: string;
-  referenceImageCount?: number;
-  importQuality?: ProductImportQuality;
-  paidReadiness?: {
-    readyForPaidGeneration: boolean;
-    blockingReasons: string[];
-    warnings: string[];
-  };
-}
-
-interface ProductDetail extends ProductSummary {
-  category: string;
-  materials: string[];
-  dimensions: string;
-  verified_selling_points: string[];
-  usage_scenes: string[];
-  forbidden_claims: string[];
-  reference_images: string[];
-  source_text?: string;
-  reference_image_statuses?: ReferenceImageStatus[];
-}
-
-type ProductFactsResponse = Omit<ProductDetail, "path" | "reference_image_statuses" | "reference_image_urls">;
 
 interface ProductImportPreviewResponse {
   product: ProductFactsResponse;
@@ -201,16 +287,6 @@ interface StoryboardHistoryRecord {
   script: string;
 }
 
-interface ProductImportQuality {
-  ready: boolean;
-  score: number;
-  summary: string;
-  missingFields: string[];
-  verifiedFacts: string[];
-  blockedClaims: string[];
-  warnings: string[];
-}
-
 interface ProductImportBatchResponse {
   summary: {
     total: number;
@@ -233,24 +309,7 @@ interface ProductImportBatchResponse {
   >;
 }
 
-type ProductFileImportRowStatus = "ready" | "needs-ai" | "needs-input" | "duplicate" | "failed";
 type ProductFileImportDiagnosticsReason = "empty" | "sku-only" | "no-product-fields";
-
-interface ProductFileImportRow {
-  rowId: string;
-  rowNumber: number;
-  sourceRowNumbers: number[];
-  status: ProductFileImportRowStatus;
-  raw: Record<string, string>;
-  sourceText: string;
-  notes: string[];
-  warnings: string[];
-  duplicate: boolean;
-  referenceImageCount: number;
-  product?: ProductFactsResponse;
-  quality: ProductImportQuality;
-  error?: string;
-}
 
 interface ProductFileImportPreviewResponse {
   fileName: string;
@@ -302,14 +361,7 @@ interface DeleteLedgerVideoResponse {
   path: string;
 }
 
-interface ReferenceImageStatus {
-  original: string;
-  resolvedPath: string;
-  previewUrl: string | null;
-  status: "previewable" | "missing" | "outside-project-root" | "remote";
-}
-
-type FinalVideoLanguage = "ja" | "zh";
+type FinalVideoLanguage = "ja" | "zh" | "en";
 
 interface SettingsState {
   defaultLanguage: FinalVideoLanguage;
@@ -357,161 +409,11 @@ interface FeeProductCostRow {
   finalVideos: number;
 }
 
-interface LedgerJob {
-  id: string;
-  reportPath: string;
-  productSku?: string;
-  provider?: string;
-  providerModel?: string;
-  status?: string;
-  durationSeconds?: number;
-  taskId?: string;
-  totalTokens: number;
-  estimatedCostCny: number;
-  hasFinalVideo: boolean;
-  finalVideoUrl?: string;
-  expiresAt?: string;
-  expired?: boolean;
-  rawManifestPath?: string;
-  selectedFinal: boolean;
-  error?: string;
-  errorDetails?: VideoJobErrorDetails;
-  qc?: QcSummaryItem;
-  contentReview: JobContentReviewSnapshot;
-}
-
-interface JobContentReviewSnapshot {
-  available: boolean;
-  scriptVoiceover?: string;
-  subtitleLines: string[];
-  cta?: string;
-  hashtags: string[];
-  promptPreview?: string;
-  rawManifestUrl?: string;
-  finalManifestUrl?: string;
-  subtitleUrl?: string;
-  missingReason?: string;
-}
-
-interface ProductGroup {
-  productSku: string;
-  jobCount: number;
-  completedJobs: number;
-  paidJobs: number;
-  mockJobs: number;
-  reviewedJobs?: number;
-  unreviewedJobs?: number;
-  publishableJobs?: number;
-  needsEditJobs?: number;
-  rejectedJobs?: number;
-  usableJobs?: number;
-  readyForInternalValidation?: boolean;
-  totalTokens: number;
-  estimatedCostCny: number;
-  finalVideos: number;
-  latestJobId: string;
-  bestPreviewJobId?: string;
-  selectedFinalJobId?: string;
-  selectedFinalNote?: string;
-  jobs: LedgerJob[];
-}
-
-interface Ledger {
-  summary: {
-    totalJobs: number;
-    completedJobs: number;
-    failedJobs: number;
-    paidJobs: number;
-    mockJobs: number;
-    totalTokens: number;
-    estimatedCostCny: number;
-    finalVideos: number;
-    reusedRawManifests: number;
-    recoveredRawOutputs: number;
-  };
-  jobs: LedgerJob[];
-  products: ProductGroup[];
-}
-
-interface VideoJob {
-  id: string;
-  status: "queued" | "running" | "completed" | "failed" | "canceled";
-  productPath: string;
-  productSku?: string;
-  provider?: ProviderName | string;
-  providerModel?: string;
-  durationSeconds?: number;
-  template?: TemplateName | string;
-  cta?: string;
-  scriptLines?: string[];
-  storyboardLines?: string[];
-  confirmPaid: boolean;
-  reuseManifest?: string;
-  outDir: string;
-  reportPath?: string;
-  reportUrl?: string;
-  rawOutputPath?: string;
-  rawOutputUrl?: string;
-  finalOutputPath?: string;
-  finalVideoUrl?: string;
-  finalManifestPath?: string;
-  finalManifestUrl?: string;
-  subtitlePath?: string;
-  subtitleUrl?: string;
-  hashtags?: string[];
-  providerTaskId?: string;
-  recoverableRawManifestPath?: string;
-  providerVideoUrl?: string;
-  canRecoverDownload?: boolean;
-  totalTokens?: number;
-  estimatedCostCny?: number;
-  error?: string;
-  errorDetails?: VideoJobErrorDetails;
-  createdAt: string;
-  updatedAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  expiresAt?: string;
-  expired?: boolean;
-}
-
-interface VideoJobErrorDetails {
-  message: string;
-  name?: string;
-  causeMessage?: string;
-  causeCode?: string;
-  providerPhase?: string;
-  providerName?: string;
-  providerModel?: string;
-  referenceImageCount?: number;
-  usedTemporaryAssetUrls?: boolean;
-  providerTaskId?: string;
-  providerVideoUrl?: string;
-  recoverableRawManifestPath?: string;
-}
-
 interface ProductVideoGenerationOptions {
   provider?: ProviderName;
   providerModelConfigId?: ModelConfigChoice;
   providerModel?: string;
-}
-
-interface CreativeVersionItem {
-  id: string;
-  status?: string;
-  provider?: string;
-  providerModel?: string;
-  durationSeconds?: number;
-  selectedFinal: boolean;
-  hasFinalVideo: boolean;
-  finalVideoUrl?: string;
-  createdAt?: string;
-  completedAt?: string;
-  expiresAt?: string;
-  expired?: boolean;
-  hashtags?: string[];
-  source: "video-job" | "ledger";
-  videoJob?: VideoJob;
+  resolution?: VideoResolution;
 }
 
 interface Preflight {
@@ -568,46 +470,7 @@ interface Filters {
   finalOnly: boolean;
 }
 
-type DashboardRange = "24h" | "7d" | "30d" | "all";
-type DashboardGranularity = "hour" | "day";
 type RefreshConsoleReason = "manual" | "polling";
-
-interface DashboardProviderRow {
-  name: string;
-  jobs: number;
-  completed: number;
-  active: number;
-  totalTokens: number;
-  estimatedCostCny: number;
-}
-
-interface DashboardTrendPoint {
-  label: string;
-  jobs: number;
-  totalTokens: number;
-  estimatedCostCny: number;
-}
-
-interface DashboardRecentRow {
-  id: string;
-  label: string;
-  productSku: string;
-  provider: string;
-  status: string;
-  durationSeconds?: number;
-  totalTokens: number;
-  estimatedCostCny: number;
-  createdAt?: string;
-}
-
-interface DashboardAnalytics {
-  providerRows: DashboardProviderRow[];
-  trend: DashboardTrendPoint[];
-  recent: DashboardRecentRow[];
-  activeJobs: number;
-  queuedJobs: number;
-  failedJobs: number;
-}
 
 interface ProviderUsageItem {
   id: string;
@@ -655,6 +518,42 @@ interface WalletLedger {
   reservedCny: number;
   availableCny: number;
   transactions: WalletTransaction[];
+}
+
+interface WalletRechargeOrder {
+  id: string;
+  provider: "stripe" | "infini";
+  providerSessionId?: string;
+  amountCny: number;
+  currency: string;
+  status: "pending" | "paid" | "expired" | "failed";
+  checkoutUrl?: string;
+}
+
+interface WalletRechargeOrderResponse {
+  order: WalletRechargeOrder;
+  checkoutUrl: string;
+}
+
+interface WalletRechargeOrderSyncResponse {
+  synced: boolean;
+  order: WalletRechargeOrder;
+  wallet: WalletLedger;
+}
+
+interface PaymentMethodView {
+  id: "stripe" | "infini";
+  label: string;
+  kind: "rmb" | "crypto";
+  enabled: boolean;
+  configured: boolean;
+  available: boolean;
+  description: string;
+  unavailableReason?: string;
+}
+
+interface PaymentMethodsResponse {
+  methods: PaymentMethodView[];
 }
 
 interface ModelConfigStatusResponse {
@@ -828,33 +727,29 @@ type ConfirmActionRequest = Omit<ConfirmActionState, "id">;
 type ProductEditorMode = "import" | "manual";
 type ProductLibraryDialogMode = ProductEditorMode | "edit" | undefined;
 
+const dashboardNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
+  { id: "dashboard", label: "仪表盘", icon: LayoutDashboard }
+];
+
 const primaryNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
-  { id: "video", label: "视频创作", icon: Clapperboard }
+  { id: "video", label: "视频创作", icon: Clapperboard },
+  { id: "image", label: "图片创作", icon: ImageIcon },
+  { id: "ledger", label: "任务记录", icon: WalletCards }
 ];
 
 const managementNavItems: Array<{ id: ConsoleSection; label: string; icon: typeof LayoutDashboard }> = [
-  { id: "dashboard", label: "仪表盘", icon: LayoutDashboard },
-  { id: "ledger", label: "任务记录", icon: WalletCards },
   { id: "wallet", label: "充值中心", icon: CircleDollarSign },
   { id: "pricing", label: "模型价格", icon: BadgeJapaneseYen },
   { id: "settings", label: "API 管理", icon: Settings }
 ];
 
-const navItems = [...primaryNavItems, ...managementNavItems] as const;
+const navItems = [...dashboardNavItems, ...primaryNavItems, ...managementNavItems] as const;
 
 const navGroups = [
+  { label: "", items: dashboardNavItems },
   { label: "主流程", items: primaryNavItems },
   { label: "管理", items: managementNavItems }
 ];
-
-const sectionSubtitles: Record<ConsoleSection, string> = {
-  video: "选择商品、设置参数、编辑脚本分镜并生成视频。",
-  dashboard: "查看生成数量、成本趋势、模型分布和最近使用。",
-  ledger: "查看正在生成和已生成的视频任务。",
-  wallet: "查看余额、冻结金额和充值记录。",
-  pricing: "查看官方模型价格快照和供应商来源。",
-  settings: "配置文本、图片和视频模型服务。"
-};
 
 const defaultFilters: Filters = {
   productSku: "all",
@@ -878,13 +773,15 @@ const defaultSettings: SettingsState = {
 
 const defaultVideoDurationSeconds = 10;
 const defaultVideoTemplate: TemplateName = "scene";
+const defaultVideoResolution: VideoResolution = "480p";
+const videoResolutionOptions: VideoResolution[] = ["480p", "720p", "1080p", "4k"];
+const PRODUCT_LIBRARY_DEFAULT_WIDTH = 232;
+const PRODUCT_LIBRARY_COLLAPSED_WIDTH = 44;
 
-const NEW_PRODUCT_SELECT_VALUE = "__new_product__";
-const storyboardTemplateNames: TemplateName[] = ["scene", "pain-point", "benefit", "ugc", "unboxing"];
 const authOtpCooldownDurationSeconds = 60;
 
 function isTemplateName(value: unknown): value is TemplateName {
-  return typeof value === "string" && storyboardTemplateNames.includes(value as TemplateName);
+  return isStoryboardTemplateName(value);
 }
 
 function restoreProductStudioSku(availableProducts: ProductSummary[], preferredSku?: string): string {
@@ -917,6 +814,7 @@ export function App() {
   const [selectedImageModelConfigId, setSelectedImageModelConfigId] = useState<ModelConfigChoice>("auto");
   const [selectedVideoModelConfigId, setSelectedVideoModelConfigId] = useState<ModelConfigChoice>("auto");
   const [duration, setDuration] = useState(defaultVideoDurationSeconds);
+  const [selectedVideoResolution, setSelectedVideoResolution] = useState<VideoResolution>(defaultVideoResolution);
   const [versionCount, setVersionCount] = useState(1);
   const [template, setTemplate] = useState<TemplateName>(defaultVideoTemplate);
   const [finalLanguage, setFinalLanguage] = useState<FinalVideoLanguage>("ja");
@@ -968,6 +866,8 @@ export function App() {
     availableCny: 0,
     transactions: []
   });
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodView[]>([]);
+  const [pendingRechargeAmountCny, setPendingRechargeAmountCny] = useState<number | undefined>();
   const [modelBundles, setModelBundles] = useState<ModelBundleItem[]>([]);
   const [modelServicePreference, setModelServicePreference] = useState<ModelServicePreference>({
     serviceMode: "byok"
@@ -999,9 +899,10 @@ export function App() {
   const productAutoSaveStatusRef = useRef<ProductAutoSaveStatus>("idle");
   const productAutoSaveSignatureRef = useRef("");
   const productAutoSaveInFlightRef = useRef<Promise<ProductDetail | undefined> | undefined>(undefined);
+  const handledWalletPaymentReturnRef = useRef(false);
 
   const enabledTemplateOptions = settings.enabledTemplates;
-  const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: selectedVideoModelConfigId, duration, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
+  const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: selectedVideoModelConfigId, duration, resolution: selectedVideoResolution, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
   const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
   const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
   const batchEstimatedCostCny = freshPreflight
@@ -1028,7 +929,6 @@ export function App() {
   });
   const activeSection = activeSectionState;
   const activeSectionLabel = navItems.find((item) => item.id === activeSection)?.label ?? "视频创作";
-  const activeSectionSubtitle = sectionSubtitles[activeSection];
   const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
   const apiOwner = modelServicePreference.serviceMode;
   const platformBundles = useMemo(
@@ -1036,11 +936,11 @@ export function App() {
     [modelBundles]
   );
   const byokBundles = useMemo(
-    () => modelBundles.filter((bundle) => bundle.apiOwner === "byok" && bundle.enabled).sort(compareCustomModelBundles),
+    () => sortByokModelBundlesForDisplay(modelBundles.filter((bundle) => bundle.apiOwner === "byok" && bundle.enabled)),
     [modelBundles]
   );
-  const selectablePlatformBundles = platformBundles.filter(isCompleteModelBundle);
-  const selectableByokBundles = byokBundles.filter(isCompleteModelBundle);
+  const selectablePlatformBundles = platformBundles.filter(isSelectableModelBundle);
+  const selectableByokBundles = byokBundles.filter(isSelectableModelBundle);
   const platformTextModelOptions = useMemo(
     () => platformConfiguredModels(providerConfig.textModels),
     [providerConfig.textModels]
@@ -1195,6 +1095,28 @@ export function App() {
   useEffect(() => {
     productAutoSaveStatusRef.current = productAutoSaveStatus;
   }, [productAutoSaveStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || handledWalletPaymentReturnRef.current || !consoleReady) return;
+    const url = new URL(window.location.href);
+    const payment = url.searchParams.get("payment");
+    if (!["stripe-success", "stripe-cancel", "infini-success", "infini-cancel"].includes(payment ?? "")) return;
+    const orderId = url.searchParams.get("orderId");
+    handledWalletPaymentReturnRef.current = true;
+    if (payment === "stripe-success" || payment === "infini-success") {
+      if (payment === "infini-success" && orderId) {
+        void syncInfiniRechargeReturn(orderId);
+      } else {
+        showConsoleToast("支付已返回，余额以到账通知为准，稍后会自动刷新。", "ok");
+        void refreshConsole({ reason: "manual" });
+      }
+    } else {
+      showConsoleToast("已取消支付，钱包余额未变化。");
+    }
+    url.searchParams.delete("payment");
+    url.searchParams.delete("orderId");
+    window.history.replaceState({}, "", url.toString());
+  }, [consoleReady]);
 
   useEffect(() => {
     return () => {
@@ -1416,23 +1338,39 @@ export function App() {
       setIsLoading(true);
     }
     try {
-      const [productsResponse, reportsResponse, ledgerResponse, qcSummaryResponse, videoAssetsResponse, storageBackupResponse, localBackupsResponse, auditLogResponse, providerConfigResponse, settingsResponse, videoJobsResponse, walletResponse, modelBundlesResponse, modelServicePreferenceResponse] =
-        await Promise.all([
-          getJson<{ products: ProductSummary[] }>("/api/products"),
-          getJson<{ reports: Report[] }>("/api/reports"),
-          getJson<Ledger>("/api/job-ledger"),
-          getJson<QcSummaryLedger>("/api/qc-summary"),
-          getJson<VideoAssetLedger>("/api/video-assets"),
-          getJson<StorageBackupReport>("/api/storage-backup"),
-          getJson<LocalBackupLedger>("/api/backups"),
-          getJson<AuditLogLedger>("/api/audit-log"),
-          getJson<ProviderConfigLedger>("/api/provider-config"),
-          getJson<{ settings: SettingsState }>("/api/settings"),
-          getJson<{ jobs: VideoJob[] }>("/api/video-jobs"),
-          getJson<WalletLedger>("/api/wallet"),
-          getJson<{ bundles: ModelBundleItem[] }>("/api/model-bundles"),
-          getJson<{ preference: ModelServicePreference }>("/api/model-service-preference")
-        ]);
+      const {
+        productsResponse,
+        reportsResponse,
+        ledgerResponse,
+        qcSummaryResponse,
+        videoAssetsResponse,
+        storageBackupResponse,
+        localBackupsResponse,
+        auditLogResponse,
+        providerConfigResponse,
+        settingsResponse,
+        videoJobsResponse,
+        walletResponse,
+        paymentMethodsResponse,
+        modelBundlesResponse,
+        modelServicePreferenceResponse
+      } = await fetchConsoleSnapshot<{
+        productsResponse: { products: ProductSummary[] };
+        reportsResponse: { reports: Report[] };
+        ledgerResponse: Ledger;
+        qcSummaryResponse: QcSummaryLedger;
+        videoAssetsResponse: VideoAssetLedger;
+        storageBackupResponse: StorageBackupReport;
+        localBackupsResponse: LocalBackupLedger;
+        auditLogResponse: AuditLogLedger;
+        providerConfigResponse: ProviderConfigLedger;
+        settingsResponse: { settings: SettingsState };
+        videoJobsResponse: { jobs: VideoJob[] };
+        walletResponse: WalletLedger;
+        paymentMethodsResponse: PaymentMethodsResponse;
+        modelBundlesResponse: { bundles: ModelBundleItem[] };
+        modelServicePreferenceResponse: { preference: ModelServicePreference };
+      }>();
       const ledgerWithQc = attachQcToLedger(ledgerResponse, qcSummaryResponse);
       const completedTransitions = polling
         ? detectCompletedVideoJobTransitions(videoJobsRef.current, videoJobsResponse.jobs)
@@ -1446,14 +1384,14 @@ export function App() {
       setAuditLog(auditLogResponse);
       setProviderConfig(providerConfigResponse);
       setWallet(walletResponse);
+      setPaymentMethods(paymentMethodsResponse.methods);
       const normalizedBundles = modelBundlesResponse.bundles.map(normalizeModelBundleItem);
       setModelBundles(normalizedBundles);
       setModelServicePreference(modelServicePreferenceResponse.preference);
       const selectedBundleId = modelServicePreferenceResponse.preference.serviceMode === "platform"
         ? modelServicePreferenceResponse.preference.platformBundleId
         : modelServicePreferenceResponse.preference.byokBundleId;
-      const selectableBundles = sortSelectableModelBundles(normalizedBundles)
-        .filter((bundle) => bundle.enabled && isCompleteModelBundle(bundle));
+      const selectableBundles = sortSelectableModelBundles(normalizedBundles);
       const selectedBundle = selectedBundleId ? selectableBundles.find((bundle) => bundle.bundleId === selectedBundleId) : undefined;
       const fallbackBundle = selectedBundle ?? selectableBundles[0];
       setSelectedModelSchemeId(fallbackBundle ? modelSchemeIdForBundle(fallbackBundle.bundleId) : "");
@@ -1503,6 +1441,7 @@ export function App() {
 
   function applySettings(nextSettings = settings) {
     setDuration(defaultVideoDurationSeconds);
+    setSelectedVideoResolution(defaultVideoResolution);
     setTemplate(defaultVideoTemplate);
     setFinalLanguage(nextSettings.defaultLanguage);
     setCta(nextSettings.defaultCta);
@@ -1677,7 +1616,6 @@ export function App() {
         apiKey: draft.apiKey.trim() || undefined,
         name: draft.name.trim(),
         vendor: draft.vendor.trim(),
-        priority: draft.priority,
         baseUrl: draft.baseUrl.trim(),
         model: draft.models,
         apiMode: apiModeForProviderDraft(providerId, draft),
@@ -1693,6 +1631,27 @@ export function App() {
       }));
       setProviderConfig((current) => updateProviderConfigStatus(current, response.provider));
       setStatusText(`模型服务已保存: ${response.provider.keyPreview || "已配置"}`);
+      await refreshConsole();
+    } catch (error) {
+      showError(error);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function toggleModelConfigEnabled(providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) {
+    setIsBusy(true);
+    try {
+      await putJson<ModelConfigStatusResponse>(`/api/model-configs/${providerId}`, {
+        configId: service.configId,
+        name: service.label || service.serviceLabel,
+        vendor: service.providerLabel,
+        baseUrl: service.baseUrl,
+        model: service.models.map((model) => model.model).filter(Boolean),
+        apiMode: service.apiMode,
+        enabled
+      });
+      setStatusText(enabled ? "模型服务已启用。" : "模型服务已停用。");
       await refreshConsole();
     } catch (error) {
       showError(error);
@@ -1736,16 +1695,19 @@ export function App() {
         textModelConfigId: input.textModelConfigId,
         imageModelConfigId: input.imageModelConfigId,
         videoModelConfigId: input.videoModelConfigId,
-        enabled: input.enabled ?? true,
-        priority: input.priority ?? 0
+        enabled: input.enabled ?? true
       };
       const savedBundleResponse = await putJson<{ bundle: ModelBundleItem }>("/api/model-bundles", nextBundleInput);
       const savedBundle = normalizeModelBundleItem(savedBundleResponse.bundle);
-      setModelBundles((current) => [
-        savedBundle,
-        ...current.filter((bundle) => bundle.bundleId !== savedBundle.bundleId)
-      ].sort(compareModelBundles));
-      if (input.activate !== false) {
+      setModelBundles((current) => {
+        const existingIndex = current.findIndex((bundle) => bundle.bundleId === savedBundle.bundleId);
+        if (existingIndex === -1) {
+          return [...current, savedBundle];
+        }
+        return current.map((bundle) => bundle.bundleId === savedBundle.bundleId ? savedBundle : bundle);
+      });
+      const shouldActivateSavedBundle = input.activate !== false && isSelectableModelBundle(savedBundle);
+      if (shouldActivateSavedBundle) {
         applyModelBundleSelection(savedBundle);
         await persistModelServicePreference({
           serviceMode: input.apiOwner === "platform" ? "platform" : "byok",
@@ -1807,6 +1769,10 @@ export function App() {
   }
 
   function applyModelBundleSelection(bundle: ModelBundleItem) {
+    if (!isSelectableModelBundle(bundle)) {
+      setStatusText("模型组合尚未配置完整，请补齐文本、图片和视频模型后再用于视频创作。");
+      return;
+    }
     const { textModelConfigId, imageModelConfigId, videoModelConfigId } = bundleModelConfigIds(bundle);
     setSelectedTextModelConfigId(textModelConfigId);
     setSelectedImageModelConfigId(imageModelConfigId);
@@ -1821,7 +1787,7 @@ export function App() {
       return;
     }
     const bundle = modelBundles.find((item) => item.bundleId === bundleId);
-    if (bundle) {
+    if (bundle && isSelectableModelBundle(bundle)) {
       applyModelBundleSelection(bundle);
       await saveModelServicePreference(
         bundle.apiOwner === "platform"
@@ -1830,6 +1796,7 @@ export function App() {
       );
       return;
     }
+    setStatusText("模型组合尚未配置完整，请补齐文本、图片和视频模型后再用于视频创作。");
   }
 
   async function testModelConfig(providerId: ModelConfigProviderId) {
@@ -1964,19 +1931,53 @@ export function App() {
     }
   }
 
-  async function topUpWallet(amountCny = 50) {
+  function openRechargeDialog(amountCny = 50) {
+    setPendingRechargeAmountCny(amountCny);
+  }
+
+  function closeRechargeDialog() {
+    if (isBusy) return;
+    setPendingRechargeAmountCny(undefined);
+  }
+
+  async function continueWalletRecharge(paymentMethodId: PaymentMethodView["id"]) {
+    if (!pendingRechargeAmountCny) {
+      return;
+    }
+    await topUpWallet(pendingRechargeAmountCny, paymentMethodId);
+  }
+
+  async function topUpWallet(amountCny = 50, paymentMethodId: PaymentMethodView["id"] = "stripe") {
     setIsBusy(true);
     try {
-      const response = await postJson<{ wallet: WalletLedger }>("/api/wallet/top-up", {
+      const response = await postJson<WalletRechargeOrderResponse>("/api/wallet/recharge-orders", {
         amountCny,
-        description: "手动充值"
+        paymentMethodId
       });
-      setWallet(response.wallet);
-      showConsoleToast(`已充值 ¥${money(amountCny)}。`, "ok");
+      showConsoleToast(`正在打开 ${paymentMethodLabel(paymentMethodId)} 安全支付页。`, "ok");
+      window.location.assign(response.checkoutUrl);
     } catch (error) {
+      showConsoleToast(errorMessage(error));
       showError(error);
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  async function syncInfiniRechargeReturn(orderId: string) {
+    try {
+      const response = await postJson<WalletRechargeOrderSyncResponse>(
+        `/api/wallet/recharge-orders/${encodeURIComponent(orderId)}/sync`,
+        {}
+      );
+      setWallet(response.wallet);
+      showConsoleToast(
+        response.synced ? "Infini 充值已到账。" : "支付已返回，余额以到账通知为准，稍后会自动刷新。",
+        "ok"
+      );
+    } catch (error) {
+      showConsoleToast("支付已返回，正在等待到账确认。", "ok");
+      await refreshConsole({ reason: "manual" });
     }
   }
 
@@ -2377,6 +2378,7 @@ export function App() {
         providerModelConfigId: videoGenerationOptions.providerModelConfigId,
         providerModel: videoGenerationOptions.providerModel,
         duration: selectedDuration,
+        resolution: videoGenerationOptions.resolution ?? selectedVideoResolution,
         template,
         finalLanguage,
         cta,
@@ -3062,10 +3064,8 @@ export function App() {
               onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
               textModelOptions={textModelOptions}
               selectedTextModelConfigId={selectedTextModelConfigId}
-              onTextModelConfigChange={setSelectedTextModelConfigId}
               imageModelOptions={imageModelOptions}
               selectedImageModelConfigId={selectedImageModelConfigId}
-              onImageModelConfigChange={setSelectedImageModelConfigId}
               videoModelOptions={videoModelOptions}
               selectedVideoModelConfigId={selectedVideoModelConfigId}
               onVideoModelConfigChange={(nextConfigId) => {
@@ -3075,6 +3075,11 @@ export function App() {
               duration={duration}
               onDurationChange={(nextDuration) => {
                 setDuration(nextDuration);
+                markPreflightStale();
+              }}
+              selectedVideoResolution={selectedVideoResolution}
+              onVideoResolutionChange={(nextResolution) => {
+                setSelectedVideoResolution(nextResolution);
                 markPreflightStale();
               }}
               versionCount={versionCount}
@@ -3109,6 +3114,12 @@ export function App() {
             />
           </section>
         );
+      case "image":
+        return (
+          <section className="grid gap-4" aria-label="图片创作">
+            <EmptyState icon={<ImageIcon size={28} />} text="图片创作待上线" />
+          </section>
+        );
       case "ledger":
         return (
           <section className="grid gap-4" aria-label="任务记录">
@@ -3119,7 +3130,7 @@ export function App() {
       case "wallet":
         return (
           <section className="grid gap-4" aria-label="充值中心">
-            <WalletRechargePanel wallet={wallet} onTopUpWallet={topUpWallet} isBusy={isBusy} />
+            <WalletRechargePanel wallet={wallet} onRequestRecharge={openRechargeDialog} isBusy={isBusy} />
           </section>
         );
       case "pricing":
@@ -3144,6 +3155,7 @@ export function App() {
               onRefreshModels={refreshModelCatalog}
               onRevealApiKey={revealModelConfigApiKey}
               onClear={clearModelConfig}
+              onToggleEnabled={toggleModelConfigEnabled}
               onServicePreferenceChange={saveModelServicePreference}
               onApplyBundleSelection={applyModelBundleSelection}
               onSaveBundle={saveModelBundle}
@@ -3192,24 +3204,22 @@ export function App() {
     >
       <aside
         className={cn(
-          "relative hidden h-dvh min-h-0 overflow-visible border-r border-[var(--border)] bg-[var(--panel)] transition-[width] duration-200 min-[900px]:grid min-[900px]:grid-rows-[auto_minmax(0,1fr)]",
+          "relative hidden h-dvh min-h-0 overflow-visible border-r border-[var(--border)] bg-[var(--panel)] transition-[width] duration-200 min-[900px]:grid min-[900px]:grid-rows-[auto_minmax(0,1fr)_auto]",
           sidebarCollapsed ? "w-[56px]" : "w-[184px]"
         )}
       >
         <button
           type="button"
-          className="app-sidebar-toggle group absolute inset-y-0 right-[-10px] z-30 hidden w-5 cursor-pointer bg-transparent text-[var(--muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none min-[900px]:flex min-[900px]:items-center min-[900px]:justify-center"
+          className="app-sidebar-collapse-rail group absolute inset-y-0 right-[-10px] z-30 hidden w-5 cursor-pointer bg-transparent text-[var(--muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none min-[900px]:flex min-[900px]:items-center min-[900px]:justify-center"
           aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
-          <span className="app-sidebar-collapse-edge pointer-events-none grid h-40 w-5 place-items-center">
-            <span className="app-sidebar-collapse-thumb grid h-36 w-3.5 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 shadow-[0_10px_24px_rgba(96,64,43,.12)]">
-              {sidebarCollapsed ? <ChevronRight size={13} strokeWidth={2.4} /> : <ChevronLeft size={13} strokeWidth={2.4} />}
-            </span>
+          <span className="app-sidebar-collapse-button pointer-events-none grid h-8 w-8 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.14)] transition group-hover:opacity-100 group-focus-visible:opacity-100 group-hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] group-hover:bg-[color-mix(in_srgb,var(--accent)_5%,var(--panel))]">
+            {sidebarCollapsed ? <ChevronRight size={16} strokeWidth={2.4} /> : <ChevronLeft size={16} strokeWidth={2.4} />}
           </span>
         </button>
-        <div className={cn("relative flex h-[72px] items-center border-b border-[var(--border)]", sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-3.5")}>
+        <div className={cn("relative flex h-[72px] items-center", sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-3.5")}>
           <BrandLogo className="h-10 w-10" />
           <div className={cn("min-w-0", sidebarCollapsed && "sr-only")}>
             <div className="truncate text-[20px] font-black leading-tight">Haitu</div>
@@ -3226,7 +3236,9 @@ export function App() {
         >
           {navGroups.map((group) => (
             <div key={group.label} className="grid gap-1">
-              <div className={cn("px-3 text-[11px] font-black uppercase tracking-[.12em] text-[var(--muted)]", sidebarCollapsed && "sr-only")}>{group.label}</div>
+              {group.label ? (
+                <div className={cn("px-3 text-[11px] font-black uppercase tracking-[.12em] text-[var(--muted)]", sidebarCollapsed && "sr-only")}>{group.label}</div>
+              ) : null}
               {group.items.map(({ id, label, icon: Icon }) => {
                 const active = activeSection === id;
                 return (
@@ -3264,45 +3276,28 @@ export function App() {
             </div>
           ))}
         </nav>
+        {authSession.authEnabled ? (
+          <div className={cn("app-sidebar-account border-t border-[var(--border)] py-2", sidebarCollapsed ? "px-1.5" : "px-2.5")}>
+            <AccountMenu
+              email={authSession.user?.email}
+              disabled={isBusy}
+              collapsed={sidebarCollapsed}
+              onLogout={() => void logout()}
+            />
+          </div>
+        ) : null}
       </aside>
 
-      <section className="grid h-dvh min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-        <header className="sticky top-0 z-20 grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/94 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="m-0 text-xl font-black leading-tight">{activeSectionLabel}</h1>
-            </div>
-            <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">{activeSectionSubtitle}</p>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Select
-              className="w-[148px] min-[900px]:hidden"
-              aria-label="切换模块"
-              value={activeSection}
-              onChange={(event) => setActiveSection(event.target.value as ConsoleSection)}
-            >
-              {activeSectionInVisibleNav ? null : (
-                <option value={activeSection}>{activeSectionLabel}</option>
-              )}
-              {navGroups.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.items.map((item) => (
-                    <option key={item.id} value={item.id}>{item.label}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
-            {authSession.authEnabled ? (
-              <AccountMenu
-                email={authSession.user?.email}
-                disabled={isBusy}
-                onLogout={() => void logout()}
-              />
-            ) : null}
-          </div>
-        </header>
-
-        <div ref={contentScrollerRef} className="min-h-0 overflow-y-auto px-4 py-4 min-[1100px]:px-6">
+      <section className="grid h-dvh min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
+        <div
+          ref={contentScrollerRef}
+          className={cn(
+            "min-h-0",
+            activeSection === "video"
+              ? "overflow-hidden p-0"
+              : "overflow-y-auto px-4 py-4 min-[1100px]:px-6"
+          )}
+        >
           {renderActiveSection()}
         </div>
         <ConsoleToast consoleToast={consoleToast} onClose={handleConsoleToastClose} />
@@ -3312,12 +3307,19 @@ export function App() {
           onCancel={() => resolveConfirmAction(false)}
           onConfirm={() => resolveConfirmAction(true)}
         />
+        <PaymentMethodDialog
+          amountCny={pendingRechargeAmountCny}
+          isBusy={isBusy}
+          paymentMethods={paymentMethods}
+          onClose={closeRechargeDialog}
+          onContinue={continueWalletRecharge}
+        />
       </section>
     </main>
   );
 }
 
-function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?: boolean; onLogout: () => void }) {
+function AccountMenu({ email, disabled, collapsed = false, onLogout }: { email?: string; disabled?: boolean; collapsed?: boolean; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const accountLabel = email?.trim() || "账号";
@@ -3357,8 +3359,10 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
         type="button"
         aria-label="账号菜单"
         aria-expanded={open}
+        title={collapsed ? accountLabel : undefined}
         className={cn(
           "grid min-h-8 max-w-[min(260px,calc(100vw-48px))] grid-cols-[24px_minmax(0,1fr)_14px] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] px-2 py-1.5 text-left text-xs font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] hover:bg-[color-mix(in_srgb,var(--accent)_5%,var(--panel))] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)] disabled:cursor-not-allowed disabled:opacity-55",
+          collapsed && "mx-auto h-9 w-9 max-w-none grid-cols-1 place-items-center px-0 py-0",
           open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))]"
         )}
         disabled={disabled}
@@ -3367,12 +3371,15 @@ function AccountMenu({ email, disabled, onLogout }: { email?: string; disabled?:
         <span className="grid h-6 w-6 place-items-center rounded-md bg-[color-mix(in_srgb,var(--accent)_12%,var(--field))] text-[11px] font-black text-[var(--accent)]">
           {accountInitial}
         </span>
-        <span className="truncate">{accountLabel}</span>
-        <ChevronDown className={cn("text-[var(--muted)] transition-transform", open && "rotate-180")} size={14} strokeWidth={2.4} />
+        <span className={cn("truncate", collapsed && "sr-only")}>{accountLabel}</span>
+        <ChevronDown className={cn("text-[var(--muted)] transition-transform", collapsed && "sr-only", open && "rotate-180")} size={14} strokeWidth={2.4} />
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] shadow-[0_18px_46px_rgba(96,64,43,.16)]">
+        <div className={cn(
+          "absolute bottom-[calc(100%+8px)] z-50 w-[min(280px,calc(100vw-32px))] overflow-hidden rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] shadow-[0_18px_46px_rgba(96,64,43,.16)]",
+          collapsed ? "left-0" : "left-0 right-0"
+        )}>
           <div className="grid gap-1.5 border-b border-[var(--border)] bg-[linear-gradient(180deg,var(--panel),var(--panel2))] px-3 py-3">
             <div className="text-[11px] font-black text-[var(--muted)]">账号</div>
             <div className="truncate text-[13px] font-black text-[var(--text)]">{accountLabel}</div>
@@ -3411,7 +3418,7 @@ function ConsoleToast({ consoleToast, onClose }: { consoleToast?: ConsoleToastSt
   const warn = consoleToast.tone === "warn";
   const ok = consoleToast.tone === "ok";
   return (
-    <div className="pointer-events-none fixed right-5 top-[86px] z-[70] w-[min(360px,calc(100vw-32px))]">
+    <div className="pointer-events-none fixed right-5 top-[86px] z-[100] w-[min(360px,calc(100vw-32px))]">
       <div
         className={cn(
           "pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2.5 shadow-[0_18px_46px_rgba(15,23,42,.14)] backdrop-blur-md",
@@ -3522,6 +3529,146 @@ function ConfirmActionDialog({
           <Button className="w-fit" variant={confirmVariant} disabled={isBusy} onClick={onConfirm}>
             {danger ? <X size={13} /> : paid ? <CircleDollarSign size={13} /> : <ShieldCheck size={13} />}
             {action.confirmLabel}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PaymentMethodDialog({
+  amountCny,
+  isBusy,
+  onClose,
+  onContinue,
+  paymentMethods
+}: {
+  amountCny?: number;
+  isBusy: boolean;
+  onClose: () => void;
+  onContinue: (paymentMethodId: PaymentMethodView["id"]) => Promise<void>;
+  paymentMethods: PaymentMethodView[];
+}) {
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<PaymentMethodView["id"]>("stripe");
+  const [selectedPaymentKind, setSelectedPaymentKind] = useState<PaymentMethodView["kind"]>("rmb");
+  const rmbMethods = paymentMethods.filter((method) => method.kind === "rmb");
+  const cryptoMethods = paymentMethods.filter((method) => method.kind === "crypto");
+  const selectedMethodInAllMethods = paymentMethods.find((method) => method.id === selectedPaymentMethodId);
+  const visibleMethods = selectedPaymentKind === "crypto" ? cryptoMethods : rmbMethods;
+  const selectedMethod = visibleMethods.find((method) => method.id === selectedPaymentMethodId) ?? visibleMethods[0];
+  const canContinue = Boolean(selectedMethod?.available);
+  const methodGroups = [
+    { kind: "rmb" as const, title: "RMB支付", emptyText: "后台暂未启用 RMB 支付", methods: rmbMethods },
+    { kind: "crypto" as const, title: "数字货币支付", emptyText: "后台暂未启用数字货币支付", methods: cryptoMethods }
+  ];
+
+  useEffect(() => {
+    if (!amountCny) return;
+    if (selectedMethodInAllMethods) return;
+    const fallback = rmbMethods[0] ?? cryptoMethods[0] ?? paymentMethods[0];
+    if (!fallback) return;
+    setSelectedPaymentMethodId(fallback?.id ?? "stripe");
+    setSelectedPaymentKind(fallback?.kind ?? "rmb");
+  }, [amountCny, paymentMethods.length]);
+
+  if (!amountCny) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] grid place-items-center bg-[rgba(23,32,51,.45)] p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="选择支付方式"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isBusy) {
+          onClose();
+        }
+      }}
+    >
+      <section className="grid w-full max-w-[520px] gap-4 rounded-[18px] border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_28px_90px_rgba(96,64,43,.18)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[18px] font-black leading-6 text-[var(--text)]">选择支付方式</div>
+            <div className="mt-1 text-[12px] font-bold text-[var(--muted)]">确认金额后跳转到支付服务完成付款。</div>
+          </div>
+          <Button className="w-fit" size="icon" variant="ghost" aria-label="关闭支付方式弹窗" disabled={isBusy} onClick={onClose}>
+            <X size={15} />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--card)] p-3">
+          <MetricInline label="支付金额" value={`¥${money(amountCny)}`} />
+          <MetricInline label="到账余额" value={`¥${money(amountCny)}`} />
+        </div>
+
+        <div className="payment-kind-card-grid grid gap-2 sm:grid-cols-2">
+          {methodGroups.map((group) => {
+            const groupSelected = selectedPaymentKind === group.kind;
+            const groupMethod = group.methods.find((method) => method.id === selectedPaymentMethodId) ?? group.methods[0];
+            const icon = group.kind === "crypto" ? <WalletCards size={18} /> : <CreditCard size={18} />;
+            const statusLabel = groupMethod
+              ? groupMethod.available
+                ? groupSelected
+                  ? "已选择"
+                  : "可选择"
+                : "未配置"
+              : "未启用";
+            return (
+              <button
+                key={group.kind}
+                type="button"
+                className={cn(
+                  "payment-kind-card grid min-h-[148px] content-start gap-3 rounded-[14px] border bg-[var(--card)] p-3 text-left transition hover:border-[var(--accent)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)]",
+                  groupSelected ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_5%,var(--card))] shadow-[0_12px_28px_rgba(10,163,148,.12)]" : "border-[var(--border)]"
+                )}
+                onClick={() => {
+                  setSelectedPaymentKind(group.kind);
+                  setSelectedPaymentMethodId(groupMethod?.id ?? (group.kind === "crypto" ? "infini" : "stripe"));
+                }}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="payment-kind-card-heading-icon grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]">
+                      {icon}
+                    </span>
+                    <span className="min-w-0 text-sm font-black text-[var(--text)]">{group.title}</span>
+                  </span>
+                  <Badge tone={groupMethod?.available ? (groupSelected ? "ok" : "neutral") : "warn"}>
+                    {statusLabel}
+                  </Badge>
+                </span>
+                {groupMethod ? (
+                  <span className="grid gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-black text-[var(--text)]">{groupMethod.label}</span>
+                      <span className="mt-1 block text-[12px] font-semibold leading-5 text-[var(--muted)]">{groupMethod.description}</span>
+                    </span>
+                    <span className="flex flex-wrap gap-1.5">
+                      {paymentMethodBadges(groupMethod.id).map((label) => <Badge key={label}>{label}</Badge>)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="grid min-h-[72px] place-items-center rounded-[10px] border border-dashed border-[var(--border)] px-3 text-center text-[12px] font-bold leading-5 text-[var(--muted)]">
+                    {group.emptyText}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {selectedMethod && !selectedMethod.available ? (
+            <div className="rounded-[10px] border border-[color-mix(in_srgb,#f59e0b_36%,var(--border))] bg-[color-mix(in_srgb,#f59e0b_10%,var(--panel))] px-3 py-2 text-[12px] font-bold leading-5 text-[var(--muted)]">
+              {selectedMethod.unavailableReason ?? "该支付方式暂不可用，请稍后再试。"}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button className="w-fit" variant="ghost" disabled={isBusy} onClick={onClose}>取消</Button>
+          <Button className="w-fit" variant="primary" disabled={isBusy || !canContinue} onClick={() => selectedMethod && selectedMethod.available ? void onContinue(selectedMethod.id) : undefined}>
+            <CreditCard size={14} />
+            支付
           </Button>
         </div>
       </section>
@@ -3899,15 +4046,15 @@ function ProductCreationWorkspace({
   onModelSchemeChange,
   textModelOptions,
   selectedTextModelConfigId,
-  onTextModelConfigChange,
   imageModelOptions,
   selectedImageModelConfigId,
-  onImageModelConfigChange,
   videoModelOptions,
   selectedVideoModelConfigId,
   onVideoModelConfigChange,
   duration,
   onDurationChange,
+  selectedVideoResolution,
+  onVideoResolutionChange,
   versionCount,
   onVersionCountChange,
   template,
@@ -3963,15 +4110,15 @@ function ProductCreationWorkspace({
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   textModelOptions: ProviderConfigItem[];
   selectedTextModelConfigId: ModelConfigChoice;
-  onTextModelConfigChange: (configId: ModelConfigChoice) => void;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
-  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   videoModelOptions: ProviderConfigItem[];
   selectedVideoModelConfigId: ModelConfigChoice;
   onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
+  selectedVideoResolution: VideoResolution;
+  onVideoResolutionChange: (resolution: VideoResolution) => void;
   versionCount: number;
   onVersionCountChange: (versionCount: number) => void;
   template: TemplateName;
@@ -4051,15 +4198,15 @@ function ProductCreationWorkspace({
       onModelSchemeChange={onModelSchemeChange}
       textModelOptions={textModelOptions}
       selectedTextModelConfigId={selectedTextModelConfigId}
-      onTextModelConfigChange={onTextModelConfigChange}
       imageModelOptions={imageModelOptions}
       selectedImageModelConfigId={selectedImageModelConfigId}
-      onImageModelConfigChange={onImageModelConfigChange}
       videoModelOptions={videoModelOptions}
       selectedVideoModelConfigId={selectedVideoModelConfigId}
       onVideoModelConfigChange={onVideoModelConfigChange}
       duration={duration}
       onDurationChange={onDurationChange}
+      selectedVideoResolution={selectedVideoResolution}
+      onVideoResolutionChange={onVideoResolutionChange}
       versionCount={versionCount}
       onVersionCountChange={onVersionCountChange}
       template={template}
@@ -4117,15 +4264,15 @@ function ProductCreationComposer({
   onModelSchemeChange,
   textModelOptions,
   selectedTextModelConfigId,
-  onTextModelConfigChange,
   imageModelOptions,
   selectedImageModelConfigId,
-  onImageModelConfigChange,
   videoModelOptions,
   selectedVideoModelConfigId,
   onVideoModelConfigChange,
   duration,
   onDurationChange,
+  selectedVideoResolution,
+  onVideoResolutionChange,
   versionCount,
   onVersionCountChange,
   template,
@@ -4179,15 +4326,15 @@ function ProductCreationComposer({
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   textModelOptions: ProviderConfigItem[];
   selectedTextModelConfigId: ModelConfigChoice;
-  onTextModelConfigChange: (configId: ModelConfigChoice) => void;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
-  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   videoModelOptions: ProviderConfigItem[];
   selectedVideoModelConfigId: ModelConfigChoice;
   onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   duration: number;
   onDurationChange: (duration: number) => void;
+  selectedVideoResolution: VideoResolution;
+  onVideoResolutionChange: (resolution: VideoResolution) => void;
   versionCount: number;
   onVersionCountChange: (versionCount: number) => void;
   template: TemplateName;
@@ -4213,7 +4360,9 @@ function ProductCreationComposer({
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
   const [fileImportOpen, setFileImportOpen] = useState(false);
+  const [productLibraryCollapsed, setProductLibraryCollapsed] = useState(false);
   const selectedSku = selectedProduct?.sku ?? pendingProductSku ?? "";
+  const productLibraryColumnWidth = productLibraryCollapsed ? PRODUCT_LIBRARY_COLLAPSED_WIDTH : PRODUCT_LIBRARY_DEFAULT_WIDTH;
   const previewReferenceImages = selectedProduct?.reference_image_statuses ?? [];
   const draftReferenceImages = useMemo<ReferenceImageStatus[]>(
     () => draftReferenceImageStatuses(draft),
@@ -4244,9 +4393,14 @@ function ProductCreationComposer({
     selectedImageModelConfigId,
     selectedVideoModelConfigId
   });
+  const schemeModelChips = [
+    { label: "文", value: modelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions) },
+    { label: "图", value: modelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions) },
+    { label: "视", value: modelConfigChoiceLabel(selectedVideoModelConfigId, videoModelOptions) }
+  ];
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
-  const languageOptions: FinalVideoLanguage[] = ["ja", "zh"];
+  const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"];
   const templateOptions = enabledTemplateOptions.includes(template)
     ? enabledTemplateOptions
     : [template, ...enabledTemplateOptions];
@@ -4267,7 +4421,7 @@ function ProductCreationComposer({
     generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"
   );
   const generationReadinessMessageClass = cn(
-    "generation-readiness-message flex min-h-12 w-full max-w-[360px] justify-self-center items-center justify-center text-center text-xs font-black leading-5",
+    "generation-status-message video-generate-status-center flex min-h-12 w-full items-center justify-center text-center text-xs font-black leading-5",
     generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"
   );
   const generateVideoSummary = [
@@ -4276,10 +4430,10 @@ function ProductCreationComposer({
     storyboardStatusLabel(storyboardDraftSource),
     templateLabel(template),
     formatDuration(duration),
+    videoResolutionLabel(selectedVideoResolution),
     finalLanguageLabel(finalLanguage),
     modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)
   ].join(" · ");
-
   useEffect(() => {
     setPreviewReferenceIndex(undefined);
     if (productFactsBodyRef.current) {
@@ -4348,7 +4502,8 @@ function ProductCreationComposer({
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct), {
         provider: "volcengine-seedance",
-        providerModelConfigId: selectedVideoModelConfigId
+        providerModelConfigId: selectedVideoModelConfigId,
+        resolution: selectedVideoResolution
       });
       onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok");
     } catch (error) {
@@ -4385,7 +4540,7 @@ function ProductCreationComposer({
   async function copyPastedMediaReferencesToProduct(references: string[]) {
     if (references.length === 0) return;
     try {
-      const files = await Promise.all(references.map(mediaReferenceToFile));
+      const files = await Promise.all(references.map((reference) => mediaReferenceToFile(reference)));
       handleReferenceFiles(files);
     } catch (error) {
       onToast(errorMessage(error));
@@ -4419,7 +4574,7 @@ function ProductCreationComposer({
     const mediaReferences = extractProductComposerImageReferences([
       event.clipboardData.getData("text/plain"),
       event.clipboardData.getData("text/html")
-    ].join("\n")).filter(isSameOriginMediaReference);
+    ].join("\n")).filter((reference) => isSameOriginMediaReference(reference));
     if (mediaReferences.length === 0) return;
     event.stopPropagation();
     event.preventDefault();
@@ -4480,70 +4635,107 @@ function ProductCreationComposer({
   return (
     <section
       id="视频创作"
-      className="video-creation-frame grid gap-0 overflow-visible rounded-[24px] border border-[var(--border-strong)] bg-[var(--card)] shadow-[0_22px_64px_rgba(96,64,43,.10)]"
+      className="video-workspace-shell relative grid h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-[var(--card)] transition-[grid-template-columns] duration-200 min-[900px]:grid-cols-[var(--product-library-column-width)_minmax(0,1fr)]"
+      style={{ "--product-library-column-width": `${productLibraryColumnWidth}px` } as CSSProperties}
       onPaste={handleReferencePaste}
     >
-      <div className="product-creation-canvas overflow-visible">
-        <div className="product-control-bar grid gap-2 border-b border-[var(--border)] bg-[var(--panel)] p-3 min-[1280px]:px-4">
-          <div className="video-parameter-row grid gap-3 min-[1280px]:grid-cols-[repeat(6,minmax(132px,1fr))] min-[1280px]:items-end">
-            <ProductCreationProductPicker
-              className="product-creation-picker min-w-0"
-              products={products}
-              selectedSku={selectedSku}
-              draftTitle={draft.title_ja}
-              onSelectProduct={onSelectProduct}
-              onAddProduct={onStartNewProduct}
-              onDeleteProduct={onDeleteProduct}
-              onImportFile={() => setFileImportOpen(true)}
-            />
+      <ProductCreationProductLibrary
+        products={products}
+        selectedSku={selectedSku}
+        draftTitle={draft.title_ja}
+        collapsed={productLibraryCollapsed}
+        onExpand={() => setProductLibraryCollapsed(false)}
+        onSelectProduct={onSelectProduct}
+        onAddProduct={onStartNewProduct}
+        onDeleteProduct={onDeleteProduct}
+        onImportFile={() => setFileImportOpen(true)}
+      />
+      <button
+        type="button"
+        className="video-product-library-collapse-rail group absolute inset-y-0 left-[calc(var(--product-library-column-width)-10px)] z-30 hidden w-5 cursor-pointer bg-transparent text-[var(--muted)] transition-[left,color] duration-200 hover:text-[var(--accent)] focus-visible:outline-none min-[900px]:flex min-[900px]:items-center min-[900px]:justify-center"
+        aria-label={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}
+        aria-expanded={!productLibraryCollapsed}
+        title={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}
+        onClick={() => setProductLibraryCollapsed((collapsed) => !collapsed)}
+      >
+        <span className="video-product-library-collapse-button pointer-events-none grid h-8 w-8 place-items-center rounded-full border border-[var(--border-strong)] bg-[var(--panel)]/95 opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.14)] transition group-hover:opacity-100 group-focus-visible:opacity-100 group-hover:border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] group-hover:bg-[color-mix(in_srgb,var(--accent)_5%,var(--panel))]">
+          {productLibraryCollapsed ? <ChevronRight size={16} strokeWidth={2.4} /> : <ChevronLeft size={16} strokeWidth={2.4} />}
+        </span>
+      </button>
+
+      <ProductCreationOperationWorkspace
+        title={draft.title_ja.trim() || selectedProduct?.title_ja || "新商品"}
+        badge={`${latestCreativeJobs.length} 个版本`}
+      >
+        {loadError ? (
+          <div className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-[var(--danger)]">
+            {loadError}
+          </div>
+        ) : null}
+
+        <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(98px,.72fr))] min-[1180px]:items-start">
+          <div className="model-scheme-control grid min-w-0 gap-1">
             <CompactChoiceDropdown
               label="模型方案"
               value={activeModelSchemeId}
               options={modelSchemeOptions.map((option) => option.id)}
               formatOption={(option) => modelSchemeChoiceLabel(option, modelSchemeOptions)}
               onChange={onModelSchemeChange}
-            />
-            <CompactChoiceDropdown
-              label="视频风格"
-              value={template}
-              options={templateOptions}
-              formatOption={templateLabel}
-              onChange={onTemplateChange}
-            />
-            <CompactChoiceDropdown
-              label="视频时长"
-              value={String(duration)}
-              options={durationOptions}
-              formatOption={(option) => `${option}s`}
-              onChange={(option) => onDurationChange(Number(option))}
-            />
-            <CompactChoiceDropdown
-              label="成片语言"
-              value={finalLanguage}
-              options={languageOptions}
-              formatOption={finalLanguageLabel}
-              onChange={onFinalLanguageChange}
-            />
-            <CompactChoiceDropdown
-              label="生成视频"
-              value={String(versionCount)}
-              options={versionCountOptions}
-              formatOption={(option) => `${option} 个`}
-              onChange={(option) => onVersionCountChange(Number(option))}
+              density="compact"
             />
           </div>
-          <div className="grid gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--card2)] px-3 py-2">
-            <div className="min-w-0 truncate text-[12px] font-black text-[var(--muted)]">{schemeSummary}</div>
+          <CompactChoiceDropdown
+            label="视频风格"
+            value={template}
+            options={templateOptions}
+            formatOption={templateLabel}
+            onChange={onTemplateChange}
+            density="compact"
+          />
+          <CompactChoiceDropdown
+            label="视频时长"
+            value={String(duration)}
+            options={durationOptions}
+            formatOption={(option) => `${option}s`}
+            onChange={(option) => onDurationChange(Number(option))}
+            density="compact"
+          />
+          <CompactChoiceDropdown
+            label="视频分辨率"
+            value={selectedVideoResolution}
+            options={videoResolutionOptions}
+            formatOption={videoResolutionLabel}
+            onChange={onVideoResolutionChange}
+            density="compact"
+          />
+          <CompactChoiceDropdown
+            label="成片语言"
+            value={finalLanguage}
+            options={languageOptions}
+            formatOption={finalLanguageLabel}
+            onChange={onFinalLanguageChange}
+            density="compact"
+          />
+          <CompactChoiceDropdown
+            label="生成视频"
+            value={String(versionCount)}
+            options={versionCountOptions}
+            formatOption={(option) => `${option} 个`}
+            onChange={(option) => onVersionCountChange(Number(option))}
+            density="compact"
+          />
+          <div
+            className="model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5 min-[1180px]:col-span-6"
+            title={schemeSummary}
+            aria-label={schemeSummary}
+          >
+            {schemeModelChips.map((item) => (
+              <ModelSchemeChip key={item.label} label={item.label} value={item.value} />
+            ))}
           </div>
-        </div>
+        </section>
 
-        {loadError ? (
-          <div className="mx-4 mt-4 rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-[var(--danger)]">
-            {loadError}
-          </div>
-        ) : null}
-
-        <div className="grid items-stretch gap-0 min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
+        <div className="grid items-stretch gap-0 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--panel)] min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
           <div className="border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
             <ProductComposerReferenceTray
               className="h-full"
@@ -4553,9 +4745,6 @@ function ProductCreationComposer({
               pendingImages={pendingReferenceImageStatuses}
               onImportAssets={onImportAssets}
               onGenerateReferenceImages={onGenerateReferenceImages}
-              imageModelOptions={imageModelOptions}
-              selectedImageModelConfigId={selectedImageModelConfigId}
-              onImageModelConfigChange={onImageModelConfigChange}
               onToast={onToast}
               onPreviewReferenceImage={setPreviewReferenceIndex}
               onPendingPreview={(index) => setPreviewReferenceIndex(index)}
@@ -4605,7 +4794,6 @@ function ProductCreationComposer({
               storyboardDraft={storyboardDraft}
               storyboardDraftIsGuidance={storyboardDraftIsGuidance}
               storyboardHistory={storyboardHistory}
-              textModelLabel={modelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions)}
               onStoryboardDraftChange={onStoryboardDraftChange}
               onApplyStoryboardHistory={onApplyStoryboardHistory}
               onDeleteStoryboardHistory={onDeleteStoryboardHistory}
@@ -4616,8 +4804,10 @@ function ProductCreationComposer({
           </div>
         </div>
 
-        <div className="video-generate-bar grid gap-3 border-t border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-          <div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{generateVideoSummary}</div>
+        <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+          <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
+            {generateVideoSummary}
+          </div>
           <div className={generationReadinessMessageClass}>
             {generationReadiness.label}
           </div>
@@ -4634,19 +4824,18 @@ function ProductCreationComposer({
           </Button>
         </div>
 
-      </div>
-
-      <VideoHistoryPanel
-        jobs={latestCreativeJobs}
-        product={selectedProduct}
-        draft={draft}
-        importText={importText}
-        onPreview={setPreviewJob}
-        onDelete={setDeleteTarget}
-        onRetryVideoJob={onRetryVideoJob}
-        onRecoverVideoJobDownload={onRecoverVideoJobDownload}
-        onToast={onToast}
-      />
+        <VideoHistoryPanel
+          jobs={latestCreativeJobs}
+          product={selectedProduct}
+          draft={draft}
+          importText={importText}
+          onPreview={setPreviewJob}
+          onDelete={setDeleteTarget}
+          onRetryVideoJob={onRetryVideoJob}
+          onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+          onToast={onToast}
+        />
+      </ProductCreationOperationWorkspace>
 
       <VideoPreviewDialog
         job={previewJob}
@@ -4694,6 +4883,211 @@ function ProductCreationComposer({
   );
 }
 
+function ProductCreationProductLibrary({
+  products,
+  selectedSku,
+  draftTitle,
+  collapsed,
+  onExpand,
+  onSelectProduct,
+  onAddProduct,
+  onDeleteProduct,
+  onImportFile
+}: {
+  products: ProductSummary[];
+  selectedSku: string;
+  draftTitle?: string;
+  collapsed: boolean;
+  onExpand: () => void;
+  onSelectProduct: (product: ProductSummary) => Promise<void>;
+  onAddProduct: () => void;
+  onDeleteProduct: (sku: string) => Promise<void>;
+  onImportFile: () => void;
+}) {
+  const productOptions = dedupeProductSummaries(products);
+  const draftProductTitle = draftTitle?.trim() ?? "";
+  const [productLibrarySearchQuery, setProductLibrarySearchQuery] = useState("");
+  const filteredProductOptions = useMemo(
+    () => filterProductLibraryProducts(productOptions, productLibrarySearchQuery, (product) => {
+      const status = productLibraryStatus(product);
+      return [status.label, status.detail];
+    }),
+    [productOptions, productLibrarySearchQuery]
+  );
+  const trimmedSearchQuery = productLibrarySearchQuery.trim();
+
+  if (collapsed) {
+    return (
+      <aside className="video-product-library-column grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[var(--border)] bg-[var(--field)]">
+        <div className="grid place-items-center border-b border-[var(--border)] bg-[var(--panel)] px-1.5 py-3">
+          <Package className="text-[var(--muted)]" size={15} />
+        </div>
+        <div className="grid min-h-0 content-start justify-items-center gap-2 overflow-hidden py-2">
+          <button
+            type="button"
+            className="grid h-8 w-8 place-items-center rounded-[8px] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            aria-label="展开商品库"
+            title={`商品库 · ${productOptions.length} 个商品`}
+            onClick={onExpand}
+          >
+            <Package size={14} />
+          </button>
+          <span className="text-[10px] font-black leading-none text-[var(--muted)]">{productOptions.length}</span>
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="video-product-library-column grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[var(--border)] bg-[var(--field)]">
+      <div className="grid gap-2.5 border-b border-[var(--border)] bg-[var(--panel)] px-3 py-3">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="m-0 truncate text-[15px] font-black leading-5 text-[var(--text)]">商品库</h2>
+            <div className="mt-0.5 text-[11px] font-bold text-[var(--muted)]">
+              {trimmedSearchQuery ? `${filteredProductOptions.length}/${productOptions.length} 个商品` : `${productOptions.length} 个商品`}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button size="icon" variant="soft" aria-label="导入 CSV/Excel" title="导入 CSV/Excel" onClick={onImportFile}>
+              <FileSpreadsheet size={14} />
+            </Button>
+            <Button size="icon" variant="primary" aria-label="新商品" title="新商品" onClick={onAddProduct}>
+              <Plus size={14} />
+            </Button>
+          </div>
+        </div>
+        <label className="product-library-search group/search relative block">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] transition group-focus-within/search:text-[var(--accent)]" size={14} />
+          <Input
+            className="h-9 min-h-9 rounded-[9px] border-[var(--border-strong)] bg-[var(--field)] pl-8 pr-8 text-[12px] font-bold shadow-[inset_0_1px_0_rgba(255,255,255,.55)] placeholder:text-[var(--muted)]"
+            type="search"
+            value={productLibrarySearchQuery}
+            placeholder="搜索商品"
+            aria-label="搜索商品"
+            onChange={(event) => setProductLibrarySearchQuery(event.target.value)}
+          />
+          {productLibrarySearchQuery ? (
+            <button
+              type="button"
+              className="absolute right-1.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-[7px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+              aria-label="清空商品搜索"
+              title="清空搜索"
+              onClick={() => setProductLibrarySearchQuery("")}
+            >
+              <X size={12} />
+            </button>
+          ) : null}
+        </label>
+      </div>
+
+      <div className="product-library-scroll min-h-0 overflow-y-auto px-2 py-2">
+        <div className="grid gap-1.5">
+          {filteredProductOptions.map((product) => {
+            const active = product.sku === selectedSku;
+            const status = productLibraryStatus(product);
+            const referenceImageCount = productReferenceCount(product);
+            const title = active && draftProductTitle ? draftProductTitle : product.title_ja;
+
+            return (
+              <article
+                key={product.path || product.sku || product.title_ja}
+                className={cn(
+                  "group/video-product-row grid min-h-[68px] grid-cols-[minmax(0,1fr)_26px] items-start gap-1.5 rounded-[8px] border px-2.5 py-2 transition",
+                  active
+                    ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--panel))]"
+                    : "border-transparent bg-[var(--panel)] hover:border-[var(--border)] hover:bg-[var(--panel2)]"
+                )}
+              >
+                <button
+                  type="button"
+                  className="grid min-w-0 gap-1 text-left"
+                  aria-current={active ? "true" : undefined}
+                  title={title}
+                  onClick={() => {
+                    if (!active) {
+                      void onSelectProduct(product);
+                    }
+                  }}
+                >
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
+                      <CheckCircle2 size={13} />
+                    </span>
+                    <span className="truncate text-[13px] font-black leading-5 text-[var(--text)]">{title}</span>
+                  </span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5 pl-5">
+                    <Badge className="min-h-5 px-1.5 text-[10px]" tone={status.tone}>{status.label}</Badge>
+                    <span className="text-[11px] font-bold text-[var(--muted)]">参考图 {referenceImageCount} 张</span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="grid h-6 w-6 place-items-center rounded-[7px] text-red-400 opacity-80 transition hover:bg-red-50 hover:text-red-600 min-[900px]:opacity-0 min-[900px]:group-hover/video-product-row:opacity-100"
+                  title="删除商品"
+                  aria-label={`删除商品 ${product.title_ja}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onDeleteProduct(product.sku);
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              </article>
+            );
+          })}
+        </div>
+
+        {productOptions.length === 0 ? (
+          <div className="mt-3 rounded-[8px] border border-dashed border-[var(--border)] bg-[var(--panel)] px-3 py-6 text-center text-xs font-bold text-[var(--muted)]">
+            暂无商品
+          </div>
+        ) : filteredProductOptions.length === 0 ? (
+          <div className="mt-3 grid gap-2 rounded-[8px] border border-dashed border-[var(--border)] bg-[var(--panel)] px-3 py-6 text-center">
+            <div className="text-xs font-black text-[var(--text)]">没有匹配的商品</div>
+            <button
+              type="button"
+              className="mx-auto w-fit rounded-[8px] px-2 py-1 text-[11px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--panel))]"
+              onClick={() => setProductLibrarySearchQuery("")}
+            >
+              清空搜索
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+function ProductCreationOperationWorkspace({
+  title,
+  badge,
+  children
+}: {
+  title: string;
+  badge?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="video-operation-column grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--card)]">
+      <div className="grid min-h-[54px] gap-1 border-b border-[var(--border)] bg-[var(--card)] px-4 py-2.5 min-[1180px]:grid-cols-[minmax(0,1fr)_auto] min-[1180px]:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="m-0 truncate text-[16px] font-black leading-5 text-[var(--text)]">{title}</h2>
+            {badge ? <Badge className="shrink-0" tone="neutral">{badge}</Badge> : null}
+          </div>
+        </div>
+      </div>
+      <div className="min-h-0 overflow-y-auto p-3 min-[1280px]:p-4">
+        <div className="grid content-start gap-3">
+          {children}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ProductComposerReferenceTray({
   className,
   product,
@@ -4702,9 +5096,6 @@ function ProductComposerReferenceTray({
   pendingImages,
   onImportAssets,
   onGenerateReferenceImages,
-  imageModelOptions,
-  selectedImageModelConfigId,
-  onImageModelConfigChange,
   onToast,
   onPreviewReferenceImage,
   onPendingPreview,
@@ -4720,9 +5111,6 @@ function ProductComposerReferenceTray({
   pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
   onGenerateReferenceImages: (sku: string) => Promise<void>;
-  imageModelOptions: ProviderConfigItem[];
-  selectedImageModelConfigId: ModelConfigChoice;
-  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   onToast: ConsoleToastFn;
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
@@ -4797,9 +5185,6 @@ function ProductComposerReferenceTray({
           }}
         />
       </label>
-      <div className="truncate text-[11px] font-black text-[var(--muted)]">
-        图片模型 {modelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions)}
-      </div>
       <Button
         className={cn("w-full justify-center", !product && "opacity-55")}
         size="sm"
@@ -4923,62 +5308,12 @@ function ProductComposerReferenceTray({
   );
 }
 
-function isReferenceImageFile(file: File): boolean {
-  const mimeType = file.type.toLowerCase();
-  if (mimeType === "image/jpeg" || mimeType === "image/png" || mimeType === "image/webp") {
-    return true;
-  }
-  return /\.(jpe?g|png|webp)$/i.test(file.name);
-}
-
-function isSameOriginMediaReference(reference: string): boolean {
-  try {
-    const url = new URL(reference, window.location.href);
-    const mediaPath = url.searchParams.get("path") ?? "";
-    return url.origin === window.location.origin &&
-      url.pathname === "/media" &&
-      /\.(jpe?g|png|webp)$/i.test(mediaPath);
-  } catch {
-    return false;
-  }
-}
-
-async function mediaReferenceToFile(reference: string): Promise<File> {
-  const url = new URL(reference, window.location.href);
-  const response = await fetch(`${url.pathname}${url.search}`);
-  if (!response.ok) {
-    throw new Error(`参考图读取失败: HTTP ${response.status}`);
-  }
-  const blob = await response.blob();
-  const fileName = mediaReferenceFileName(url, blob.type);
-  return new File([blob], fileName, {
-    type: blob.type || mediaReferenceMimeType(fileName)
-  });
-}
-
-function mediaReferenceFileName(url: URL, mimeType: string): string {
-  const mediaPath = url.searchParams.get("path") ?? "";
-  const decodedName = mediaPath.split(/[\\/]/).pop() ?? "";
-  if (/\.(?:jpe?g|png|webp)$/i.test(decodedName)) {
-    return decodedName;
-  }
-  const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : ".jpg";
-  return `copied-reference${extension}`;
-}
-
-function mediaReferenceMimeType(fileName: string): string {
-  if (/\.png$/i.test(fileName)) return "image/png";
-  if (/\.webp$/i.test(fileName)) return "image/webp";
-  return "image/jpeg";
-}
-
 function StoryboardComposerPanel({
   template,
   duration,
   storyboardDraft,
   storyboardDraftIsGuidance,
   storyboardHistory,
-  textModelLabel,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
@@ -4991,7 +5326,6 @@ function StoryboardComposerPanel({
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
-  textModelLabel: string;
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
@@ -5006,7 +5340,6 @@ function StoryboardComposerPanel({
         <div className="min-w-0">
           <div className="text-base font-black text-[var(--text)]">脚本分镜</div>
           <div className="mt-1 text-xs font-bold text-[var(--muted)]">可选；留空会按商品资料生成。</div>
-          <div className="mt-1 truncate text-[11px] font-black text-[var(--muted)]">文本模型: {textModelLabel}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <Badge>{templateLabel(template)}</Badge>
@@ -5229,17 +5562,6 @@ function VideoHistoryPanel({
       )}
     </section>
   );
-}
-
-function productDraftToProductDetail(draft: ProductDraft): ProductDetail {
-  const facts = productDraftToFacts(draft);
-  return {
-    ...facts,
-    path: "",
-    referenceImageCount: facts.reference_images.length,
-    importQuality: undefined,
-    reference_image_statuses: []
-  };
 }
 
 function ProductLibraryHome({
@@ -5739,156 +6061,6 @@ function VideoHashtagChips({ hashtags, onToast }: { hashtags?: string[]; onToast
   );
 }
 
-function ProductCreationProductPicker({
-  className,
-  products,
-  selectedSku,
-  draftTitle,
-  onSelectProduct,
-  onAddProduct,
-  onDeleteProduct,
-  onImportFile
-}: {
-  className?: string;
-  products: ProductSummary[];
-  selectedSku: string;
-  draftTitle?: string;
-  onSelectProduct: (product: ProductSummary) => Promise<void>;
-  onAddProduct: () => void;
-  onDeleteProduct: (sku: string) => Promise<void>;
-  onImportFile: () => void;
-}) {
-  const [productPickerOpen, setProductPickerOpen] = useState(false);
-  const productOptions = dedupeProductSummaries(products);
-  const selectedProductOption = productOptions.find((product) => product.sku === selectedSku);
-  const draftProductTitle = draftTitle?.trim() ?? "";
-  const selectedProductLabel = draftProductTitle || (selectedProductOption ? selectedProductOption.title_ja : "新商品");
-
-  const handleProductPickerSelect = (sku: string) => {
-    if (sku === NEW_PRODUCT_SELECT_VALUE) {
-      setProductPickerOpen(false);
-      onAddProduct();
-      return;
-    }
-    const nextProduct = productOptions.find((product) => product.sku === sku);
-    if (!nextProduct) return;
-    setProductPickerOpen(false);
-    if (nextProduct.sku !== selectedSku) {
-      void onSelectProduct(nextProduct);
-    }
-  };
-
-  return (
-    <div
-      className={cn("product-picker-single relative grid min-w-0 gap-1.5", className)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setProductPickerOpen(false);
-        }
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          setProductPickerOpen(false);
-        }
-      }}
-    >
-      <span className="shrink-0 text-[12px] font-black text-[var(--muted)]">创作商品</span>
-      <button
-        type="button"
-        className={cn(
-          "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
-          productPickerOpen
-            ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
-            : "border-[var(--border-strong)] hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]"
-        )}
-        aria-haspopup="listbox"
-        aria-expanded={productPickerOpen}
-        title={selectedProductLabel}
-        onClick={() => setProductPickerOpen((open) => !open)}
-      >
-        <span className="min-w-0 truncate">{selectedProductLabel}</span>
-        <ChevronDown className={cn("shrink-0 text-[var(--muted)] transition", productPickerOpen && "rotate-180 text-[var(--accent)]")} size={15} />
-      </button>
-      {productPickerOpen ? (
-        <div
-          className="product-creation-product-menu absolute left-0 right-0 top-[calc(100%+8px)] z-30 grid max-h-[280px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
-          role="listbox"
-        >
-          <button
-            type="button"
-            role="option"
-            aria-selected={!selectedProductOption}
-            className={cn(
-              "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_38%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--panel))] px-2.5 text-left text-[13px] font-black text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_10%,var(--panel))]",
-              !selectedProductOption && "border-solid bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))]"
-            )}
-            onClick={() => handleProductPickerSelect(NEW_PRODUCT_SELECT_VALUE)}
-          >
-            <Plus size={13} />
-            <span>新商品</span>
-          </button>
-          <button
-            type="button"
-            role="option"
-            aria-selected={false}
-            className="grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-            onClick={() => {
-              setProductPickerOpen(false);
-              onImportFile();
-            }}
-          >
-            <FileSpreadsheet size={13} />
-            <span>导入 CSV/Excel</span>
-          </button>
-          {productOptions.length > 0 ? (
-            productOptions.map((option) => {
-              const active = option.sku === selectedSku;
-              const optionTitle = active && draftProductTitle ? draftProductTitle : option.title_ja;
-              return (
-                <div
-                  key={option.sku}
-                  className={cn(
-                    "group/product-option grid min-h-10 grid-cols-[minmax(0,1fr)_32px] items-center gap-1 rounded-lg transition",
-                    active ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-                  )}
-                >
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    className="grid min-h-10 min-w-0 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black"
-                    onClick={() => handleProductPickerSelect(option.sku)}
-                  >
-                    <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
-                      <CheckCircle2 size={14} />
-                    </span>
-                    <span className="min-w-0 truncate" title={optionTitle}>{optionTitle}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="grid h-8 w-8 place-items-center rounded-lg text-red-400 opacity-80 transition hover:bg-red-50 hover:text-red-600 min-[900px]:opacity-0 min-[900px]:group-hover/product-option:opacity-100"
-                    title="删除商品"
-                    aria-label={`删除商品 ${option.title_ja}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setProductPickerOpen(false);
-                      void onDeleteProduct(option.sku);
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              );
-            })
-          ) : (
-            <div className="px-3 py-2 text-xs font-bold text-[var(--muted)]">暂无商品</div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function ProductFileImportDialog({
   open,
   onClose,
@@ -6118,152 +6290,6 @@ function ProductFileImportDialog({
       </section>
     </div>
   );
-}
-
-function productReferenceCount(product?: ProductSummary | ProductDetail): number {
-  if (!product) return 0;
-  if ("reference_image_statuses" in product && product.reference_image_statuses) {
-    return product.reference_image_statuses.length;
-  }
-  if ("reference_images" in product) {
-    return product.reference_images.length;
-  }
-  return product.referenceImageCount ?? 0;
-}
-
-function isProductImportFile(file: File): boolean {
-  const name = file.name.toLowerCase();
-  return name.endsWith(".csv") || name.endsWith(".xlsx") || name.endsWith(".xls");
-}
-
-function fileImportRowLabel(status: ProductFileImportRowStatus): string {
-  const labels: Record<ProductFileImportRowStatus, string> = {
-    ready: "未导入",
-    "needs-ai": "未导入",
-    "needs-input": "不可导入",
-    duplicate: "已导入",
-    failed: "不可导入"
-  };
-  return labels[status];
-}
-
-function fileImportCanSelect(row: ProductFileImportRow): boolean {
-  return Boolean(row.product) && row.status !== "failed" && row.status !== "needs-input" && row.status !== "duplicate";
-}
-
-function fileImportSourceRowsLabel(row: ProductFileImportRow): string {
-  const rows = row.sourceRowNumbers?.length ? row.sourceRowNumbers : [row.rowNumber];
-  if (rows.length === 1) {
-    return String(rows[0]);
-  }
-  return `${rows[0]}-${rows[rows.length - 1]} (${rows.length} 行)`;
-}
-
-function fileImportProductIdLabel(row: ProductFileImportRow): string {
-  const productId = Object.entries(row.raw).find(([header, value]) =>
-    /^(商品ID|商品id|产品ID|產品ID|产品id|產品id|全球产品ID|全球產品ID|product\s*id|global\s*product\s*id|id|ID)$/i.test(header.trim()) &&
-    value.trim()
-  )?.[1];
-  return productId?.trim() || row.product?.sku || "-";
-}
-
-function fileImportRowTone(status: ProductFileImportRowStatus): "neutral" | "ok" | "warn" | "danger" {
-  if (status === "ready") return "ok";
-  if (status === "failed" || status === "needs-input") return "danger";
-  if (status === "needs-ai" || status === "duplicate") return "warn";
-  return "neutral";
-}
-
-function productGenerationReadiness({
-  selectedProduct,
-  importText
-}: {
-  selectedProduct?: ProductDetail;
-  importText: string;
-}): { ready: boolean; label: string } {
-  if (selectedProduct) {
-    return { ready: true, label: "资料已保存，可生成视频。" };
-  }
-  if (!importText.trim()) {
-    return { ready: false, label: "请先填写商品资料。" };
-  }
-  return { ready: true, label: "将先整理资料包，再生成视频。" };
-}
-
-function productFactsStatusLabel({
-  selectedProduct,
-  importText
-}: {
-  selectedProduct?: ProductDetail;
-  importText: string;
-}): string {
-  if (!selectedProduct) {
-    if (importText.trim()) {
-      return "原始资料";
-    }
-    return "未填资料";
-  }
-  return "已整理资料包";
-}
-
-function productAutoSaveStatusLabel(status: ProductAutoSaveStatus): string {
-  if (status === "saving") {
-    return "保存中";
-  }
-  if (status === "saved") {
-    return "已保存";
-  }
-  if (status === "failed") {
-    return "保存失败";
-  }
-  return "";
-}
-
-function storyboardStatusLabel(storyboardDraftSource: StoryboardDraftSource): string {
-  if (storyboardDraftSource === "default") {
-    return "默认分镜";
-  }
-  if (storyboardDraftSource === "ai") {
-    return "AI 生成分镜";
-  }
-  return "手动分镜";
-}
-
-function dedupeProductSummaries(products: ProductSummary[]): ProductSummary[] {
-  const byIdentity = new Map<string, ProductSummary>();
-  for (const product of products) {
-    const identity = productIdentityKey(product);
-    const existing = byIdentity.get(identity);
-    if (!existing || productSummaryCompleteness(product) > productSummaryCompleteness(existing)) {
-      byIdentity.set(identity, product);
-    }
-  }
-  return Array.from(byIdentity.values());
-}
-
-function productIdentityKey(product: ProductSummary): string {
-  const sku = product.sku.trim().toLowerCase();
-  if (sku) return `sku:${sku}`;
-  const path = product.path.trim().toLowerCase();
-  if (path) return `path:${path}`;
-  return `title:${product.title_ja.trim().toLowerCase()}`;
-}
-
-function productSummaryCompleteness(product: ProductSummary): number {
-  return productReferenceCount(product) * 100 +
-    (product.importQuality?.score ?? 0) +
-    (product.paidReadiness?.readyForPaidGeneration ? 10 : 0);
-}
-
-function productActionSummary(product: ProductDetail, summary?: ProductSummary): ProductSummary {
-  return summary ?? {
-    path: product.path,
-    sku: product.sku,
-    title_ja: product.title_ja,
-    referenceImageCount: productReferenceCount(product),
-    importQuality: product.importQuality,
-    paidReadiness: product.paidReadiness
-  };
 }
 
 function FactList({ title, items }: { title: string; items: string[] }) {
@@ -6919,6 +6945,7 @@ function ChartBlock({ option, height, empty }: { option: EChartsOption; height: 
   return (
     <ReactECharts
       className="min-w-0"
+      echarts={echartsCore}
       option={option}
       notMerge
       lazyUpdate
@@ -6929,11 +6956,11 @@ function ChartBlock({ option, height, empty }: { option: EChartsOption; height: 
 
 function WalletRechargePanel({
   wallet,
-  onTopUpWallet,
+  onRequestRecharge,
   isBusy
 }: {
   wallet: WalletLedger;
-  onTopUpWallet: (amountCny?: number) => Promise<void>;
+  onRequestRecharge: (amountCny?: number) => void;
   isBusy: boolean;
 }) {
   const quickAmounts = [50, 100, 300];
@@ -6958,7 +6985,7 @@ function WalletRechargePanel({
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {quickAmounts.map((amount) => (
-          <Button key={amount} size="sm" type="button" disabled={isBusy} onClick={() => void onTopUpWallet(amount)}>
+          <Button key={amount} size="sm" type="button" disabled={isBusy} onClick={() => onRequestRecharge(amount)}>
             <CircleDollarSign size={14} />
             充值 ¥{money(amount)}
           </Button>
@@ -6969,8 +6996,8 @@ function WalletRechargePanel({
       </div>
       <div className="mt-4 grid gap-2">
         {wallet.transactions.slice(0, 8).map((transaction) => (
-          <div key={transaction.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-2 text-xs md:grid-cols-[120px_minmax(0,1fr)_96px_150px] md:items-center">
-            <Badge tone={transaction.amountCny >= 0 ? "ok" : "warn"}>{walletTransactionTypeLabel(transaction.type)}</Badge>
+          <div key={transaction.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-2 text-xs md:grid-cols-[68px_minmax(0,1fr)_96px_150px] md:items-center">
+            <Badge className="recharge-transaction-type-badge w-14 justify-center px-0 text-center" tone={transaction.amountCny >= 0 ? "ok" : "warn"}>{walletTransactionTypeLabel(transaction.type)}</Badge>
             <span className="min-w-0 truncate font-bold text-[var(--text)]">{transaction.description ?? "-"}</span>
             <strong className={transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]"}>
               {transaction.amountCny >= 0 ? "+" : ""}¥{money(transaction.amountCny)}
@@ -7227,14 +7254,6 @@ function VideoJobsPanel({
       )}
     </Card>
   );
-}
-
-function videoJobResultHint(job: VideoJob): string {
-  if (job.status === "completed") return "暂无成片入口";
-  if (job.status === "failed" && job.canRecoverDownload) return "视频已生成，但服务器下载成片失败，可重新下载成片";
-  if (job.status === "failed") return "任务失败，可直接重试原任务";
-  if (job.status === "canceled") return "任务已取消";
-  return "任务完成后显示成片和报告";
 }
 
 function AuditLogPanel({ auditLog }: { auditLog?: AuditLogLedger }) {
@@ -7782,155 +7801,8 @@ function ConsoleSectionLoadingState({ label }: { label: string }) {
   );
 }
 
-const chartPalette = ["#6f442c", "#0aa394", "#c65a36", "#b7791f", "#d87955", "#738a66"];
-const chartAxisColor = "#8a7665";
-const chartGridLineColor = "#ead7c4";
-
-function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsOption {
-  return {
-    color: chartPalette,
-    tooltip: {
-      trigger: "item",
-      formatter: "{b}: {c} 次 ({d}%)"
-    },
-    legend: {
-      bottom: 0,
-      left: "center",
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: { color: chartAxisColor, fontSize: 11 }
-    },
-    series: [
-      {
-        name: "模型分布",
-        type: "pie",
-        radius: ["58%", "76%"],
-        center: ["50%", "44%"],
-        avoidLabelOverlap: true,
-        label: { show: false },
-        emphasis: {
-          label: { show: true, fontSize: 12, fontWeight: 700 }
-        },
-        data: rows.map((row) => ({
-          name: row.name,
-          value: row.jobs
-        }))
-      }
-    ]
-  };
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOption {
-  return {
-    color: ["#6f442c", "#0aa394", "#c65a36"],
-    tooltip: { trigger: "axis" },
-    legend: {
-      top: 0,
-      right: 8,
-      textStyle: { color: chartAxisColor, fontSize: 12 }
-    },
-    grid: { top: 46, right: 48, bottom: 54, left: 48 },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: points.map((point) => point.label),
-      axisLabel: { color: chartAxisColor, rotate: 36, fontSize: 10 },
-      axisLine: { lineStyle: { color: chartGridLineColor } }
-    },
-    yAxis: [
-      {
-        type: "value",
-        name: "Token",
-        axisLabel: { color: chartAxisColor, formatter: (value: number) => formatCompactNumber(value) },
-        splitLine: { lineStyle: { color: chartGridLineColor } }
-      },
-      {
-        type: "value",
-        name: "¥",
-        axisLabel: { color: chartAxisColor, formatter: (value: number) => `¥${value}` },
-        splitLine: { show: false }
-      }
-    ],
-    series: [
-      {
-        name: "Token",
-        type: "line",
-        smooth: true,
-        symbolSize: 6,
-        areaStyle: { opacity: 0.08 },
-        data: points.map((point) => point.totalTokens)
-      },
-      {
-        name: "任务",
-        type: "bar",
-        barWidth: 12,
-        yAxisIndex: 1,
-        data: points.map((point) => point.jobs)
-      },
-      {
-        name: "成本",
-        type: "line",
-        yAxisIndex: 1,
-        smooth: true,
-        symbolSize: 6,
-        data: points.map((point) => point.estimatedCostCny)
-      }
-    ]
-  };
-}
-
-function buildRecentChartOption(rows: DashboardRecentRow[]): EChartsOption {
-  const ordered = [...rows].reverse();
-  return {
-    color: ["#6f442c", "#c65a36"],
-    tooltip: { trigger: "axis" },
-    legend: {
-      top: 0,
-      right: 8,
-      textStyle: { color: chartAxisColor, fontSize: 12 }
-    },
-    grid: { top: 46, right: 48, bottom: 54, left: 52 },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: ordered.map((row) => row.label),
-      axisLabel: { color: chartAxisColor, rotate: 28, fontSize: 10 },
-      axisLine: { lineStyle: { color: chartGridLineColor } }
-    },
-    yAxis: [
-      {
-        type: "value",
-        axisLabel: { color: chartAxisColor, formatter: (value: number) => formatCompactNumber(value) },
-        splitLine: { lineStyle: { color: chartGridLineColor } }
-      },
-      {
-        type: "value",
-        axisLabel: { color: chartAxisColor, formatter: (value: number) => `¥${value}` },
-        splitLine: { show: false }
-      }
-    ],
-    series: [
-      {
-        name: "Token",
-        type: "line",
-        smooth: true,
-        symbolSize: 6,
-        data: ordered.map((row) => row.totalTokens)
-      },
-      {
-        name: "成本",
-        type: "line",
-        yAxisIndex: 1,
-        smooth: true,
-        symbolSize: 6,
-        data: ordered.map((row) => row.estimatedCostCny)
-      }
-    ]
-  };
 }
 
 function attachQcToLedger(ledger: Ledger, qcSummary: QcSummaryLedger): Ledger {
@@ -7974,156 +7846,6 @@ function buildFeeProductRows(reports: Report[]): FeeProductCostRow[] {
   return Array.from(groups.values()).sort(
     (left, right) => right.estimatedCostCny - left.estimatedCostCny || right.jobs - left.jobs || left.productSku.localeCompare(right.productSku)
   );
-}
-
-function buildDashboardAnalytics(input: {
-  ledger?: Ledger;
-  videoJobs: VideoJob[];
-  range: DashboardRange;
-  granularity: DashboardGranularity;
-}): DashboardAnalytics {
-  const ledgerJobs = input.ledger?.jobs ?? input.ledger?.products.flatMap((group) => group.jobs) ?? [];
-  const ledgerById = new Map(ledgerJobs.map((job) => [job.id, job]));
-  const videoJobIds = new Set(input.videoJobs.map((job) => job.id));
-  const usageRows: DashboardRecentRow[] = [
-    ...input.videoJobs.map((job) => {
-      const ledgerJob = ledgerById.get(job.id);
-      return toDashboardRecentRow({
-        id: job.id,
-        productSku: job.productSku ?? ledgerJob?.productSku ?? productNameFromPath(job.productPath),
-        provider: job.provider ?? ledgerJob?.provider ?? "mock",
-        status: job.status,
-        durationSeconds: job.durationSeconds ?? ledgerJob?.durationSeconds,
-        totalTokens: ledgerJob?.totalTokens ?? 0,
-        estimatedCostCny: ledgerJob?.estimatedCostCny ?? 0,
-        createdAt: job.createdAt
-      });
-    }),
-    ...ledgerJobs
-      .filter((job) => !videoJobIds.has(job.id))
-      .map((job) =>
-        toDashboardRecentRow({
-          id: job.id,
-          productSku: job.productSku ?? "unknown",
-          provider: job.provider ?? "unknown",
-          status: job.status ?? "completed",
-          durationSeconds: job.durationSeconds,
-          totalTokens: job.totalTokens,
-          estimatedCostCny: job.estimatedCostCny,
-          createdAt: createdAtFromJobId(job.id) ?? createdAtFromReportPath(job.reportPath)
-        })
-      )
-  ];
-  const filteredRows = filterRowsByRange(usageRows, input.range);
-  return {
-    providerRows: buildProviderRows(filteredRows),
-    trend: buildTrendPoints(filteredRows, input.granularity),
-    recent: [...filteredRows].sort(compareRecentRows).slice(0, 12),
-    activeJobs: input.videoJobs.filter((job) => job.status === "queued" || job.status === "running").length,
-    queuedJobs: input.videoJobs.filter((job) => job.status === "queued").length,
-    failedJobs: filteredRows.filter((row) => row.status === "failed").length
-  };
-}
-
-function toDashboardRecentRow(input: {
-  id: string;
-  productSku: string;
-  provider: string;
-  status: string;
-  durationSeconds?: number;
-  totalTokens: number;
-  estimatedCostCny: number;
-  createdAt?: string;
-}): DashboardRecentRow {
-  return {
-    ...input,
-    label: input.createdAt ? shortTimeLabel(input.createdAt) : input.id.replace(/^job-/, "").slice(-8)
-  };
-}
-
-function buildProviderRows(rows: DashboardRecentRow[]): DashboardProviderRow[] {
-  const groups = new Map<string, DashboardProviderRow>();
-  for (const row of rows) {
-    const name = row.provider || "unknown";
-    const current = groups.get(name) ?? {
-      name,
-      jobs: 0,
-      completed: 0,
-      active: 0,
-      totalTokens: 0,
-      estimatedCostCny: 0
-    };
-    current.jobs += 1;
-    current.completed += row.status === "completed" ? 1 : 0;
-    current.active += row.status === "queued" || row.status === "running" ? 1 : 0;
-    current.totalTokens += row.totalTokens;
-    current.estimatedCostCny = roundMoney(current.estimatedCostCny + row.estimatedCostCny);
-    groups.set(name, current);
-  }
-  return Array.from(groups.values()).sort(
-    (left, right) => right.estimatedCostCny - left.estimatedCostCny || right.jobs - left.jobs || left.name.localeCompare(right.name)
-  );
-}
-
-function buildTrendPoints(rows: DashboardRecentRow[], granularity: DashboardGranularity): DashboardTrendPoint[] {
-  const buckets = new Map<string, DashboardTrendPoint>();
-  const sorted = [...rows].sort((left, right) => rowTimestamp(left) - rowTimestamp(right));
-  for (const row of sorted) {
-    const key = trendBucketKey(row.createdAt, granularity);
-    const current = buckets.get(key) ?? {
-      label: key,
-      jobs: 0,
-      totalTokens: 0,
-      estimatedCostCny: 0
-    };
-    current.jobs += 1;
-    current.totalTokens += row.totalTokens;
-    current.estimatedCostCny = roundMoney(current.estimatedCostCny + row.estimatedCostCny);
-    buckets.set(key, current);
-  }
-  return Array.from(buckets.values()).slice(-24);
-}
-
-function filterRowsByRange(rows: DashboardRecentRow[], range: DashboardRange): DashboardRecentRow[] {
-  if (range === "all") {
-    return rows;
-  }
-  const hours = range === "24h" ? 24 : range === "7d" ? 24 * 7 : 24 * 30;
-  const cutoff = Date.now() - hours * 60 * 60 * 1000;
-  return rows.filter((row) => !row.createdAt || Date.parse(row.createdAt) >= cutoff);
-}
-
-function compareRecentRows(left: DashboardRecentRow, right: DashboardRecentRow): number {
-  return rowTimestamp(right) - rowTimestamp(left) || right.id.localeCompare(left.id);
-}
-
-function rowTimestamp(row: DashboardRecentRow): number {
-  return row.createdAt ? Date.parse(row.createdAt) || 0 : 0;
-}
-
-function trendBucketKey(value: string | undefined, granularity: DashboardGranularity): string {
-  if (!value) {
-    return "历史";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "历史";
-  }
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  if (granularity === "day") {
-    return `${month}-${day}`;
-  }
-  const hour = String(date.getHours()).padStart(2, "0");
-  return `${month}-${day} ${hour}:00`;
-}
-
-function shortTimeLabel(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function createdAtFromJobId(id: string): string | undefined {
@@ -8184,83 +7906,31 @@ function videoModelLabel(provider?: string, model?: string): string {
   return provider || "-";
 }
 
-function templateLabel(value?: string): string {
-  if (value === "scene") return "场景型";
-  if (value === "pain-point") return "痛点型";
-  if (value === "benefit") return "卖点型";
-  if (value === "ugc") return "UGC 型";
-  if (value === "unboxing") return "开箱型";
-  return value || "-";
-}
-
 function finalLanguageLabel(value?: string): string {
+  if (value === "en") return "英语";
   if (value === "zh") return "中文";
   return "日文";
 }
 
-function statusLabel(value?: string): string {
-  if (value === "queued") return "排队中";
-  if (value === "running") return "生成中";
-  if (value === "completed" || value === "succeeded") return "已完成";
-  if (value === "failed") return "失败";
-  if (value === "canceled" || value === "cancelled") return "已取消";
-  return value || "-";
+function videoResolutionLabel(value?: string): string {
+  if (value === "4k") return "4K";
+  return value || defaultVideoResolution;
+}
+
+function ModelSchemeChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span
+      className="model-scheme-chip inline-grid shrink-0 grid-cols-[18px_auto] items-center gap-1 rounded-[6px] border border-[var(--border)] bg-[var(--field)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]"
+      title={`${label} ${value}`}
+    >
+      <span className="grid h-[18px] w-[18px] place-items-center rounded-[5px] bg-[color-mix(in_srgb,var(--accent)_8%,var(--panel2))] text-[var(--accent)]">{label}</span>
+      <span>{value}</span>
+    </span>
+  );
 }
 
 function versionLabel(index: number): string {
   return `版本 ${index + 1}`;
-}
-
-function videoLabel(index: number): string {
-  return `视频 ${index + 1}`;
-}
-
-function formatHistoryTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return formatAbsoluteMinuteTime(value);
-}
-
-function historyPreview(value: string): string {
-  return splitLines(value).slice(0, 2).join("\n") || "空分镜";
-}
-
-function creativeVersionStatusLabel(value?: string): string {
-  if (value === "completed" || value === "succeeded") return "可预览";
-  if (value === "queued") return "排队中";
-  if (value === "running") return "生成中";
-  if (value === "failed") return "生成失败";
-  if (value === "canceled" || value === "cancelled") return "已取消";
-  return value || "-";
-}
-
-function hasPlayableVideo(job: { finalVideoUrl?: string; finalOutputPath?: string; expiresAt?: string; expired?: boolean }): boolean {
-  return !isExpiredVideo(job) && Boolean(job.finalVideoUrl || job.finalOutputPath);
-}
-
-function creativeVersionDisplayStatus(job: CreativeVersionItem): string {
-  if (isExpiredVideo(job)) return "已过期";
-  if (hasPlayableVideo(job)) return "可预览";
-  if (job.status === "completed" || job.status === "succeeded") return "已完成";
-  return creativeVersionStatusLabel(job.status);
-}
-
-function creativeVersionFailureReason(job: CreativeVersionItem): string {
-  if (job.status !== "failed") {
-    return "";
-  }
-  return readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails) || "生成失败，请检查视频模型配置后重试。";
-}
-
-function creativeVersionLifecycleHint(job: CreativeVersionItem): string {
-  const failureReason = creativeVersionFailureReason(job);
-  if (failureReason) return failureReason;
-  if (hasPlayableVideo(job)) return videoExpiryLabel(job);
-  return "";
-}
-
-function readableVideoJobError(message?: string, details?: VideoJobErrorDetails): string {
-  return readableVideoProviderError(details ? { ...details, message: message ?? details.message, rawMessage: details.message } : message);
 }
 
 function creativeVersionMetaParts(job: CreativeVersionItem): string[] {
@@ -8269,75 +7939,6 @@ function creativeVersionMetaParts(job: CreativeVersionItem): string[] {
     formatDuration(job.durationSeconds),
     formatCreativeVersionTime(job)
   ].filter((part) => part && part !== "-");
-}
-
-function isExpiredVideo(job: { expiresAt?: string; expired?: boolean }): boolean {
-  if (job.expired) return true;
-  if (!job.expiresAt) return false;
-  const expiresAt = Date.parse(job.expiresAt);
-  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
-}
-
-function videoExpiryLabel(job: { expiresAt?: string; expired?: boolean }): string {
-  if (isExpiredVideo(job)) return "已过期";
-  if (!job.expiresAt) return "24 小时内可下载";
-  const expiresAt = Date.parse(job.expiresAt);
-  if (!Number.isFinite(expiresAt)) return "24 小时内可下载";
-  return `将于 ${formatDeletionTime(expiresAt)} 删除`;
-}
-
-function formatDeletionTime(value: number): string {
-  return formatAbsoluteMinuteTime(value);
-}
-
-function formatAbsoluteMinuteTime(value: string | number): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleString("zh-CN", {
-    ...(sameYear ? {} : { year: "numeric" as const }),
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function removeLedgerJob(ledger: Ledger, jobId: string): Ledger {
-  const jobs = ledger.jobs.filter((job) => job.id !== jobId);
-  return {
-    ...ledger,
-    jobs,
-    products: ledger.products
-      .map((product) => ({
-        ...product,
-        jobs: product.jobs.filter((job) => job.id !== jobId),
-        jobCount: product.jobs.filter((job) => job.id !== jobId).length
-      }))
-      .filter((product) => product.jobs.length > 0)
-  };
-}
-
-function mergeLedgerJobs(...jobGroups: LedgerJob[][]): LedgerJob[] {
-  const byId = new Map<string, LedgerJob>();
-  for (const jobs of jobGroups) {
-    for (const job of jobs) {
-      if (!byId.has(job.id)) {
-        byId.set(job.id, job);
-      }
-    }
-  }
-  return Array.from(byId.values());
-}
-
-function mergeVideoJobs(nextJobs: VideoJob[], currentJobs: VideoJob[]): VideoJob[] {
-  const byId = new Map<string, VideoJob>();
-  for (const job of [...nextJobs, ...currentJobs]) {
-    if (!byId.has(job.id)) {
-      byId.set(job.id, job);
-    }
-  }
-  return Array.from(byId.values()).sort((left, right) => videoJobSortTime(right) - videoJobSortTime(left));
 }
 
 async function copyHashtags(hashtags: string[], onToast: ConsoleToastFn): Promise<void> {
@@ -8366,134 +7967,6 @@ function normalizeDisplayHashtags(hashtags?: string[]): string[] {
     result.push(tag);
   }
   return result;
-}
-
-function buildLatestCreativeJobs(input: {
-  actionProduct: ProductSummary;
-  ledgerJobs: LedgerJob[];
-  videoJobs: VideoJob[];
-}): CreativeVersionItem[] {
-  const matchingVideoJobs = input.videoJobs
-    .filter((job) => isVideoJobForProduct(job, input.actionProduct));
-  const productVideoJobs = matchingVideoJobs
-    .filter((job) => job.status !== "canceled")
-    .map(videoJobToCreativeVersion);
-  const videoJobIds = new Set(productVideoJobs.map((job) => job.id));
-  const ledgerVersions = input.ledgerJobs
-    .filter((job) => !videoJobIds.has(job.id))
-    .map(ledgerJobToCreativeVersion);
-  return [...productVideoJobs, ...ledgerVersions]
-    .sort((left, right) => creativeVersionSortTime(right) - creativeVersionSortTime(left));
-}
-
-function videoJobToCreativeVersion(job: VideoJob): CreativeVersionItem {
-  return {
-    id: job.id,
-    status: job.status,
-    provider: job.provider,
-    providerModel: job.providerModel,
-    durationSeconds: job.durationSeconds,
-    selectedFinal: false,
-    hasFinalVideo: hasPlayableVideo(job),
-    finalVideoUrl: job.finalVideoUrl,
-    createdAt: job.createdAt,
-    completedAt: job.completedAt,
-    expiresAt: job.expiresAt,
-    expired: job.expired,
-    hashtags: job.hashtags,
-    source: "video-job",
-    videoJob: job
-  };
-}
-
-function ledgerJobToCreativeVersion(job: LedgerJob): CreativeVersionItem {
-  const createdAt = createdAtFromReportPath(job.reportPath);
-  const status = isVideoJobStatus(job.status) ? job.status : "failed";
-  return {
-    id: job.id,
-    status: job.status,
-    provider: job.provider,
-    providerModel: job.providerModel,
-    durationSeconds: job.durationSeconds,
-    selectedFinal: job.selectedFinal,
-    hasFinalVideo: hasPlayableVideo(job),
-    finalVideoUrl: job.finalVideoUrl,
-    createdAt,
-    expiresAt: job.expiresAt,
-    expired: job.expired,
-    hashtags: job.contentReview.hashtags,
-    source: "ledger",
-    videoJob: job.error || job.errorDetails
-      ? {
-          id: job.id,
-          status,
-          productPath: "",
-          productSku: job.productSku,
-          provider: job.provider,
-          providerModel: job.providerModel,
-          durationSeconds: job.durationSeconds,
-          confirmPaid: job.provider !== undefined && job.provider !== "mock",
-          outDir: "",
-          error: job.error,
-          errorDetails: job.errorDetails,
-          createdAt: createdAt ?? "",
-          updatedAt: createdAt ?? "",
-          completedAt: createdAt,
-          expiresAt: job.expiresAt,
-          expired: job.expired
-        }
-      : undefined
-  };
-}
-
-function isVideoJobStatus(value: string | undefined): value is VideoJob["status"] {
-  return value === "queued" || value === "running" || value === "completed" || value === "failed" || value === "canceled";
-}
-
-function videoDownloadProductContext(product: ProductDetail | undefined, draft: ProductDraft, importText: string): VideoDownloadProductContext {
-  return {
-    title: product?.title_ja || draft.title_ja,
-    title_ja: product?.title_ja || draft.title_ja,
-    sku: product?.sku || draft.sku,
-    sourceText: importText || product?.source_text || draft.source_text,
-    source_text: product?.source_text || draft.source_text || importText
-  };
-}
-
-function videoJobDownloadProductContext(job: VideoJob, products: ProductSummary[]): VideoDownloadProductContext {
-  const product = products.find((item) => item.sku === job.productSku || item.path === job.productPath);
-  return {
-    title: product?.title_ja,
-    title_ja: product?.title_ja,
-    sku: job.productSku
-  };
-}
-
-function isVideoJobForProduct(job: VideoJob, product: ProductSummary): boolean {
-  return job.productSku === product.sku || job.productPath === product.path;
-}
-
-function isActiveCreativeVersion(job: CreativeVersionItem): boolean {
-  return isActiveVideoJobStatus(job.status);
-}
-
-function formatCreativeVersionTime(job: CreativeVersionItem): string {
-  if (job.status !== "completed" && job.status !== "succeeded" && !hasPlayableVideo(job)) {
-    return "";
-  }
-  const completedAt = job.completedAt ?? job.createdAt;
-  if (!completedAt) return "";
-  const date = new Date(completedAt);
-  if (Number.isNaN(date.getTime())) return "";
-  return formatAbsoluteMinuteTime(completedAt);
-}
-
-function creativeVersionSortTime(job: CreativeVersionItem): number {
-  return job.createdAt ? Date.parse(job.createdAt) || 0 : 0;
-}
-
-function videoJobSortTime(job: VideoJob): number {
-  return Date.parse(job.createdAt) || 0;
 }
 
 function referenceStatusLabel(value: ReferenceImageStatus["status"]): string {
@@ -8601,54 +8074,6 @@ function auditMetadataSummary(metadata?: Record<string, unknown>): string {
     .join(" / ") || "-";
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path);
-  return readJsonResponse<T>(response);
-}
-
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  return readJsonResponse<T>(response);
-}
-
-async function postJsonWithSignal<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal
-  });
-  return readJsonResponse<T>(response);
-}
-
-async function putJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  return readJsonResponse<T>(response);
-}
-
-async function deleteJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, {
-    method: "DELETE"
-  });
-  return readJsonResponse<T>(response);
-}
-
-async function readJsonResponse<T>(response: Response): Promise<T> {
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.error || `HTTP ${response.status}`);
-  }
-  return body as T;
-}
-
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -8705,48 +8130,6 @@ function formatPreflightStatus(preflight: Preflight) {
     "",
     "请检查成本、参考图、脚本和 prompt 后再决定是否运行。"
   ].join("\n");
-}
-
-function productDraftToFacts(draft: ProductDraft) {
-  return {
-    sku: draft.sku.trim() || internalProductIdFromTitle(draft.title_ja),
-    title_ja: draft.title_ja.trim(),
-    category: draft.category.trim(),
-    materials: splitList(draft.materials),
-    dimensions: draft.dimensions.trim(),
-    verified_selling_points: splitLines(draft.verified_selling_points),
-    usage_scenes: splitLines(draft.usage_scenes),
-    forbidden_claims: splitLines(draft.forbidden_claims),
-    reference_images: splitLines(draft.reference_images),
-    source_text: draft.source_text.trim() || undefined
-  };
-}
-
-function internalProductIdFromTitle(title: string): string {
-  const normalized = title
-    .trim()
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const base = normalized || "product";
-  return `ITEM-${base.slice(0, 28)}-${Date.now().toString(36)}`;
-}
-
-function productFactsToDraft(product: ProductFactsResponse): ProductDraft {
-  return {
-    sku: product.sku,
-    title_ja: product.title_ja,
-    category: product.category,
-    materials: product.materials.join("、"),
-    dimensions: product.dimensions,
-    verified_selling_points: product.verified_selling_points.join("\n"),
-    usage_scenes: product.usage_scenes.join("\n"),
-    forbidden_claims: product.forbidden_claims.join("\n"),
-    reference_images: product.reference_images.join("\n"),
-    source_text: product.source_text ?? ""
-  };
 }
 
 function formatProviderTask(task: Record<string, unknown>) {
@@ -8826,6 +8209,19 @@ function walletTransactionTypeLabel(type: WalletTransaction["type"]) {
   }
 }
 
+function paymentMethodLabel(id: PaymentMethodView["id"]) {
+  if (id === "stripe") return "Stripe";
+  if (id === "infini") return "Infini";
+  return id;
+}
+
+function paymentMethodBadges(id: PaymentMethodView["id"]) {
+  if (id === "infini") {
+    return ["USDT", "USDC", "多链网络", "低手续费"];
+  }
+  return ["支付宝", "微信", "Visa", "Mastercard", "Apple Pay"];
+}
+
 function formatProviderUnixTime(value?: number) {
   if (!value) return "-";
   const date = new Date(value * 1000);
@@ -8867,13 +8263,6 @@ function formatBytes(value?: number) {
   return `${formatNumber(bytes)} B`;
 }
 
-function splitLines(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
   if (
     fromIndex === toIndex ||
@@ -8899,153 +8288,6 @@ function indexAfterMove(index: number, fromIndex: number, toIndex: number): numb
   if (fromIndex < toIndex && index > fromIndex && index <= toIndex) return index - 1;
   if (fromIndex > toIndex && index >= toIndex && index < fromIndex) return index + 1;
   return index;
-}
-
-function updateComposerReferenceOrder(value: string, referenceImages: string[]): string {
-  const references = referenceImages.map((item) => item.trim()).filter(Boolean);
-  const referenceBlock = references.length > 0 ? references.join("\n") : "";
-  const lines = value.split(/\r?\n/);
-  const referenceLabelPattern = /^\s*(参考图|图片|主图|画像)\s*[：:]/;
-  const sectionLabelPattern = /^\s*(标题|分类|材质|尺寸|尺寸\/重量|卖点|使用场景|不可用卖点|禁止|商品ID|商品名|商品名称|产品名称|カテゴリ|素材|サイズ|规格选项|规格|商品説明|商品描述|描述|参考图|图片|主图|画像)\s*[：:]/;
-  const referenceStart = lines.findIndex((line) => referenceLabelPattern.test(line));
-  if (referenceStart < 0) {
-    const trimmed = value.trim();
-    const suffix = `参考图：${referenceBlock}`;
-    return trimmed ? `${trimmed}\n\n${suffix}` : suffix;
-  }
-  const labelMatch = lines[referenceStart]?.match(/^\s*([^：:]+)\s*[：:]/);
-  const label = labelMatch?.[1]?.trim() || "参考图";
-  const nextSectionOffset = lines
-    .slice(referenceStart + 1)
-    .findIndex((line) => sectionLabelPattern.test(line));
-  const referenceEnd = nextSectionOffset >= 0 ? referenceStart + 1 + nextSectionOffset : lines.length;
-  return [
-    ...lines.slice(0, referenceStart),
-    `${label}：${referenceBlock}`,
-    ...lines.slice(referenceEnd)
-  ].join("\n").trim();
-}
-
-function splitDraftLines(value: string): string[] | undefined {
-  const lines = splitLines(value);
-  return lines.length > 0 ? lines : undefined;
-}
-
-function defaultStoryboardDraft(template: TemplateName, durationSeconds: number): string {
-  const ranges = storyboardTimeRanges(durationSeconds);
-  return defaultStoryboardDraftForTemplate(template)
-    .map((description, index) => `${ranges[index]}: ${description}`)
-    .join("\n");
-}
-
-function defaultStoryboardDraftForTemplate(template: TemplateName): string[] {
-  const descriptions: Record<TemplateName, string[]> = {
-    scene: [
-      "展示商品所处的真实使用环境和整体外观。",
-      "切近景展示使用动作，让商品自然进入画面主体。",
-      "展示材质、尺寸、结构和手部操作细节。",
-      "回到完整使用场景，呈现使用后的效果和商品整体。"
-    ],
-    "pain-point": [
-      "先展示没有使用商品时的不便或痛点场景。",
-      "切到商品出现并快速解决核心问题。",
-      "用近景强化关键卖点和操作过程。",
-      "展示解决后的轻松状态和商品整体。"
-    ],
-    benefit: [
-      "开场直接展示最重要的卖点和结果。",
-      "用近景说明卖点对应的结构或材质细节。",
-      "切换到使用过程，连续展示多个优势。",
-      "用整体彩色或多角度画面收束，强化购买理由。"
-    ],
-    ugc: [
-      "以手持或第一视角开场，像真实用户刚拿到商品。",
-      "边展示边试用，用自然动作呈现第一感受。",
-      "近景拍摄细节、材质和使用中的小发现。",
-      "用真实使用后的评价式画面收尾。"
-    ],
-    unboxing: [
-      "从包装或桌面开场，展示开箱前的整洁画面。",
-      "打开包装并取出商品，让主体自然进入镜头。",
-      "依次展示配件、材质、尺寸和关键细节。",
-      "摆放商品并进入简单使用场景，完成开箱收尾。"
-    ]
-  };
-  return descriptions[template] ?? descriptions.scene;
-}
-
-function storyboardTimeRanges(durationSeconds: number): string[] {
-  const duration = Math.max(4, Math.min(15, Math.floor(durationSeconds || defaultVideoDurationSeconds)));
-  const firstEnd = Math.max(1, Math.min(2, Math.floor(duration * 0.2)));
-  const secondEnd = Math.max(firstEnd + 1, Math.min(duration - 2, Math.floor(duration * 0.4)));
-  const thirdEnd = Math.max(secondEnd + 1, Math.min(duration - 1, Math.floor(duration * 0.7)));
-  return [
-    `0-${firstEnd}s`,
-    `${firstEnd}-${secondEnd}s`,
-    `${secondEnd}-${thirdEnd}s`,
-    `${thirdEnd}-${duration}s`
-  ];
-}
-
-function defaultStudioScriptDraft(product: ProductDetail, durationSeconds: number, template: TemplateName): string {
-  const scenes = safeChineseDraftText(product.usage_scenes.slice(0, 2).join("、"), "日常使用");
-  const sellingPoints = product.verified_selling_points.slice(0, 3).map((point, index) => safeChineseDraftFact(point, index === 0 ? "核心卖点" : "已确认卖点"));
-  const materialsText = safeChineseDraftText(product.materials.join("、"), "材质细节");
-  return [
-    `类型: ${templateLabel(template)} / 时长: ${durationSeconds}s`,
-    `面向${scenes}场景里的用户，开头 1 秒先展示痛点或使用场景。`,
-    `自然展示「${product.title_ja}」的外观，以及${sellingPoints[0] || "商品资料里确认过的核心卖点"}。`,
-    `用手部动作展示${sellingPoints.slice(1).join("、") || "商品资料中已确认的特点"}。`,
-    product.materials.length > 0 ? `加入能看出${materialsText}的近景。` : ""
-  ].filter(Boolean).join("\n");
-}
-
-function defaultStudioStoryboardDraft(product: ProductDetail, durationSeconds: number, template: TemplateName): string {
-  const firstScene = safeChineseDraftText(product.usage_scenes[0], "使用场景");
-  const firstPoint = safeChineseDraftFact(product.verified_selling_points[0], "商品细节");
-  const middle = Math.max(2, Math.floor(durationSeconds * 0.45));
-  const closing = Math.max(middle + 1, durationSeconds - 2);
-  return [
-    `0-2s: 以${templateLabel(template)}开场，展示${firstScene}和商品整体。`,
-    `2-${middle}s: 近景展示${firstPoint}。`,
-    `${middle}-${closing}s: 展示使用中的手部动作、质感和尺寸感。`,
-    `${closing}-${durationSeconds}s: 再次展示使用后的效果和商品整体。`
-  ].join("\n");
-}
-
-function defaultStudioStoryboardCnDraft(product: ProductDetail, durationSeconds: number, template: TemplateName): string {
-  const firstScene = safeChineseDraftText(product.usage_scenes[0], "使用场景");
-  const firstPoint = safeChineseDraftFact(product.verified_selling_points[0], "商品细节");
-  const middle = Math.max(2, Math.floor(durationSeconds * 0.45));
-  const closing = Math.max(middle + 1, durationSeconds - 2);
-  return [
-    `0-2 秒：以${templateLabel(template)}开场，展示${firstScene}和商品整体。`,
-    `2-${middle} 秒：近景展示${firstPoint}。`,
-    `${middle}-${closing} 秒：展示使用中的手部动作、质感和尺寸感。`,
-    `${closing}-${durationSeconds} 秒：再次展示使用后的效果和商品整体。`
-  ].join("\n");
-}
-
-function safeChineseDraftFact(value: string | undefined, fallback: string): string {
-  return safeChineseDraftText(value, fallback);
-}
-
-function safeChineseDraftText(value: string | undefined, fallback: string): string {
-  if (!value?.trim()) {
-    return fallback;
-  }
-  return containsJapaneseKana(value) ? fallback : value.trim();
-}
-
-function containsJapaneseKana(value: string): boolean {
-  return /[\u3040-\u30ffー]/.test(value);
-}
-
-function splitList(value: string) {
-  return value
-    .split(/[、,\n]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function unique(values: Array<string | undefined | null>) {

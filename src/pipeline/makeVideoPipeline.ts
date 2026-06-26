@@ -7,7 +7,7 @@ import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import type { FinalVideoLanguage } from "../core/videoLanguage.js";
 import { postprocessVideo } from "../postprocess/postprocessVideo.js";
 import { createVideoProvider, type VideoProviderName } from "../providers/providerFactory.js";
-import type { MoneyAmount, ReferenceImageUrlResolver } from "../providers/types.js";
+import type { MoneyAmount, ReferenceImageUrlResolver, VideoResolution } from "../providers/types.js";
 import { runProductJob, type ProductJobManifest } from "./runProductJob.js";
 
 export interface MakeVideoPipelineInput {
@@ -15,6 +15,7 @@ export interface MakeVideoPipelineInput {
   outDir: string;
   providerName: VideoProviderName;
   durationSeconds: number;
+  resolution?: VideoResolution;
   cta: string;
   template: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
@@ -110,6 +111,7 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
         apiKey: input.apiKey,
         baseUrl: input.providerBaseUrl,
         model: input.providerModel,
+        resolution: input.resolution,
         fetchImpl: input.fetchImpl,
         referenceImageUrlResolver: input.referenceImageUrlResolver
       }),
@@ -118,7 +120,8 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
       finalLanguage: input.finalLanguage,
       scriptLines: input.scriptLines,
       storyboardLines: input.storyboardLines,
-      durationSeconds: input.durationSeconds
+      durationSeconds: input.durationSeconds,
+      resolution: input.resolution
     }));
   const recoveredRawOutput = await ensureRawOutput(rawManifest, input);
   return writePipelineReport({
