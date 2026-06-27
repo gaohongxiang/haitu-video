@@ -73,4 +73,22 @@ describe("marketing SEO renderer", () => {
       "tools/product-title-generator"
     ]);
   });
+
+  it("uses the same warm clay theme tokens as the app console", () => {
+    const html = renderMarketingPage({
+      origin: "https://haitu.example",
+      locale: "zh",
+      pageSlug: ""
+    });
+
+    expect(html).toContain("--bg:#f3e6d8");
+    expect(html).toContain("--panel:#fffaf3");
+    expect(html).toContain("--card:#fff5e9");
+    expect(html).toContain("--accent:#0aa394");
+    expect(html).toContain("--text:#2a211b");
+    expect(html).toContain("--radius:8px");
+    expect(html).toContain("-apple-system");
+    expect(html).not.toContain("font-family:Charter");
+    expect(html).not.toContain("--paper:#f7f6ef");
+  });
 });
