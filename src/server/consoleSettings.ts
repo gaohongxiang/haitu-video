@@ -1,10 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { defaultFinalVideoLanguage, normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import { normalizeEnabledTemplates } from "../core/templateCatalog.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import type { DatabaseHandle } from "./db/client.js";
+import { centsToCny, cnyToCents } from "./walletLedger.js";
 
 export interface ConsoleSettings {
   defaultLanguage: FinalVideoLanguage;
@@ -64,18 +63,49 @@ export const defaultConsoleSettings: ConsoleSettings = {
   paymentMethods: defaultPaymentMethods
 };
 
-export class FileConsoleSettingsStore {
-  constructor(private readonly path: string) {}
+export interface ConsoleSettingsStore {
+  read(): Promise<ConsoleSettings>;
+  write(input: unknown): Promise<ConsoleSettings>;
+}
+
+interface ConsoleSettingsRow {
+  id: string;
+  default_language: string;
+  default_duration_seconds: number;
+  default_template: string;
+  enabled_templates_json: string;
+  default_cta: string;
+  default_provider: string;
+  max_estimated_cost_cents_per_video: number;
+  test_credit_balance_cents: number;
+  forbidden_words_json: string;
+  exaggeration_rules_json: string;
+  payment_methods_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const consoleSettingsId = "global";
+
+export class SqliteConsoleSettingsStore implements ConsoleSettingsStore {
+  constructor(
+    private readonly input: {
+      handle: DatabaseHandle;
+      now?: () => Date;
+    }
+  ) {}
 
   async read(): Promise<ConsoleSettings> {
-    try {
-      return normalizeConsoleSettings(JSON.parse(await readFile(this.path, "utf8")));
-    } catch (error) {
-      if (isMissingFileError(error)) {
-        return defaultConsoleSettings;
-      }
-      throw error;
+    this.ensureDefaults();
+    const row = this.findSettings();
+    if (!row) {
+      throw new Error("系统设置初始化失败。");
     }
+    return consoleSettingsFromRow(row);
+  }
+
+  initialize(): void {
+    this.ensureDefaults();
   }
 
   async write(input: unknown): Promise<ConsoleSettings> {
@@ -83,9 +113,100 @@ export class FileConsoleSettingsStore {
       ...(await this.read()),
       ...(isPlainObject(input) ? input : {})
     });
-    await mkdir(dirname(this.path), { recursive: true });
-    await writeFile(this.path, JSON.stringify(settings, null, 2), "utf8");
+    const now = this.nowIso();
+    this.input.handle.sqlite.prepare(`
+      UPDATE console_settings
+      SET
+        default_language = @defaultLanguage,
+        default_duration_seconds = @defaultDurationSeconds,
+        default_template = @defaultTemplate,
+        enabled_templates_json = @enabledTemplatesJson,
+        default_cta = @defaultCta,
+        default_provider = @defaultProvider,
+        max_estimated_cost_cents_per_video = @maxEstimatedCostCentsPerVideo,
+        test_credit_balance_cents = @testCreditBalanceCents,
+        forbidden_words_json = @forbiddenWordsJson,
+        exaggeration_rules_json = @exaggerationRulesJson,
+        payment_methods_json = @paymentMethodsJson,
+        updated_at = @updatedAt
+      WHERE id = @id
+    `).run({
+      ...settingsToSqlParams(settings),
+      id: consoleSettingsId,
+      updatedAt: now
+    });
     return settings;
+  }
+
+  private ensureDefaults(): void {
+    const now = this.nowIso();
+    this.input.handle.sqlite.prepare(`
+      INSERT INTO console_settings (
+        id,
+        default_language,
+        default_duration_seconds,
+        default_template,
+        enabled_templates_json,
+        default_cta,
+        default_provider,
+        max_estimated_cost_cents_per_video,
+        test_credit_balance_cents,
+        forbidden_words_json,
+        exaggeration_rules_json,
+        payment_methods_json,
+        created_at,
+        updated_at
+      ) VALUES (
+        @id,
+        @defaultLanguage,
+        @defaultDurationSeconds,
+        @defaultTemplate,
+        @enabledTemplatesJson,
+        @defaultCta,
+        @defaultProvider,
+        @maxEstimatedCostCentsPerVideo,
+        @testCreditBalanceCents,
+        @forbiddenWordsJson,
+        @exaggerationRulesJson,
+        @paymentMethodsJson,
+        @now,
+        @now
+      )
+      ON CONFLICT(id) DO NOTHING
+    `).run({
+      ...settingsToSqlParams(defaultConsoleSettings),
+      id: consoleSettingsId,
+      now
+    });
+  }
+
+  private findSettings(): ConsoleSettingsRow | undefined {
+    return this.input.handle.sqlite.prepare(`
+      SELECT *
+      FROM console_settings
+      WHERE id = ?
+      LIMIT 1
+    `).get(consoleSettingsId) as ConsoleSettingsRow | undefined;
+  }
+
+  private nowIso(): string {
+    return (this.input.now ?? (() => new Date()))().toISOString();
+  }
+}
+
+export class MemoryConsoleSettingsStore implements ConsoleSettingsStore {
+  private settings = defaultConsoleSettings;
+
+  async read(): Promise<ConsoleSettings> {
+    return this.settings;
+  }
+
+  async write(input: unknown): Promise<ConsoleSettings> {
+    this.settings = normalizeConsoleSettings({
+      ...this.settings,
+      ...(isPlainObject(input) ? input : {})
+    });
+    return this.settings;
   }
 }
 
@@ -178,6 +299,43 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isMissingFileError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT";
+function settingsToSqlParams(settings: ConsoleSettings) {
+  return {
+    defaultLanguage: settings.defaultLanguage,
+    defaultDurationSeconds: settings.defaultDurationSeconds,
+    defaultTemplate: settings.defaultTemplate,
+    enabledTemplatesJson: JSON.stringify(settings.enabledTemplates),
+    defaultCta: settings.defaultCta,
+    defaultProvider: settings.defaultProvider,
+    maxEstimatedCostCentsPerVideo: cnyToCents(settings.maxEstimatedCostCnyPerVideo),
+    testCreditBalanceCents: cnyToCents(settings.testCreditBalanceCny),
+    forbiddenWordsJson: JSON.stringify(settings.forbiddenWords),
+    exaggerationRulesJson: JSON.stringify(settings.exaggerationRules),
+    paymentMethodsJson: JSON.stringify(settings.paymentMethods)
+  };
+}
+
+function consoleSettingsFromRow(row: ConsoleSettingsRow): ConsoleSettings {
+  return normalizeConsoleSettings({
+    defaultLanguage: row.default_language,
+    defaultDurationSeconds: row.default_duration_seconds,
+    defaultTemplate: row.default_template,
+    enabledTemplates: parseJsonList(row.enabled_templates_json),
+    defaultCta: row.default_cta,
+    defaultProvider: row.default_provider,
+    maxEstimatedCostCnyPerVideo: centsToCny(row.max_estimated_cost_cents_per_video),
+    testCreditBalanceCny: centsToCny(row.test_credit_balance_cents),
+    forbiddenWords: parseJsonList(row.forbidden_words_json),
+    exaggerationRules: parseJsonList(row.exaggeration_rules_json),
+    paymentMethods: parseJsonList(row.payment_methods_json)
+  });
+}
+
+function parseJsonList(value: string): unknown[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

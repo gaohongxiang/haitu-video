@@ -14,6 +14,7 @@ import {
   type ModelProviderKeySource,
   type ModelStoredConfig
 } from "./modelConfigStore.js";
+import { tokenPriceCnyPerMillionForVideoModel } from "./videoJobBilling.js";
 
 export interface ProviderConfigItem {
   id: ModelProviderId;
@@ -57,7 +58,7 @@ export interface ProviderConfigLedger {
   };
 }
 
-export interface PlatformModelAdminConfigItem {
+export interface ModelServiceAdminConfigItem {
   id: ModelProviderId;
   configId?: string;
   label: string;
@@ -71,10 +72,10 @@ export interface PlatformModelAdminConfigItem {
   enabled?: boolean;
 }
 
-export interface PlatformModelAdminConfigResponse {
-  textModels: PlatformModelAdminConfigItem[];
-  imageModels: PlatformModelAdminConfigItem[];
-  videoModels: PlatformModelAdminConfigItem[];
+export interface ModelServiceAdminConfigResponse {
+  textModels: ModelServiceAdminConfigItem[];
+  imageModels: ModelServiceAdminConfigItem[];
+  videoModels: ModelServiceAdminConfigItem[];
 }
 
 export async function buildProviderConfig(input: {
@@ -110,16 +111,16 @@ export async function buildProviderConfig(input: {
   };
 }
 
-export async function buildPlatformModelAdminConfig(store: ModelConfigStore): Promise<PlatformModelAdminConfigResponse> {
+export async function buildModelServiceAdminConfig(store: ModelConfigStore): Promise<ModelServiceAdminConfigResponse> {
   const [textModels, imageModels, videoModels] = await Promise.all([
     store.listConfigs("openai-compatible-text"),
     store.listConfigs("openai-compatible-image"),
     store.listConfigs("volcengine-seedance")
   ]);
   return {
-    textModels: textModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem),
-    imageModels: imageModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem),
-    videoModels: videoModels.filter(isPlatformStoredConfig).map(platformModelAdminConfigItem)
+    textModels: textModels.filter(isPlatformStoredConfig).map(modelServiceAdminConfigItem),
+    imageModels: imageModels.filter(isPlatformStoredConfig).map(modelServiceAdminConfigItem),
+    videoModels: videoModels.filter(isPlatformStoredConfig).map(modelServiceAdminConfigItem)
   };
 }
 
@@ -127,7 +128,7 @@ function isPlatformStoredConfig(config: ModelStoredConfig): boolean {
   return config.apiOwner === "platform";
 }
 
-function platformModelAdminConfigItem(config: ModelStoredConfig): PlatformModelAdminConfigItem {
+function modelServiceAdminConfigItem(config: ModelStoredConfig): ModelServiceAdminConfigItem {
   return {
     id: config.providerId,
     configId: config.configId,
@@ -215,6 +216,8 @@ function buildVideoModelConfigs(configs: ModelStoredConfig[]): VideoProviderConf
   return configs.map((config) => {
     const model = config.model ?? defaultVideoModelId();
     const catalogEntry = catalogEntryForModel("volcengine-seedance", model);
+    const resolution = seedanceResolutionFromEnv(process.env.SEEDANCE_RESOLUTION);
+    const tokenPriceCnyPerMillion = tokenPriceCnyPerMillionForVideoModel(model, resolution);
     const keyStatus = modelProviderStatus("volcengine-seedance", {
       apiKey: config.apiKey,
       configId: config.configId
@@ -233,8 +236,8 @@ function buildVideoModelConfigs(configs: ModelStoredConfig[]): VideoProviderConf
       model,
       capabilities: ["视频生成"],
       modelKind: "video" as const,
-      resolution: seedanceResolutionFromEnv(process.env.SEEDANCE_RESOLUTION),
-      tokenPriceCnyPerMillion: numberFromEnv(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION, 37),
+      resolution,
+      tokenPriceCnyPerMillion,
       estimatedCostCnyPerSecond: numberFromEnv(process.env.SEEDANCE_ESTIMATED_COST_CNY_PER_SECOND, 0.8),
       watermark: booleanFromEnv(process.env.SEEDANCE_WATERMARK ?? "false"),
       docsUrl: catalogEntry?.docsUrl ?? "https://www.volcengine.com/docs/82379/1541595?lang=zh",

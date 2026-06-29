@@ -1,8 +1,21 @@
-export const marketingLocales = ["zh", "en"] as const;
+import {
+  getLocaleMeta,
+  supportedLocales,
+  type AppLocale
+} from "../i18n/config.js";
+import {
+  createServerI18n,
+  getMarketingHomepageContent,
+  getMarketingPageContent,
+  getMarketingPageMeta,
+  getMarketingPageSlugs,
+  getMarketingPreviewLabels,
+  type MarketingGeoAnswer
+} from "../i18n/server.js";
 
-export type MarketingLocale = (typeof marketingLocales)[number];
+export const marketingLocales = supportedLocales;
 
-type Hreflang = "zh-CN" | "en";
+export type MarketingLocale = AppLocale;
 
 interface MarketingPageLocaleContent {
   title: string;
@@ -12,6 +25,8 @@ interface MarketingPageLocaleContent {
   lead: string;
   primaryCta: string;
   secondaryCta: string;
+  heroTitleLines?: string[];
+  geoAnswer: MarketingGeoAnswer;
   sections: Array<{
     heading: string;
     body: string;
@@ -27,7 +42,6 @@ interface MarketingPage {
   slug: string;
   priority: string;
   changefreq: string;
-  content: Record<MarketingLocale, MarketingPageLocaleContent>;
 }
 
 interface MarketingRoute {
@@ -35,235 +49,51 @@ interface MarketingRoute {
   pageSlug: string;
 }
 
-const localeMeta: Record<MarketingLocale, { label: string; hreflang: Hreflang; htmlLang: string; pathPrefix: string }> = {
-  zh: {
-    label: "中文",
-    hreflang: "zh-CN",
-    htmlLang: "zh-CN",
-    pathPrefix: ""
-  },
-  en: {
-    label: "English",
-    hreflang: "en",
-    htmlLang: "en",
-    pathPrefix: "/en"
+interface MarketingRouteMatch {
+  route?: MarketingRoute;
+  redirectPath?: string;
+}
+
+const localeMeta = {
+  zh: getLocaleMeta("zh"),
+  en: getLocaleMeta("en")
+} satisfies Record<MarketingLocale, ReturnType<typeof getLocaleMeta>>;
+
+const openGraphLocaleByMarketingLocale = {
+  zh: "zh_CN",
+  en: "en_US"
+} satisfies Record<MarketingLocale, string>;
+
+const marketingLastModified = "2026-06-28";
+const defaultPublicOrigin = "https://haitu.online";
+
+export const marketingPages: MarketingPage[] = getMarketingPageSlugs("zh").map((slug) => ({
+  slug,
+  ...getMarketingPageMeta("zh", slug)
+}));
+
+export function matchMarketingRoute(url: URL): MarketingRouteMatch {
+  const pathname = url.pathname;
+  const normalizedPathname = normalizePathname(pathname);
+  const route = resolveMarketingRoute(url);
+  if (!route) {
+    return {};
   }
-};
-
-const crossBorderPlatformsZh = "TikTok Shop、Amazon、Shopee、Lazada、Shopify";
-const crossBorderPlatformsEn = "TikTok Shop, Amazon, Shopee, Lazada, and Shopify";
-
-export const marketingPages: MarketingPage[] = [
-  {
-    slug: "",
-    priority: "1.0",
-    changefreq: "weekly",
-    content: {
-      zh: {
-        title: "Haitu 海兔 - 跨境电商 AI 商品视频与图片创作平台",
-        description: "Haitu 海兔帮助中国跨境电商卖家把 1688/ERP 表格、商品资料和参考图批量生成海外平台可用的商品图、短视频、标题、卖点和多语言脚本。",
-        h1: "面向跨境电商卖家的 AI 商品创意生产平台",
-        eyebrow: "从中国供应链到全球货架",
-        lead: `把 1688/ERP 表格、商品资料和参考图转成适配 ${crossBorderPlatformsZh} 的商品图、短视频、标题、卖点和多语言脚本。`,
-        primaryCta: "免费诊断商品素材",
-        secondaryCta: "进入创作台",
-        sections: [
-          {
-            heading: "把商品资料变成可发布素材",
-            body: "Haitu 围绕卖家的真实流程设计：导入商品资料，提炼可信卖点，生成多语言文案，再产出商品图和短视频版本。",
-            bullets: ["AI 商品视频生成器", "AI 商品图生成器", "多语言标题与描述", "批量商品创意生产"]
-          },
-          {
-            heading: "为跨境团队减少重复劳动",
-            body: "从单个商品打样到整批 SKU 素材整理，都可以沉淀在同一个商品创意工作流里。",
-            bullets: ["保留参考图和商品事实", "减少手工写脚本和改标题", "适配多个平台和市场", "支持团队审核发布"]
-          }
-        ],
-        faqs: [
-          {
-            question: "Haitu 适合哪些卖家？",
-            answer: "适合有中国供应链、需要批量制作海外平台商品素材的跨境电商卖家、运营团队和代运营服务商。"
-          },
-          {
-            question: "是不是只支持某一个国家站？",
-            answer: "不是。国家站主要是语言、平台规则和表达习惯的差异，Haitu 的核心是从商品资料生成多市场创意资产。"
-          }
-        ]
-      },
-      en: {
-        title: "Haitu - AI Product Creative Platform for Ecommerce Sellers",
-        description: "Haitu turns product data, reference images, and selling points into ecommerce product videos, images, titles, descriptions, and multilingual scripts.",
-        h1: "AI product creative platform for ecommerce sellers",
-        eyebrow: "From product data to global creative assets",
-        lead: `Turn supplier sheets, product facts, and reference images into videos, product images, titles, selling points, and multilingual scripts for ${crossBorderPlatformsEn}.`,
-        primaryCta: "Audit product creatives",
-        secondaryCta: "Open app",
-        sections: [
-          {
-            heading: "Generate product creatives from facts",
-            body: "Haitu keeps product facts, reference images, scripts, and creative versions in one workflow for ecommerce teams.",
-            bullets: ["AI product video generator", "AI product image generator", "Multilingual ecommerce copy", "Batch creative generation"]
-          },
-          {
-            heading: "Built for cross-border ecommerce",
-            body: "Create localized creative assets without rebuilding the same product workflow for every marketplace.",
-            bullets: ["Preserve verified selling points", "Generate platform-ready scripts", "Adapt copy by market", "Review and publish faster"]
-          }
-        ],
-        faqs: [
-          {
-            question: "Who is Haitu for?",
-            answer: "Haitu is built for ecommerce sellers, operators, and agencies that need product videos, images, and copy across multiple marketplaces."
-          },
-          {
-            question: "Is Haitu limited to one marketplace?",
-            answer: "No. Marketplaces mainly change language, platform rules, and creative style. Haitu focuses on the product-to-creative workflow."
-          }
-        ]
-      }
-    }
-  },
-  page("features/ai-product-video-generator", "0.9", {
-    zh: [
-      "AI 商品视频生成器 - Haitu",
-      "用商品资料、卖点和参考图批量生成跨境电商短视频，适配 TikTok Shop、Amazon、Shopee 等平台。",
-      "AI 商品视频生成器",
-      "把 SKU 变成短视频",
-      "从商品标题、卖点、使用场景和参考图出发，生成适合海外货架和短视频广告的商品视频脚本与成片版本。",
-      "生成商品视频",
-      "查看商品图能力"
-    ],
-    en: [
-      "AI Product Video Generator for Ecommerce Sellers - Haitu",
-      "Create product videos from product facts, reference images, and selling points.",
-      "AI product video generator for ecommerce sellers",
-      "Turn SKUs into product videos",
-      "Create product videos from product facts, reference images, and selling points.",
-      "Generate product videos",
-      "Explore image generation"
-    ]
-  }),
-  page("features/ai-product-image-generator", "0.9", {
-    zh: [
-      "AI 商品图生成器 - Haitu",
-      "基于商品参考图和可信卖点生成跨境电商主图、场景图和广告素材。",
-      "AI 商品图生成器",
-      "商品参考图到可投放素材",
-      "用参考图、材质、尺寸和卖点生成商品主图、场景图和广告图片，保持商品事实一致。",
-      "生成商品图",
-      "查看视频生成"
-    ],
-    en: [
-      "AI Product Image Generator for Ecommerce - Haitu",
-      "Generate ecommerce product images, lifestyle scenes, and ad creatives from product references.",
-      "AI product image generator for ecommerce",
-      "Reference images to campaign assets",
-      "Generate product images, lifestyle scenes, and ad creatives while keeping product facts consistent.",
-      "Generate product images",
-      "Explore video generation"
-    ]
-  }),
-  page("features/product-copy-generator", "0.8", {
-    zh: [
-      "AI 商品文案生成器 - Haitu",
-      "为跨境电商商品批量生成多语言标题、卖点、描述、广告脚本和短视频字幕。",
-      "AI 商品文案生成器",
-      "多语言标题、卖点和脚本",
-      "把原始商品资料整理成不同市场可用的标题、描述、卖点、短视频脚本和广告 CTA。",
-      "生成商品文案",
-      "查看批量生成"
-    ],
-    en: [
-      "AI Product Copy Generator for Global Ecommerce - Haitu",
-      "Generate multilingual product titles, descriptions, selling points, ad scripts, and captions.",
-      "AI product copy generator for global ecommerce",
-      "Titles, selling points, and scripts",
-      "Turn raw product information into localized titles, descriptions, selling points, short-video scripts, and ad CTAs.",
-      "Generate copy",
-      "Explore batch workflows"
-    ]
-  }),
-  page("features/batch-product-creative-generation", "0.8", {
-    zh: [
-      "批量商品素材生成 - Haitu",
-      "导入表格或商品资料，批量生成跨境电商商品图、视频、标题、卖点和脚本。",
-      "批量商品素材生成",
-      "从表格到整批创意资产",
-      "适合有大量 SKU 的跨境团队，把商品资料导入后统一整理、生成、审核和发布。",
-      "批量生成素材",
-      "了解工作流"
-    ],
-    en: [
-      "Batch Product Creative Generation - Haitu",
-      "Import product sheets and generate ecommerce images, videos, titles, selling points, and scripts in batches.",
-      "Batch product creative generation",
-      "From product sheets to creative assets",
-      "For ecommerce teams with many SKUs that need one workflow for importing, generating, reviewing, and publishing creatives.",
-      "Generate in batch",
-      "Explore workflow"
-    ]
-  }),
-  page("platforms/tiktok-shop", "0.8", {
-    zh: [
-      "TikTok Shop 商品素材生成 - Haitu",
-      "为 TikTok Shop 卖家生成商品短视频、商品图、标题、卖点、描述和多语言广告脚本。",
-      "TikTok Shop 商品素材生成",
-      "适配内容电商的商品创意",
-      "Haitu 把商品资料转成 TikTok Shop 可用的短视频脚本、商品图、广告卖点和本地化文案。",
-      "生成 TikTok Shop 素材",
-      "查看标题工具"
-    ],
-    en: [
-      "TikTok Shop Product Creative Automation - Haitu",
-      "Haitu turns product data into short videos, product images, ad scripts, and multilingual copy for TikTok Shop sellers.",
-      "TikTok Shop product creative automation",
-      "Creative assets for social commerce",
-      "Haitu turns product data into short videos, product images, ad scripts, and multilingual copy for TikTok Shop sellers.",
-      "Create TikTok Shop creatives",
-      "Try title generator"
-    ]
-  }),
-  page("platforms/amazon", "0.8", {
-    zh: [
-      "Amazon 商品图与视频生成 - Haitu",
-      "为亚马逊卖家生成商品图、视频脚本、卖点描述和多语言 Listing 创意素材。",
-      "Amazon 商品图与视频生成",
-      "为 Listing 和广告准备商品素材",
-      "从商品事实和参考图出发，生成适合 Amazon Listing、A+ 内容和站外广告的图文视频素材。",
-      "生成 Amazon 素材",
-      "查看商品文案"
-    ],
-    en: [
-      "Amazon Product Image and Video Generator - Haitu",
-      "Generate Amazon product images, video scripts, selling points, and listing copy from product data.",
-      "Amazon product image and video generator",
-      "Creative assets for listings and ads",
-      "Use product facts and reference images to generate creatives for Amazon listings, A+ content, and external ads.",
-      "Generate Amazon assets",
-      "Explore copy generation"
-    ]
-  }),
-  page("tools/product-title-generator", "0.7", {
-    zh: [
-      "AI 商品标题生成器 - Haitu",
-      "输入商品资料和目标市场，生成适合跨境电商平台的多语言商品标题。",
-      "AI 商品标题生成器",
-      "先从标题拿到精准流量",
-      "把商品名称、类目、材质、卖点和目标语言整理成更适合搜索和转化的商品标题。",
-      "生成商品标题",
-      "继续生成视频脚本"
-    ],
-    en: [
-      "AI Product Title Generator - Haitu",
-      "Generate multilingual ecommerce product titles from product facts, category, materials, and selling points.",
-      "AI product title generator",
-      "Search-ready titles for global ecommerce",
-      "Turn product names, categories, materials, selling points, and target languages into ecommerce titles for search and conversion.",
-      "Generate titles",
-      "Create video scripts"
-    ]
-  })
-];
+  const canonicalPath = marketingPath(route.locale, route.pageSlug);
+  if (pathname !== canonicalPath) {
+    return {
+      route,
+      redirectPath: `${canonicalPath}${url.search}`
+    };
+  }
+  if (pathname !== normalizedPathname) {
+    return {
+      route,
+      redirectPath: `${normalizedPathname}${url.search}`
+    };
+  }
+  return { route };
+}
 
 export function resolveMarketingRoute(url: URL): MarketingRoute | undefined {
   const pathname = normalizePathname(url.pathname);
@@ -283,17 +113,32 @@ export function renderMarketingPage(input: {
   locale: MarketingLocale;
   pageSlug: string;
 }): string {
+  const publicOrigin = publicMarketingOrigin(input.origin);
+  const i18n = createServerI18n(input.locale, ["common", "marketing"]);
   const page = findPage(input.pageSlug);
-  const content = page.content[input.locale];
-  const canonicalUrl = absoluteMarketingUrl(input.origin, input.locale, page.slug);
+  const content = getMarketingPageContent(input.locale, page.slug);
+  const canonicalUrl = absoluteMarketingUrl(publicOrigin, input.locale, page.slug);
   const alternateLinks = marketingLocales.map((locale) => {
     const meta = localeMeta[locale];
-    return `<link rel="alternate" hreflang="${meta.hreflang}" href="${absoluteMarketingUrl(input.origin, locale, page.slug)}" />`;
+    return `<link rel="alternate" hreflang="${meta.hreflang}" href="${absoluteMarketingUrl(publicOrigin, locale, page.slug)}" />`;
   }).join("\n    ");
+  const ogImageUrl = `${trimOrigin(publicOrigin)}/static/seo-og.png`;
+  const siteName = localizedSiteName(input.locale);
+  const socialImageAlt = input.locale === "zh"
+    ? "Haitu 嗨兔跨境电商 AI 商品图片优化与商品视频创作平台预览图"
+    : "Haitu AI product image optimization and product video creation platform preview";
+  const openGraphLocale = openGraphLocaleByMarketingLocale[input.locale];
+  const openGraphAlternateLocales = marketingLocales
+    .filter((locale) => locale !== input.locale)
+    .map((locale) => `<meta property="og:locale:alternate" content="${openGraphLocaleByMarketingLocale[locale]}" />`)
+    .join("\n    ");
   const languageLinks = marketingLocales.map((locale) => {
     const active = locale === input.locale ? " aria-current=\"true\"" : "";
     return `<a${active} href="${marketingPath(locale, page.slug)}">${escapeHtml(localeMeta[locale].label)}</a>`;
   }).join("");
+  const breadcrumb = page.slug
+    ? `<nav class="breadcrumb" aria-label="${escapeAttribute(i18n.t("common:seo.breadcrumbLabel"))}"><a href="${marketingPath(input.locale, "")}">${escapeHtml(i18n.t("common:seo.home"))}</a><span>${escapeHtml(content.h1)}</span></nav>`
+    : "";
   const cards = content.sections.map((section) => `
         <section class="growth-card">
           <h2>${escapeHtml(section.heading)}</h2>
@@ -302,12 +147,26 @@ export function renderMarketingPage(input: {
             ${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
           </ul>
         </section>`).join("");
+  const geoAnswer = renderGeoAnswerBlock(content.geoAnswer);
   const faqs = content.faqs.map((faq) => `
         <details>
           <summary>${escapeHtml(faq.question)}</summary>
           <p>${escapeHtml(faq.answer)}</p>
         </details>`).join("");
-  const schema = JSON.stringify(buildStructuredData(input.origin, input.locale, page, content, canonicalUrl));
+  const footerNav = renderSeoFooter(input.locale, i18n);
+  const schema = JSON.stringify(buildStructuredData(publicOrigin, input.locale, page, content, canonicalUrl, i18n.t("common:seo.home")));
+  const previewLabels = getMarketingPreviewLabels(input.locale);
+  const heroTitleHtml = content.heroTitleLines
+    ? renderConfiguredHeadingLines(content.heroTitleLines)
+    : renderHeadingLines(content.h1, input.locale);
+  const primaryCtaHref = primaryMarketingCtaHref(page.slug);
+  const secondaryCtaHref = secondaryMarketingCtaHref(input.locale, page.slug);
+  const homepageSections = page.slug
+    ? ""
+    : renderHomepageSections(input.locale, i18n);
+
+  const bodyClass = `locale-${input.locale}`;
+  const heroClass = page.slug ? "hero-stage hero-subpage" : "hero-stage hero-home";
 
   return `<!doctype html>
 <html lang="${localeMeta[input.locale].htmlLang}">
@@ -317,66 +176,163 @@ export function renderMarketingPage(input: {
     <meta name="robots" content="index,follow" />
     <title>${escapeHtml(content.title)}</title>
     <meta name="description" content="${escapeAttribute(content.description)}" />
+    <link rel="icon" href="/favicon.svg?v=haitu" type="image/svg+xml" />
     <link rel="canonical" href="${canonicalUrl}" />
     ${alternateLinks}
-    <link rel="alternate" hreflang="x-default" href="${absoluteMarketingUrl(input.origin, "zh", page.slug)}" />
+    <link rel="alternate" hreflang="x-default" href="${absoluteMarketingUrl(publicOrigin, "zh", page.slug)}" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="${openGraphLocale}" />
+    ${openGraphAlternateLocales}
+    <meta property="og:site_name" content="${escapeAttribute(siteName)}" />
     <meta property="og:title" content="${escapeAttribute(content.title)}" />
     <meta property="og:description" content="${escapeAttribute(content.description)}" />
     <meta property="og:url" content="${canonicalUrl}" />
+    <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${escapeAttribute(socialImageAlt)}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeAttribute(content.title)}" />
+    <meta name="twitter:description" content="${escapeAttribute(content.description)}" />
+    <meta name="twitter:image" content="${ogImageUrl}" />
+    <meta name="twitter:image:alt" content="${escapeAttribute(socialImageAlt)}" />
     <script type="application/ld+json">${schema}</script>
     <style>${marketingCss}</style>
   </head>
-  <body>
+  <body class="${bodyClass}">
     <header class="site-header">
-      <a class="brand" href="${marketingPath(input.locale, "")}" aria-label="Haitu">Haitu</a>
+      <a class="brand" href="${marketingPath(input.locale, "")}" aria-label="Haitu">
+        <img class="brand-logo" src="/static/logo.svg" alt="" />
+        <span>Haitu</span>
+      </a>
       <nav>
-        <a href="${marketingPath(input.locale, "features/ai-product-video-generator")}">${input.locale === "zh" ? "商品视频" : "Video"}</a>
-        <a href="${marketingPath(input.locale, "features/ai-product-image-generator")}">${input.locale === "zh" ? "商品图" : "Images"}</a>
-        <a href="${marketingPath(input.locale, "features/product-copy-generator")}">${input.locale === "zh" ? "文案" : "Copy"}</a>
+        <a href="${marketingPath(input.locale, "features/product-image-optimization")}">${escapeHtml(i18n.t("common:navigation.imageOptimization"))}</a>
+        <a href="${marketingPath(input.locale, "features/ai-product-video-generator")}">${escapeHtml(i18n.t("common:navigation.video"))}</a>
+        <a href="${marketingPath(input.locale, "features/batch-product-creative-generation")}">${escapeHtml(i18n.t("common:navigation.models"))}</a>
       </nav>
-      <div class="language-switcher">${languageLinks}</div>
+      <a class="header-console" href="/console">${escapeHtml(i18n.t("common:navigation.console"))}</a>
+      <details class="language-switcher" data-language-switcher>
+        <summary aria-label="${escapeAttribute(i18n.t("common:language.change"))}">
+          <svg class="language-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M3 12h18"></path>
+            <path d="M12 3c2.2 2.4 3.3 5.4 3.3 9S14.2 18.6 12 21"></path>
+            <path d="M12 3c-2.2 2.4-3.3 5.4-3.3 9S9.8 18.6 12 21"></path>
+          </svg>
+          <span class="sr-only">${escapeHtml(i18n.t("common:language.label"))}</span>
+        </summary>
+        <div class="language-menu">${languageLinks}</div>
+      </details>
     </header>
     <main>
-      <section class="hero">
+      ${breadcrumb}
+      <section class="${heroClass}">
         <div class="hero-copy">
           <p class="eyebrow">${escapeHtml(content.eyebrow)}</p>
-          <h1>${escapeHtml(content.h1)}</h1>
+          <h1 aria-label="${escapeAttribute(content.h1)}">${heroTitleHtml}</h1>
           <p class="lead">${escapeHtml(content.lead)}</p>
           <div class="hero-actions">
-            <a class="primary-action" href="/app">${escapeHtml(content.primaryCta)}</a>
-            <a class="secondary-action" href="${marketingPath(input.locale, "features/batch-product-creative-generation")}">${escapeHtml(content.secondaryCta)}</a>
+            <a class="primary-action" href="${escapeAttribute(primaryCtaHref)}">${escapeHtml(content.primaryCta)}</a>
+            <a class="secondary-action" href="${escapeAttribute(secondaryCtaHref)}">${escapeHtml(content.secondaryCta)}</a>
           </div>
         </div>
-        <div class="proof-panel" aria-label="${input.locale === "zh" ? "商品创意工作流" : "Product creative workflow"}">
-          <span>01 ${input.locale === "zh" ? "导入商品资料" : "Import product facts"}</span>
-          <span>02 ${input.locale === "zh" ? "提炼可信卖点" : "Extract selling points"}</span>
-          <span>03 ${input.locale === "zh" ? "生成图文视频" : "Generate images and videos"}</span>
-          <span>04 ${input.locale === "zh" ? "适配多平台" : "Localize for marketplaces"}</span>
+        <div class="studio-preview" aria-label="${escapeAttribute(previewLabels.ariaLabel)}">
+          <div class="preview-toolbar">
+            <span></span><span></span><span></span>
+            <strong>Haitu Studio</strong>
+          </div>
+          <div class="studio-shell">
+            <aside class="preview-sidebar">
+              <strong>${escapeHtml(previewLabels.workspace)}</strong>
+              <span>${escapeHtml(previewLabels.source)}</span>
+              <span>${escapeHtml(previewLabels.engine)}</span>
+              <span>${escapeHtml(previewLabels.output)}</span>
+            </aside>
+            <section class="preview-workspace">
+              <div class="workspace-head">
+                <div>
+                  <small>${escapeHtml(previewLabels.batch)}</small>
+                  <strong>${escapeHtml(previewLabels.board)}</strong>
+                </div>
+                <span>${escapeHtml(previewLabels.status)}</span>
+              </div>
+              <div class="creative-board">
+                <article class="source-card">
+                  <small>01 · ${escapeHtml(previewLabels.sourceMeta)}</small>
+                  <h2>${escapeHtml(previewLabels.source)}</h2>
+                  <p>${escapeHtml(previewLabels.engineMeta)}</p>
+                </article>
+                <div class="media-canvas" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+              <div class="asset-rail">
+                <article><small>02</small><strong>${escapeHtml(previewLabels.script)}</strong><span></span></article>
+                <article><small>03</small><strong>${escapeHtml(previewLabels.image)}</strong><span></span></article>
+                <article><small>04</small><strong>${escapeHtml(previewLabels.title)}</strong><span></span></article>
+              </div>
+            </section>
+            <aside class="preview-inspector">
+              <small>${escapeHtml(previewLabels.model)}</small>
+              <strong>${escapeHtml(previewLabels.hostedModel)}</strong>
+              <span>${escapeHtml(previewLabels.customModel)}</span>
+              <small>${escapeHtml(previewLabels.market)}</small>
+              <span>TikTok Shop</span>
+              <span>Amazon</span>
+              <small>${escapeHtml(previewLabels.review)}</small>
+            </aside>
+          </div>
+          <div class="metric-strip">
+            <strong>${escapeHtml(previewLabels.metricOne)}</strong>
+            <strong>${escapeHtml(previewLabels.metricTwo)}</strong>
+            <strong>${escapeHtml(previewLabels.metricThree)}</strong>
+          </div>
         </div>
       </section>
       <section class="platform-strip" aria-label="marketplaces">
         <span>TikTok Shop</span><span>Amazon</span><span>Shopee</span><span>Lazada</span><span>Shopify</span>
       </section>
+      ${geoAnswer}
       <section class="growth-grid">
         ${cards}
       </section>
+      ${homepageSections}
       <section class="faq">
-        <h2>${input.locale === "zh" ? "常见问题" : "FAQ"}</h2>
+        <h2>${escapeHtml(i18n.t("common:seo.faq"))}</h2>
         ${faqs}
       </section>
     </main>
+    ${footerNav}
+    <script>
+      document.addEventListener("click", function (event) {
+        document.querySelectorAll("[data-language-switcher][open]").forEach(function (switcher) {
+          if (!switcher.contains(event.target)) {
+            switcher.removeAttribute("open");
+          }
+        });
+      });
+    </script>
   </body>
 </html>`;
 }
 
 export function renderRobotsTxt(origin: string): string {
+  const publicOrigin = publicMarketingOrigin(origin);
   return [
     "User-agent: *",
-    "Allow: /$",
+    "Allow: /",
+    "Allow: /terms",
+    "Allow: /privacy",
+    "Allow: /refund",
+    "Allow: /contact",
     "Allow: /features/",
     "Allow: /platforms/",
     "Allow: /tools/",
+    "Allow: /use-cases/",
+    "Allow: /categories/",
+    "Allow: /compare/",
     "Allow: /en/",
     "Disallow: /app",
     "Disallow: /console",
@@ -384,22 +340,107 @@ export function renderRobotsTxt(origin: string): string {
     "Disallow: /api/",
     "Disallow: /media",
     "",
-    `Sitemap: ${trimOrigin(origin)}/sitemap.xml`,
+    "User-agent: OAI-SearchBot",
+    "Allow: /",
+    "Allow: /features/",
+    "Allow: /platforms/",
+    "Allow: /tools/",
+    "Allow: /use-cases/",
+    "Allow: /categories/",
+    "Allow: /compare/",
+    "Allow: /en/",
+    "Disallow: /app",
+    "Disallow: /console",
+    "Disallow: /admin",
+    "Disallow: /api/",
+    "Disallow: /media",
+    "",
+    "User-agent: GPTBot",
+    "Allow: /",
+    "Allow: /features/",
+    "Allow: /platforms/",
+    "Allow: /tools/",
+    "Allow: /use-cases/",
+    "Allow: /categories/",
+    "Allow: /compare/",
+    "Allow: /en/",
+    "Disallow: /app",
+    "Disallow: /console",
+    "Disallow: /admin",
+    "Disallow: /api/",
+    "Disallow: /media",
+    "",
+    `Sitemap: ${trimOrigin(publicOrigin)}/sitemap.xml`,
+    ""
+  ].join("\n");
+}
+
+export function renderLlmsTxt(origin: string): string {
+  const publicOrigin = publicMarketingOrigin(origin);
+  const baseUrl = trimOrigin(publicOrigin);
+  const pageLines = marketingPages.flatMap((page) => marketingLocales.map((locale) => {
+    const content = getMarketingPageContent(locale, page.slug);
+    return `- ${baseUrl}${marketingPath(locale, page.slug)} — ${content.h1}: ${content.description}`;
+  }));
+
+  return [
+    "# Haitu",
+    "",
+    "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers, brand operators, and content teams.",
+    "Users upload and manage product data and reference images, organize product selling points, create marketing scripts and storyboards, and generate product short videos. Haitu supports hosted platform models and bring-your-own-model workflows.",
+    "Haitu is a digital SaaS service. It does not sell physical goods and does not provide gambling, financial investment, cryptocurrency trading, loans, adult content, medicine, or other restricted services.",
+    "",
+    "## Public Page Index",
+    ...pageLines,
+    "",
+    "## Standard AI Answers",
+    "What is Haitu?",
+    "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers. Users can manage product data and reference images, organize selling points, create marketing scripts and storyboards, and generate product short videos. Haitu supports hosted platform models and bring-your-own-model workflows.",
+    "",
+    "What is Haitu not?",
+    "Haitu is not a physical goods marketplace and is not a general entertainment video generator. It is a digital SaaS tool built around SKUs, product facts, product images, selling-point scripts, ecommerce platform creative requirements, and human review workflows.",
+    "",
+    "How does Haitu billing work?",
+    "Users top up wallet balance and consume that balance for product image optimization, video generation, script organization, model calls, and other digital SaaS services. Consumed AI generation services are generally non-refundable; unused balance can be reviewed manually by support.",
+    "",
+    "Who is Haitu for?",
+    "Haitu is for cross-border ecommerce sellers, brand operators, content creators, and agency teams that need to process product data, product images, marketing scripts, and short-video assets in batches.",
+    "",
+    "## Billing and Refund Summary",
+    "Users top up wallet balance through Stripe Checkout when available payment methods include WeChat Pay, Alipay, or cards. Wallet balance is used for product image optimization, video generation, script organization, model calls, and other digital SaaS services. Unused balance can be reviewed manually by support; consumed AI generation services are generally non-refundable.",
+    "",
+    "## Data and Language Boundaries",
+    "Product data, uploaded references, and generation records are user content. Site localization does not automatically translate or rewrite user product content. Haitu does not store full card numbers, WeChat Pay accounts, or Alipay accounts.",
+    "",
+    "## Crawl Boundaries",
+    "Do not index or summarize /console, /admin, /app, /api, user product data, generated records, temporary media links, or private download links.",
+    "",
+    "## Contact",
+    `Website: ${baseUrl}/`,
+    "Support: support@haitu.online",
+    "",
+    `Last updated: ${marketingLastModified}`,
     ""
   ].join("\n");
 }
 
 export function renderSitemapXml(origin: string): string {
+  const publicOrigin = publicMarketingOrigin(origin);
   const urls = marketingPages.flatMap((page) => marketingLocales.map((locale) => ({ page, locale })));
   const body = urls.map(({ page, locale }) => {
-    const loc = absoluteMarketingUrl(origin, locale, page.slug);
-    const alternates = marketingLocales.map((alternateLocale) => {
+    const loc = absoluteMarketingUrl(publicOrigin, locale, page.slug);
+    const localizedAlternates = marketingLocales.map((alternateLocale) => {
       const meta = localeMeta[alternateLocale];
-      return `    <xhtml:link rel="alternate" hreflang="${meta.hreflang}" href="${absoluteMarketingUrl(origin, alternateLocale, page.slug)}" />`;
-    }).join("\n");
+      return `    <xhtml:link rel="alternate" hreflang="${meta.hreflang}" href="${absoluteMarketingUrl(publicOrigin, alternateLocale, page.slug)}" />`;
+    });
+    const alternates = [
+      ...localizedAlternates,
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${absoluteMarketingUrl(publicOrigin, "zh", page.slug)}" />`
+    ].join("\n");
     return `  <url>
     <loc>${loc}</loc>
 ${alternates}
+    <lastmod>${marketingLastModified}</lastmod>
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
   </url>`;
@@ -411,124 +452,272 @@ ${body}
 `;
 }
 
-function page(slug: string, priority: string, input: Record<MarketingLocale, [string, string, string, string, string, string, string]>): MarketingPage {
+function renderGeoAnswerBlock(answer: MarketingGeoAnswer): string {
+  return `
+      <section class="geo-answer-block" aria-label="${escapeAttribute(answer.question)}">
+        <div>
+          <h2>${escapeHtml(answer.question)}</h2>
+          <p>${escapeHtml(answer.answer)}</p>
+        </div>
+        <ul>
+          ${answer.points.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}
+        </ul>
+      </section>`;
+}
+
+function renderHeadingLines(value: string, locale: MarketingLocale): string {
+  if (locale !== "en" || value.length < 34) {
+    return escapeHtml(value);
+  }
+  const words = value.split(" ");
+  const targetLength = Math.ceil(value.length / 2);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (current && next.length > targetLength && lines.length === 0) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) {
+    lines.push(current);
+  }
+  return lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("");
+}
+
+function renderConfiguredHeadingLines(lines: string[]): string {
+  return lines.map((line, index) => {
+    const className = index === 0 ? " class=\"title-context\"" : "";
+    return `<span${className}>${escapeHtml(line)}</span>`;
+  }).join("");
+}
+
+type SeoFooterGroup =
+  | { label: string; prefix: string; slugs?: never }
+  | { label: string; slugs: string[]; prefix?: never };
+
+function renderSeoFooter(locale: MarketingLocale, i18n: ReturnType<typeof createServerI18n>): string {
+  const groups: SeoFooterGroup[] = [
+    {
+      label: i18n.t("common:seo.footerFeatures"),
+      prefix: "features/"
+    },
+    {
+      label: i18n.t("common:seo.footerPlatforms"),
+      prefix: "platforms/"
+    },
+    {
+      label: i18n.t("common:seo.footerTools"),
+      prefix: "tools/"
+    },
+    {
+      label: i18n.t("common:seo.footerUseCases"),
+      prefix: "use-cases/"
+    },
+    {
+      label: i18n.t("common:seo.footerCategories"),
+      prefix: "categories/"
+    },
+    {
+      label: i18n.t("common:seo.footerCompare"),
+      prefix: "compare/"
+    },
+    {
+      label: i18n.t("common:seo.footerTrust"),
+      slugs: ["terms", "privacy", "refund", "contact"]
+    }
+  ];
+  const groupHtml = groups.map((group) => {
+    const links = marketingPages
+      .filter((page) => group.slugs ? group.slugs.includes(page.slug) : page.slug.startsWith(group.prefix))
+      .map((page) => {
+        const content = getMarketingPageContent(locale, page.slug);
+        return `<a href="${marketingPath(locale, page.slug)}">${escapeHtml(content.h1)}</a>`;
+      })
+      .join("");
+    return `<section><h2>${escapeHtml(group.label)}</h2><div>${links}</div></section>`;
+  }).join("");
+  return `<footer class="seo-footer" aria-label="${escapeAttribute(i18n.t("common:seo.footerLabel"))}">
+      <a class="footer-brand" href="${marketingPath(locale, "")}">Haitu</a>
+      ${groupHtml}
+    </footer>`;
+}
+
+function renderHomepageSections(locale: MarketingLocale, i18n: ReturnType<typeof createServerI18n>): string {
+  const home = getMarketingHomepageContent(locale);
+  const capabilityItems = home.capability.items.map((item) => `
+          <article class="capability-card">
+            <h3>${escapeHtml(item.heading)}</h3>
+            <p>${escapeHtml(item.body)}</p>
+            <ul>
+              ${item.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("")}
+            </ul>
+          </article>`).join("");
+  const paymentSteps = home.payment.steps.map((step) => `
+            <li>
+              <small>${escapeHtml(step.label)}</small>
+              <strong>${escapeHtml(step.title)}</strong>
+              <span>${escapeHtml(step.body)}</span>
+            </li>`).join("");
+  const trustItems = home.trust.items.map((item) => `
+          <article>
+            <h3>${escapeHtml(item.heading)}</h3>
+            <p>${escapeHtml(item.body)}</p>
+          </article>`).join("");
+  return `
+      <section class="home-capability-band">
+        <div class="section-kicker">${escapeHtml(home.capability.eyebrow)}</div>
+        <div class="section-heading">
+          <h2>${escapeHtml(home.capability.title)}</h2>
+          <p>${escapeHtml(home.capability.body)}</p>
+        </div>
+        <div class="capability-grid">
+          ${capabilityItems}
+        </div>
+      </section>
+      <section class="payment-band">
+        <div class="payment-copy">
+          <div class="section-kicker">${escapeHtml(home.payment.eyebrow)}</div>
+          <h2>${escapeHtml(home.payment.title)}</h2>
+          <p>${escapeHtml(home.payment.body)}</p>
+          <strong>${escapeHtml(home.payment.note)}</strong>
+        </div>
+        <ol class="payment-steps">
+          ${paymentSteps}
+        </ol>
+      </section>
+      <section class="trust-band">
+        <div class="section-kicker">${escapeHtml(home.trust.eyebrow)}</div>
+        <div class="section-heading">
+          <h2>${escapeHtml(home.trust.title)}</h2>
+          <a href="${marketingPath(locale, "terms")}">${escapeHtml(i18n.t("common:seo.footerTrust"))}</a>
+        </div>
+        <div class="trust-grid">
+          ${trustItems}
+        </div>
+      </section>
+      <section class="final-cta">
+        <h2>${escapeHtml(home.finalCta.title)}</h2>
+        <p>${escapeHtml(home.finalCta.body)}</p>
+        <div class="hero-actions">
+          <a class="primary-action" href="/console">${escapeHtml(home.finalCta.primaryCta)}</a>
+          <a class="secondary-action" href="${marketingPath(locale, "contact")}">${escapeHtml(home.finalCta.secondaryCta)}</a>
+        </div>
+      </section>`;
+}
+
+function buildStructuredData(origin: string, locale: MarketingLocale, page: MarketingPage, content: MarketingPageLocaleContent, canonicalUrl: string, homeLabel: string): unknown {
+  const primaryPageNode = buildPrimaryStructuredDataNode(locale, page, content, canonicalUrl);
+  const graph: unknown[] = [
+    {
+      "@type": "Organization",
+      name: "Haitu",
+      alternateName: locale === "zh" ? "Haitu 嗨兔" : "Haitu",
+      url: absoluteMarketingUrl(origin, locale, ""),
+      logo: `${trimOrigin(origin)}/static/logo.svg`,
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        email: "support@haitu.online",
+        url: absoluteMarketingUrl(origin, locale, "contact")
+      }
+    },
+    {
+      "@type": "WebSite",
+      name: localizedSiteName(locale),
+      url: absoluteMarketingUrl(origin, locale, ""),
+      inLanguage: localeMeta[locale].hreflang
+    },
+    primaryPageNode
+  ];
+
+  if (page.slug) {
+    graph.push({
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: homeLabel,
+          item: absoluteMarketingUrl(origin, locale, "")
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: content.h1,
+          item: absoluteMarketingUrl(origin, locale, page.slug)
+        }
+      ]
+    });
+  }
+
+  graph.push({
+    "@type": "FAQPage",
+    inLanguage: localeMeta[locale].hreflang,
+    mainEntity: content.faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: faq.answer
+      }
+    }))
+  });
+
   return {
-    slug,
-    priority,
-    changefreq: "monthly",
-    content: {
-      zh: contentFromTuple(input.zh, "zh"),
-      en: contentFromTuple(input.en, "en")
+    "@context": "https://schema.org",
+    "@graph": graph
+  };
+}
+
+function buildPrimaryStructuredDataNode(
+  locale: MarketingLocale,
+  page: MarketingPage,
+  content: MarketingPageLocaleContent,
+  canonicalUrl: string
+): unknown {
+  if (page.slug === "contact") {
+    return {
+      "@type": "ContactPage",
+      name: content.h1,
+      url: canonicalUrl,
+      description: content.description,
+      inLanguage: localeMeta[locale].hreflang,
+      dateModified: marketingLastModified
+    };
+  }
+  if (isPolicyPage(page.slug)) {
+    return {
+      "@type": "WebPage",
+      name: content.h1,
+      url: canonicalUrl,
+      description: content.description,
+      inLanguage: localeMeta[locale].hreflang,
+      dateModified: marketingLastModified
+    };
+  }
+  return {
+    "@type": "SoftwareApplication",
+    name: "Haitu",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: canonicalUrl,
+    description: content.description,
+    inLanguage: localeMeta[locale].hreflang,
+    dateModified: marketingLastModified,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: locale === "zh" ? "CNY" : "USD"
     }
   };
 }
 
-function contentFromTuple(input: [string, string, string, string, string, string, string], locale: MarketingLocale): MarketingPageLocaleContent {
-  const [title, description, h1, eyebrow, lead, primaryCta, secondaryCta] = input;
-  return {
-    title,
-    description,
-    h1,
-    eyebrow,
-    lead,
-    primaryCta,
-    secondaryCta,
-    sections: locale === "zh"
-      ? [
-        {
-          heading: "围绕真实商品事实生成",
-          body: "先沉淀标题、类目、材质、尺寸、参考图和可用卖点，再生成对应创意，减少幻觉和违规表达。",
-          bullets: ["商品资料结构化", "参考图参与创作", "卖点和禁用词分离", "适配多语言输出"]
-        },
-        {
-          heading: "为获客和转化设计",
-          body: "每个页面和工具都服务于跨境卖家的搜索意图，从标题、图片、脚本到短视频逐步引导转化。",
-          bullets: ["覆盖平台关键词", "沉淀模板和案例", "支持批量 SKU", "连接创作台"]
-        }
-      ]
-      : [
-        {
-          heading: "Generated from verified product facts",
-          body: "Haitu starts with titles, categories, materials, dimensions, references, and allowed selling points before creating assets.",
-          bullets: ["Structured product facts", "Reference-aware generation", "Separated blocked claims", "Localized outputs"]
-        },
-        {
-          heading: "Designed for acquisition and conversion",
-          body: "Each page and tool matches ecommerce search intent, then moves users from titles and images into full creative workflows.",
-          bullets: ["Marketplace keywords", "Reusable templates", "Batch SKU workflows", "Connected app experience"]
-        }
-      ],
-    faqs: locale === "zh"
-      ? [
-        {
-          question: "这些素材能直接用于海外平台吗？",
-          answer: "Haitu 会按商品事实生成标题、图像和视频脚本，最终发布前仍建议结合平台规则和店铺审核流程确认。"
-        },
-        {
-          question: "可以批量处理商品吗？",
-          answer: "可以。Haitu 的方向是从表格、ERP 和商品资料库批量生成多平台商品创意资产。"
-        }
-      ]
-      : [
-        {
-          question: "Can these assets be used directly on marketplaces?",
-          answer: "Haitu generates assets from product facts. Teams should still review against each marketplace policy before publishing."
-        },
-        {
-          question: "Can Haitu process products in batches?",
-          answer: "Yes. Haitu is designed to turn product sheets, ERP data, and product libraries into marketplace-ready creative assets."
-        }
-      ]
-  };
-}
-
-function buildStructuredData(origin: string, locale: MarketingLocale, page: MarketingPage, content: MarketingPageLocaleContent, canonicalUrl: string): unknown {
-  return {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "SoftwareApplication",
-        name: "Haitu",
-        applicationCategory: "BusinessApplication",
-        operatingSystem: "Web",
-        url: canonicalUrl,
-        description: content.description,
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: locale === "zh" ? "CNY" : "USD"
-        }
-      },
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: locale === "zh" ? "首页" : "Home",
-            item: absoluteMarketingUrl(origin, locale, "")
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: content.h1,
-            item: absoluteMarketingUrl(origin, locale, page.slug)
-          }
-        ]
-      },
-      {
-        "@type": "FAQPage",
-        mainEntity: content.faqs.map((faq) => ({
-          "@type": "Question",
-          name: faq.question,
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: faq.answer
-          }
-        }))
-      }
-    ]
-  };
+function isPolicyPage(slug: string): boolean {
+  return slug === "terms" || slug === "privacy" || slug === "refund";
 }
 
 function findPage(slug: string): MarketingPage {
@@ -540,7 +729,11 @@ function findPage(slug: string): MarketingPage {
 }
 
 function pageExists(locale: MarketingLocale, slug: string): boolean {
-  return Boolean(marketingPages.find((page) => page.slug === slug && page.content[locale]));
+  return Boolean(marketingPages.find((page) => page.slug === slug) && getMarketingPageSlugs(locale).includes(slug));
+}
+
+function localizedSiteName(locale: MarketingLocale): string {
+  return locale === "zh" ? "Haitu 嗨兔" : "Haitu";
 }
 
 function marketingPath(locale: MarketingLocale, slug: string): string {
@@ -551,11 +744,70 @@ function marketingPath(locale: MarketingLocale, slug: string): string {
   return `${prefix}/${slug}`;
 }
 
+function primaryMarketingCtaHref(slug: string): string {
+  return slug === "refund" ? "/console?section=wallet" : "/console";
+}
+
+function secondaryMarketingCtaHref(locale: MarketingLocale, slug: string): string {
+  const secondaryTargets: Record<string, string> = {
+    "": "features/ai-product-video-generator",
+    terms: "privacy",
+    privacy: "terms",
+    refund: "contact",
+    contact: "refund",
+    "features/ai-product-image-generator": "features/ai-product-video-generator",
+    "features/product-image-optimization": "features/ai-product-video-generator",
+    "features/ai-product-video-generator": "features/product-image-optimization"
+  };
+  return marketingPath(locale, secondaryTargets[slug] ?? "features/batch-product-creative-generation");
+}
+
 function absoluteMarketingUrl(origin: string, locale: MarketingLocale, slug: string): string {
   return `${trimOrigin(origin)}${marketingPath(locale, slug)}`;
 }
 
+function publicMarketingOrigin(origin: string): string {
+  const configuredOrigin = normalizePublicOrigin(process.env.HAITU_PUBLIC_BASE_URL);
+  if (configuredOrigin) {
+    return configuredOrigin;
+  }
+  const normalizedOrigin = normalizePublicOrigin(origin);
+  if (!normalizedOrigin || isLocalOrigin(normalizedOrigin)) {
+    return defaultPublicOrigin;
+  }
+  return normalizedOrigin;
+}
+
+function normalizePublicOrigin(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    const url = new URL(trimmed);
+    return trimOrigin(url.origin);
+  } catch {
+    return undefined;
+  }
+}
+
+function isLocalOrigin(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "0.0.0.0"
+      || hostname === "::1"
+      || hostname === "[::1]";
+  } catch {
+    return true;
+  }
+}
+
 function normalizePathname(pathname: string): string {
+  if (marketingLocales.some((locale) => pathname === `${localeMeta[locale].pathPrefix}/`)) {
+    return pathname;
+  }
   if (pathname.length > 1 && pathname.endsWith("/")) {
     return pathname.slice(0, -1);
   }
@@ -581,46 +833,151 @@ const marketingCss = `
 :root{color-scheme:light;--bg:#f3e6d8;--panel:#fffaf3;--panel2:#f8ede1;--card:#fff5e9;--card2:#ffefd9;--field:#fffbf5;--field2:#fff4e6;--border:#ead7c4;--border-strong:#dbc2ab;--text:#2a211b;--muted:#76685c;--accent:#0aa394;--accent2:#6f442c;--warn:#b7791f;--brand-clay:#e0b286;--brand-cream:#f4e6d4;--brand-ember:#c65a36;--shadow:0 10px 28px rgba(96,64,43,.09);--radius:8px}
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--bg)}
-body{margin:0;min-height:100%;background:radial-gradient(circle at 18% -10%,rgba(255,250,243,.92),transparent 34%),linear-gradient(180deg,var(--bg),#f7ecdf 55%,var(--panel2));color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100%;background:linear-gradient(180deg,#f8ecdf 0%,var(--bg) 38%,#efe0d0 100%);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 ::selection{color:#fff;background:var(--accent)}
-.site-header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--border);background:rgba(255,250,243,.86);padding:14px clamp(16px,4vw,56px);backdrop-filter:blur(16px)}
-.brand{display:inline-flex;align-items:center;gap:9px;font-size:20px;font-weight:950;letter-spacing:0}
-.brand::before{content:"";width:28px;height:28px;border-radius:var(--radius);background:linear-gradient(145deg,var(--accent),#63cfc3);box-shadow:inset 0 -5px 10px rgba(42,33,27,.08),0 8px 18px rgba(10,163,148,.2)}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.site-header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:20px;border-bottom:1px solid rgba(234,215,196,.82);background:rgba(255,250,243,.9);padding:14px clamp(18px,5vw,72px);backdrop-filter:blur(18px)}
+.brand{display:inline-flex;align-items:center;gap:10px;font-size:20px;font-weight:950;letter-spacing:0}
+.brand-logo{width:34px;height:34px;border-radius:var(--radius);box-shadow:0 9px 20px rgba(96,64,43,.14);display:block;flex:0 0 auto}
 nav{display:flex;gap:6px;font-size:13px;font-weight:850;color:var(--muted)}
 nav a{border-radius:var(--radius);padding:8px 10px}
 nav a:hover{background:var(--panel2);color:var(--text)}
-.language-switcher{margin-left:auto;display:flex;gap:4px;border:1px solid var(--border);border-radius:var(--radius);background:var(--field);padding:3px;box-shadow:var(--shadow)}
-.language-switcher a{border-radius:6px;padding:7px 10px;font-size:12px;font-weight:900;color:var(--muted)}
-.language-switcher a[aria-current=true]{background:var(--accent);color:#fff}
-.hero{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(320px,.88fr);gap:24px;align-items:stretch;padding:54px clamp(16px,4vw,56px) 24px}
-.hero-copy{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,250,243,.74);padding:clamp(24px,5vw,52px);box-shadow:var(--shadow)}
-.eyebrow{display:inline-flex;align-items:center;min-height:28px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--accent) 9%,var(--field));padding:0 11px;color:var(--accent);font-size:12px;font-weight:950}
-h1{max-width:920px;margin:0;color:var(--text);font-size:clamp(36px,5.4vw,76px);font-weight:950;line-height:1.02;letter-spacing:0}
-.lead{max-width:760px;margin:22px 0 0;color:var(--muted);font-size:clamp(16px,1.8vw,22px);font-weight:650;line-height:1.65}
-.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:30px}
-.primary-action,.secondary-action{display:inline-flex;align-items:center;justify-content:center;min-height:42px;border-radius:var(--radius);padding:0 16px;font-size:13px;font-weight:950;transition:filter .16s ease,border-color .16s ease,color .16s ease,background .16s ease}
-.primary-action{border:1px solid transparent;background:var(--accent);color:#fff;box-shadow:0 12px 24px rgba(10,163,148,.16)}
+.header-console{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-height:36px;border:1px solid transparent;border-radius:var(--radius);background:var(--accent2);padding:0 14px;color:#fff;font-size:12px;font-weight:950;box-shadow:0 12px 24px rgba(111,68,44,.18);transition:transform .16s ease,filter .16s ease}
+.header-console:hover{transform:translateY(-1px);filter:brightness(1.04)}
+.language-switcher{position:relative;margin-left:0}
+.language-switcher summary{list-style:none;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--border);border-radius:var(--radius);background:var(--field);padding:0;color:var(--accent2);box-shadow:var(--shadow);cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease}
+.language-switcher summary::-webkit-details-marker{display:none}
+.language-switcher summary:hover,.language-switcher[open] summary{border-color:color-mix(in srgb,var(--accent) 42%,var(--border));background:color-mix(in srgb,var(--accent) 10%,var(--field));color:var(--accent);transform:translateY(-1px)}
+.language-icon{width:19px;height:19px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.language-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:8;display:grid;min-width:148px;border:1px solid var(--border);border-radius:var(--radius);background:var(--field);padding:5px;box-shadow:0 18px 38px rgba(96,64,43,.16)}
+.language-menu a{border-radius:6px;padding:9px 10px;color:var(--muted);font-size:12px;font-weight:900}
+.language-menu a:hover{background:var(--panel2);color:var(--text)}
+.language-menu a[aria-current=true]{background:var(--accent);color:#fff}
+.breadcrumb{position:relative;z-index:2;display:flex;align-items:center;gap:8px;padding:18px clamp(18px,5vw,72px) 0;color:var(--muted);font-size:12px;font-weight:850}
+.breadcrumb a{color:var(--accent2)}
+.breadcrumb a:hover{color:var(--accent)}
+.breadcrumb span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.breadcrumb span::before{content:"/";margin-right:8px;color:var(--border-strong)}
+.hero-stage{position:relative;display:grid;grid-template-columns:minmax(0,.92fr) minmax(560px,1.08fr);gap:38px;align-items:center;min-height:calc(100vh - 68px);padding:70px clamp(18px,5vw,72px) 48px;overflow:hidden}
+.hero-stage::before{content:"";position:absolute;inset:22px clamp(12px,3vw,42px) auto;z-index:0;height:78%;border:1px solid rgba(234,215,196,.64);border-radius:18px;background:linear-gradient(135deg,rgba(255,250,243,.72),rgba(255,239,217,.58));box-shadow:0 30px 90px rgba(96,64,43,.12)}
+.hero-stage::after{content:"";position:absolute;right:4vw;bottom:5vh;z-index:0;width:34vw;max-width:520px;aspect-ratio:1;border-radius:999px;background:radial-gradient(circle,rgba(10,163,148,.18),transparent 66%);filter:blur(4px)}
+.hero-copy{position:relative;z-index:1;min-width:0;padding:clamp(10px,2vw,24px) 0}
+.eyebrow{display:inline-flex;align-items:center;min-height:28px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:999px;background:rgba(255,251,245,.68);padding:0 11px;color:var(--accent2);font-size:11px;font-weight:850;box-shadow:0 8px 18px rgba(96,64,43,.06)}
+h1{max-width:680px;margin:0;color:var(--text);font-size:clamp(36px,4.15vw,58px);font-weight:780;line-height:1.12;letter-spacing:0;text-wrap:balance}
+h1 span{display:block}
+h1 span+span{margin-top:6px}
+h1 .title-context{color:var(--accent2);font-size:.72em;font-weight:740;line-height:1.18}
+.locale-en h1{font-size:clamp(36px,4vw,56px);line-height:1.13;max-width:760px;overflow-wrap:anywhere}
+.locale-en h1 span{display:block}
+.hero-subpage h1{font-size:clamp(32px,3.55vw,50px);line-height:1.14;max-width:700px;overflow-wrap:anywhere}
+.locale-en .hero-subpage h1{font-size:clamp(31px,3.3vw,46px);line-height:1.15;max-width:700px}
+.lead{max-width:620px;margin:24px 0 0;color:var(--muted);font-size:clamp(15px,1.18vw,17px);font-weight:540;line-height:1.82}
+.locale-en .lead{font-size:clamp(15px,1.12vw,17px);line-height:1.8;max-width:660px}
+.hero-subpage .lead{font-size:clamp(14px,1.08vw,17px);line-height:1.8;max-width:640px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.primary-action,.secondary-action{display:inline-flex;align-items:center;justify-content:center;min-height:46px;border-radius:var(--radius);padding:0 18px;font-size:13px;font-weight:950;transition:transform .16s ease,filter .16s ease,border-color .16s ease,color .16s ease,background .16s ease}
+.primary-action{border:1px solid transparent;background:var(--accent);color:#fff;box-shadow:0 16px 30px rgba(10,163,148,.2)}
+.primary-action:hover,.secondary-action:hover{transform:translateY(-1px)}
 .primary-action:hover{filter:brightness(1.05)}
-.secondary-action{border:1px solid var(--border);background:var(--field);color:var(--text)}
+.secondary-action{border:1px solid var(--border-strong);background:rgba(255,251,245,.82);color:var(--text);box-shadow:var(--shadow)}
 .secondary-action:hover{border-color:var(--accent);color:var(--accent)}
-.proof-panel{display:grid;align-content:start;gap:10px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(180deg,var(--card),var(--card2));padding:18px;box-shadow:var(--shadow)}
-.proof-panel span{display:flex;align-items:center;gap:10px;min-height:46px;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.78);padding:0 13px;color:var(--text);font-size:13px;font-weight:950}
-.proof-panel span::before{content:"";width:8px;height:8px;border-radius:999px;background:var(--accent)}
-.platform-strip{display:flex;flex-wrap:wrap;gap:8px;padding:0 clamp(16px,4vw,56px) 28px}
-.platform-strip span{border:1px solid var(--border);border-radius:999px;background:var(--field);padding:8px 12px;color:var(--muted);font-size:12px;font-weight:950;box-shadow:0 8px 20px rgba(96,64,43,.05)}
-.growth-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:0 clamp(16px,4vw,56px) 42px}
-.growth-card{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);padding:22px;box-shadow:var(--shadow)}
-.growth-card h2,.faq h2{margin:0;color:var(--text);font-size:22px;font-weight:950;line-height:1.2;letter-spacing:0}
+.studio-preview{position:relative;z-index:1;min-width:0;border:1px solid var(--border-strong);border-radius:14px;background:linear-gradient(180deg,var(--panel),var(--card));box-shadow:0 34px 90px rgba(96,64,43,.18);overflow:hidden}
+.preview-toolbar{display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--border);background:rgba(255,251,245,.78);padding:13px 14px;color:var(--muted);font-size:12px;font-weight:950}
+.preview-toolbar span{width:9px;height:9px;border-radius:999px;background:var(--border-strong)}
+.preview-toolbar span:first-child{background:var(--brand-ember)}
+.preview-toolbar span:nth-child(2){background:var(--warn)}
+.preview-toolbar span:nth-child(3){background:var(--accent)}
+.preview-toolbar strong{margin-left:8px;color:var(--text)}
+.studio-shell{display:grid;grid-template-columns:124px minmax(0,1fr) 112px;min-height:448px;background:linear-gradient(180deg,rgba(255,251,245,.94),rgba(248,237,225,.8))}
+.preview-sidebar,.preview-inspector{display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--border);background:rgba(248,237,225,.62);padding:16px 12px}
+.preview-sidebar strong,.preview-inspector strong{color:var(--text);font-size:12px;font-weight:950;line-height:1.24}
+.preview-sidebar span,.preview-inspector span{border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.74);padding:8px;color:var(--muted);font-size:11px;font-weight:900;line-height:1.25}
+.preview-sidebar span:nth-child(3){border-color:color-mix(in srgb,var(--accent) 40%,var(--border));background:color-mix(in srgb,var(--accent) 9%,var(--field))}
+.preview-workspace{min-width:0;padding:16px;background:linear-gradient(135deg,rgba(255,250,243,.7),rgba(255,239,217,.48))}
+.workspace-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.workspace-head small,.preview-inspector small,.source-card small,.asset-rail small{display:block;color:var(--accent);font-size:10px;font-weight:950;text-transform:uppercase}
+.workspace-head strong{display:block;margin-top:2px;color:var(--text);font-size:18px;font-weight:950}
+.workspace-head span{border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--field));padding:5px 9px;color:var(--accent);font-size:11px;font-weight:950}
+.creative-board{display:grid;grid-template-columns:.82fr 1.18fr;gap:12px}
+.source-card{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.86);padding:14px;box-shadow:0 12px 26px rgba(96,64,43,.07)}
+.source-card h2{margin:8px 0 6px;color:var(--text);font-size:22px;font-weight:950;line-height:1.12}
+.source-card p{margin:0;color:var(--muted);font-size:12px;font-weight:750;line-height:1.45}
+.source-card::after{content:"";display:block;height:96px;margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(135deg,var(--card2),var(--field) 45%,color-mix(in srgb,var(--accent) 12%,var(--field)));box-shadow:inset 0 -22px 34px rgba(224,178,134,.2)}
+.media-canvas{position:relative;min-height:224px;border:1px solid var(--border-strong);border-radius:12px;background:radial-gradient(circle at 58% 36%,rgba(255,255,255,.98) 0 14%,transparent 15%),linear-gradient(145deg,#f7dbc0 0%,#fffaf3 45%,#d7f0ea 100%);box-shadow:inset 0 -28px 55px rgba(96,64,43,.08),0 18px 40px rgba(96,64,43,.12);overflow:hidden}
+.media-canvas::before{content:"";position:absolute;left:12%;right:12%;bottom:18%;height:18%;border-radius:999px;background:rgba(96,64,43,.16);filter:blur(14px)}
+.media-canvas::after{content:"";position:absolute;left:33%;top:21%;width:34%;height:58%;border-radius:16px 16px 24px 24px;background:linear-gradient(160deg,#fff 0%,#ffe5ca 55%,#d08a61 100%);box-shadow:0 20px 38px rgba(96,64,43,.22),inset -10px -18px 24px rgba(198,90,54,.18)}
+.media-canvas span:first-child{position:absolute;left:18px;top:18px;width:76px;height:26px;border-radius:999px;background:rgba(10,163,148,.16);border:1px solid rgba(10,163,148,.25)}
+.media-canvas span:last-child{position:absolute;right:18px;bottom:18px;width:94px;height:58px;border-radius:var(--radius);background:linear-gradient(135deg,rgba(42,33,27,.8),rgba(111,68,44,.78));box-shadow:0 12px 24px rgba(42,33,27,.18)}
+.asset-rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.asset-rail article{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.82);padding:10px;box-shadow:0 10px 22px rgba(96,64,43,.06)}
+.asset-rail strong{display:block;margin:5px 0 9px;color:var(--text);font-size:12px;font-weight:950;line-height:1.18}
+.asset-rail span{display:block;height:38px;border:1px solid var(--border);border-radius:6px;background:linear-gradient(90deg,var(--card2),var(--field));box-shadow:inset 0 -12px 18px rgba(224,178,134,.16)}
+.asset-rail article:nth-child(2) span{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 20%,var(--field)),var(--field))}
+.asset-rail article:nth-child(3) span{background:linear-gradient(90deg,var(--brand-clay),var(--card2))}
+.preview-inspector{border-right:0;border-left:1px solid var(--border);background:rgba(255,250,243,.58)}
+.preview-inspector strong{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 10%,var(--field));padding:8px;color:var(--accent)}
+.preview-inspector small:last-child{margin-top:auto;color:var(--brand-ember)}
+.metric-strip{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);background:rgba(248,237,225,.72)}
+.metric-strip strong{display:flex;align-items:center;justify-content:center;min-height:58px;border-right:1px solid var(--border);color:var(--text);font-size:13px;font-weight:950}
+.metric-strip strong:last-child{border-right:0}
+.platform-strip{display:flex;flex-wrap:wrap;gap:8px;padding:0 clamp(18px,5vw,72px) 34px;margin-top:-18px;position:relative;z-index:2}
+.platform-strip span{border:1px solid var(--border);border-radius:999px;background:var(--field);padding:9px 13px;color:var(--muted);font-size:12px;font-weight:950;box-shadow:0 8px 20px rgba(96,64,43,.05)}
+.geo-answer-block{display:grid;grid-template-columns:minmax(0,.9fr) minmax(260px,.55fr);gap:18px;margin:0 clamp(18px,5vw,72px) 28px;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:12px;background:linear-gradient(135deg,rgba(255,250,243,.9),rgba(215,240,234,.38));padding:22px;box-shadow:0 16px 38px rgba(96,64,43,.08)}
+.geo-answer-block h2{margin:0;color:var(--text);font-size:22px;font-weight:950;line-height:1.22;letter-spacing:0}
+.geo-answer-block p{margin:10px 0 0;color:var(--muted);font-size:14px;font-weight:660;line-height:1.72}
+.geo-answer-block ul{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.geo-answer-block li{border:1px solid rgba(10,163,148,.18);border-radius:var(--radius);background:rgba(255,251,245,.72);padding:9px 10px;color:var(--accent2);font-size:12px;font-weight:920;line-height:1.42}
+.geo-answer-block li::before{content:"";display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:var(--accent)}
+.growth-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:0 clamp(18px,5vw,72px) 46px}
+.growth-card{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,250,243,.88);padding:24px;box-shadow:var(--shadow)}
+.growth-card h2,.faq h2{margin:0;color:var(--text);font-size:24px;font-weight:950;line-height:1.18;letter-spacing:0}
 .growth-card p,.faq p{color:var(--muted);font-weight:650;line-height:1.7}
 .growth-card ul{margin:18px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .growth-card li{border:1px solid var(--border);border-radius:var(--radius);background:var(--field2);padding:9px 10px;color:var(--text);font-size:12px;font-weight:900}
 .growth-card li::before{content:"";display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:var(--brand-ember)}
-.faq{padding:0 clamp(16px,4vw,56px) 70px}
+.home-capability-band,.payment-band,.trust-band,.final-cta{padding:54px clamp(18px,5vw,72px)}
+.section-kicker{margin-bottom:10px;color:var(--brand-ember);font-size:11px;font-weight:950;letter-spacing:0;text-transform:uppercase}
+.section-heading{display:grid;grid-template-columns:minmax(0,.78fr) minmax(260px,.52fr);gap:28px;align-items:end;margin-bottom:22px}
+.section-heading h2,.payment-copy h2,.final-cta h2{margin:0;color:var(--text);font-size:clamp(26px,2.8vw,38px);font-weight:820;line-height:1.16;letter-spacing:0;text-wrap:balance}
+.section-heading p,.payment-copy p,.final-cta p{margin:0;color:var(--muted);font-size:15px;font-weight:620;line-height:1.75}
+.capability-grid,.trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.capability-card,.trust-grid article{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,250,243,.78);padding:20px;box-shadow:0 12px 28px rgba(96,64,43,.07)}
+.capability-card h3,.trust-grid h3{margin:0;color:var(--text);font-size:17px;font-weight:950;line-height:1.24}
+.capability-card p,.trust-grid p{margin:10px 0 0;color:var(--muted);font-size:13px;font-weight:650;line-height:1.65}
+.capability-card ul{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 0;padding:0;list-style:none}
+.capability-card li{border:1px solid var(--border);border-radius:999px;background:var(--field);padding:6px 9px;color:var(--accent2);font-size:11px;font-weight:950}
+.payment-band{display:grid;grid-template-columns:minmax(280px,.72fr) minmax(0,1fr);gap:24px;align-items:stretch;background:rgba(255,250,243,.35)}
+.payment-copy{border:1px solid var(--border-strong);border-radius:12px;background:linear-gradient(145deg,var(--panel),var(--card2));padding:26px;box-shadow:0 20px 54px rgba(96,64,43,.12)}
+.payment-copy p{margin-top:16px}
+.payment-copy strong{display:inline-flex;margin-top:20px;border:1px solid color-mix(in srgb,var(--accent) 36%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--accent) 10%,var(--field));padding:8px 11px;color:var(--accent);font-size:12px;font-weight:950}
+.payment-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.payment-steps li{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.86);padding:18px;box-shadow:var(--shadow)}
+.payment-steps small{display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:999px;background:var(--accent2);color:#fff;font-size:11px;font-weight:950}
+.payment-steps strong{display:block;margin-top:18px;color:var(--text);font-size:18px;font-weight:950;line-height:1.22}
+.payment-steps span{display:block;margin-top:9px;color:var(--muted);font-size:13px;font-weight:650;line-height:1.65}
+.trust-band .section-heading{align-items:center}
+.trust-band .section-heading a{justify-self:end;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--field);padding:9px 12px;color:var(--accent2);font-size:12px;font-weight:950;box-shadow:var(--shadow)}
+.trust-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trust-grid article{background:rgba(255,251,245,.74)}
+.final-cta{margin:0 clamp(18px,5vw,72px) 72px;border:1px solid var(--border-strong);border-radius:16px;background:linear-gradient(135deg,rgba(255,250,243,.92),rgba(255,239,217,.72));text-align:center;box-shadow:0 22px 60px rgba(96,64,43,.12)}
+.final-cta p{max-width:680px;margin:14px auto 0}
+.final-cta .hero-actions{justify-content:center;margin-top:24px}
+.faq{padding:0 clamp(18px,5vw,72px) 76px}
 .faq h2{margin-bottom:12px}
-details{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);padding:15px 16px}
-details+details{margin-top:10px}
-summary{cursor:pointer;color:var(--text);font-size:15px;font-weight:950}
-details p{margin:10px 0 0}
-@media (max-width:780px){.site-header{align-items:flex-start;flex-direction:column}.language-switcher{margin-left:0}.hero{grid-template-columns:1fr;padding-top:28px}.growth-grid{grid-template-columns:1fr}.growth-card ul{grid-template-columns:1fr}nav{flex-wrap:wrap}}
+.faq details{border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,250,243,.86);box-shadow:var(--shadow);padding:15px 16px}
+.faq details+details{margin-top:10px}
+.faq summary{cursor:pointer;color:var(--text);font-size:15px;font-weight:950}
+.faq details p{margin:10px 0 0}
+.seo-footer{display:grid;grid-template-columns:minmax(120px,.7fr) repeat(4,minmax(0,1fr));gap:18px;border-top:1px solid var(--border);background:rgba(255,250,243,.82);padding:28px clamp(18px,5vw,72px) 36px}
+.footer-brand{font-size:20px;font-weight:950;color:var(--text)}
+.seo-footer section{min-width:0}
+.seo-footer h2{margin:0 0 10px;color:var(--accent2);font-size:12px;font-weight:950}
+.seo-footer div{display:grid;gap:7px}
+.seo-footer a{color:var(--muted);font-size:12px;font-weight:850;line-height:1.35}
+.seo-footer a:hover{color:var(--accent)}
+@media (max-width:1080px){.hero-stage{grid-template-columns:1fr;min-height:auto;padding-top:40px}.hero-stage::before{inset:16px 10px auto;height:92%}.studio-preview{max-width:840px}}
+@media (max-width:960px){.section-heading,.payment-band{grid-template-columns:1fr}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr 1fr}.trust-band .section-heading a{justify-self:start}}
+@media (max-width:860px){.geo-answer-block,.growth-grid{grid-template-columns:1fr}.studio-shell{grid-template-columns:1fr}.preview-sidebar,.preview-inspector{border:0;border-bottom:1px solid var(--border)}.preview-sidebar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.preview-sidebar strong{grid-column:1/-1}.preview-inspector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.preview-inspector small:last-child{margin-top:0}.creative-board{grid-template-columns:1fr}}
+@media (max-width:780px){.site-header{align-items:flex-start;flex-direction:column}.header-console,.language-switcher{margin-left:0}.language-menu{left:0;right:auto}.growth-card ul{grid-template-columns:1fr}nav{flex-wrap:wrap}h1{font-size:clamp(34px,9.5vw,52px);line-height:1.1}.lead{font-size:15px;line-height:1.72}.asset-rail{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr}.metric-strip strong{border-right:0;border-bottom:1px solid var(--border)}.metric-strip strong:last-child{border-bottom:0}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr}.home-capability-band,.payment-band,.trust-band{padding-top:40px;padding-bottom:40px}.final-cta{margin-bottom:52px;padding:38px 18px}.seo-footer{grid-template-columns:1fr}.breadcrumb{padding-top:14px}}
 `;

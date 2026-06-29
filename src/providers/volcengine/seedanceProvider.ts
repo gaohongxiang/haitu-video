@@ -14,6 +14,7 @@ import type {
   VideoProviderResult,
   VideoResolution
 } from "../types.js";
+import { videoDimensionsFor } from "../videoGeometry.js";
 
 interface VolcengineSeedanceProviderOptions {
   apiKey?: string;
@@ -198,10 +199,15 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     }
 
     const outputPath = join(request.outputDir, `${request.jobId}.seedance.mp4`);
+    const outputResolution = request.resolution ?? this.resolution;
+    const dimensions = videoDimensionsFor({
+      resolution: outputResolution,
+      aspectRatio: request.aspectRatio
+    });
     const output: VideoOutput = {
       path: outputPath,
-      width: 1080,
-      height: 1920,
+      width: dimensions.width,
+      height: dimensions.height,
       durationSeconds: request.durationSeconds,
       mimeType: "video/mp4"
     };

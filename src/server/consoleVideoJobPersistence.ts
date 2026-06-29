@@ -1,5 +1,13 @@
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { DatabaseHandle } from "./db/client.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { VideoJobRecord } from "./consoleVideoJobTypes.js";
+import {
+  estimateVideoUpstreamCostCny,
+  modelPricingSnapshotForUsage,
+  type ModelPricingSnapshot,
+  type VideoModelPricingSnapshot
+} from "./modelPricing.js";
 import { WalletStore } from "./walletStore.js";
 
 export function persistVideoJobRecord(input: {
@@ -86,6 +94,9 @@ export function captureVideoJobWalletCharge(input: {
   record: VideoJobRecord;
   workspaceId?: string;
   now?: () => Date;
+  billingPolicyStore?: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
 }): void {
   if (!input.record.walletReservationId) {
     return;
@@ -96,8 +107,13 @@ export function captureVideoJobWalletCharge(input: {
   }
   const platformFeeCny = input.record.platformFeeCny ?? 0;
   const upstreamCostCny = input.record.apiBillingMode === "platform"
-    ? input.record.estimatedCostCny ?? input.record.upstreamEstimatedCostCny ?? 0
+    ? resolveVideoUpstreamCost(input.record, input.billingPolicyStore, input.modelPricingCatalog)
     : 0;
+  const priceSnapshot = resolveVideoPriceSnapshot({
+    record: input.record,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion
+  });
   new WalletStore({
     handle,
     workspaceId: workspaceIdForVideoJob(input.record, input.workspaceId),
@@ -110,9 +126,58 @@ export function captureVideoJobWalletCharge(input: {
     metadata: {
       apiBillingMode: input.record.apiBillingMode,
       platformFeeCny,
-      upstreamCostCny
+      upstreamCostCny,
+      priceSnapshot
     }
   });
+}
+
+function resolveVideoUpstreamCost(
+  record: VideoJobRecord,
+  billingPolicyStore?: BillingPolicyStore,
+  modelPricingCatalog?: readonly ModelPricingEntry[]
+): number {
+  if (record.totalTokens !== undefined) {
+    const lockedSnapshot = record.billingPriceSnapshot;
+    if (lockedSnapshot?.kind === "video" && typeof lockedSnapshot.unitPriceCny === "number") {
+      return roundMoney((Math.max(0, record.totalTokens) / 1_000_000) * lockedSnapshot.unitPriceCny);
+    }
+    return estimateVideoUpstreamCostCny({
+      model: record.providerModel,
+      resolution: record.resolution,
+      aspectRatio: record.aspectRatio,
+      totalTokens: record.totalTokens,
+      catalog: modelPricingCatalog
+    });
+  }
+  return record.estimatedCostCny ?? record.upstreamEstimatedCostCny ?? 0;
+}
+
+function resolveVideoPriceSnapshot(input: {
+  record: VideoJobRecord;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+}): ModelPricingSnapshot {
+  const lockedSnapshot = input.record.billingPriceSnapshot;
+  if (isVideoModelPricingSnapshot(lockedSnapshot)) {
+    return {
+      ...lockedSnapshot,
+      totalTokens: input.record.totalTokens ?? lockedSnapshot.totalTokens
+    };
+  }
+  return modelPricingSnapshotForUsage({
+    kind: "video",
+    model: input.record.providerModel,
+    resolution: input.record.resolution,
+    aspectRatio: input.record.aspectRatio,
+    totalTokens: input.record.totalTokens,
+    catalog: input.modelPricingCatalog,
+    catalogVersion: input.modelPricingCatalogVersion ?? input.record.billingCatalogVersion
+  });
+}
+
+function isVideoModelPricingSnapshot(snapshot: ModelPricingSnapshot | undefined): snapshot is VideoModelPricingSnapshot {
+  return snapshot?.kind === "video" && snapshot.unit === "video_tokens_1m";
 }
 
 export function releaseVideoJobWalletReservation(input: {

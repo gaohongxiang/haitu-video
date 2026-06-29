@@ -10,6 +10,7 @@ import {
   modelConfigChoiceLabel,
   modelSchemeBundleLabel,
   modelSchemeChoiceLabel,
+  localizedModelSchemeBundleLabel,
   nextModelBundleLabel,
   normalizeModelBundleItem,
   byokConfiguredModels,
@@ -72,13 +73,26 @@ describe("model service bundle rules", () => {
       selectableByokBundles.map((bundle) => bundle.bundleId)
     );
     expect(options.map((option) => option.label)).toEqual([
-      ...selectablePlatformBundles.map(modelSchemeBundleLabel),
-      ...selectableByokBundles.map(modelSchemeBundleLabel)
+      ...selectablePlatformBundles.map((bundle) => modelSchemeBundleLabel(bundle)),
+      ...selectableByokBundles.map((bundle) => modelSchemeBundleLabel(bundle))
     ]);
     expect(options.map((option) => option.id)).not.toContain("auto");
     expect(options.map((option) => option.bundleId)).not.toContain("platform-draft");
     expect(options.map((option) => option.bundleId)).not.toContain("platform-disabled");
     expect(modelSchemeChoiceLabel("bundle:missing", options)).toBe(modelSchemeBundleLabel(selectablePlatformBundles[0]!));
+  });
+
+  it("localizes built-in bundle labels while keeping custom user labels intact", () => {
+    const quality = bundle({ bundleId: "platform-quality-bundle", apiOwner: "platform", label: "高质量", textModelConfigId: "t1", imageModelConfigId: "i1", videoModelConfigId: "v1" });
+    const lowCost = bundle({ bundleId: "platform-low-cost-bundle", apiOwner: "platform", label: "低成本", textModelConfigId: "t2", imageModelConfigId: "i2", videoModelConfigId: "v2" });
+    const custom = bundle({ bundleId: "platform-custom-bundle-1", apiOwner: "platform", label: "夏季广告组合", textModelConfigId: "t3", imageModelConfigId: "i3", videoModelConfigId: "v3" });
+    const byok = bundle({ bundleId: "byok-bundle-1", apiOwner: "byok", label: "Amazon JP", textModelConfigId: "t4", imageModelConfigId: "i4", videoModelConfigId: "v4" });
+
+    expect(localizedModelSchemeBundleLabel(lowCost, "en")).toBe("Platform · Low cost");
+    expect(localizedModelSchemeBundleLabel(quality, "en")).toBe("Platform · High quality");
+    expect(localizedModelSchemeBundleLabel(custom, "en")).toBe("Platform · 夏季广告组合");
+    expect(localizedModelSchemeBundleLabel(byok, "en")).toBe("Your key · Amazon JP");
+    expect(modelSchemeBundleLabel(lowCost, "en")).toBe("Platform · Low cost");
   });
 
   it("keeps selectable platform bundles before BYOK bundles and orders numbered custom bundles naturally without priority", () => {
@@ -158,6 +172,10 @@ describe("model service bundle rules", () => {
       bundle({ bundleId: "a", apiOwner: "byok", label: "新增组合1" }),
       bundle({ bundleId: "b", apiOwner: "byok", label: "新增组合3" })
     ])).toBe("新增组合2");
+    expect(nextModelBundleLabel([
+      bundle({ bundleId: "a", apiOwner: "byok", label: "New Bundle 1" }),
+      bundle({ bundleId: "b", apiOwner: "byok", label: "New Bundle 3" })
+    ], "en")).toBe("New Bundle 2");
     expect(bundleIdForPreference([{ ...complete, enabled: false }, incomplete], complete.bundleId)).toBeUndefined();
     expect(bundleIdForPreference([complete, { ...incomplete, enabled: false }], "missing")).toBe("platform-custom-bundle-1");
     expect(bundleModelConfigIds(complete)).toEqual({
@@ -165,7 +183,8 @@ describe("model service bundle rules", () => {
       imageModelConfigId: "image-1",
       videoModelConfigId: "video-1"
     });
-    expect(() => bundleModelConfigIds(incomplete)).toThrow("模型组合未配置完整");
+    expect(() => bundleModelConfigIds(incomplete)).toThrow("模型组合尚未配置完整");
+    expect(() => bundleModelConfigIds(incomplete, "en")).toThrow("The model bundle is incomplete");
     expect(isCompleteModelBundle(complete)).toBe(true);
     expect(isCompleteModelBundle(incomplete)).toBe(false);
     expect(isCompleteModelBundle({ ...complete, imageModelConfigId: "auto" })).toBe(false);
@@ -182,7 +201,9 @@ describe("model service bundle rules", () => {
 
     expect(platformConfiguredModels(models).map((item) => item.configId)).toEqual(["platform-text"]);
     expect(modelConfigChoiceLabel("auto", models)).toBe("自动推荐");
+    expect(modelConfigChoiceLabel("auto", models, "en")).toBe("Auto");
     expect(modelConfigChoiceLabel("missing", models)).toBe("已删除模型");
+    expect(modelConfigChoiceLabel("missing", models, "en")).toBe("Deleted model");
     expect(modelConfigChoiceLabel("platform-text", models)).toBe("gpt-5.5-review");
   });
 });

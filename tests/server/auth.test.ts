@@ -8,6 +8,7 @@ import { createConsoleServer } from "../../src/server/consoleServer.js";
 import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
 import { runMigrations } from "../../src/server/db/migrate.js";
 import type { MakeVideoReport } from "../../src/pipeline/makeVideoPipeline.js";
+import { WalletStore } from "../../src/server/walletStore.js";
 
 const tempDirs: string[] = [];
 
@@ -913,14 +914,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
         reference_images: ["https://cdn.example.com/paid.jpg"]
       })
     });
-    await server.fetchJson("/api/wallet/top-up", {
-      method: "POST",
-      headers: { cookie: aliceCookie },
-      body: JSON.stringify({
-        amountCny: 100,
-        description: "test paid video balance"
-      })
-    });
+    await creditAuthenticatedTestWallet(root, server, aliceCookie, 100, "test paid video balance");
 
     const queued = await server.fetchJson("/api/products/PAID-001/video-jobs", {
       method: "POST",
@@ -1078,6 +1072,30 @@ async function registerUser(
   }
   expect(response.status).toBe(200);
   return response.headers.get("set-cookie") ?? "";
+}
+
+async function creditAuthenticatedTestWallet(
+  root: string,
+  server: ReturnType<typeof createConsoleServer>,
+  cookie: string,
+  amountCny: number,
+  description: string
+): Promise<void> {
+  const session = await server.fetchJson("/api/auth/session", {
+    headers: { cookie }
+  }) as { workspace: { id: string } };
+  const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+  try {
+    new WalletStore({
+      handle,
+      workspaceId: session.workspace.id
+    }).topUp({
+      amountCny,
+      description
+    });
+  } finally {
+    closeDatabase(handle);
+  }
 }
 
 async function latestEmailOtp(root: string, email: string, type: "email-verification" | "forget-password"): Promise<string> {

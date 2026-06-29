@@ -90,6 +90,60 @@ describe("VolcengineSeedanceProvider", () => {
     );
   });
 
+  it("uses horizontal output metadata when 16:9 is requested", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-provider-wide-"));
+    tempDirs.push(outDir);
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith("/api/v3/contents/generations/tasks")) {
+        return jsonResponse({ id: "cgt-wide", status: "queued" });
+      }
+      if (String(url).endsWith("/api/v3/contents/generations/tasks/cgt-wide")) {
+        return jsonResponse({
+          id: "cgt-wide",
+          status: "succeeded",
+          content: [{ type: "video_url", url: "https://cdn.example.com/wide.mp4" }]
+        });
+      }
+      if (String(url) === "https://cdn.example.com/wide.mp4") {
+        return new Response(Buffer.from("wide mp4 bytes"), {
+          status: 200,
+          headers: { "content-type": "video/mp4" }
+        });
+      }
+      throw new Error(`Unexpected URL: ${String(url)}`);
+    };
+    const provider = new VolcengineSeedanceProvider({
+      apiKey: "test-key",
+      baseUrl: "https://ark.ap-southeast.bytepluses.com",
+      model: "dreamina-seedance-2-0-fast-260128",
+      pollIntervalMs: 1,
+      maxPolls: 2,
+      fetchImpl
+    });
+
+    const result = await provider.generateVideo({
+      jobId: "job-wide",
+      productSku: "TK-001",
+      prompt: "Create a 10 second 16:9 product ad.",
+      script: "今すぐチェック",
+      durationSeconds: 10,
+      aspectRatio: "16:9",
+      resolution: "720p",
+      outputDir: outDir
+    });
+
+    const createBody = JSON.parse(String(calls[0]?.init?.body)) as {
+      ratio: string;
+      resolution: string;
+    };
+    expect(createBody.ratio).toBe("16:9");
+    expect(createBody.resolution).toBe("720p");
+    expect(result.output.width).toBe(1280);
+    expect(result.output.height).toBe(720);
+  });
+
   it("uses 480p and estimates lower cost for short low-cost videos by default", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-seedance-low-cost-"));
     tempDirs.push(outDir);

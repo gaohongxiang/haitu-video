@@ -19,6 +19,10 @@ describe("console navigation", () => {
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=templates")).toBe("settings");
   });
 
+  it("opens removed transaction links in the wallet center", () => {
+    expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=transactions")).toBe("wallet");
+  });
+
   it("falls back to video creation for missing, unknown, or removed sections", () => {
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/")).toBe("video");
     expect(consoleSectionFromUrl("http://127.0.0.1:4173/?section=all")).toBe("video");
@@ -52,7 +56,7 @@ describe("console navigation", () => {
     expect(productStudioProductUrl("http://127.0.0.1:4173/?section=video&step=generate&productSku=TK-001", "")).toBe("http://127.0.0.1:4173/?section=video&step=generate");
   });
 
-  it.each<ConsoleSection>(["dashboard", "video", "ledger", "wallet", "pricing", "settings"])(
+  it.each<ConsoleSection>(["dashboard", "video", "image", "ledger", "wallet", "pricing", "settings"])(
     "accepts %s as a known console section",
     (section) => {
       expect(consoleSectionFromUrl(`http://127.0.0.1:4173/?section=${section}`)).toBe(section);

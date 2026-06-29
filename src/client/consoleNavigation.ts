@@ -16,6 +16,7 @@ export function consoleSectionFromUrl(currentUrl: string): ConsoleSection {
   const section = url.searchParams.get("section");
   if (section === "templates") return "settings";
   if (section === "products") return "video";
+  if (section === "transactions") return "wallet";
   return isConsoleSection(section) ? section : defaultConsoleSection;
 }
 

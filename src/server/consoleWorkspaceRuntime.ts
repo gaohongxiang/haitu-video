@@ -1,8 +1,10 @@
 import { runMakeVideoPipeline } from "../pipeline/makeVideoPipeline.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { ReferenceImageUrlResolver } from "../providers/types.js";
+import { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { ConsoleAuthStore } from "./consoleAuth.js";
 import { createReferenceImageUrlResolver } from "./consoleAssetService.js";
-import { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import { LocalVideoJobQueue, type LocalVideoJobQueueOptions } from "./consoleVideoJobQueue.js";
 import type { DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
@@ -11,7 +13,10 @@ import { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { selectedVideoModelConfig } from "./modelConfigSelection.js";
 import { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
+import { ModelPricingCatalogStore } from "./modelPricingCatalogStore.js";
+import type { ModelPricingCatalogContext } from "./modelPricingCatalogContext.js";
 import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
+import { tokenPriceCnyPerMillionForVideoModel } from "./videoJobBilling.js";
 import {
   DEFAULT_WORKSPACE_ID,
   getWorkspacePaths
@@ -28,6 +33,10 @@ export interface ConsoleRequestContext {
   platformModelConfigStore: ModelConfigStore;
   modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion: string;
+  modelPricingCatalogContext: ModelPricingCatalogContext;
   walletStore: WalletStore;
   videoJobQueue: LocalVideoJobQueue;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
@@ -42,7 +51,7 @@ export async function createConsoleRequestContext(input: {
   defaultModelConfigStore: ModelConfigStore;
   defaultVideoJobQueue: LocalVideoJobQueue;
   workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   publicBaseUrl?: string;
@@ -75,6 +84,24 @@ export async function createConsoleRequestContext(input: {
     workspaceId: resolved.workspaceId,
     now: input.now
   });
+  const billingPolicyStore = new BillingPolicyStore({
+    handle: input.databaseHandle,
+    now: input.now
+  });
+  const modelPricingCatalogStore = new ModelPricingCatalogStore({
+    handle: input.databaseHandle,
+    now: input.now
+  });
+  const getModelPricingCatalogContext = (): ModelPricingCatalogContext => {
+    const active = modelPricingCatalogStore.getActiveCatalog();
+    return {
+      catalog: active.catalog,
+      version: active.version,
+      source: active.source
+    };
+  };
+  const modelPricingCatalogContext = getModelPricingCatalogContext();
+  const modelPricingCatalog = modelPricingCatalogContext.catalog;
   return {
     workspaceId: resolved.workspaceId,
     databaseHandle: input.databaseHandle,
@@ -85,6 +112,10 @@ export async function createConsoleRequestContext(input: {
     platformModelConfigStore: input.platformModelConfigStore,
     modelBundleStore,
     modelServicePreferenceStore,
+    billingPolicyStore,
+    modelPricingCatalog,
+    modelPricingCatalogVersion: modelPricingCatalogContext.version,
+    modelPricingCatalogContext,
     walletStore: new WalletStore({
       handle: input.databaseHandle,
       workspaceId: resolved.workspaceId,
@@ -102,6 +133,9 @@ export async function createConsoleRequestContext(input: {
       settingsStore: input.settingsStore,
       modelBundleStore,
       modelServicePreferenceStore,
+      billingPolicyStore,
+      modelPricingCatalog,
+      getModelPricingCatalogContext,
       fetchImpl: input.fetchImpl,
       runMakeVideoPipeline: input.runMakeVideoPipeline,
       referenceImageUrlResolver,
@@ -118,9 +152,12 @@ function videoJobQueueForWorkspace(input: {
   defaultVideoJobQueue: LocalVideoJobQueue;
   workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
   rootDir: string;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog: readonly ModelPricingEntry[];
+  getModelPricingCatalogContext?: () => ModelPricingCatalogContext;
   fetchImpl?: typeof fetch;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
@@ -144,10 +181,16 @@ function videoJobQueueForWorkspace(input: {
       platformModelConfigStore: input.platformModelConfigStore,
       modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
+      billingPolicyStore: input.billingPolicyStore,
+      modelPricingCatalog: input.modelPricingCatalog,
+      getModelPricingCatalogContext: input.getModelPricingCatalogContext,
       runMakeVideoPipeline: input.runMakeVideoPipeline
     }),
     referenceImageUrlResolver: input.referenceImageUrlResolver,
-    databaseHandle: input.databaseHandle
+    databaseHandle: input.databaseHandle,
+    billingPolicyStore: input.billingPolicyStore,
+    modelPricingCatalog: input.modelPricingCatalog,
+    getModelPricingCatalogContext: input.getModelPricingCatalogContext
   });
   input.workspaceVideoJobQueues.set(input.workspaceId, queue);
   return queue;
@@ -158,6 +201,9 @@ export function createConfiguredMakeVideoPipeline(input: {
   platformModelConfigStore?: ModelConfigStore;
   modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
+  billingPolicyStore?: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  getModelPricingCatalogContext?: () => ModelPricingCatalogContext;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
 }): LocalVideoJobQueueOptions["runMakeVideoPipeline"] {
   return async (pipelineInput) => {
@@ -170,11 +216,14 @@ export function createConfiguredMakeVideoPipeline(input: {
       providerModelConfigId: pipelineInput.providerModelConfigId
     });
     const runPipeline = input.runMakeVideoPipeline ?? runMakeVideoPipeline;
+    const modelPricingCatalogContext = input.getModelPricingCatalogContext?.();
+    const modelPricingCatalog = modelPricingCatalogContext?.catalog ?? input.modelPricingCatalog;
     return runPipeline({
       ...pipelineInput,
       apiKey: config.apiKey,
       providerBaseUrl: config.baseUrl,
-      providerModel: pipelineInput.providerModel ?? config.model
+      providerModel: config.model,
+      tokenPriceCnyPerMillion: tokenPriceCnyPerMillionForVideoModel(config.model, pipelineInput.resolution, modelPricingCatalog)
     });
   };
 }

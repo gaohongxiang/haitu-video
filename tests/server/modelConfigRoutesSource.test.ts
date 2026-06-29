@@ -22,6 +22,7 @@ describe("model config routes source boundaries", () => {
     expect(apiRoutesSource).toContain("handleModelConfigRoutes(");
     expect(consoleServerSource).not.toContain('url.pathname === "/api/provider-config"');
     expect(consoleServerSource).not.toContain('url.pathname === "/api/platform/model-configs"');
+    expect(consoleServerSource).not.toContain('url.pathname === "/api/admin/platform-model-configs"');
     expect(consoleServerSource).not.toContain("const platformModelConfigMatch");
     expect(consoleServerSource).not.toContain("const providerModelsMatch");
     expect(consoleServerSource).not.toContain("const modelConfigTestMatch");
@@ -35,6 +36,8 @@ describe("model config routes source boundaries", () => {
     expect(routesSource).toContain("export async function handleModelConfigRoutes(");
     expect(routesSource).toContain('url.pathname === "/api/provider-config"');
     expect(routesSource).toContain('url.pathname === "/api/platform/model-configs"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/platform-model-configs"');
+    expect(routesSource).toContain("/^\\/api\\/admin\\/platform-model-configs\\/");
     expect(routesSource).toContain("platformModelConfigMatch");
     expect(routesSource).toContain("providerModelsMatch");
     expect(routesSource).toContain("modelConfigTestMatch");

@@ -542,7 +542,9 @@ function formatPreflight(preflight) {
     `时长: ${preflight.durationSeconds}s / ${preflight.aspectRatio}`,
     `调用类型: ${preflight.paidProvider ? "真实模型" : "内部任务"}`,
     `估算 tokens: ${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)} / 期望 ${formatNumber(preflight.estimatedTokens.expected)}`,
-    `估算成本: ¥${Number(preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.estimatedCostCny.high).toFixed(2)} / 期望 ¥${Number(preflight.estimatedCostCny.expected).toFixed(2)}`,
+    `预计扣余额: ¥${Number(preflight.walletEstimatedChargeCny?.low ?? preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.walletEstimatedChargeCny?.high ?? preflight.estimatedCostCny.high).toFixed(2)} / 期望 ¥${Number(preflight.walletEstimatedChargeCny?.expected ?? preflight.estimatedCostCny.expected).toFixed(2)}`,
+    `上游成本: ¥${Number(preflight.upstreamEstimatedCostCny?.expected || 0).toFixed(2)}`,
+    `平台服务费: ¥${Number(preflight.serviceFeeCny?.expected || 0).toFixed(2)}`,
     `参考图: ${preflight.assetSummary.previewable}/${preflight.assetSummary.total} 可预览, ${preflight.assetSummary.missing} 缺失, ${preflight.assetSummary.outsideProjectRoot} 项目外`,
     preflight.warnings.length ? `警告: ${preflight.warnings.join(" / ")}` : "警告: 无",
     "",
@@ -561,8 +563,10 @@ function renderPreflight(preflight) {
   els.preflightState.textContent = preflight.paidProvider ? "真实模型预检" : "内部任务预检";
   els.preflightState.style.color = preflight.paidProvider ? "var(--accent-2)" : "var(--accent)";
   els.preflightCost.innerHTML = [
-    ["期望成本", `¥${Number(preflight.estimatedCostCny.expected).toFixed(2)}`, `区间 ¥${Number(preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.estimatedCostCny.high).toFixed(2)}`],
+    ["预计扣余额", `¥${Number(preflight.walletEstimatedChargeCny?.expected ?? preflight.estimatedCostCny.expected).toFixed(2)}`, `区间 ¥${Number(preflight.walletEstimatedChargeCny?.low ?? preflight.estimatedCostCny.low).toFixed(2)} - ¥${Number(preflight.walletEstimatedChargeCny?.high ?? preflight.estimatedCostCny.high).toFixed(2)}`],
     ["期望 Token", formatNumber(preflight.estimatedTokens.expected), `${formatNumber(preflight.estimatedTokens.low)} - ${formatNumber(preflight.estimatedTokens.high)}`],
+    ["上游成本", `¥${Number(preflight.upstreamEstimatedCostCny?.expected || 0).toFixed(2)}`, preflight.apiBillingMode === "platform" ? "按官方价格估算" : "自带 API 自行承担"],
+    ["平台服务费", `¥${Number(preflight.serviceFeeCny?.expected || 0).toFixed(2)}`, "后台计费规则"],
     ["时长", `${preflight.durationSeconds}s`, preflight.aspectRatio],
     ["Provider", preflight.provider, preflight.paidProvider ? "真实模型调用" : "内部任务"]
   ]

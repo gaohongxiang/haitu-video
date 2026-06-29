@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { VideoProvider, VideoProviderRequest, VideoProviderResult } from "./types.js";
+import { videoDimensionsFor } from "./videoGeometry.js";
 
 export class MockVideoProvider implements VideoProvider {
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
@@ -20,14 +21,18 @@ export class MockVideoProvider implements VideoProvider {
       ].join("\n"),
       "utf8"
     );
+    const dimensions = videoDimensionsFor({
+      resolution: request.resolution,
+      aspectRatio: request.aspectRatio
+    });
 
     return {
       provider: "mock",
       model: "mock-local-placeholder",
       output: {
         path: outputPath,
-        width: 1080,
-        height: 1920,
+        width: dimensions.width,
+        height: dimensions.height,
         durationSeconds: request.durationSeconds,
         mimeType: "text/plain"
       },

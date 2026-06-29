@@ -187,6 +187,24 @@ describe("dashboard analytics", () => {
     ]);
   });
 
+  it("localizes the fallback trend bucket for rows without usable dates", () => {
+    const rows: DashboardRecentRow[] = [
+      {
+        id: "unknown",
+        label: "unknown",
+        productSku: "SKU",
+        provider: "mock",
+        status: "completed",
+        totalTokens: 10,
+        estimatedCostCny: 0.01
+      }
+    ];
+
+    expect(buildTrendPoints(rows, "hour", "en")).toEqual([
+      { label: "Historical", jobs: 1, totalTokens: 10, estimatedCostCny: 0.01 }
+    ]);
+  });
+
   it("filters rows by selected time range while retaining rows with unknown dates", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-25T12:00:00.000"));

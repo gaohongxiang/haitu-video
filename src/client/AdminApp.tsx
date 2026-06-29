@@ -6,12 +6,14 @@ import {
   CreditCard,
   Database,
   DollarSign,
+  Globe2,
   KeyRound,
   LayoutDashboard,
   LogOut,
   MailCheck,
   Package,
   RefreshCcw,
+  Search,
   Settings2,
   ShieldAlert,
   SlidersHorizontal,
@@ -21,13 +23,15 @@ import {
 } from "lucide-react";
 import * as EChartsForReact from "echarts-for-react";
 import type { EChartsOption, EChartsReactProps } from "echarts-for-react";
-import { FormEvent, type ComponentType, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, type ComponentType, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "./components/ui/badge.js";
 import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input, Select, Textarea } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
+import { getLocaleMeta, supportedLocales, type AppLocale } from "../i18n/config.js";
+import { clientLocaleStorageKey, i18n } from "../i18n/client.js";
 import {
   apiModeForProviderDraft,
   draftFromProviderConfig,
@@ -48,45 +52,115 @@ const ReactECharts = ((EChartsForReact as { default?: unknown }).default ?? ECha
 const brandLogoUrl = new URL("./assets/logo.svg", import.meta.url).href;
 const authOtpCooldownDurationSeconds = 60;
 
+function tAdmin(key: string, options?: Record<string, unknown>): string {
+  return i18n.t(`app:admin.${key}`, options);
+}
+
+function adminLabel(item: (typeof adminNavigationItems)[number]): string {
+  if (item.translationKey === "overview") return tAdmin("navigation.overview.label");
+  if (item.translationKey === "users") return tAdmin("navigation.users.label");
+  if (item.translationKey === "content") return tAdmin("navigation.content.label");
+  if (item.translationKey === "finance") return tAdmin("navigation.finance.label");
+  if (item.translationKey === "paymentBilling") return tAdmin("navigation.paymentBilling.label");
+  if (item.translationKey === "modelServices") return tAdmin("navigation.modelServices.label");
+  if (item.translationKey === "modelPricing") return tAdmin("navigation.modelPricing.label");
+  if (item.translationKey === "siteSettings") return tAdmin("navigation.siteSettings.label");
+  return tAdmin("navigation.system.label");
+}
+
+function adminDescription(item: (typeof adminNavigationItems)[number]): string {
+  if (item.translationKey === "overview") return tAdmin("navigation.overview.description");
+  if (item.translationKey === "users") return tAdmin("navigation.users.description");
+  if (item.translationKey === "content") return tAdmin("navigation.content.description");
+  if (item.translationKey === "finance") return tAdmin("navigation.finance.description");
+  if (item.translationKey === "paymentBilling") return tAdmin("navigation.paymentBilling.description");
+  if (item.translationKey === "modelServices") return tAdmin("navigation.modelServices.description");
+  if (item.translationKey === "modelPricing") return tAdmin("navigation.modelPricing.description");
+  if (item.translationKey === "siteSettings") return tAdmin("navigation.siteSettings.description");
+  return tAdmin("navigation.system.description");
+}
+
+function adminStringArray(key: string): string[] {
+  const value = i18n.t(`app:admin.${key}`, { returnObjects: true });
+  if (!Array.isArray(value)) return [];
+  return (value as unknown[]).filter((item): item is string => typeof item === "string");
+}
+
 type AuthFlowMode = "entry" | "verify-email";
-type AdminSection = "overview" | "users" | "platform-models" | "billing" | "system";
+type AdminSection = "overview" | "users" | "content" | "finance" | "payment-billing" | "model-services" | "model-pricing" | "site-settings" | "system";
+type AdminTranslationKey = "overview" | "users" | "content" | "finance" | "paymentBilling" | "modelServices" | "modelPricing" | "siteSettings" | "system";
+type AdminNavigationGroup = "operate" | "commercial" | "configuration" | "system";
+type AdminTranslator = (key: string, options?: Record<string, unknown>) => string;
+type AdminContentView = "products" | "videoJobs";
+type AdminFinanceLedgerView = "wallets" | "rechargeOrders" | "walletTransactions";
 
 const adminNavigationItems: Array<{
   id: AdminSection;
-  label: string;
-  description: string;
+  translationKey: AdminTranslationKey;
+  group: AdminNavigationGroup;
   icon: ComponentType<{ size?: number; className?: string }>;
 }> = [
   {
     id: "overview",
-    label: "概览",
-    description: "增长、活跃、任务指标",
+    translationKey: "overview",
+    group: "operate",
     icon: LayoutDashboard
   },
   {
     id: "users",
-    label: "用户管理",
-    description: "用户、工作区、任务明细",
+    translationKey: "users",
+    group: "operate",
     icon: Users
   },
   {
-    id: "platform-models",
-    label: "平台模型",
-    description: "模型商、版本、平台 Key",
-    icon: KeyRound
+    id: "content",
+    translationKey: "content",
+    group: "operate",
+    icon: Package
   },
   {
-    id: "billing",
-    label: "充值账单",
-    description: "余额、充值、收费记录",
+    id: "finance",
+    translationKey: "finance",
+    group: "commercial",
     icon: CreditCard
   },
   {
+    id: "payment-billing",
+    translationKey: "paymentBilling",
+    group: "configuration",
+    icon: SlidersHorizontal
+  },
+  {
+    id: "model-services",
+    translationKey: "modelServices",
+    group: "configuration",
+    icon: KeyRound
+  },
+  {
+    id: "model-pricing",
+    translationKey: "modelPricing",
+    group: "configuration",
+    icon: DollarSign
+  },
+  {
+    id: "site-settings",
+    translationKey: "siteSettings",
+    group: "configuration",
+    icon: Globe2
+  },
+  {
     id: "system",
-    label: "系统",
-    description: "备份、审计、运行状态",
+    translationKey: "system",
+    group: "system",
     icon: Settings2
   }
+];
+
+const adminNavigationGroups: Array<{ id: AdminNavigationGroup; labelKey: string }> = [
+  { id: "operate", labelKey: "navigationGroups.operate" },
+  { id: "commercial", labelKey: "navigationGroups.commercial" },
+  { id: "configuration", labelKey: "navigationGroups.configuration" },
+  { id: "system", labelKey: "navigationGroups.system" }
 ];
 
 interface AuthSession {
@@ -199,7 +273,7 @@ interface AdminUserVideoJobSummary {
   expiresAt?: string;
 }
 
-type PlatformModelAdminConfigResponse = Pick<ProviderConfigLedger, "textModels" | "imageModels" | "videoModels">;
+type ModelServiceAdminConfigResponse = Pick<ProviderConfigLedger, "textModels" | "imageModels" | "videoModels">;
 
 interface PaymentMethodView {
   id: "stripe" | "infini";
@@ -233,12 +307,224 @@ interface AdminWalletsResponse {
   wallets: AdminWalletSummary[];
 }
 
+interface AdminWalletTransactionView {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  ownerEmail?: string;
+  type: string;
+  amountCny: number;
+  balanceAfterCny: number;
+  reservedAfterCny: number;
+  reservationId?: string;
+  jobId?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface AdminWalletTransactionsResponse {
+  transactions: AdminWalletTransactionView[];
+}
+
+interface AdminRechargeOrderView {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  ownerEmail?: string;
+  provider: string;
+  providerSessionId?: string;
+  providerPaymentIntentId?: string;
+  paymentAmount: number;
+  paymentAmountCents: number;
+  paymentCurrency: string;
+  walletCurrency: "cny";
+  creditCny: number;
+  creditCents: number;
+  status: string;
+  checkoutUrl?: string;
+  failureReason?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  expiresAt?: string;
+}
+
+interface AdminRechargeOrdersResponse {
+  orders: AdminRechargeOrderView[];
+}
+
 interface AdminWalletAdjustmentResponse {
   wallet: {
     workspaceId: string;
     balanceCny: number;
     reservedCny: number;
     availableCny: number;
+  };
+}
+
+type BillingUsageKind = "text" | "image" | "video";
+
+interface BillingPriceRuleView {
+  ruleId: string;
+  policyId: string;
+  usageKind: BillingUsageKind;
+  serviceFeeCny: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BillingSettingsView {
+  policy: {
+    policyId: string;
+    mode: "metered_generation";
+    label: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  rules: BillingPriceRuleView[];
+}
+
+interface AdminBillingSettingsResponse {
+  settings: BillingSettingsView;
+}
+
+interface AdminContentSummaryResponse {
+  metrics: {
+    totalProducts: number;
+    totalVideoJobs: number;
+    completedVideoJobs: number;
+    failedVideoJobs: number;
+    totalVideoAssets: number;
+    totalStoryboards: number;
+  };
+  statusCounts: Array<{
+    status: string;
+    count: number;
+  }>;
+  recentVideoJobs: AdminContentVideoJobView[];
+}
+
+interface AdminContentProductView {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  ownerEmail?: string;
+  sku: string;
+  title?: string;
+  videoJobCount: number;
+  assetCount: number;
+  storyboardCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AdminContentProductsResponse {
+  products: AdminContentProductView[];
+}
+
+interface AdminContentVideoJobView {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  ownerEmail?: string;
+  productId?: string;
+  productSku?: string;
+  productTitle?: string;
+  status: string;
+  model?: string;
+  language?: string;
+  durationSeconds?: number;
+  outputCount?: number;
+  assetCount: number;
+  jobDir: string;
+  createdAt: string;
+  completedAt?: string;
+  expiresAt?: string;
+}
+
+interface AdminContentVideoJobsResponse {
+  videoJobs: AdminContentVideoJobView[];
+}
+
+type AdminModelPricingKind = "text" | "image" | "video";
+type AdminModelPricingProviderId = "openai" | "deepseek" | "gemini" | "volcengine";
+type AdminModelPricingStatus = "verified" | "official-reference";
+
+interface AdminModelPricingEntry {
+  providerId: AdminModelPricingProviderId;
+  model: string;
+  label: string;
+  kind: AdminModelPricingKind;
+  unit: string;
+  input: string;
+  cachedInput?: string;
+  output: string;
+  note?: string;
+  status: AdminModelPricingStatus;
+  sourceUrl: string;
+  inputPriceCnyPerMillion?: number;
+  outputPriceCnyPerMillion?: number;
+  cachedInputPriceCnyPerMillion?: number;
+  fallbackPriceCnyPerCall?: number;
+  imagePriceCnyPerImage?: number;
+  videoTokenPriceCnyPerMillion?: number;
+  editable: boolean;
+}
+
+interface AdminModelPricingCatalogResponse {
+  active: {
+    id?: string;
+    version: string;
+    source: "built_in" | "database";
+    publishedAt?: string;
+    entries: AdminModelPricingEntry[];
+  };
+}
+
+interface AdminModelPricingDraftResponse {
+  draft: {
+    id: string;
+    version: string;
+  };
+}
+
+interface AdminSiteSettingsResponse {
+  sections: Array<{
+    id: string;
+    label: string;
+    status: "configured" | "attention" | "planned";
+    description: string;
+  }>;
+  publicPages: Array<{
+    id: string;
+    label: string;
+    status: "configured" | "planned";
+  }>;
+  seoGeo: {
+    status: "configured";
+    roadmapPath: string;
+    productionCheck: string;
+  };
+  paymentMethods: PaymentMethodView[];
+  billing: {
+    policyId: string;
+    label: string;
+    enabled: boolean;
+    rules: Array<{
+      usageKind: string;
+      serviceFeeCny: number;
+      enabled: boolean;
+    }>;
+  };
+  modelPricing: {
+    activeVersion: string;
+    source: "built_in" | "database";
+    entryCount: number;
+    publishedAt?: string;
   };
 }
 
@@ -250,33 +536,25 @@ interface ModelConfigKeyRevealResponse {
   keyPreview?: string;
 }
 
-const platformModelAdminProviders: Array<{
+const modelServiceAdminProviders: Array<{
   providerId: ModelConfigProviderId;
   endpoint: string;
-  title: string;
-  description: string;
-  badge: string;
+  groupKey: "text" | "image" | "video";
 }> = [
   {
     providerId: "openai-compatible-text",
-    endpoint: "/api/platform/model-configs/openai-compatible-text",
-    title: "文本模型",
-    description: "商品整理、脚本分镜等文本调用。",
-    badge: "文本"
+    endpoint: "/api/admin/platform-model-configs/openai-compatible-text",
+    groupKey: "text"
   },
   {
     providerId: "openai-compatible-image",
-    endpoint: "/api/platform/model-configs/openai-compatible-image",
-    title: "图片模型",
-    description: "商品图、素材图等图片生成调用。",
-    badge: "图片"
+    endpoint: "/api/admin/platform-model-configs/openai-compatible-image",
+    groupKey: "image"
   },
   {
     providerId: "volcengine-seedance",
-    endpoint: "/api/platform/model-configs/volcengine-seedance",
-    title: "视频模型",
-    description: "成片生成调用。",
-    badge: "视频"
+    endpoint: "/api/admin/platform-model-configs/volcengine-seedance",
+    groupKey: "video"
   }
 ];
 
@@ -302,7 +580,7 @@ function defaultPlatformModelDrafts(): Record<ModelConfigProviderId, ModelConfig
   };
 }
 
-function platformConfigLedgerFromResponse(response: PlatformModelAdminConfigResponse): ProviderConfigLedger {
+function platformConfigLedgerFromResponse(response: ModelServiceAdminConfigResponse): ProviderConfigLedger {
   return {
     textModels: response.textModels,
     imageModels: response.imageModels,
@@ -316,7 +594,7 @@ function platformConfigLedgerFromResponse(response: PlatformModelAdminConfigResp
   };
 }
 
-function platformModelsForProvider(config: ProviderConfigLedger, providerId: ModelConfigProviderId): ProviderConfigItem[] {
+function modelServicesForProvider(config: ProviderConfigLedger, providerId: ModelConfigProviderId): ProviderConfigItem[] {
   if (providerId === "openai-compatible-text") {
     return config.textModels;
   }
@@ -327,6 +605,7 @@ function platformModelsForProvider(config: ProviderConfigLedger, providerId: Mod
 }
 
 export function AdminApp() {
+  const [adminLocale, setAdminLocale] = useState<AppLocale>(supportedLocales.includes(i18n.language as AppLocale) ? i18n.language as AppLocale : "zh");
   const [session, setSession] = useState<AuthSession | undefined>();
   const [overview, setOverview] = useState<AdminOverview | undefined>();
   const [authMode, setAuthMode] = useState<AuthFlowMode>("entry");
@@ -343,9 +622,30 @@ export function AdminApp() {
   const [editingPlatformProviderId, setEditingPlatformProviderId] = useState<ModelConfigProviderId | undefined>();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodView[]>([]);
   const [adminWallets, setAdminWallets] = useState<AdminWalletSummary[]>([]);
+  const [walletTransactions, setWalletTransactions] = useState<AdminWalletTransactionView[]>([]);
+  const [rechargeOrders, setRechargeOrders] = useState<AdminRechargeOrderView[]>([]);
+  const [billingSettings, setBillingSettings] = useState<BillingSettingsView | undefined>();
+  const [contentSummary, setContentSummary] = useState<AdminContentSummaryResponse | undefined>();
+  const [contentProducts, setContentProducts] = useState<AdminContentProductView[]>([]);
+  const [contentVideoJobs, setContentVideoJobs] = useState<AdminContentVideoJobView[]>([]);
+  const [modelPricingCatalog, setModelPricingCatalog] = useState<AdminModelPricingCatalogResponse | undefined>();
+  const [siteSettings, setSiteSettings] = useState<AdminSiteSettingsResponse | undefined>();
 
   useEffect(() => {
     void bootstrap();
+  }, []);
+
+  useEffect(() => {
+    function syncAdminLocale(locale: string) {
+      if (supportedLocales.includes(locale as AppLocale)) {
+        setAdminLocale(locale as AppLocale);
+      }
+    }
+
+    i18n.on("languageChanged", syncAdminLocale);
+    return () => {
+      i18n.off("languageChanged", syncAdminLocale);
+    };
   }, []);
 
   useEffect(() => {
@@ -377,24 +677,56 @@ export function AdminApp() {
     setBusy(true);
     setForbidden(false);
     try {
-      const [nextOverview, platformModels, paymentMethodsResponse, walletsResponse] = await Promise.all([
-        getJson<AdminOverview>("/api/admin/overview"),
-        getJson<PlatformModelAdminConfigResponse>("/api/platform/model-configs"),
-        getJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods"),
-        getJson<AdminWalletsResponse>("/api/admin/wallets")
-      ]);
+      const nextOverview = await getJson<AdminOverview>("/api/admin/overview");
       setOverview(nextOverview);
-      setPlatformConfig(platformConfigLedgerFromResponse(platformModels));
-      setPaymentMethods(paymentMethodsResponse.methods);
-      setAdminWallets(walletsResponse.wallets);
-      setStatus("");
+      const failedModules: string[] = [];
+      await Promise.all([
+        loadAdminModule(tAdmin("navigation.modelServices.label"), () => getJson<ModelServiceAdminConfigResponse>("/api/admin/platform-model-configs"), (modelServices) => {
+          setPlatformConfig(platformConfigLedgerFromResponse(modelServices));
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.finance.label"), () => getJson<AdminPaymentMethodsResponse>("/api/admin/payment-methods"), (paymentMethodsResponse) => {
+          setPaymentMethods(paymentMethodsResponse.methods);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.finance.label"), () => getJson<AdminWalletsResponse>("/api/admin/wallets"), (walletsResponse) => {
+          setAdminWallets(walletsResponse.wallets);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.finance.label"), () => getJson<AdminWalletTransactionsResponse>("/api/admin/wallet-transactions"), (walletTransactionsResponse) => {
+          setWalletTransactions(walletTransactionsResponse.transactions);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.finance.label"), () => getJson<AdminRechargeOrdersResponse>("/api/admin/recharge-orders"), (rechargeOrdersResponse) => {
+          setRechargeOrders(rechargeOrdersResponse.orders);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.finance.label"), () => getJson<AdminBillingSettingsResponse>("/api/admin/billing-settings"), (billingSettingsResponse) => {
+          setBillingSettings(billingSettingsResponse.settings);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.content.label"), () => getJson<AdminContentSummaryResponse>("/api/admin/content/summary"), (contentSummaryResponse) => {
+          setContentSummary(contentSummaryResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.content.label"), () => getJson<AdminContentProductsResponse>("/api/admin/content/products"), (contentProductsResponse) => {
+          setContentProducts(contentProductsResponse.products);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.content.label"), () => getJson<AdminContentVideoJobsResponse>("/api/admin/content/video-jobs"), (contentVideoJobsResponse) => {
+          setContentVideoJobs(contentVideoJobsResponse.videoJobs);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.modelPricing.label"), () => getJson<AdminModelPricingCatalogResponse>("/api/admin/model-pricing-catalog"), (modelPricingCatalogResponse) => {
+          setModelPricingCatalog(modelPricingCatalogResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.siteSettings.label"), () => getJson<AdminSiteSettingsResponse>("/api/admin/site-settings"), (siteSettingsResponse) => {
+          setSiteSettings(siteSettingsResponse);
+        }, failedModules)
+      ]);
+      if (failedModules.length > 0) {
+        setStatus(tAdmin("status.partialLoadFailed", { modules: Array.from(new Set(failedModules)).join(tAdmin("status.moduleSeparator")) }));
+      } else {
+        setStatus("");
+      }
     } catch (error) {
       if (error instanceof HttpError && error.status === 403) {
         setForbidden(true);
         setStatus("");
       } else if (error instanceof HttpError && error.status === 401) {
         setSession({ authEnabled: true, authenticated: false });
-        setStatus("登录已过期，请重新登录。");
+        setStatus(tAdmin("status.authExpired"));
       } else {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -526,21 +858,21 @@ export function AdminApp() {
     event.preventDefault();
     const draft = platformDrafts[providerId];
     if (!draft) {
-      setStatus("没有可保存的平台模型配置。");
+      setStatus(tAdmin("status.noPlatformConfig"));
       return;
     }
     if (!draft.apiKey.trim() && !draft.configId) {
-      setStatus("请先填写平台 Key。");
+      setStatus(tAdmin("status.platformKeyRequired"));
       return;
     }
     if (draft.models.length === 0) {
-      setStatus("请至少选择一个模型版本。");
+      setStatus(tAdmin("status.modelVersionRequired"));
       return;
     }
     setBusy(true);
     setStatus("");
     try {
-      await putJson(platformModelAdminEndpoint(providerId), {
+      await putJson(modelServicesEndpoint(providerId), {
         configId: draft.configId,
         apiKey: draft.apiKey.trim() || undefined,
         name: draft.name.trim(),
@@ -552,7 +884,7 @@ export function AdminApp() {
       });
       await refreshOverview();
       setEditingPlatformProviderId(undefined);
-      setStatus("平台模型已保存，Key 已加密写入数据库，并已更新平台模型配置。");
+      setStatus(tAdmin("status.platformSaved"));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -564,7 +896,7 @@ export function AdminApp() {
     setBusy(true);
     setStatus("");
     try {
-      await putJson(platformModelAdminEndpoint(providerId), {
+      await putJson(modelServicesEndpoint(providerId), {
         configId: service.configId,
         name: service.label || service.serviceLabel,
         vendor: service.providerLabel,
@@ -574,7 +906,7 @@ export function AdminApp() {
         enabled
       });
       await refreshOverview();
-      setStatus(enabled ? "平台模型服务已启用。" : "平台模型服务已停用。");
+      setStatus(enabled ? tAdmin("status.platformEnabled") : tAdmin("status.platformDisabled"));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -587,12 +919,12 @@ export function AdminApp() {
     setStatus("");
     try {
       const suffix = configId ? `?configId=${encodeURIComponent(configId)}` : "";
-      const response = await fetch(`${platformModelAdminEndpoint(providerId)}${suffix}`, {
+      const response = await fetch(`${modelServicesEndpoint(providerId)}${suffix}`, {
         method: "DELETE"
       });
       await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response);
       await refreshOverview();
-      setStatus("已删除平台模型服务。");
+      setStatus(tAdmin("status.platformDeleted"));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -602,7 +934,7 @@ export function AdminApp() {
 
   async function revealPlatformModelConfigApiKey(providerId: ModelConfigProviderId, configId: string) {
     const response = await getJson<ModelConfigKeyRevealResponse>(
-      `${platformModelAdminEndpoint(providerId)}/key?configId=${encodeURIComponent(configId)}`
+      `${modelServicesEndpoint(providerId)}/key?configId=${encodeURIComponent(configId)}`
     );
     updatePlatformDraft(providerId, {
       keyPreview: response.keyPreview
@@ -621,7 +953,7 @@ export function AdminApp() {
         }))
       });
       setPaymentMethods(response.methods);
-      setStatus(enabled ? "支付方式已启用。" : "支付方式已停用。");
+      setStatus(enabled ? tAdmin("status.paymentEnabled") : tAdmin("status.paymentDisabled"));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -634,9 +966,60 @@ export function AdminApp() {
     setStatus("");
     try {
       await postJson<AdminWalletAdjustmentResponse>("/api/admin/wallet-adjustments", input);
-      const walletsResponse = await getJson<AdminWalletsResponse>("/api/admin/wallets");
+      const [walletsResponse, walletTransactionsResponse] = await Promise.all([
+        getJson<AdminWalletsResponse>("/api/admin/wallets"),
+        getJson<AdminWalletTransactionsResponse>("/api/admin/wallet-transactions")
+      ]);
       setAdminWallets(walletsResponse.wallets);
-      setStatus("余额调整已写入流水。");
+      setWalletTransactions(walletTransactionsResponse.transactions);
+      setStatus(tAdmin("status.walletAdjusted"));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveBillingSettings(rules: Array<Pick<BillingPriceRuleView, "usageKind" | "serviceFeeCny" | "enabled">>) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await putJson<AdminBillingSettingsResponse>("/api/admin/billing-settings", {
+        rules
+      });
+      setBillingSettings(response.settings);
+      setStatus(tAdmin("status.billingSettingsSaved"));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveModelPricingDraft(input: { version: string; entries: AdminModelPricingEntry[] }) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await putJson<AdminModelPricingDraftResponse>("/api/admin/model-pricing-catalog/draft", input);
+      setStatus(tAdmin("status.modelPricingDraftSaved", { version: response.draft.version }));
+      return response.draft.id;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      return undefined;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publishModelPricingDraft(draftId: string) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await postJson<AdminModelPricingCatalogResponse>("/api/admin/model-pricing-catalog/publish", { draftId });
+      setModelPricingCatalog(response);
+      const siteSettingsResponse = await getJson<AdminSiteSettingsResponse>("/api/admin/site-settings");
+      setSiteSettings(siteSettingsResponse);
+      setStatus(tAdmin("status.modelPricingPublished", { version: response.active.version }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -692,9 +1075,20 @@ export function AdminApp() {
       platformTestStatus={platformTestStatus}
       onClosePlatformModelDialog={() => setEditingPlatformProviderId(undefined)}
       paymentMethods={paymentMethods}
+      billingSettings={billingSettings}
       adminWallets={adminWallets}
+      walletTransactions={walletTransactions}
+      rechargeOrders={rechargeOrders}
+      contentSummary={contentSummary}
+      contentProducts={contentProducts}
+      contentVideoJobs={contentVideoJobs}
+      modelPricingCatalog={modelPricingCatalog}
+      siteSettings={siteSettings}
       onTogglePaymentMethodEnabled={togglePaymentMethodEnabled}
       onSubmitWalletAdjustment={submitWalletAdjustment}
+      onSaveBillingSettings={saveBillingSettings}
+      onSaveModelPricingDraft={saveModelPricingDraft}
+      onPublishModelPricingDraft={publishModelPricingDraft}
     />
   );
 }
@@ -737,34 +1131,34 @@ function AdminLoginScreen({
           <img src={brandLogoUrl} alt="Haitu" className="h-11 w-11 rounded-[10px]" />
           <div className="min-w-0">
             <h1 className="m-0 text-xl font-black leading-tight">Haitu Admin</h1>
-            <p className="m-0 mt-1 text-xs font-semibold text-[var(--muted)]">项目方用户运营后台</p>
+            <p className="m-0 mt-1 text-xs font-semibold text-[var(--muted)]">{tAdmin("auth.subtitle")}</p>
           </div>
         </div>
 
         {mode === "entry" ? (
           <form className="grid gap-4" onSubmit={onLogin}>
-            <Field label="邮箱">
+            <Field label={tAdmin("auth.email")}>
               <Input
                 autoFocus
                 autoComplete="email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="请输入项目方邮箱"
+                placeholder={tAdmin("auth.emailPlaceholder")}
               />
             </Field>
-            <Field label="密码">
+            <Field label={tAdmin("auth.password")}>
               <Input
                 autoComplete="current-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="请输入密码"
+                placeholder={tAdmin("auth.passwordPlaceholder")}
               />
             </Field>
             <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !password.trim()}>
               <KeyRound size={15} />
-              进入后台
+              {tAdmin("auth.enterAdmin")}
             </Button>
             <AdminStatus status={status} />
           </form>
@@ -772,7 +1166,7 @@ function AdminLoginScreen({
 
         {mode === "verify-email" ? (
           <form className="grid gap-4" onSubmit={onVerifyEmail}>
-            <Field label="邮箱">
+            <Field label={tAdmin("auth.email")}>
               <Input
                 autoComplete="email"
                 type="email"
@@ -780,7 +1174,7 @@ function AdminLoginScreen({
                 onChange={(event) => setEmail(event.target.value)}
               />
             </Field>
-            <Field label="验证码">
+            <Field label={tAdmin("auth.otp")}>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <Input
                   autoFocus
@@ -788,7 +1182,7 @@ function AdminLoginScreen({
                   inputMode="numeric"
                   value={otp}
                   onChange={(event) => setOtp(event.target.value)}
-                  placeholder="6 位验证码"
+                  placeholder={tAdmin("auth.otpPlaceholder")}
                 />
                 <Button
                   variant="soft"
@@ -798,20 +1192,20 @@ function AdminLoginScreen({
                   onClick={() => void onResendVerificationCode()}
                 >
                   <RefreshCcw size={15} />
-                  {authOtpCooldownSeconds > 0 ? `${authOtpCooldownSeconds} 秒` : "重发验证码"}
+                  {authOtpCooldownSeconds > 0 ? tAdmin("auth.cooldown", { seconds: authOtpCooldownSeconds }) : tAdmin("auth.resendOtp")}
                 </Button>
               </div>
             </Field>
             <Button variant="primary" type="submit" disabled={isBusy || !email.trim() || !otp.trim()}>
               <MailCheck size={15} />
-              验证邮箱
+              {tAdmin("auth.verifyEmail")}
             </Button>
             <button
               type="button"
               className="justify-self-center text-xs font-black text-[var(--accent)] hover:underline"
               onClick={() => setMode("entry")}
             >
-              返回登录
+              {tAdmin("auth.backToLogin")}
             </button>
             <AdminStatus status={status} />
           </form>
@@ -837,10 +1231,21 @@ function AdminDashboard({
   onRevealPlatformModelConfigKey,
   onRefresh,
   onSavePlatformModelConfig,
+  onSaveBillingSettings,
+  onSaveModelPricingDraft,
+  onPublishModelPricingDraft,
   onSubmitWalletAdjustment,
   onTogglePaymentMethodEnabled,
   overview,
   adminWallets,
+  walletTransactions,
+  rechargeOrders,
+  billingSettings,
+  contentSummary,
+  contentProducts,
+  contentVideoJobs,
+  modelPricingCatalog,
+  siteSettings,
   paymentMethods,
   platformConfig,
   platformDrafts,
@@ -864,18 +1269,31 @@ function AdminDashboard({
   onSavePlatformModelConfig: (providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
   onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
   onSubmitWalletAdjustment: (input: { workspaceId: string; amountCny: number; reason: string }) => Promise<void>;
+  onSaveBillingSettings: (rules: Array<Pick<BillingPriceRuleView, "usageKind" | "serviceFeeCny" | "enabled">>) => Promise<void>;
+  onSaveModelPricingDraft: (input: { version: string; entries: AdminModelPricingEntry[] }) => Promise<string | undefined>;
+  onPublishModelPricingDraft: (draftId: string) => Promise<void>;
   overview?: AdminOverview;
   adminWallets: AdminWalletSummary[];
+  walletTransactions: AdminWalletTransactionView[];
+  rechargeOrders: AdminRechargeOrderView[];
+  billingSettings?: BillingSettingsView;
+  contentSummary?: AdminContentSummaryResponse;
+  contentProducts: AdminContentProductView[];
+  contentVideoJobs: AdminContentVideoJobView[];
+  modelPricingCatalog?: AdminModelPricingCatalogResponse;
+  siteSettings?: AdminSiteSettingsResponse;
   paymentMethods: PaymentMethodView[];
   platformConfig: ProviderConfigLedger;
   platformDrafts: Record<ModelConfigProviderId, ModelConfigDraft>;
   platformTestStatus: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
   status: string;
 }) {
-  const adminShellStatus = checkingSession ? "检查登录状态" : isBusy ? "刷新数据中" : "";
+  const adminShellStatus = checkingSession ? tAdmin("shell.checkingSession") : isBusy ? tAdmin("shell.refreshing") : "";
   const growthOption = useMemo(() => buildGrowthOption(overview), [overview]);
   const activityOption = useMemo(() => buildActivityOption(overview), [overview]);
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [timeRange, setTimeRange] = useState("30d");
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | undefined>();
   const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | undefined>();
   const [detailStatus, setDetailStatus] = useState("");
@@ -883,6 +1301,14 @@ function AdminDashboard({
   const activeNavigationItem = adminNavigationItems.find((item) => item.id === activeSection) ?? adminNavigationItems[0];
 
   async function openUserDetail(user: AdminUserSummary) {
+    if (selectedUser?.id === user.id) {
+      setSelectedUser(undefined);
+      setSelectedUserDetail(undefined);
+      setDetailStatus("");
+      setDetailLoading(false);
+      return;
+    }
+
     setSelectedUser(user);
     setSelectedUserDetail(undefined);
     setDetailStatus("");
@@ -897,11 +1323,19 @@ function AdminDashboard({
     }
   }
 
-  function closeUserDetail() {
-    setSelectedUser(undefined);
-    setSelectedUserDetail(undefined);
-    setDetailStatus("");
-    setDetailLoading(false);
+  function prepareUserOperationalFilter(user: AdminUserSummary) {
+    setSelectedUser(user);
+    setGlobalSearch(user.email);
+  }
+
+  function openUserContentView(user: AdminUserSummary) {
+    prepareUserOperationalFilter(user);
+    setActiveSection("content");
+  }
+
+  function openUserFinanceView(user: AdminUserSummary) {
+    prepareUserOperationalFilter(user);
+    setActiveSection("finance");
   }
 
   function renderAdminSection() {
@@ -910,15 +1344,15 @@ function AdminDashboard({
     }
     if (activeSection === "overview") {
       return (
-        <section className="grid gap-4" aria-label="后台概览">
+        <section className="grid gap-4" aria-label={tAdmin("overview.ariaLabel")}>
           <AdminMetricGrid overview={overview} />
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="bg-[var(--card)]">
-              <CardHeader heading="注册趋势" icon={<BarChart3 size={16} />} right={<Badge>30 天</Badge>} />
+              <CardHeader heading={tAdmin("overview.registrationTrend")} icon={<BarChart3 size={16} />} right={<Badge>{tAdmin("overview.days30")}</Badge>} />
               <AdminChart option={growthOption} empty={overview.growth.every((row) => row.registrations === 0)} />
             </Card>
             <Card className="bg-[var(--card)]">
-              <CardHeader heading="活跃趋势" icon={<Activity size={16} />} right={<Badge>30 天</Badge>} />
+              <CardHeader heading={tAdmin("overview.activityTrend")} icon={<Activity size={16} />} right={<Badge>{tAdmin("overview.days30")}</Badge>} />
               <AdminChart option={activityOption} empty={overview.activity.every((row) => row.events === 0)} />
             </Card>
           </div>
@@ -927,20 +1361,59 @@ function AdminDashboard({
     }
     if (activeSection === "users") {
       return (
-        <section className="grid gap-4" aria-label="用户管理">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <AdminCompactMetric label="用户" value={overview.metrics.totalUsers} hint={`${overview.metrics.verifiedUsers} 已验证`} />
-            <AdminCompactMetric label="工作区" value={overview.metrics.totalWorkspaces} hint="全站工作区" />
-            <AdminCompactMetric label="视频任务" value={overview.metrics.totalVideoJobs} hint="用户生成记录" />
-          </div>
-          <AdminUsersTable users={overview.users} onSelectUser={(user) => void openUserDetail(user)} />
-        </section>
+        <AdminUsersPanel
+          globalSearch={globalSearch}
+          loading={detailLoading}
+          overview={overview}
+          rechargeOrders={rechargeOrders}
+          selectedUser={selectedUser}
+          selectedUserDetail={selectedUserDetail}
+          status={detailStatus}
+          walletTransactions={walletTransactions}
+          wallets={adminWallets}
+          onOpenContent={openUserContentView}
+          onOpenFinance={openUserFinanceView}
+          onSelectUser={(user) => void openUserDetail(user)}
+        />
       );
     }
-    if (activeSection === "platform-models") {
+    if (activeSection === "content") {
       return (
-        <section className="grid gap-4" aria-label="平台模型">
-          <PlatformModelAdminPanel
+        <AdminContentPanel
+          globalSearch={globalSearch}
+          summary={contentSummary}
+          products={contentProducts}
+          videoJobs={contentVideoJobs}
+        />
+      );
+    }
+    if (activeSection === "finance") {
+      return (
+        <AdminFinancePanel
+          globalSearch={globalSearch}
+          wallets={adminWallets}
+          walletTransactions={walletTransactions}
+          rechargeOrders={rechargeOrders}
+          isBusy={isBusy}
+          onSubmitWalletAdjustment={onSubmitWalletAdjustment}
+        />
+      );
+    }
+    if (activeSection === "payment-billing") {
+      return (
+        <AdminPaymentBillingPanel
+          billingSettings={billingSettings}
+          isBusy={isBusy}
+          paymentMethods={paymentMethods}
+          onSaveBillingSettings={onSaveBillingSettings}
+          onTogglePaymentMethodEnabled={onTogglePaymentMethodEnabled}
+        />
+      );
+    }
+    if (activeSection === "model-services") {
+      return (
+        <section className="grid gap-4" aria-label={tAdmin("modelServices.ariaLabel")}>
+          <AdminModelServicesPanel
             config={platformConfig}
             drafts={platformDrafts}
             editingProviderId={editingPlatformProviderId}
@@ -959,74 +1432,120 @@ function AdminDashboard({
         </section>
       );
     }
-    if (activeSection === "billing") {
+    if (activeSection === "model-pricing") {
       return (
-        <AdminBillingPanel
-          paymentMethods={paymentMethods}
-          wallets={adminWallets}
+        <AdminModelPricingPanel
+          catalog={modelPricingCatalog}
           isBusy={isBusy}
-          onTogglePaymentMethodEnabled={onTogglePaymentMethodEnabled}
-          onSubmitWalletAdjustment={onSubmitWalletAdjustment}
+          onSaveDraft={onSaveModelPricingDraft}
+          onPublishDraft={onPublishModelPricingDraft}
         />
       );
+    }
+    if (activeSection === "site-settings") {
+      return <AdminSiteSettingsPanel settings={siteSettings} />;
     }
     return (
       <AdminPlaceholderSection
         icon={<Settings2 size={18} />}
-        title="系统"
-        badge="待接入"
-        items={["备份", "审计日志", "运行状态"]}
+        title={tAdmin("system.title")}
+        badge={tAdmin("system.badge")}
+        items={adminStringArray("system.items")}
       />
     );
   }
 
   return (
-    <main className="grid h-dvh grid-cols-[260px_minmax(0,1fr)] overflow-hidden bg-[var(--bg)] text-[var(--text)] max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto_minmax(0,1fr)]">
+    <main className="grid h-dvh grid-cols-[280px_minmax(0,1fr)] overflow-hidden bg-[var(--bg)] text-[var(--text)] max-[900px]:grid-cols-1 max-[900px]:grid-rows-[auto_minmax(0,1fr)]">
       <AdminSidebar
         activeSection={activeSection}
         email={email}
         onSectionChange={setActiveSection}
       />
       <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-        <header className="grid min-h-[72px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center min-[1100px]:px-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="m-0 text-xl font-black leading-tight">{activeNavigationItem.label}</h1>
-              <Badge tone="ok">Admin</Badge>
-            </div>
-            <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">{activeNavigationItem.description}</p>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button onClick={onRefresh} disabled={isBusy}>
-              <RefreshCcw className={isBusy ? "animate-spin" : undefined} size={14} />
-              {adminShellStatus || "刷新"}
-            </Button>
-            <Button variant="ghost" onClick={onLogout} disabled={isBusy}>
-              <LogOut size={14} />
-              退出
-            </Button>
-          </div>
-        </header>
+        <AdminTopBar
+          activeNavigationItem={activeNavigationItem}
+          adminShellStatus={adminShellStatus}
+          globalSearch={globalSearch}
+          isBusy={isBusy}
+          timeRange={timeRange}
+          onGlobalSearchChange={setGlobalSearch}
+          onLogout={onLogout}
+          onRefresh={onRefresh}
+          onTimeRangeChange={setTimeRange}
+        />
 
         <div className="min-h-0 overflow-y-auto px-4 py-4 min-[1100px]:px-6">
           {status ? <AdminStatus status={status} /> : null}
           {renderAdminSection()}
         </div>
       </section>
-      <AdminUserDetailDrawer
-        detail={selectedUserDetail}
-        fallbackUser={selectedUser}
-        loading={detailLoading}
-        status={detailStatus}
-        onClose={closeUserDetail}
-      />
     </main>
   );
 }
 
-function platformModelAdminEndpoint(providerId: ModelConfigProviderId): string {
-  return platformModelAdminProviders.find((provider) => provider.providerId === providerId)?.endpoint
-    ?? `/api/platform/model-configs/${providerId}`;
+function modelServicesEndpoint(providerId: ModelConfigProviderId): string {
+  return modelServiceAdminProviders.find((provider) => provider.providerId === providerId)?.endpoint
+    ?? `/api/admin/platform-model-configs/${providerId}`;
+}
+
+function AdminTopBar({
+  activeNavigationItem,
+  adminShellStatus,
+  globalSearch,
+  isBusy,
+  onGlobalSearchChange,
+  onLogout,
+  onRefresh,
+  onTimeRangeChange,
+  timeRange
+}: {
+  activeNavigationItem: (typeof adminNavigationItems)[number];
+  adminShellStatus: string;
+  globalSearch: string;
+  isBusy: boolean;
+  onGlobalSearchChange: (value: string) => void;
+  onLogout: () => void;
+  onRefresh: () => void;
+  onTimeRangeChange: (value: string) => void;
+  timeRange: string;
+}) {
+  return (
+    <header className="grid min-h-[84px] gap-3 border-b border-[var(--border)] bg-[var(--panel)]/96 px-4 py-3 backdrop-blur min-[900px]:grid-cols-[minmax(0,1fr)_minmax(360px,620px)] min-[900px]:items-center min-[1100px]:px-6">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="m-0 text-xl font-black leading-tight">{adminLabel(activeNavigationItem)}</h1>
+          <Badge tone="ok">{tAdmin("shell.adminBadge")}</Badge>
+        </div>
+        <p className="m-0 mt-1 truncate text-[12px] font-medium text-[var(--muted)]">{adminDescription(activeNavigationItem)}</p>
+      </div>
+      <div className="grid gap-2 min-[720px]:grid-cols-[minmax(180px,1fr)_128px_auto_auto]">
+        <label className="relative min-w-0">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={15} />
+          <Input
+            className="pl-9"
+            value={globalSearch}
+            placeholder={tAdmin("shell.globalSearch")}
+            onChange={(event) => onGlobalSearchChange(event.target.value)}
+          />
+        </label>
+        <Select value={timeRange} onChange={(event) => onTimeRangeChange(event.target.value)} aria-label={tAdmin("shell.timeRange")}>
+          <option value="24h">{tAdmin("shell.ranges.24h")}</option>
+          <option value="7d">{tAdmin("shell.ranges.7d")}</option>
+          <option value="30d">{tAdmin("shell.ranges.30d")}</option>
+          <option value="all">{tAdmin("shell.ranges.all")}</option>
+        </Select>
+        <Button onClick={onRefresh} disabled={isBusy}>
+          <RefreshCcw className={isBusy ? "animate-spin" : undefined} size={14} />
+          {adminShellStatus || tAdmin("shell.refresh")}
+        </Button>
+        <Button variant="ghost" onClick={onLogout} disabled={isBusy}>
+          <LogOut size={14} />
+          {tAdmin("shell.logout")}
+        </Button>
+      </div>
+    </header>
+  );
 }
 
 function AdminSidebar({
@@ -1043,49 +1562,154 @@ function AdminSidebar({
       <div className="flex min-w-0 items-center gap-3 border-b border-[var(--border)] px-4 py-4 max-[900px]:border-b-0">
         <img src={brandLogoUrl} alt="Haitu" className="h-9 w-9 rounded-[8px]" />
         <div className="min-w-0">
-          <div className="truncate text-[16px] font-black leading-tight">项目方后台</div>
+          <div className="truncate text-[16px] font-black leading-tight">{tAdmin("shell.title")}</div>
           <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--muted)]">{email ?? "admin"}</div>
         </div>
       </div>
-      <nav className="min-h-0 overflow-y-auto px-3 py-3 max-[900px]:overflow-x-auto max-[900px]:overflow-y-hidden max-[900px]:px-4 max-[900px]:pt-0" aria-label="后台导航">
-        <div className="grid gap-1.5 max-[900px]:flex max-[900px]:min-w-max">
-          {adminNavigationItems.map((item) => {
-            const Icon = item.icon;
-            const active = item.id === activeSection;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={cn(
-                  "grid min-h-[58px] grid-cols-[30px_minmax(0,1fr)] items-center gap-2 rounded-lg border px-2.5 text-left transition",
-                  active
-                    ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--text)] shadow-[inset_3px_0_0_var(--accent)]"
-                    : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--field)]",
-                  "max-[900px]:min-w-[138px] max-[900px]:grid-cols-[22px_minmax(0,1fr)] max-[900px]:shadow-none"
-                )}
-                aria-current={active ? "page" : undefined}
-                onClick={() => onSectionChange(item.id)}
-              >
-                <span className={cn("grid h-7 w-7 place-items-center rounded-[8px]", active ? "bg-[var(--accent)] text-white" : "bg-[var(--panel2)] text-[var(--accent)]")}>
-                  <Icon size={15} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[13px] font-black">{item.label}</span>
-                  <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-80">{item.description}</span>
-                </span>
-              </button>
-            );
-          })}
+      <nav className="min-h-0 overflow-y-auto px-3 py-3 max-[900px]:overflow-x-auto max-[900px]:overflow-y-hidden max-[900px]:px-4 max-[900px]:pt-0" aria-label={tAdmin("shell.navigationLabel")}>
+        <div className="grid gap-4 max-[900px]:flex max-[900px]:min-w-max">
+          {adminNavigationGroups.map((group) => (
+            <div key={group.id} className="grid gap-1.5 max-[900px]:min-w-[170px]">
+              <div className="px-2 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--muted)]">{tAdmin(group.labelKey)}</div>
+              {adminNavigationItems.filter((item) => item.group === group.id).map((item) => {
+                const Icon = item.icon;
+                const active = item.id === activeSection;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={cn(
+                      "grid min-h-[56px] grid-cols-[30px_minmax(0,1fr)] items-center gap-2 rounded-lg border px-2.5 text-left transition",
+                      active
+                        ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--text)] shadow-[inset_3px_0_0_var(--accent)]"
+                        : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--field)]",
+                      "max-[900px]:grid-cols-[22px_minmax(0,1fr)] max-[900px]:shadow-none"
+                    )}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => onSectionChange(item.id)}
+                  >
+                    <span className={cn("grid h-7 w-7 place-items-center rounded-[8px]", active ? "bg-[var(--accent)] text-white" : "bg-[var(--panel2)] text-[var(--accent)]")}>
+                      <Icon size={15} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13px] font-black">{adminLabel(item)}</span>
+                      <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-80">{adminDescription(item)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </nav>
-      <div className="border-t border-[var(--border)] px-4 py-3 text-[11px] font-semibold leading-5 text-[var(--muted)] max-[900px]:hidden">
-        平台 Key 只在后台加密保存，普通用户只选择可用组合。
+      <div className="grid gap-2 border-t border-[var(--border)] px-4 py-3 max-[900px]:hidden">
+        <div className="text-[11px] font-semibold leading-5 text-[var(--muted)]">
+          {tAdmin("shell.keyHint")}
+        </div>
+        <AdminLanguageSwitcher />
       </div>
     </aside>
   );
 }
 
-function PlatformModelAdminPanel({
+function AdminLanguageSwitcher() {
+  const initialLocale = supportedLocales.includes(i18n.language as AppLocale) ? i18n.language as AppLocale : "zh";
+  const [open, setOpen] = useState(false);
+  const [currentLocale, setCurrentLocale] = useState<AppLocale>(initialLocale);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function syncLanguage(locale: string) {
+      if (supportedLocales.includes(locale as AppLocale)) {
+        setCurrentLocale(locale as AppLocale);
+      }
+    }
+
+    i18n.on("languageChanged", syncLanguage);
+    return () => {
+      i18n.off("languageChanged", syncLanguage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", closeOnOutsideClick);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeOnOutsideClick);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function selectLocale(locale: AppLocale) {
+    setCurrentLocale(locale);
+    window.localStorage.setItem(clientLocaleStorageKey, locale);
+    void i18n.changeLanguage(locale);
+    setOpen(false);
+  }
+
+  const languageChangeLabel = i18n.t("common:language.change", { lng: currentLocale });
+
+  return (
+    <div ref={menuRef} className="app-language-switcher relative z-40 min-w-0">
+      <button
+        type="button"
+        aria-label={languageChangeLabel}
+        aria-expanded={open}
+        title={languageChangeLabel}
+        className={cn(
+          "grid min-h-9 w-full min-w-0 grid-cols-[26px_minmax(0,1fr)] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-[var(--field)] px-2 text-left text-xs font-black text-[var(--accent2)] shadow-[0_8px_18px_rgba(96,64,43,.08)] transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))] hover:bg-[color-mix(in_srgb,var(--accent)_7%,var(--field))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.18)]",
+          open && "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_9%,var(--field))] text-[var(--accent)]"
+        )}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-[color-mix(in_srgb,var(--accent)_9%,var(--field))]">
+          <Globe2 size={17} strokeWidth={2.1} />
+        </span>
+        <span className="min-w-0 truncate">{getLocaleMeta(currentLocale).label}</span>
+      </button>
+
+      {open ? (
+        <div className="app-language-menu absolute bottom-[calc(100%+8px)] left-0 top-auto z-50 grid min-w-[136px] gap-1 rounded-[8px] border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_46px_rgba(96,64,43,.16)]">
+          {supportedLocales.map((locale) => (
+            <button
+              key={locale}
+              type="button"
+              aria-current={locale === currentLocale ? "true" : undefined}
+              className={cn(
+                "grid min-h-8 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-[7px] px-2 text-left text-[12px] font-black transition",
+                locale === currentLocale
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+              )}
+              onClick={() => selectLocale(locale)}
+            >
+              <span className="grid h-[18px] w-[18px] place-items-center rounded-full border border-current/25 text-[10px]">
+                {locale.toUpperCase()}
+              </span>
+              <span className="truncate">{getLocaleMeta(locale).label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminModelServicesPanel({
   config,
   drafts,
   editingProviderId,
@@ -1116,25 +1740,25 @@ function PlatformModelAdminPanel({
   onRevealApiKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
   onSave: (providerId: ModelConfigProviderId, event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
-  const groups: ModelServiceGroup[] = platformModelAdminProviders.map((provider) => ({
+  const groups: ModelServiceGroup[] = modelServiceAdminProviders.map((provider) => ({
     kind: provider.providerId === "openai-compatible-text" ? "text" : provider.providerId === "openai-compatible-image" ? "image" : "video",
-    title: provider.title,
-    description: provider.description,
-    models: platformModelsForProvider(config, provider.providerId),
+    title: modelServicesGroupTitle(provider.groupKey),
+    description: modelServicesGroupDescription(provider.groupKey),
+    models: modelServicesForProvider(config, provider.providerId),
     providerId: provider.providerId,
-    badge: provider.badge
+    badge: modelServicesGroupBadge(provider.groupKey)
   }));
   const editingGroup = groups.find((group) => group.providerId === editingProviderId);
   const configuredCount = groups.reduce((total, group) => total + group.models.filter((model) => model.configured).length, 0);
   return (
     <Card className="bg-[var(--card)]">
       <CardHeader
-        heading="平台模型配置"
+        heading={tAdmin("modelServices.title")}
         icon={<KeyRound size={16} />}
-        right={<Badge tone={configuredCount > 0 ? "ok" : "neutral"}>{configuredCount} 条平台服务</Badge>}
+        right={<Badge tone={configuredCount > 0 ? "ok" : "neutral"}>{tAdmin("modelServices.configuredCount", { count: configuredCount })}</Badge>}
       />
       <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] px-3 py-2 text-[12px] font-semibold leading-5 text-[var(--muted)]">
-        平台 API Key 加密写入数据库；这里和用户自带 API 使用同一套模型服务配置，只是服务归属为平台托管。
+        {tAdmin("modelServices.hint")}
       </div>
       <div className="grid gap-3">
         {groups.map((group) => (
@@ -1146,9 +1770,9 @@ function PlatformModelAdminPanel({
             providerId={group.providerId}
             models={group.models}
             apiOwner="platform"
-            keyBadgeLabel="平台托管"
-            addButtonLabel={(badge) => `添加${badge}服务`}
-            emptyText="还没有配置平台服务，添加平台 API Key 后这里会显示已启用的模型服务。"
+            keyBadgeLabel={tAdmin("modelServices.keyBadge")}
+            addButtonLabel={(badge) => tAdmin("modelServices.addService", { badge })}
+            emptyText={tAdmin("modelServices.empty")}
             canManageServices
             isBusy={isBusy}
             onAdd={() => onAdd(group.providerId)}
@@ -1160,13 +1784,13 @@ function PlatformModelAdminPanel({
       </div>
       {editingGroup ? (
         <SharedModelConfigDialog
-          title={`添加${editingGroup.badge}服务`}
+          title={tAdmin("modelServices.dialogTitle", { badge: editingGroup.badge })}
           badge={editingGroup.badge}
           providerId={editingGroup.providerId}
           draft={drafts[editingGroup.providerId]}
           testStatus={testStatuses[editingGroup.providerId]}
           presets={modelConfigPresets[editingGroup.providerId]}
-          apiKeyLabel="平台 API Key"
+          apiKeyLabel={tAdmin("modelServices.apiKeyLabel")}
           onDraftChange={onDraftChange}
           onApplyPreset={onApplyPreset}
           onClose={onCloseDialog}
@@ -1179,71 +1803,456 @@ function PlatformModelAdminPanel({
   );
 }
 
-function AdminBillingPanel({
+function modelServicesGroupTitle(groupKey: "text" | "image" | "video"): string {
+  if (groupKey === "text") return tAdmin("modelServices.groups.text.title");
+  if (groupKey === "image") return tAdmin("modelServices.groups.image.title");
+  return tAdmin("modelServices.groups.video.title");
+}
+
+function modelServicesGroupDescription(groupKey: "text" | "image" | "video"): string {
+  if (groupKey === "text") return tAdmin("modelServices.groups.text.description");
+  if (groupKey === "image") return tAdmin("modelServices.groups.image.description");
+  return tAdmin("modelServices.groups.video.description");
+}
+
+function modelServicesGroupBadge(groupKey: "text" | "image" | "video"): string {
+  if (groupKey === "text") return tAdmin("modelServices.groups.text.badge");
+  if (groupKey === "image") return tAdmin("modelServices.groups.image.badge");
+  return tAdmin("modelServices.groups.video.badge");
+}
+
+function AdminContentPanel({
+  globalSearch,
+  products,
+  summary,
+  videoJobs
+}: {
+  globalSearch: string;
+  products: AdminContentProductView[];
+  summary?: AdminContentSummaryResponse;
+  videoJobs: AdminContentVideoJobView[];
+}) {
+  const [activeContentView, setActiveContentView] = useState<AdminContentView>("videoJobs");
+  const visibleProducts = filterAdminContentProducts(products, globalSearch);
+  const visibleVideoJobs = filterAdminContentVideoJobs(videoJobs, globalSearch);
+  const isProductsView = activeContentView === "products";
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("content.totalProducts"), value: summary?.metrics.totalProducts ?? 0, hint: tAdmin("content.productHint") },
+            { label: tAdmin("content.totalVideoJobs"), value: summary?.metrics.totalVideoJobs ?? 0, hint: tAdmin("content.completedFailed", { completed: summary?.metrics.completedVideoJobs ?? 0, failed: summary?.metrics.failedVideoJobs ?? 0 }) },
+            { label: tAdmin("content.totalAssets"), value: summary?.metrics.totalVideoAssets ?? 0, hint: tAdmin("content.assetHint") },
+            { label: tAdmin("content.totalStoryboards"), value: summary?.metrics.totalStoryboards ?? 0, hint: tAdmin("content.storyboardHint") }
+          ]}
+        />
+      )}
+    >
+      <AdminDataPanel
+        title={isProductsView ? tAdmin("content.products") : tAdmin("content.videoJobs")}
+        icon={isProductsView ? <Package size={16} /> : <Video size={16} />}
+        right={(
+          <AdminSegmentedControl<AdminContentView>
+            value={activeContentView}
+            onChange={setActiveContentView}
+            options={[
+              { value: "videoJobs", label: tAdmin("content.videoJobs"), count: visibleVideoJobs.length },
+              { value: "products", label: tAdmin("content.products"), count: visibleProducts.length }
+            ]}
+          />
+        )}
+      >
+        <AdminContentSignalStrip summary={summary} activeView={activeContentView} />
+        {isProductsView ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
+                <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                  <tr>
+                    <AdminTh>{tAdmin("content.productTable.product")}</AdminTh>
+                    <AdminTh>{tAdmin("content.productTable.workspace")}</AdminTh>
+                    <AdminTh>{tAdmin("content.productTable.jobs")}</AdminTh>
+                    <AdminTh>{tAdmin("content.productTable.assets")}</AdminTh>
+                    <AdminTh>{tAdmin("content.productTable.updatedAt")}</AdminTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleProducts.map((product) => (
+                    <tr key={product.id} className="bg-[var(--card)]">
+                      <AdminTd>
+                        <div className="font-black text-[var(--text)]">{product.sku}</div>
+                        <div className="mt-0.5 text-[11px] text-[var(--muted)]">{product.title ?? "-"}</div>
+                      </AdminTd>
+                      <AdminTd>
+                        <div className="font-black text-[var(--text)]">{adminBusinessSpaceName(product.workspaceName)}</div>
+                        <div className="mt-0.5 text-[11px] text-[var(--muted)]">{product.ownerEmail ?? product.workspaceId}</div>
+                      </AdminTd>
+                      <AdminTd>{formatNumber(product.videoJobCount)}</AdminTd>
+                      <AdminTd>{formatNumber(product.assetCount)}</AdminTd>
+                      <AdminTd>{formatDateTime(product.updatedAt)}</AdminTd>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {visibleProducts.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("content.emptyProducts")} /></div> : null}
+          </>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left text-xs">
+              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                <tr>
+                  <AdminTh>{tAdmin("content.jobTable.job")}</AdminTh>
+                  <AdminTh>{tAdmin("content.jobTable.workspace")}</AdminTh>
+                  <AdminTh>{tAdmin("content.jobTable.status")}</AdminTh>
+                  <AdminTh>{tAdmin("content.jobTable.model")}</AdminTh>
+                  <AdminTh>{tAdmin("content.jobTable.assets")}</AdminTh>
+                  <AdminTh>{tAdmin("content.jobTable.createdAt")}</AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleVideoJobs.map((job) => (
+                  <tr key={job.id} className="bg-[var(--card)]">
+                    <AdminTd>
+                      <div className="font-black text-[var(--text)]">{job.productSku ?? job.id}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{job.productTitle ?? job.jobDir}</div>
+                    </AdminTd>
+                    <AdminTd>
+                      <div className="font-black text-[var(--text)]">{adminBusinessSpaceName(job.workspaceName)}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{job.ownerEmail ?? job.workspaceId}</div>
+                    </AdminTd>
+                    <AdminTd><Badge tone={adminJobStatusTone(job.status)}>{adminJobStatusLabel(job.status)}</Badge></AdminTd>
+                    <AdminTd>{job.model ?? "-"}</AdminTd>
+                    <AdminTd>{formatNumber(job.assetCount)}</AdminTd>
+                    <AdminTd>{formatDateTime(job.createdAt)}</AdminTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {!isProductsView && visibleVideoJobs.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("content.emptyJobs")} /></div> : null}
+      </AdminDataPanel>
+    </AdminWorkbench>
+  );
+}
+
+function AdminContentSignalStrip({
+  activeView,
+  summary
+}: {
+  activeView: AdminContentView;
+  summary?: AdminContentSummaryResponse;
+}) {
+  const recentJobs = (summary?.recentVideoJobs ?? []).slice(0, 3);
+  return (
+    <div className="grid gap-3 border-b border-[var(--border)] bg-[var(--panel2)] px-4 py-3 text-xs min-[960px]:grid-cols-[minmax(0,1fr)_minmax(320px,0.86fr)]">
+      <div className="min-w-0">
+        <div className="mb-2 flex min-w-0 items-center gap-2 font-black text-[var(--text)]">
+          <Activity size={14} className="text-[var(--accent)]" />
+          <span>{tAdmin("content.statusDistribution")}</span>
+        </div>
+        <div className="mb-2 flex flex-wrap gap-2">
+          {(summary?.statusCounts ?? []).map((item) => (
+            <Badge key={item.status} tone={adminJobStatusTone(item.status)}>{adminJobStatusLabel(item.status)} {formatNumber(item.count)}</Badge>
+          ))}
+          {summary?.statusCounts.length === 0 ? <span className="font-semibold text-[var(--muted)]">{tAdmin("content.emptyStatus")}</span> : null}
+        </div>
+        <div className="font-semibold leading-5 text-[var(--muted)]">
+          {activeView === "products" ? tAdmin("content.productsWorkbenchHint") : tAdmin("content.videoJobsWorkbenchHint")}
+        </div>
+      </div>
+      <div className="min-w-0 border-t border-[var(--border)] pt-3 min-[960px]:border-l min-[960px]:border-t-0 min-[960px]:pl-4 min-[960px]:pt-0">
+        <div className="mb-2 font-black text-[var(--text)]">{tAdmin("content.recentJobs")}</div>
+        <div className="grid gap-2">
+          {recentJobs.map((job) => (
+            <div key={job.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="min-w-0">
+                <div className="truncate font-black text-[var(--text)]">{job.productSku ?? job.id}</div>
+                <div className="mt-0.5 truncate font-semibold text-[var(--muted)]">{adminBusinessSpaceName(job.workspaceName)}</div>
+              </div>
+              <Badge tone={adminJobStatusTone(job.status)}>{adminJobStatusLabel(job.status)}</Badge>
+            </div>
+          ))}
+          {recentJobs.length === 0 ? <span className="font-semibold text-[var(--muted)]">{tAdmin("content.emptyJobs")}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminFinancePanel({
+  globalSearch,
   isBusy,
   onSubmitWalletAdjustment,
-  onTogglePaymentMethodEnabled,
-  paymentMethods,
+  rechargeOrders,
+  walletTransactions,
   wallets
 }: {
+  globalSearch: string;
   isBusy: boolean;
   onSubmitWalletAdjustment: (input: { workspaceId: string; amountCny: number; reason: string }) => Promise<void>;
-  onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
-  paymentMethods: PaymentMethodView[];
+  rechargeOrders: AdminRechargeOrderView[];
+  walletTransactions: AdminWalletTransactionView[];
   wallets: AdminWalletSummary[];
 }) {
-  const [adjustWorkspaceId, setAdjustWorkspaceId] = useState("");
+  const [adjustingWallet, setAdjustingWallet] = useState<AdminWalletSummary | undefined>();
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
-  const selectedWallet = wallets.find((wallet) => wallet.workspaceId === adjustWorkspaceId) ?? wallets[0];
-  const totalBalanceCny = wallets.reduce((total, wallet) => total + wallet.balanceCny, 0);
-  const totalReservedCny = wallets.reduce((total, wallet) => total + wallet.reservedCny, 0);
-  const enabledPaymentCount = paymentMethods.filter((method) => method.enabled).length;
+  const [activeLedgerView, setActiveLedgerView] = useState<AdminFinanceLedgerView>("wallets");
+  const visibleWallets = filterAdminWallets(wallets, globalSearch);
+  const visibleRechargeOrders = filterAdminRechargeOrders(rechargeOrders, globalSearch);
+  const visibleWalletTransactions = filterAdminWalletTransactions(walletTransactions, globalSearch);
+  const totalBalanceCny = visibleWallets.reduce((total, wallet) => total + wallet.balanceCny, 0);
+  const totalReservedCny = visibleWallets.reduce((total, wallet) => total + wallet.reservedCny, 0);
+  const paidRechargeCny = visibleRechargeOrders.filter((order) => order.status === "paid").reduce((total, order) => total + order.creditCny, 0);
+  const totalSpendCny = visibleWalletTransactions
+    .filter((transaction) => transaction.amountCny < 0)
+    .reduce((total, transaction) => total + Math.abs(transaction.amountCny), 0);
+  const activeLedgerTitle = activeLedgerView === "wallets"
+    ? tAdmin("finance.userBalances")
+    : activeLedgerView === "rechargeOrders"
+      ? tAdmin("finance.rechargeOrders")
+      : tAdmin("finance.walletTransactions");
+  const activeLedgerIcon = activeLedgerView === "wallets"
+    ? <DollarSign size={16} />
+    : activeLedgerView === "rechargeOrders"
+      ? <CreditCard size={16} />
+      : <Activity size={16} />;
 
-  useEffect(() => {
-    if (adjustWorkspaceId && wallets.some((wallet) => wallet.workspaceId === adjustWorkspaceId)) {
-      return;
-    }
-    setAdjustWorkspaceId(wallets[0]?.workspaceId ?? "");
-  }, [adjustWorkspaceId, wallets]);
-
-  async function submitAdjustment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedWallet) {
-      return;
-    }
-    await onSubmitWalletAdjustment({
-      workspaceId: selectedWallet.workspaceId,
-      amountCny: Number(adjustAmount),
-      reason: adjustReason
-    });
+  function openWalletAdjustment(wallet: AdminWalletSummary) {
+    setAdjustingWallet(wallet);
     setAdjustAmount("");
     setAdjustReason("");
   }
 
-  return (
-    <section className="grid gap-4" aria-label="充值账单">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <AdminCompactMetric label="总余额" value={totalBalanceCny} hint={`${wallets.length} 个工作区`} />
-        <AdminCompactMetric label="冻结金额" value={totalReservedCny} hint="正在生成任务占用" />
-        <AdminCompactMetric label="支付方式" value={enabledPaymentCount} hint={`${paymentMethods.length} 个后台配置`} />
-      </div>
+  function closeWalletAdjustment() {
+    setAdjustingWallet(undefined);
+    setAdjustAmount("");
+    setAdjustReason("");
+  }
 
-      <Card className="bg-[var(--card)]">
-        <CardHeader heading="支付方式" icon={<SlidersHorizontal size={16} />} right={<Badge>{enabledPaymentCount}/{paymentMethods.length} 启用</Badge>} />
-        <div className="grid gap-2">
-          {paymentMethods.map((method) => (
-            <div key={method.id} className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel2)] p-3 min-[760px]:grid-cols-[minmax(0,1fr)_auto] min-[760px]:items-center">
+  async function submitAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!adjustingWallet) {
+      return;
+    }
+    await onSubmitWalletAdjustment({
+      workspaceId: adjustingWallet.workspaceId,
+      amountCny: Number(adjustAmount),
+      reason: adjustReason
+    });
+    closeWalletAdjustment();
+  }
+
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("finance.totalBalance"), value: `¥${money(totalBalanceCny)}`, hint: tAdmin("finance.workspaceCount", { count: visibleWallets.length }) },
+            { label: tAdmin("finance.reserved"), value: `¥${money(totalReservedCny)}`, hint: tAdmin("finance.reservedHint") },
+            { label: tAdmin("finance.paidRecharge"), value: `¥${money(paidRechargeCny)}`, hint: tAdmin("finance.rechargeCount", { count: visibleRechargeOrders.length }) },
+            { label: tAdmin("finance.totalSpend"), value: `¥${money(totalSpendCny)}`, hint: tAdmin("finance.transactionCount", { count: visibleWalletTransactions.length }) }
+          ]}
+        />
+      )}
+    >
+      <AdminDataPanel
+        title={activeLedgerTitle}
+        icon={activeLedgerIcon}
+        right={(
+          <AdminSegmentedControl<AdminFinanceLedgerView>
+            value={activeLedgerView}
+            onChange={setActiveLedgerView}
+            options={[
+              { value: "wallets", label: tAdmin("finance.userBalances"), count: visibleWallets.length },
+              { value: "rechargeOrders", label: tAdmin("finance.rechargeOrders"), count: visibleRechargeOrders.length },
+              { value: "walletTransactions", label: tAdmin("finance.walletTransactions"), count: visibleWalletTransactions.length }
+            ]}
+          />
+        )}
+      >
+        {activeLedgerView === "wallets" ? <AdminFinanceWalletsTable wallets={visibleWallets} isBusy={isBusy} onAdjust={openWalletAdjustment} /> : null}
+        {activeLedgerView === "rechargeOrders" ? <AdminFinanceRechargeOrdersTable orders={visibleRechargeOrders} /> : null}
+        {activeLedgerView === "walletTransactions" ? <AdminFinanceWalletTransactionsTable transactions={visibleWalletTransactions} /> : null}
+      </AdminDataPanel>
+      <AdminWalletAdjustmentDialog
+        amount={adjustAmount}
+        isBusy={isBusy}
+        reason={adjustReason}
+        wallet={adjustingWallet}
+        onAmountChange={setAdjustAmount}
+        onClose={closeWalletAdjustment}
+        onReasonChange={setAdjustReason}
+        onSubmit={submitAdjustment}
+      />
+    </AdminWorkbench>
+  );
+}
+
+function AdminPaymentBillingPanel({
+  billingSettings,
+  isBusy,
+  onTogglePaymentMethodEnabled,
+  paymentMethods,
+  onSaveBillingSettings
+}: {
+  billingSettings?: BillingSettingsView;
+  isBusy: boolean;
+  onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
+  paymentMethods: PaymentMethodView[];
+  onSaveBillingSettings: (rules: Array<Pick<BillingPriceRuleView, "usageKind" | "serviceFeeCny" | "enabled">>) => Promise<void>;
+}) {
+  const [billingDrafts, setBillingDrafts] = useState<Record<BillingUsageKind, { serviceFeeCny: string; enabled: boolean }>>(() => defaultBillingDrafts());
+  const enabledPaymentCount = paymentMethods.filter((method) => method.enabled).length;
+  const configuredPaymentCount = paymentMethods.filter((method) => method.configured).length;
+
+  useEffect(() => {
+    if (!billingSettings) {
+      return;
+    }
+    setBillingDrafts(draftsFromBillingRules(billingSettings.rules));
+  }, [billingSettings]);
+
+  function updateBillingDraft(usageKind: BillingUsageKind, patch: Partial<{ serviceFeeCny: string; enabled: boolean }>) {
+    setBillingDrafts((current) => ({
+      ...current,
+      [usageKind]: {
+        ...current[usageKind],
+        ...patch
+      }
+    }));
+  }
+
+  async function submitBillingSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSaveBillingSettings(billingUsageKinds.map((usageKind) => ({
+      usageKind,
+      serviceFeeCny: Number(billingDrafts[usageKind].serviceFeeCny),
+      enabled: billingDrafts[usageKind].enabled
+    })));
+  }
+
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("paymentBilling.paymentMethods"), value: `${enabledPaymentCount}/${paymentMethods.length}`, hint: tAdmin("paymentBilling.configuredMethods", { count: configuredPaymentCount }) },
+            { label: tAdmin("paymentBilling.billingPolicy"), value: billingSettings?.policy.enabled ? tAdmin("paymentBilling.toggleOn") : tAdmin("paymentBilling.toggleOff"), hint: billingSettings?.policy.label ?? tAdmin("paymentBilling.meteredPolicy") },
+            { label: tAdmin("paymentBilling.usageKinds.video"), value: `¥${billingDrafts.video.serviceFeeCny}`, hint: tAdmin("paymentBilling.serviceFeeUnits.perVideo") },
+            { label: tAdmin("paymentBilling.usageKinds.image"), value: `¥${billingDrafts.image.serviceFeeCny}`, hint: tAdmin("paymentBilling.serviceFeeUnits.perImage") }
+          ]}
+        />
+      )}
+    >
+      <div className="grid gap-3">
+        <AdminPaymentBillingSettingsPanel
+          billingDrafts={billingDrafts}
+          billingSettings={billingSettings}
+          isBusy={isBusy}
+          onBillingDraftChange={updateBillingDraft}
+          onSubmitBillingSettings={submitBillingSettings}
+        />
+        <AdminPaymentMethodsPanel
+          enabledPaymentCount={enabledPaymentCount}
+          isBusy={isBusy}
+          paymentMethods={paymentMethods}
+          onTogglePaymentMethodEnabled={onTogglePaymentMethodEnabled}
+        />
+      </div>
+    </AdminWorkbench>
+  );
+}
+
+function AdminPaymentBillingSettingsPanel({
+  billingDrafts,
+  billingSettings,
+  isBusy,
+  onBillingDraftChange,
+  onSubmitBillingSettings
+}: {
+  billingDrafts: Record<BillingUsageKind, { serviceFeeCny: string; enabled: boolean }>;
+  billingSettings?: BillingSettingsView;
+  isBusy: boolean;
+  onBillingDraftChange: (usageKind: BillingUsageKind, patch: Partial<{ serviceFeeCny: string; enabled: boolean }>) => void;
+  onSubmitBillingSettings: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  return (
+    <AdminDataPanel
+      title={tAdmin("paymentBilling.serviceFees")}
+      icon={<SlidersHorizontal size={16} />}
+      right={<Badge>{billingSettings?.policy.label ?? tAdmin("paymentBilling.meteredPolicy")}</Badge>}
+    >
+      <form className="grid gap-0" onSubmit={onSubmitBillingSettings}>
+        <div className="border-b border-[var(--border)] px-4 py-3 text-[12px] font-semibold leading-5 text-[var(--muted)]">
+          {tAdmin("paymentBilling.officialCostHint")}
+        </div>
+        <div className="divide-y divide-[var(--border)]">
+          {billingUsageKinds.map((usageKind) => {
+            const draft = billingDrafts[usageKind];
+            return (
+              <div key={usageKind} className="grid gap-3 px-4 py-3 min-[720px]:grid-cols-[minmax(0,1fr)_180px_auto] min-[720px]:items-center">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-[var(--text)]">{billingUsageKindLabel(usageKind)}</div>
+                  <div className="mt-1 text-[11px] font-semibold text-[var(--muted)]">{billingServiceFeeUnitLabel(usageKind)}</div>
+                </div>
+                <Input
+                  inputMode="decimal"
+                  value={draft.serviceFeeCny}
+                  onChange={(event) => onBillingDraftChange(usageKind, { serviceFeeCny: event.target.value })}
+                  disabled={isBusy}
+                />
+                <AdminToggle
+                  checked={draft.enabled}
+                  disabled={isBusy}
+                  onChange={(enabled) => onBillingDraftChange(usageKind, { enabled })}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-end border-t border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <Button variant="primary" type="submit" disabled={isBusy || !billingSettings}>
+            <CreditCard size={14} />
+            {tAdmin("paymentBilling.savePricing")}
+          </Button>
+        </div>
+      </form>
+    </AdminDataPanel>
+  );
+}
+
+function AdminPaymentMethodsPanel({
+  enabledPaymentCount,
+  isBusy,
+  onTogglePaymentMethodEnabled,
+  paymentMethods
+}: {
+  enabledPaymentCount: number;
+  isBusy: boolean;
+  onTogglePaymentMethodEnabled: (methodId: PaymentMethodView["id"], enabled: boolean) => Promise<void>;
+  paymentMethods: PaymentMethodView[];
+}) {
+  return (
+    <AdminDataPanel
+      title={tAdmin("paymentBilling.paymentMethods")}
+      icon={<CreditCard size={16} />}
+      right={<Badge>{tAdmin("paymentBilling.enabledCount", { enabled: enabledPaymentCount, total: paymentMethods.length })}</Badge>}
+    >
+      <div className="divide-y divide-[var(--border)]">
+        {paymentMethods.map((method) => (
+          <div key={method.id} className="grid gap-2 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong className="text-sm">{method.label}</strong>
-                  <Badge tone={method.kind === "rmb" ? "ok" : "neutral"}>{method.kind === "rmb" ? "RMB支付" : "数字货币支付"}</Badge>
-                  <Badge tone={method.configured ? "ok" : "warn"}>{method.configured ? "已配置" : "未配置"}</Badge>
+                  <Badge tone={method.kind === "rmb" ? "ok" : "neutral"}>{method.kind === "rmb" ? tAdmin("paymentBilling.rmbPayment") : tAdmin("paymentBilling.cryptoPayment")}</Badge>
+                  <Badge tone={method.configured ? "ok" : "warn"}>{method.configured ? tAdmin("paymentBilling.configured") : tAdmin("paymentBilling.notConfigured")}</Badge>
                 </div>
                 <p className="m-0 mt-1 text-[12px] font-semibold leading-5 text-[var(--muted)]">{method.description}</p>
-                {method.unavailableReason ? (
-                  <p className="m-0 mt-1 text-[11px] font-black text-[var(--warn)]">{method.unavailableReason}</p>
-                ) : null}
               </div>
               <AdminToggle
                 checked={method.enabled}
@@ -1251,90 +2260,14 @@ function AdminBillingPanel({
                 onChange={(enabled) => void onTogglePaymentMethodEnabled(method.id, enabled)}
               />
             </div>
-          ))}
-          {paymentMethods.length === 0 ? <EmptyAdminDetail text="暂无支付方式" /> : null}
-        </div>
-      </Card>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="overflow-hidden bg-[var(--card)] p-0">
-          <div className="border-b border-[var(--border)] p-4">
-            <CardHeader className="m-0" heading="用户余额" icon={<DollarSign size={16} />} right={<Badge>{wallets.length} 个工作区</Badge>} />
+            {method.unavailableReason ? (
+              <p className="m-0 text-[11px] font-black text-[var(--warn)]">{method.unavailableReason}</p>
+            ) : null}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] border-separate border-spacing-0 text-left text-xs">
-              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
-                <tr>
-                  <AdminTh>工作区</AdminTh>
-                  <AdminTh>用户</AdminTh>
-                  <AdminTh>余额</AdminTh>
-                  <AdminTh>冻结</AdminTh>
-                  <AdminTh>可用</AdminTh>
-                  <AdminTh>流水</AdminTh>
-                  <AdminTh>最后变动</AdminTh>
-                </tr>
-              </thead>
-              <tbody>
-                {wallets.map((wallet) => (
-                  <tr key={wallet.workspaceId} className="bg-[var(--card)]">
-                    <AdminTd>
-                      <div className="font-black text-[var(--text)]">{wallet.workspaceName}</div>
-                      <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{wallet.workspaceId}</div>
-                    </AdminTd>
-                    <AdminTd>{wallet.ownerEmail ?? "-"}</AdminTd>
-                    <AdminTd>¥{money(wallet.balanceCny)}</AdminTd>
-                    <AdminTd>¥{money(wallet.reservedCny)}</AdminTd>
-                    <AdminTd>
-                      <strong className={wallet.availableCny > 0 ? "text-[var(--ok)]" : "text-[var(--muted)]"}>¥{money(wallet.availableCny)}</strong>
-                    </AdminTd>
-                    <AdminTd>{formatNumber(wallet.transactionCount)}</AdminTd>
-                    <AdminTd>
-                      <div>{formatDateTime(wallet.lastTransactionAt)}</div>
-                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{adminWalletTransactionTypeLabel(wallet.lastTransactionType)}</div>
-                    </AdminTd>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {wallets.length === 0 ? <div className="p-4"><EmptyAdminDetail text="暂无余额数据" /></div> : null}
-        </Card>
-
-        <Card className="bg-[var(--card)]">
-          <CardHeader heading="余额调整" icon={<CreditCard size={16} />} right={<Badge>写入流水</Badge>} />
-          <form className="grid gap-3" onSubmit={submitAdjustment}>
-            <Field label="工作区">
-              <Select value={selectedWallet?.workspaceId ?? ""} onChange={(event) => setAdjustWorkspaceId(event.target.value)} disabled={isBusy || wallets.length === 0}>
-                {wallets.map((wallet) => (
-                  <option key={wallet.workspaceId} value={wallet.workspaceId}>{wallet.ownerEmail ?? wallet.workspaceName} / ¥{money(wallet.availableCny)}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="调整金额">
-              <Input
-                inputMode="decimal"
-                placeholder="例如 10 或 -3.5"
-                value={adjustAmount}
-                onChange={(event) => setAdjustAmount(event.target.value)}
-                disabled={isBusy || !selectedWallet}
-              />
-            </Field>
-            <Field label="原因">
-              <Textarea
-                placeholder="例如：补偿充值手续费、扣回误发余额"
-                value={adjustReason}
-                onChange={(event) => setAdjustReason(event.target.value)}
-                disabled={isBusy || !selectedWallet}
-              />
-            </Field>
-            <Button variant="primary" type="submit" disabled={isBusy || !selectedWallet || !adjustAmount.trim() || !adjustReason.trim()}>
-              <CreditCard size={14} />
-              提交调整
-            </Button>
-          </form>
-        </Card>
+        ))}
+        {paymentMethods.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("paymentBilling.emptyPaymentMethods")} /></div> : null}
       </div>
-    </section>
+    </AdminDataPanel>
   );
 }
 
@@ -1364,23 +2297,653 @@ function AdminToggle({
           checked ? "translate-x-[33px] text-[var(--accent)]" : "translate-x-0 text-[var(--muted)]"
         )}
       >
-        {checked ? "开" : "关"}
+        {checked ? tAdmin("paymentBilling.toggleOn") : tAdmin("paymentBilling.toggleOff")}
       </span>
     </button>
   );
 }
 
+function AdminModelPricingPanel({
+  catalog,
+  isBusy,
+  onPublishDraft,
+  onSaveDraft
+}: {
+  catalog?: AdminModelPricingCatalogResponse;
+  isBusy: boolean;
+  onPublishDraft: (draftId: string) => Promise<void>;
+  onSaveDraft: (input: { version: string; entries: AdminModelPricingEntry[] }) => Promise<string | undefined>;
+}) {
+  const active = catalog?.active;
+  const [version, setVersion] = useState("");
+  const [draftId, setDraftId] = useState<string | undefined>();
+  const [entries, setEntries] = useState<AdminModelPricingEntry[]>([]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    setVersion(nextModelPricingVersion(active.version));
+    setEntries(active.entries.map((entry) => ({ ...entry })));
+    setDraftId(undefined);
+  }, [active]);
+
+  function updateEntry(model: string, patch: Partial<AdminModelPricingEntry>) {
+    setEntries((current) => current.map((entry) => entry.model === model ? { ...entry, ...patch } : entry));
+  }
+
+  async function saveDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextDraftId = await onSaveDraft({ version, entries });
+    if (nextDraftId) {
+      setDraftId(nextDraftId);
+    }
+  }
+
+  async function publishDraft() {
+    if (!draftId) {
+      return;
+    }
+    await onPublishDraft(draftId);
+    setDraftId(undefined);
+  }
+
+  const providerCounts = entries.reduce<Record<string, number>>((current, entry) => {
+    current[entry.providerId] = (current[entry.providerId] ?? 0) + 1;
+    return current;
+  }, {});
+  const providerSummaryItems = Array.from(new Set(entries.map((entry) => entry.providerId))).map((providerId) => ({
+    label: modelPricingProviderLabel(providerId),
+    value: providerCounts[providerId] ?? 0,
+    hint: tAdmin("modelPricing.providerEntries")
+  }));
+
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("modelPricing.activeVersion"), value: active?.version ?? "-", hint: active ? modelPricingSourceLabel(active.source) : "-" },
+            ...providerSummaryItems
+          ]}
+        />
+      )}
+      side={(
+        <AdminModelPricingPublishPanel
+          draftId={draftId}
+          entriesCount={entries.length}
+          isBusy={isBusy}
+          version={version}
+          onPublishDraft={publishDraft}
+          onSaveDraft={saveDraft}
+          onVersionChange={setVersion}
+        />
+      )}
+    >
+      <AdminDataPanel
+        title={tAdmin("modelPricing.catalogEditor")}
+        icon={<DollarSign size={16} />}
+        right={<Badge tone={draftId ? "warn" : "neutral"}>{draftId ? tAdmin("modelPricing.draftReady") : tAdmin("modelPricing.noDraft")}</Badge>}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-xs">
+            <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+              <tr>
+                <AdminTh>{tAdmin("modelPricing.table.model")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.kind")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.input")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.output")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.cached")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.image")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.video")}</AdminTh>
+                <AdminTh>{tAdmin("modelPricing.table.source")}</AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={`${entry.providerId}-${entry.model}`} className="bg-[var(--card)]">
+                  <AdminTd>
+                    <div className="font-black text-[var(--text)]">{entry.model}</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--muted)]">{modelPricingProviderLabel(entry.providerId)} · {entry.label}</div>
+                  </AdminTd>
+                  <AdminTd><Badge>{modelPricingKindLabel(entry.kind)}</Badge></AdminTd>
+                  <AdminTd>
+                    <AdminPriceInput value={entry.inputPriceCnyPerMillion} disabled={isBusy || entry.kind !== "text"} onChange={(value) => updateEntry(entry.model, { inputPriceCnyPerMillion: value })} />
+                  </AdminTd>
+                  <AdminTd>
+                    <AdminPriceInput value={entry.outputPriceCnyPerMillion} disabled={isBusy || entry.kind !== "text"} onChange={(value) => updateEntry(entry.model, { outputPriceCnyPerMillion: value })} />
+                  </AdminTd>
+                  <AdminTd>
+                    <AdminPriceInput value={entry.cachedInputPriceCnyPerMillion} disabled={isBusy || entry.kind !== "text"} onChange={(value) => updateEntry(entry.model, { cachedInputPriceCnyPerMillion: value })} />
+                  </AdminTd>
+                  <AdminTd>
+                    <AdminPriceInput value={entry.imagePriceCnyPerImage} disabled={isBusy || entry.kind !== "image"} onChange={(value) => updateEntry(entry.model, { imagePriceCnyPerImage: value })} />
+                  </AdminTd>
+                  <AdminTd>
+                    <AdminPriceInput value={entry.videoTokenPriceCnyPerMillion} disabled={isBusy || entry.kind !== "video"} onChange={(value) => updateEntry(entry.model, { videoTokenPriceCnyPerMillion: value })} />
+                  </AdminTd>
+                  <AdminTd>
+                    <a className="font-black text-[var(--accent)] hover:underline" href={entry.sourceUrl} target="_blank" rel="noreferrer">{tAdmin("modelPricing.source")}</a>
+                  </AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {entries.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("modelPricing.emptyEntries")} /></div> : null}
+      </AdminDataPanel>
+    </AdminWorkbench>
+  );
+}
+
+function AdminModelPricingPublishPanel({
+  draftId,
+  entriesCount,
+  isBusy,
+  onPublishDraft,
+  onSaveDraft,
+  onVersionChange,
+  version
+}: {
+  draftId?: string;
+  entriesCount: number;
+  isBusy: boolean;
+  onPublishDraft: () => Promise<void>;
+  onSaveDraft: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onVersionChange: (value: string) => void;
+  version: string;
+}) {
+  return (
+    <AdminSidePanel title={tAdmin("modelPricing.publishPanel")} icon={<CheckCircle2 size={16} />}>
+      <form className="grid gap-3" onSubmit={onSaveDraft}>
+        <Field label={tAdmin("modelPricing.version")}>
+          <Input value={version} onChange={(event) => onVersionChange(event.target.value)} disabled={isBusy} />
+        </Field>
+        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-3 text-[12px] font-semibold leading-5 text-[var(--muted)]">
+          {tAdmin("modelPricing.publishHint")}
+        </div>
+        <Button variant="primary" type="submit" disabled={isBusy || entriesCount === 0 || !version.trim()}>
+          <DollarSign size={14} />
+          {tAdmin("modelPricing.saveDraft")}
+        </Button>
+        <Button type="button" disabled={isBusy || !draftId} onClick={() => void onPublishDraft()}>
+          <CheckCircle2 size={14} />
+          {tAdmin("modelPricing.publish")}
+        </Button>
+      </form>
+    </AdminSidePanel>
+  );
+}
+
+function AdminPriceInput({
+  disabled,
+  onChange,
+  value
+}: {
+  disabled?: boolean;
+  onChange: (value: number | undefined) => void;
+  value?: number;
+}) {
+  return (
+    <Input
+      className="min-h-8 px-2 text-xs"
+      disabled={disabled}
+      inputMode="decimal"
+      value={value ?? ""}
+      onChange={(event) => {
+        const raw = event.target.value.trim();
+        onChange(raw === "" ? undefined : Number(raw));
+      }}
+    />
+  );
+}
+
+function AdminSiteSettingsPanel({ settings }: { settings?: AdminSiteSettingsResponse }) {
+  const enabledPaymentCount = (settings?.paymentMethods ?? []).filter((method) => method.enabled).length;
+  const enabledBillingRuleCount = (settings?.billing.rules ?? []).filter((rule) => rule.enabled).length;
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("siteSettings.sections"), value: settings?.sections.length ?? 0, hint: tAdmin("siteSettings.sectionHint") },
+            { label: tAdmin("siteSettings.publicPages"), value: settings?.publicPages.length ?? 0, hint: tAdmin("siteSettings.publicPageHint") },
+            { label: tAdmin("siteSettings.modelPricing"), value: settings?.modelPricing.entryCount ?? 0, hint: settings?.modelPricing.activeVersion ?? "-" },
+            { label: tAdmin("siteSettings.paymentMethods"), value: `${enabledPaymentCount}/${settings?.paymentMethods.length ?? 0}`, hint: tAdmin("siteSettings.billingRules", { count: enabledBillingRuleCount }) }
+          ]}
+        />
+      )}
+      side={<AdminSiteSettingsSidePanel settings={settings} />}
+    >
+      <AdminDataPanel
+        title={tAdmin("siteSettings.configSections")}
+        icon={<Settings2 size={16} />}
+        right={<Badge>{tAdmin("siteSettings.statusOnly")}</Badge>}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
+            <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+              <tr>
+                <AdminTh>{tAdmin("siteSettings.table.section")}</AdminTh>
+                <AdminTh>{tAdmin("siteSettings.table.description")}</AdminTh>
+                <AdminTh>{tAdmin("siteSettings.table.status")}</AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {(settings?.sections ?? []).map((section) => (
+                <tr key={section.id} className="bg-[var(--card)]">
+                  <AdminTd>
+                    <div className="font-black text-[var(--text)]">{section.label}</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--muted)]">{section.id}</div>
+                  </AdminTd>
+                  <AdminTd>{section.description}</AdminTd>
+                  <AdminTd><Badge tone={siteSettingsTone(section.status)}>{siteSettingsStatusLabel(section.status)}</Badge></AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {(settings?.sections ?? []).length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("siteSettings.emptySections")} /></div> : null}
+      </AdminDataPanel>
+    </AdminWorkbench>
+  );
+}
+
+function AdminSiteSettingsSidePanel({ settings }: { settings?: AdminSiteSettingsResponse }) {
+  return (
+    <AdminSidePanel title={tAdmin("siteSettings.sidePanel")} icon={<Globe2 size={16} />}>
+      <div className="grid gap-4">
+        <section>
+          <h3 className="m-0 mb-3 text-sm font-black text-[var(--text)]">{tAdmin("siteSettings.publicPages")}</h3>
+          <div className="divide-y divide-[var(--border)] rounded-[8px] border border-[var(--border)] bg-[var(--panel2)]">
+            {(settings?.publicPages ?? []).map((page) => (
+              <div key={page.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm font-black">
+                <span className="truncate">{page.label}</span>
+                <Badge tone={siteSettingsTone(page.status)}>{siteSettingsStatusLabel(page.status)}</Badge>
+              </div>
+            ))}
+            {(settings?.publicPages ?? []).length === 0 ? <div className="p-3"><EmptyAdminDetail text={tAdmin("siteSettings.emptyPublicPages")} /></div> : null}
+          </div>
+        </section>
+
+        <section className="border-t border-[var(--border)] pt-4">
+          <h3 className="m-0 mb-3 flex items-center gap-2 text-sm font-black text-[var(--text)]">
+            <Search size={15} className="text-[var(--accent)]" />
+            {tAdmin("siteSettings.seoGeo")}
+          </h3>
+          <div className="grid gap-2 text-xs font-semibold leading-5 text-[var(--muted)]">
+            <Badge tone={siteSettingsTone(settings?.seoGeo.status ?? "planned")}>{siteSettingsStatusLabel(settings?.seoGeo.status ?? "planned")}</Badge>
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-3">
+              <div className="font-black text-[var(--text)]">{tAdmin("siteSettings.roadmapPath")}</div>
+              <div className="mt-1 break-words">{settings?.seoGeo.roadmapPath ?? "-"}</div>
+            </div>
+            <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-3">
+              <div className="font-black text-[var(--text)]">{tAdmin("siteSettings.productionCheck")}</div>
+              <div className="mt-1 break-words">{settings?.seoGeo.productionCheck ?? "-"}</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-[var(--border)] pt-4">
+          <h3 className="m-0 mb-3 flex items-center gap-2 text-sm font-black text-[var(--text)]">
+            <CreditCard size={15} className="text-[var(--accent)]" />
+            {tAdmin("siteSettings.commerce")}
+          </h3>
+          <div className="divide-y divide-[var(--border)] rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] text-xs font-semibold text-[var(--muted)]">
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span>{tAdmin("siteSettings.paymentMethods")}</span>
+              <strong className="text-[var(--text)]">{(settings?.paymentMethods ?? []).filter((method) => method.enabled).length}/{settings?.paymentMethods.length ?? 0}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span>{settings?.billing.label ?? tAdmin("paymentBilling.meteredPolicy")}</span>
+              <Badge tone={settings?.billing.enabled ? "ok" : "warn"}>{settings?.billing.enabled ? tAdmin("paymentBilling.toggleOn") : tAdmin("paymentBilling.toggleOff")}</Badge>
+            </div>
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span>{tAdmin("siteSettings.modelPricing")}</span>
+              <strong className="text-[var(--text)]">{settings?.modelPricing.activeVersion ?? "-"}</strong>
+            </div>
+          </div>
+        </section>
+      </div>
+    </AdminSidePanel>
+  );
+}
+
+function AdminFinanceWalletsTable({
+  isBusy,
+  onAdjust,
+  wallets
+}: {
+  isBusy: boolean;
+  onAdjust: (wallet: AdminWalletSummary) => void;
+  wallets: AdminWalletSummary[];
+}) {
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-xs">
+          <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+            <tr>
+              <AdminTh>{tAdmin("finance.walletTable.workspace")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.user")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.balance")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.reserved")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.available")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.ledger")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.lastChange")}</AdminTh>
+              <AdminTh>{tAdmin("finance.walletTable.action")}</AdminTh>
+            </tr>
+          </thead>
+          <tbody>
+            {wallets.map((wallet) => (
+              <tr key={wallet.workspaceId} className="bg-[var(--card)]">
+                <AdminTd>
+                  <div className="font-black text-[var(--text)]">{adminBusinessSpaceName(wallet.workspaceName)}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{wallet.workspaceId}</div>
+                </AdminTd>
+                <AdminTd>{wallet.ownerEmail ?? "-"}</AdminTd>
+                <AdminTd>¥{money(wallet.balanceCny)}</AdminTd>
+                <AdminTd>¥{money(wallet.reservedCny)}</AdminTd>
+                <AdminTd>
+                  <strong className={wallet.availableCny > 0 ? "text-[var(--ok)]" : "text-[var(--muted)]"}>¥{money(wallet.availableCny)}</strong>
+                </AdminTd>
+                <AdminTd>{formatNumber(wallet.transactionCount)}</AdminTd>
+                <AdminTd>
+                  <div>{formatDateTime(wallet.lastTransactionAt)}</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--muted)]">{adminWalletTransactionTypeLabel(wallet.lastTransactionType)}</div>
+                </AdminTd>
+                <AdminTd>
+                  <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={() => onAdjust(wallet)}>
+                    <CreditCard size={14} />
+                    {tAdmin("finance.adjustment")}
+                  </Button>
+                </AdminTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {wallets.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("finance.emptyWallets")} /></div> : null}
+    </>
+  );
+}
+
+function AdminWalletAdjustmentDialog({
+  amount,
+  isBusy,
+  onAmountChange,
+  onClose,
+  onReasonChange,
+  onSubmit,
+  reason,
+  wallet
+}: {
+  amount: string;
+  isBusy: boolean;
+  onAmountChange: (value: string) => void;
+  onClose: () => void;
+  onReasonChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  reason: string;
+  wallet?: AdminWalletSummary;
+}) {
+  if (!wallet) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(42,33,27,.35)] p-4">
+      <form className="w-full max-w-[520px] overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)] shadow-[0_24px_70px_rgba(42,33,27,.24)]" role="dialog" aria-modal="true" aria-label={tAdmin("finance.adjustment")} onSubmit={onSubmit}>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <div className="min-w-0">
+            <h2 className="m-0 text-base font-black text-[var(--text)]">{tAdmin("finance.adjustment")}</h2>
+            <p className="m-0 mt-1 truncate text-xs font-semibold text-[var(--muted)]">{adminBusinessSpaceName(wallet.workspaceName)} / ¥{money(wallet.availableCny)}</p>
+          </div>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>{tAdmin("finance.cancelAdjustment")}</Button>
+        </div>
+        <div className="grid gap-3 px-4 py-4">
+          <Field label={tAdmin("finance.amount")}>
+            <Input
+              inputMode="decimal"
+              placeholder={tAdmin("finance.amountPlaceholder")}
+              value={amount}
+              onChange={(event) => onAmountChange(event.target.value)}
+              disabled={isBusy}
+            />
+          </Field>
+          <Field label={tAdmin("finance.reason")}>
+            <Textarea
+              placeholder={tAdmin("finance.reasonPlaceholder")}
+              value={reason}
+              onChange={(event) => onReasonChange(event.target.value)}
+              disabled={isBusy}
+            />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>{tAdmin("finance.cancelAdjustment")}</Button>
+          <Button variant="primary" type="submit" disabled={isBusy || !amount.trim() || !reason.trim()}>
+            <CreditCard size={14} />
+            {tAdmin("finance.submitAdjustment")}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AdminFinanceRechargeOrdersTable({ orders }: { orders: AdminRechargeOrderView[] }) {
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
+          <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+            <tr>
+              <AdminTh>{tAdmin("finance.orderTable.order")}</AdminTh>
+              <AdminTh>{tAdmin("finance.orderTable.workspace")}</AdminTh>
+              <AdminTh>{tAdmin("finance.orderTable.amount")}</AdminTh>
+              <AdminTh>{tAdmin("finance.orderTable.provider")}</AdminTh>
+              <AdminTh>{tAdmin("finance.orderTable.status")}</AdminTh>
+              <AdminTh>{tAdmin("finance.orderTable.createdAt")}</AdminTh>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id} className="bg-[var(--card)]">
+                <AdminTd>
+                  <div className="font-black text-[var(--text)]">{order.id}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{order.providerSessionId ?? "-"}</div>
+                </AdminTd>
+                <AdminTd>
+                  <div className="font-black text-[var(--text)]">{adminBusinessSpaceName(order.workspaceName)}</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--muted)]">{order.ownerEmail ?? order.workspaceId}</div>
+                </AdminTd>
+                <AdminTd>
+                  <div className="font-black text-[var(--text)]">¥{money(order.creditCny)}</div>
+                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">
+                    {order.paymentCurrency.toUpperCase()} {money(order.paymentAmount)}
+                  </div>
+                </AdminTd>
+                <AdminTd>{order.provider}</AdminTd>
+                <AdminTd><Badge tone={rechargeOrderTone(order.status)}>{rechargeOrderStatusLabel(order.status)}</Badge></AdminTd>
+                <AdminTd>{formatDateTime(order.createdAt)}</AdminTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {orders.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("finance.emptyRechargeOrders")} /></div> : null}
+    </>
+  );
+}
+
+function AdminFinanceWalletTransactionsTable({ transactions }: { transactions: AdminWalletTransactionView[] }) {
+  const [selectedTransaction, setSelectedTransaction] = useState<AdminWalletTransactionView | undefined>();
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left text-xs">
+          <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+            <tr>
+              <AdminTh>{tAdmin("finance.transactionTable.type")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.workspace")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.amount")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.balance")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.job")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.createdAt")}</AdminTh>
+              <AdminTh>{tAdmin("finance.transactionTable.action")}</AdminTh>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map((transaction) => (
+              <tr key={transaction.id} className="bg-[var(--card)]">
+                <AdminTd>
+                  <Badge tone={transaction.amountCny < 0 ? "danger" : "ok"}>{adminWalletTransactionTypeLabel(transaction.type)}</Badge>
+                  <div className="mt-1 text-[11px] text-[var(--muted)]">{transaction.description ?? transaction.id}</div>
+                </AdminTd>
+                <AdminTd>
+                  <div className="font-black text-[var(--text)]">{adminBusinessSpaceName(transaction.workspaceName)}</div>
+                  <div className="mt-0.5 text-[11px] text-[var(--muted)]">{transaction.ownerEmail ?? transaction.workspaceId}</div>
+                </AdminTd>
+                <AdminTd>
+                  <strong className={transaction.amountCny < 0 ? "text-[var(--danger)]" : "text-[var(--ok)]"}>{transaction.amountCny < 0 ? "-" : "+"}¥{money(Math.abs(transaction.amountCny))}</strong>
+                </AdminTd>
+                <AdminTd>¥{money(transaction.balanceAfterCny)}</AdminTd>
+                <AdminTd>{transaction.jobId ?? transaction.reservationId ?? "-"}</AdminTd>
+                <AdminTd>{formatDateTime(transaction.createdAt)}</AdminTd>
+                <AdminTd>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedTransaction(transaction)}>
+                    <Database size={14} />
+                    {tAdmin("finance.transactionTable.details")}
+                  </Button>
+                </AdminTd>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {transactions.length === 0 ? <div className="p-4"><EmptyAdminDetail text={tAdmin("finance.emptyWalletTransactions")} /></div> : null}
+      <AdminWalletTransactionDetailDialog
+        transaction={selectedTransaction}
+        onClose={() => setSelectedTransaction(undefined)}
+      />
+    </>
+  );
+}
+
+function AdminWalletTransactionDetailDialog({
+  onClose,
+  transaction
+}: {
+  onClose: () => void;
+  transaction?: AdminWalletTransactionView;
+}) {
+  if (!transaction) return null;
+  const metadata = transaction.metadata ?? {};
+  const priceSnapshot = adminRecordValue(metadata.priceSnapshot);
+  const rows = adminWalletTransactionDetailRows(transaction, metadata, priceSnapshot);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-[rgba(42,33,27,.35)] p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={tAdmin("finance.transactionDetail.title")}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="grid w-full max-w-[680px] overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)] shadow-[0_24px_70px_rgba(42,33,27,.24)]">
+        <header className="flex items-start justify-between gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={transaction.amountCny < 0 ? "danger" : "ok"}>{adminWalletTransactionTypeLabel(transaction.type)}</Badge>
+              <span className="text-[12px] font-bold text-[var(--muted)]">{formatDateTime(transaction.createdAt)}</span>
+            </div>
+            <h2 className="m-0 mt-2 text-base font-black text-[var(--text)]">{tAdmin("finance.transactionDetail.title")}</h2>
+          </div>
+          <Button type="button" variant="ghost" size="icon" aria-label={tAdmin("finance.transactionDetail.close")} onClick={onClose}>
+            <X size={15} />
+          </Button>
+        </header>
+        <div className="grid gap-4 px-4 py-4">
+          <div className="grid grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--border)]">
+            <AdminTransactionDetailMetric label={tAdmin("finance.transactionDetail.amount")} value={`${transaction.amountCny < 0 ? "-" : "+"}¥${money(Math.abs(transaction.amountCny))}`} />
+            <AdminTransactionDetailMetric label={tAdmin("finance.transactionDetail.balanceAfter")} value={`¥${money(transaction.balanceAfterCny)}`} />
+            <AdminTransactionDetailMetric label={tAdmin("finance.transactionDetail.reservedAfter")} value={`¥${money(transaction.reservedAfterCny)}`} />
+          </div>
+          <div className="grid gap-2">
+            {rows.map((row) => (
+              <AdminTransactionDetailRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AdminTransactionDetailMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-r border-[var(--border)] bg-[var(--panel2)] px-3 py-2.5 last:border-r-0">
+      <div className="truncate text-[10px] font-black uppercase text-[var(--muted)]">{label}</div>
+      <div className="mt-1 truncate text-[17px] font-black tabular-nums text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
+function AdminTransactionDetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="grid gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2 text-xs min-[560px]:grid-cols-[160px_minmax(0,1fr)] min-[560px]:items-center">
+      <div className="font-black text-[var(--muted)]">{label}</div>
+      <div className="min-w-0 break-words font-semibold text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
+const billingUsageKinds: BillingUsageKind[] = ["text", "image", "video"];
+
+function defaultBillingDrafts(): Record<BillingUsageKind, { serviceFeeCny: string; enabled: boolean }> {
+  return {
+    text: { serviceFeeCny: "0.20", enabled: true },
+    image: { serviceFeeCny: "0.30", enabled: true },
+    video: { serviceFeeCny: "1.00", enabled: true }
+  };
+}
+
+function draftsFromBillingRules(rules: BillingPriceRuleView[]): Record<BillingUsageKind, { serviceFeeCny: string; enabled: boolean }> {
+  const next = defaultBillingDrafts();
+  for (const rule of rules) {
+    next[rule.usageKind] = {
+      serviceFeeCny: money(rule.serviceFeeCny),
+      enabled: rule.enabled
+    };
+  }
+  return next;
+}
+
+function billingUsageKindLabel(usageKind: BillingUsageKind): string {
+  if (usageKind === "text") return tAdmin("paymentBilling.usageKinds.text");
+  if (usageKind === "image") return tAdmin("paymentBilling.usageKinds.image");
+  return tAdmin("paymentBilling.usageKinds.video");
+}
+
+function billingServiceFeeUnitLabel(usageKind: BillingUsageKind): string {
+  if (usageKind === "text") return tAdmin("paymentBilling.serviceFeeUnits.perTextCall");
+  if (usageKind === "image") return tAdmin("paymentBilling.serviceFeeUnits.perImage");
+  return tAdmin("paymentBilling.serviceFeeUnits.perVideo");
+}
+
 function AdminMetricGrid({ overview }: { overview: AdminOverview }) {
   const metrics = [
-    { label: "总用户", value: overview.metrics.totalUsers, hint: `${overview.metrics.verifiedUsers} 已验证`, icon: Users },
-    { label: "今日新增", value: overview.metrics.newUsersToday, hint: `7 天 ${overview.metrics.newUsers7d}`, icon: CheckCircle2 },
-    { label: "7 天活跃", value: overview.metrics.activeUsers7d, hint: "登录 / 生成活动", icon: Activity },
-    { label: "工作区", value: overview.metrics.totalWorkspaces, hint: "全站", icon: Database },
-    { label: "商品", value: overview.metrics.totalProducts, hint: "用户资料库", icon: BarChart3 },
-    { label: "视频任务", value: overview.metrics.totalVideoJobs, hint: "生成记录", icon: Video }
+    { label: tAdmin("overview.metrics.totalUsers"), value: overview.metrics.totalUsers, hint: tAdmin("overview.metrics.verifiedUsers", { count: overview.metrics.verifiedUsers }), icon: Users },
+    { label: tAdmin("overview.metrics.newToday"), value: overview.metrics.newUsersToday, hint: tAdmin("overview.metrics.new7d", { count: overview.metrics.newUsers7d }), icon: CheckCircle2 },
+    { label: tAdmin("overview.metrics.active7d"), value: overview.metrics.activeUsers7d, hint: tAdmin("overview.metrics.activeHint"), icon: Activity },
+    { label: tAdmin("overview.metrics.workspaces"), value: overview.metrics.totalWorkspaces, hint: tAdmin("overview.metrics.siteWide"), icon: Database },
+    { label: tAdmin("overview.metrics.products"), value: overview.metrics.totalProducts, hint: tAdmin("overview.metrics.productLibrary"), icon: BarChart3 },
+    { label: tAdmin("overview.metrics.videoJobs"), value: overview.metrics.totalVideoJobs, hint: tAdmin("overview.metrics.generationRecords"), icon: Video }
   ];
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="后台指标">
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label={tAdmin("overview.metricsAriaLabel")}>
       {metrics.map((metric) => {
         const Icon = metric.icon;
         return (
@@ -1437,15 +3000,138 @@ function AdminPlaceholderSection({
   );
 }
 
+function AdminWorkbench({
+  children,
+  side,
+  summary
+}: {
+  children: React.ReactNode;
+  side?: React.ReactNode;
+  summary?: React.ReactNode;
+}) {
+  return (
+    <section className="grid min-h-0 gap-3">
+      {summary ? <div className="min-w-0">{summary}</div> : null}
+      <div className={cn(
+        "grid min-h-0 gap-3",
+        side ? "xl:grid-cols-[minmax(0,1fr)_360px]" : "xl:grid-cols-1"
+      )}>
+        <div className="min-w-0">{children}</div>
+        {side ? <aside className="min-w-0">{side}</aside> : null}
+      </div>
+    </section>
+  );
+}
+
+function AdminSummaryStrip({
+  items
+}: {
+  items: Array<{ label: string; value: number | string; hint: string }>;
+}) {
+  return (
+    <div className="grid overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow)] sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0 border-b border-[var(--border)] px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0">
+          <div className="truncate text-[11px] font-black uppercase text-[var(--muted)]">{item.label}</div>
+          <div className="mt-1 truncate text-[22px] font-black tabular-nums leading-tight">{typeof item.value === "number" ? formatNumber(item.value) : item.value}</div>
+          <div className="mt-1 truncate text-[11px] font-semibold text-[var(--muted)]">{item.hint}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminSegmentedControl<T extends string>({
+  onChange,
+  options,
+  value
+}: {
+  onChange: (value: T) => void;
+  options: Array<{ value: T; label: string; count?: number }>;
+  value: T;
+}) {
+  return (
+    <div className="inline-flex min-w-0 flex-wrap gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-1">
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className={cn(
+              "inline-flex min-h-8 items-center gap-1.5 rounded-[7px] px-3 text-xs font-black transition",
+              selected ? "bg-[var(--accent)] text-white shadow-[0_8px_18px_rgba(10,163,148,.16)]" : "text-[var(--muted)] hover:bg-[var(--field)] hover:text-[var(--text)]"
+            )}
+            aria-pressed={selected}
+            onClick={() => onChange(option.value)}
+          >
+            <span>{option.label}</span>
+            {option.count !== undefined ? (
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px]", selected ? "bg-white/20 text-white" : "bg-[var(--field)] text-[var(--muted)]")}>
+                {formatNumber(option.count)}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AdminDataPanel({
+  children,
+  icon,
+  right,
+  title
+}: {
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  right?: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow)]">
+      <div className="flex min-h-[58px] flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+        <h2 className="m-0 flex min-w-0 items-center gap-2 text-[15px] font-black">
+          {icon ? <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[var(--panel2)] text-[var(--accent)]">{icon}</span> : null}
+          <span className="truncate">{title}</span>
+        </h2>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AdminSidePanel({
+  children,
+  icon,
+  title
+}: {
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="min-w-0 rounded-[8px] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow)]">
+      <h2 className="m-0 mb-3 flex min-w-0 items-center gap-2 text-[15px] font-black">
+        {icon ? <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[var(--panel2)] text-[var(--accent)]">{icon}</span> : null}
+        <span className="truncate">{title}</span>
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 function AdminDashboardSkeleton({ checkingSession }: { checkingSession: boolean }) {
-  const label = checkingSession ? "检查登录状态" : "刷新数据中";
+  const label = checkingSession ? tAdmin("shell.checkingSession") : tAdmin("shell.refreshing");
   return (
     <section className="grid gap-4" aria-label={label}>
       <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-black text-[var(--muted)]">
         <RefreshCcw className="animate-spin text-[var(--accent)]" size={14} />
         {label}
       </div>
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="后台指标占位">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label={tAdmin("overview.metricsPlaceholderAriaLabel")}>
         {Array.from({ length: 6 }).map((_, index) => (
           <Card key={index} className="bg-[var(--card)] p-3">
             <div className="grid gap-2">
@@ -1494,7 +3180,7 @@ function AdminChart({ empty, option }: { empty: boolean; option: EChartsOption }
   if (empty) {
     return (
       <div className="grid h-[280px] place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)] text-xs font-bold text-[var(--muted)]">
-        暂无数据
+        {tAdmin("overview.empty")}
       </div>
     );
   }
@@ -1509,191 +3195,456 @@ function AdminChart({ empty, option }: { empty: boolean; option: EChartsOption }
   );
 }
 
-function AdminUsersTable({ onSelectUser, users }: { onSelectUser: (user: AdminUserSummary) => void; users: AdminUserSummary[] }) {
+function AdminUsersPanel({
+  globalSearch,
+  loading,
+  onOpenContent,
+  onOpenFinance,
+  onSelectUser,
+  overview,
+  rechargeOrders,
+  selectedUser,
+  selectedUserDetail,
+  status,
+  walletTransactions,
+  wallets
+}: {
+  globalSearch: string;
+  loading: boolean;
+  onOpenContent: (user: AdminUserSummary) => void;
+  onOpenFinance: (user: AdminUserSummary) => void;
+  onSelectUser: (user: AdminUserSummary) => void;
+  overview: AdminOverview;
+  rechargeOrders: AdminRechargeOrderView[];
+  selectedUser?: AdminUserSummary;
+  selectedUserDetail?: AdminUserDetail;
+  status: string;
+  walletTransactions: AdminWalletTransactionView[];
+  wallets: AdminWalletSummary[];
+}) {
+  const visibleUsers = filterAdminUsers(overview.users, globalSearch);
   return (
-    <Card className="overflow-hidden bg-[var(--card)] p-0">
-      <div className="border-b border-[var(--border)] p-4">
-        <CardHeader className="m-0" heading="用户列表" icon={<Users size={16} />} right={<Badge>{users.length} 人</Badge>} />
+    <section className="grid min-h-0 gap-3">
+      <div className="min-w-0">
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("users.users"), value: overview.metrics.totalUsers, hint: tAdmin("overview.metrics.verifiedUsers", { count: overview.metrics.verifiedUsers }) },
+            { label: tAdmin("users.workspaces"), value: overview.metrics.totalWorkspaces, hint: tAdmin("users.siteWorkspaces") },
+            { label: tAdmin("users.videoJobs"), value: overview.metrics.totalVideoJobs, hint: tAdmin("users.userGeneratedRecords") },
+            { label: tAdmin("users.active7d"), value: overview.metrics.activeUsers7d, hint: tAdmin("overview.metrics.activeHint") }
+          ]}
+        />
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left text-xs">
-          <thead className="bg-[var(--panel2)] text-[var(--muted)]">
-            <tr>
-              <AdminTh>用户</AdminTh>
-              <AdminTh>状态</AdminTh>
-              <AdminTh>工作区</AdminTh>
-              <AdminTh>商品</AdminTh>
-              <AdminTh>视频任务</AdminTh>
-              <AdminTh>注册时间</AdminTh>
-              <AdminTh>最近活跃</AdminTh>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr
-                key={user.id}
-                tabIndex={0}
-                className="cursor-pointer bg-[var(--card)] outline-none transition hover:bg-[var(--field2)] focus:bg-[var(--field2)] focus-visible:shadow-[inset_3px_0_0_var(--accent)]"
-                onClick={() => onSelectUser(user)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onSelectUser(user);
-                  }
-                }}
-              >
-                <AdminTd>
-                  <div className="font-black text-[var(--text)]">{user.email}</div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-[var(--muted)]">{user.displayName || user.id}</div>
-                </AdminTd>
-                <AdminTd>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tone={user.role === "admin" ? "ok" : "neutral"}>{user.role === "admin" ? "管理员" : "用户"}</Badge>
-                    <Badge tone={user.emailVerified ? "ok" : "warn"}>{user.emailVerified ? "已验证" : "未验证"}</Badge>
-                  </div>
-                </AdminTd>
-                <AdminTd>{formatNumber(user.workspaceCount)}</AdminTd>
-                <AdminTd>{formatNumber(user.productCount)}</AdminTd>
-                <AdminTd>{formatNumber(user.videoJobCount)}</AdminTd>
-                <AdminTd>{formatDateTime(user.createdAt)}</AdminTd>
-                <AdminTd>{formatDateTime(user.lastActiveAt)}</AdminTd>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+      <AdminUsersPanelFrame
+        users={visibleUsers}
+        selectedUserId={selectedUser?.id}
+        selectedUserDetail={selectedUserDetail}
+        loading={loading}
+        rechargeOrders={rechargeOrders}
+        status={status}
+        walletTransactions={walletTransactions}
+        wallets={wallets}
+        onSelectUser={onSelectUser}
+        onOpenContent={onOpenContent}
+        onOpenFinance={onOpenFinance}
+      />
+    </section>
   );
 }
 
-function AdminUserDetailDrawer({
+function AdminUsersPanelFrame({
+  loading,
+  onSelectUser,
+  onOpenContent,
+  onOpenFinance,
+  rechargeOrders,
+  selectedUserId,
+  selectedUserDetail,
+  status,
+  walletTransactions,
+  wallets,
+  users
+}: {
+  loading: boolean;
+  onOpenContent: (user: AdminUserSummary) => void;
+  onOpenFinance: (user: AdminUserSummary) => void;
+  onSelectUser: (user: AdminUserSummary) => void;
+  rechargeOrders: AdminRechargeOrderView[];
+  selectedUserId?: string;
+  selectedUserDetail?: AdminUserDetail;
+  status: string;
+  walletTransactions: AdminWalletTransactionView[];
+  wallets: AdminWalletSummary[];
+  users: AdminUserSummary[];
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow)]">
+      <div className="flex min-h-[58px] items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+        <h2 className="m-0 flex min-w-0 items-center gap-2 text-[15px] font-black">
+          <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[var(--panel2)] text-[var(--accent)]"><Users size={16} /></span>
+          <span className="truncate">{tAdmin("users.title")}</span>
+        </h2>
+        <Badge>{tAdmin("users.count", { count: users.length })}</Badge>
+      </div>
+      <AdminUsersTable
+        users={users}
+        selectedUserId={selectedUserId}
+        selectedUserDetail={selectedUserDetail}
+        loading={loading}
+        rechargeOrders={rechargeOrders}
+        status={status}
+        walletTransactions={walletTransactions}
+        wallets={wallets}
+        onSelectUser={onSelectUser}
+        onOpenContent={onOpenContent}
+        onOpenFinance={onOpenFinance}
+      />
+    </section>
+  );
+}
+
+function AdminUsersTable({
+  loading,
+  onOpenContent,
+  onOpenFinance,
+  onSelectUser,
+  rechargeOrders,
+  selectedUserId,
+  selectedUserDetail,
+  status,
+  walletTransactions,
+  wallets,
+  users
+}: {
+  loading: boolean;
+  onOpenContent: (user: AdminUserSummary) => void;
+  onOpenFinance: (user: AdminUserSummary) => void;
+  onSelectUser: (user: AdminUserSummary) => void;
+  rechargeOrders: AdminRechargeOrderView[];
+  selectedUserId?: string;
+  selectedUserDetail?: AdminUserDetail;
+  status: string;
+  walletTransactions: AdminWalletTransactionView[];
+  wallets: AdminWalletSummary[];
+  users: AdminUserSummary[];
+}) {
+  return (
+    <div className="min-w-0 overflow-x-auto">
+      <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-xs">
+        <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+          <tr>
+            <AdminTh>{tAdmin("users.columns.user")}</AdminTh>
+            <AdminTh>{tAdmin("users.columns.status")}</AdminTh>
+            <AdminTh>{tAdmin("users.columns.workspace")}</AdminTh>
+            <AdminTh>{tAdmin("finance.totalBalance")}</AdminTh>
+            <AdminTh>{tAdmin("finance.paidRecharge")}</AdminTh>
+            <AdminTh>{tAdmin("users.workbench.spend")}</AdminTh>
+            <AdminTh>{tAdmin("users.columns.videoJobs")}</AdminTh>
+            <AdminTh>{tAdmin("users.columns.lastActive")}</AdminTh>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => {
+            const selected = user.id === selectedUserId;
+            const detail = selected ? selectedUserDetail : undefined;
+            const userWallets = adminWalletsForUserDetail(detail, wallets);
+            const userRechargeOrders = adminRechargeOrdersForUserDetail(detail, rechargeOrders);
+            const userWalletTransactions = adminWalletTransactionsForUserDetail(detail, walletTransactions);
+            const finance = adminUserFinanceSnapshot(userWallets, userRechargeOrders, userWalletTransactions);
+            return (
+              <Fragment key={user.id}>
+                <tr
+                  tabIndex={0}
+                  className={cn(
+                    "cursor-pointer bg-[var(--card)] outline-none transition hover:bg-[var(--field2)] focus:bg-[var(--field2)] focus-visible:shadow-[inset_3px_0_0_var(--accent)]",
+                    selected ? "bg-[color-mix(in_srgb,var(--accent)_7%,var(--card))] shadow-[inset_3px_0_0_var(--accent)]" : ""
+                  )}
+                  onClick={() => onSelectUser(user)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelectUser(user);
+                    }
+                  }}
+                >
+                  <AdminTd>
+                    <div className="max-w-[240px] truncate font-black text-[var(--text)]">{user.email}</div>
+                    <div className="mt-0.5 max-w-[240px] truncate text-[11px] font-semibold text-[var(--muted)]">{user.displayName || user.id}</div>
+                  </AdminTd>
+                  <AdminTd>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={user.role === "admin" ? "ok" : "neutral"}>{user.role === "admin" ? tAdmin("users.roleAdmin") : tAdmin("users.roleUser")}</Badge>
+                      <Badge tone={user.emailVerified ? "ok" : "warn"}>{user.emailVerified ? tAdmin("users.verified") : tAdmin("users.unverified")}</Badge>
+                    </div>
+                  </AdminTd>
+                  <AdminTd>{formatNumber(user.workspaceCount)}</AdminTd>
+                  <AdminTd>¥{money(finance.totalBalanceCny)}</AdminTd>
+                  <AdminTd>¥{money(finance.totalRechargeCny)}</AdminTd>
+                  <AdminTd>¥{money(finance.totalSpendCny)}</AdminTd>
+                  <AdminTd>{formatNumber(user.videoJobCount)}</AdminTd>
+                  <AdminTd>{formatDateTime(user.lastActiveAt)}</AdminTd>
+                </tr>
+                {selected ? (
+                  <tr className="bg-[color-mix(in_srgb,var(--accent)_4%,var(--card))]">
+                    <td colSpan={8} className="border-b border-[var(--border)] p-0">
+                      <AdminUserExpandedRow
+                        detail={selectedUserDetail}
+                        fallbackUser={user}
+                        loading={loading}
+                        rechargeOrders={rechargeOrders}
+                        status={status}
+                        walletTransactions={walletTransactions}
+                        wallets={wallets}
+                        onOpenContent={onOpenContent}
+                        onOpenFinance={onOpenFinance}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdminUserExpandedRow({
   detail,
   fallbackUser,
   loading,
-  onClose,
-  status
+  rechargeOrders,
+  status,
+  walletTransactions,
+  wallets,
+  onOpenContent,
+  onOpenFinance
 }: {
   detail?: AdminUserDetail;
   fallbackUser?: AdminUserSummary;
   loading: boolean;
-  onClose: () => void;
+  rechargeOrders: AdminRechargeOrderView[];
   status: string;
+  walletTransactions: AdminWalletTransactionView[];
+  wallets: AdminWalletSummary[];
+  onOpenContent: (user: AdminUserSummary) => void;
+  onOpenFinance: (user: AdminUserSummary) => void;
 }) {
   if (!fallbackUser) {
-    return null;
+    return (
+      <section className="p-4">
+        <div className="grid min-h-[120px] place-items-center">
+          <EmptyAdminDetail text={tAdmin("users.workbench.emptyHint")} />
+        </div>
+      </section>
+    );
   }
   const user = detail?.user ?? fallbackUser;
   const statusEntries = Object.entries(detail?.videoStatusCounts ?? {}).sort(([left], [right]) => left.localeCompare(right));
+  const userWallets = adminWalletsForUserDetail(detail, wallets);
+  const userRechargeOrders = adminRechargeOrdersForUserDetail(detail, rechargeOrders);
+  const userWalletTransactions = adminWalletTransactionsForUserDetail(detail, walletTransactions);
+  const finance = adminUserFinanceSnapshot(userWallets, userRechargeOrders, userWalletTransactions);
+  const recentJobs = detail?.videoJobs.slice(0, 3) ?? [];
+  const recentProducts = detail?.products.slice(0, 3) ?? [];
+
   return (
-    <div className="fixed inset-0 z-50 grid bg-[rgba(42,33,27,.22)] min-[900px]:justify-items-end" role="dialog" aria-modal="true" aria-label="用户详情">
-      <button className="absolute inset-0 cursor-default" type="button" aria-label="关闭用户详情" onClick={onClose} />
-      <aside className="relative grid h-dvh w-full max-w-[760px] grid-rows-[auto_minmax(0,1fr)] border-l border-[var(--border)] bg-[var(--panel)] shadow-[0_30px_90px_rgba(42,33,27,.22)]">
-        <header className="grid gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 py-4 min-[720px]:grid-cols-[minmax(0,1fr)_auto] min-[720px]:items-start">
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 className="m-0 min-w-0 truncate text-lg font-black">{user.email}</h2>
-              <Badge tone={user.role === "admin" ? "ok" : "neutral"}>{user.role === "admin" ? "管理员" : "用户"}</Badge>
-              <Badge tone={user.emailVerified ? "ok" : "warn"}>{user.emailVerified ? "已验证" : "未验证"}</Badge>
-            </div>
-            <p className="m-0 mt-1 text-[12px] font-semibold text-[var(--muted)]">注册 {formatDateTime(user.createdAt)} / 最近活跃 {formatDateTime(user.lastActiveAt)}</p>
+    <section className="admin-user-expanded-profile grid gap-0 bg-[var(--field)]">
+      {loading ? (
+        <div className="grid min-h-[96px] place-items-center border-b border-dashed border-[var(--border)] bg-[var(--panel2)] px-4 py-5">
+          <div className="grid justify-items-center gap-2 text-xs font-black text-[var(--muted)]">
+            <RefreshCcw className="animate-spin text-[var(--accent)]" size={24} />
+            {tAdmin("users.drawer.loading")}
           </div>
-          <Button variant="ghost" size="icon" aria-label="关闭" onClick={onClose}>
-            <X size={16} />
-          </Button>
-        </header>
-
-        <div className="min-h-0 overflow-y-auto p-4">
-          {loading ? (
-            <div className="grid min-h-[280px] place-items-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel2)]">
-              <div className="grid justify-items-center gap-2 text-xs font-black text-[var(--muted)]">
-                <RefreshCcw className="animate-spin text-[var(--accent)]" size={24} />
-                正在载入用户详情
-              </div>
-            </div>
-          ) : null}
-
-          {status ? <AdminStatus status={status} /> : null}
-
-          {detail ? (
-            <div className="grid gap-4">
-              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="用户详情指标">
-                <DetailMetric icon={<Database size={16} />} label="工作区" value={detail.user.workspaceCount} />
-                <DetailMetric icon={<Package size={16} />} label="商品" value={detail.user.productCount} />
-                <DetailMetric icon={<Video size={16} />} label="视频任务" value={detail.user.videoJobCount} />
-                <DetailMetric icon={<Clock3 size={16} />} label="最近会话" value={formatDateTime(detail.user.lastSessionAt)} />
-              </section>
-
-              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="m-0 text-sm font-black">视频状态</h3>
-                  <Badge>{statusEntries.length} 类</Badge>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {statusEntries.length > 0 ? statusEntries.map(([name, count]) => (
-                    <Badge key={name} tone={adminJobStatusTone(name)}>{adminJobStatusLabel(name)} {formatNumber(count)}</Badge>
-                  )) : <span className="text-xs font-semibold text-[var(--muted)]">暂无视频任务</span>}
-                </div>
-              </section>
-
-              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="m-0 text-sm font-black">工作区</h3>
-                  <Badge>{detail.workspaces.length} 个</Badge>
-                </div>
-                <div className="grid gap-2">
-                  {detail.workspaces.map((workspace) => (
-                    <div key={workspace.id} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs min-[720px]:grid-cols-[minmax(0,1fr)_auto]">
-                      <div className="min-w-0">
-                        <div className="truncate font-black">{workspace.name}</div>
-                        <div className="mt-1 truncate font-semibold text-[var(--muted)]">owner: {workspace.ownerEmail ?? "-"} / role: {workspace.role}</div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 min-[720px]:justify-end">
-                        <Badge>{workspace.memberCount} 成员</Badge>
-                        <Badge>{workspace.productCount} 商品</Badge>
-                        <Badge>{workspace.videoJobCount} 任务</Badge>
-                        <Badge tone="ok">{workspace.completedJobCount} 完成</Badge>
-                        <Badge tone={workspace.failedJobCount > 0 ? "danger" : "neutral"}>{workspace.failedJobCount} 失败</Badge>
-                      </div>
-                    </div>
-                  ))}
-                  {detail.workspaces.length === 0 ? <EmptyAdminDetail text="暂无工作区" /> : null}
-                </div>
-              </section>
-
-              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="m-0 text-sm font-black">最近视频任务</h3>
-                  <Badge>{detail.videoJobs.length}/50</Badge>
-                </div>
-                <div className="grid gap-2">
-                  {detail.videoJobs.map((job) => (
-                    <AdminVideoJobCard key={job.id} job={job} />
-                  ))}
-                  {detail.videoJobs.length === 0 ? <EmptyAdminDetail text="暂无视频任务" /> : null}
-                </div>
-              </section>
-
-              <section className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="m-0 text-sm font-black">最近商品</h3>
-                  <Badge>{detail.products.length}/50</Badge>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {detail.products.map((product) => (
-                    <div key={product.id} className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs">
-                      <div className="truncate font-black">{product.sku}</div>
-                      <div className="mt-1 truncate font-semibold text-[var(--muted)]">{product.title ?? "-"}</div>
-                      <div className="mt-1 text-[11px] font-semibold text-[var(--muted)]">更新 {formatDateTime(product.updatedAt)}</div>
-                    </div>
-                  ))}
-                  {detail.products.length === 0 ? <EmptyAdminDetail text="暂无商品" /> : null}
-                </div>
-              </section>
-            </div>
-          ) : null}
         </div>
-      </aside>
+      ) : null}
+
+      {status ? <AdminStatus status={status} /> : null}
+
+      <header className="grid gap-4 border-b border-[var(--border)] bg-[var(--card)] px-4 py-4 min-[980px]:grid-cols-[minmax(280px,1fr)_minmax(520px,1.25fr)] min-[980px]:items-center">
+        <div className="min-w-0 border-l-4 border-[var(--accent)] pl-3">
+          <div className="truncate text-[18px] font-black leading-tight text-[var(--text)]">{user.email}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <Badge tone={user.role === "admin" ? "ok" : "neutral"}>{user.role === "admin" ? tAdmin("users.roleAdmin") : tAdmin("users.roleUser")}</Badge>
+            <Badge tone={user.emailVerified ? "ok" : "warn"}>{user.emailVerified ? tAdmin("users.verified") : tAdmin("users.unverified")}</Badge>
+          </div>
+          <div className="mt-3 grid gap-x-5 gap-y-1 text-[12px] font-semibold leading-5 text-[var(--muted)] min-[720px]:grid-cols-2">
+            <span>{tAdmin("users.columns.createdAt")} {formatDateTime(user.createdAt)}</span>
+            <span>{tAdmin("users.columns.lastActive")} {formatDateTime(user.lastActiveAt)}</span>
+          </div>
+        </div>
+        <div className="grid gap-y-3 border-t border-[var(--border)] pt-3 min-[620px]:grid-cols-4 min-[980px]:border-t-0 min-[980px]:pt-0">
+          <AdminHeaderMetric label={tAdmin("users.workspaces")} value={user.workspaceCount} />
+          <AdminHeaderMetric label={tAdmin("users.columns.products")} value={user.productCount} />
+          <AdminHeaderMetric label={tAdmin("users.videoJobs")} value={user.videoJobCount} />
+          <AdminHeaderMetric label={tAdmin("finance.totalBalance")} value={`¥${money(finance.totalBalanceCny)}`} emphasis />
+        </div>
+      </header>
+
+      {detail ? (
+        <div className="grid gap-0 divide-y divide-[var(--border)] bg-[var(--card)] min-[1180px]:grid-cols-[0.95fr_1.35fr_0.95fr] min-[1180px]:divide-x min-[1180px]:divide-y-0">
+          <AdminUserDetailColumn
+            title={tAdmin("users.profile.businessContext")}
+            right={<span className="shrink-0 text-[11px] font-black text-[var(--muted)]">{tAdmin("users.profile.contextSummary", {
+              workspaces: detail.workspaces.length,
+              products: detail.products.length,
+              jobs: detail.videoJobs.length
+            })}</span>}
+          >
+            <AdminWorkspaceMiniList workspaces={detail.workspaces.slice(0, 3)} />
+            <AdminProductMiniList products={recentProducts} />
+          </AdminUserDetailColumn>
+
+          <AdminUserDetailColumn title={tAdmin("users.profile.videoHealth")} right={<Badge>{tAdmin("users.drawer.statusKinds", { count: statusEntries.length })}</Badge>}>
+            <div className="flex flex-wrap gap-1.5">
+              {statusEntries.length > 0 ? statusEntries.map(([name, count]) => (
+                <Badge key={name} tone={adminJobStatusTone(name)}>{adminJobStatusLabel(name)} {formatNumber(count)}</Badge>
+              )) : <span className="text-xs font-semibold text-[var(--muted)]">{tAdmin("users.drawer.emptyVideoJobs")}</span>}
+            </div>
+            <div className="grid gap-2">
+              {recentJobs.map((job) => <AdminVideoJobCard key={job.id} job={job} />)}
+              {recentJobs.length === 0 ? <EmptyAdminDetail text={tAdmin("users.drawer.emptyVideoJobs")} /> : null}
+            </div>
+          </AdminUserDetailColumn>
+
+          <AdminUserDetailColumn title={tAdmin("users.profile.recentLedger")} right={<Badge>{tAdmin("finance.transactionCount", { count: userWalletTransactions.length })}</Badge>}>
+            <div className="grid grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--border)]">
+              <AdminInlineMetric label={tAdmin("finance.paidRecharge")} value={`¥${money(finance.totalRechargeCny)}`} />
+              <AdminInlineMetric label={tAdmin("users.workbench.spend")} value={`¥${money(finance.totalSpendCny)}`} />
+              <AdminInlineMetric label={tAdmin("finance.walletTransactions")} value={userWalletTransactions.length} />
+            </div>
+            <AdminUserRecentLedgerList transactions={userWalletTransactions.slice(0, 4)} />
+          </AdminUserDetailColumn>
+        </div>
+      ) : !loading ? <div className="p-4"><EmptyAdminDetail text={tAdmin("users.workbench.loadHint")} /></div> : null}
+
+      {detail ? (
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+          <div className="min-w-0 text-xs font-semibold text-[var(--muted)]">
+            {tAdmin("users.drawer.registered", { date: formatDateTime(user.createdAt), lastActive: formatDateTime(user.lastActiveAt) })}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-2 min-[760px]:w-auto min-[760px]:min-w-[420px]">
+            <Button type="button" onClick={() => onOpenContent(user)}>
+              <Video size={14} />
+              {tAdmin("users.profile.openContent")}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => onOpenFinance(user)}>
+              <CreditCard size={14} />
+              {tAdmin("users.profile.openFinance")}
+            </Button>
+          </div>
+        </footer>
+      ) : null}
+    </section>
+  );
+}
+
+function AdminUserDetailColumn({
+  children,
+  right,
+  title
+}: {
+  children: React.ReactNode;
+  right?: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="grid min-w-0 content-start gap-3 px-4 py-4">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <h3 className="m-0 truncate text-[12px] font-black uppercase text-[var(--muted)]">{title}</h3>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AdminHeaderMetric({ emphasis, label, value }: { emphasis?: boolean; label: string; value: number | string }) {
+  return (
+    <div className="min-w-0 border-l border-[var(--border)] pl-4 first:border-l-0 first:pl-0 max-[619px]:border-l-0 max-[619px]:pl-0">
+      <div className="truncate text-[10px] font-black uppercase text-[var(--muted)]">{label}</div>
+      <div className={cn("mt-1 truncate text-xl font-black tabular-nums leading-tight", emphasis ? "text-[var(--accent)]" : "text-[var(--text)]")}>
+        {typeof value === "number" ? formatNumber(value) : value}
+      </div>
     </div>
+  );
+}
+
+function AdminInlineMetric({ emphasis, label, value }: { emphasis?: boolean; label: string; value: number | string }) {
+  return (
+    <div className="min-w-0 border-r border-[var(--border)] bg-[var(--panel2)] px-3 py-2.5 last:border-r-0">
+      <div className="truncate text-[10px] font-black uppercase text-[var(--muted)]">{label}</div>
+      <div className={cn("mt-1 truncate text-[17px] font-black tabular-nums leading-tight", emphasis ? "text-[var(--accent)]" : "text-[var(--text)]")}>
+        {typeof value === "number" ? formatNumber(value) : value}
+      </div>
+    </div>
+  );
+}
+
+function AdminWorkspaceMiniList({ workspaces }: { workspaces: AdminUserWorkspaceSummary[] }) {
+  return (
+    <div className="grid gap-2">
+      {workspaces.map((workspace) => (
+        <div key={workspace.id} className="grid gap-2 border-b border-[var(--border)] pb-2 last:border-b-0 last:pb-0">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <strong className="min-w-0 truncate text-sm text-[var(--text)]">{adminBusinessSpaceName(workspace.name)}</strong>
+            <Badge>{workspace.role}</Badge>
+          </div>
+          <div className="grid grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--border)]">
+            <AdminMiniFact label={tAdmin("users.drawer.products")} value={workspace.productCount} />
+            <AdminMiniFact label={tAdmin("users.drawer.videoJobs")} value={workspace.videoJobCount} />
+            <AdminMiniFact label={tAdmin("users.drawer.membersLabel")} value={workspace.memberCount} />
+          </div>
+        </div>
+      ))}
+      {workspaces.length === 0 ? <EmptyAdminDetail text={tAdmin("users.drawer.emptyWorkspaces")} /> : null}
+    </div>
+  );
+}
+
+function AdminMiniFact({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="min-w-0 border-r border-[var(--border)] bg-[var(--panel2)] px-2 py-1.5 last:border-r-0">
+      <div className="truncate text-[10px] font-black text-[var(--muted)]">{label}</div>
+      <div className="mt-0.5 truncate text-sm font-black tabular-nums text-[var(--text)]">{typeof value === "number" ? formatNumber(value) : value}</div>
+    </div>
+  );
+}
+
+function AdminProductMiniList({ products }: { products: AdminUserProductSummary[] }) {
+  return (
+    <div className="grid gap-2 border-t border-[var(--border)] pt-3">
+      <div className="text-[11px] font-black uppercase text-[var(--muted)]">{tAdmin("users.drawer.recentProducts")}</div>
+      {products.map((product) => (
+        <div key={product.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
+          <div className="min-w-0">
+            <div className="truncate font-black text-[var(--text)]">{product.sku}</div>
+            <div className="mt-0.5 truncate font-semibold text-[var(--muted)]">{product.title ?? product.id}</div>
+          </div>
+          <span className="whitespace-nowrap font-semibold text-[var(--muted)]">{formatDateTime(product.updatedAt)}</span>
+        </div>
+      ))}
+      {products.length === 0 ? <EmptyAdminDetail text={tAdmin("users.drawer.emptyProducts")} /> : null}
+    </div>
+  );
+}
+
+function AdminUserRecentLedgerList({ transactions }: { transactions: AdminWalletTransactionView[] }) {
+  return (
+    <section className="grid gap-2">
+      {transactions.map((transaction) => (
+        <div key={transaction.id} className="grid gap-1 border-b border-[var(--border)] pb-2 text-xs last:border-b-0 last:pb-0">
+          <div className="flex items-center justify-between gap-2">
+            <Badge tone={transaction.amountCny < 0 ? "danger" : "ok"}>{adminWalletTransactionTypeLabel(transaction.type)}</Badge>
+            <strong className={transaction.amountCny < 0 ? "text-[var(--danger)]" : "text-[var(--ok)]"}>{transaction.amountCny < 0 ? "-" : "+"}¥{money(Math.abs(transaction.amountCny))}</strong>
+          </div>
+          <div className="truncate font-semibold text-[var(--muted)]">{transaction.description ?? transaction.id}</div>
+          <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{formatDateTime(transaction.createdAt)}</div>
+        </div>
+      ))}
+      {transactions.length === 0 ? <EmptyAdminDetail text={tAdmin("finance.emptyWalletTransactions")} /> : null}
+    </section>
   );
 }
 
@@ -1707,7 +3658,7 @@ function AdminVideoJobCard({ job }: { job: AdminUserVideoJobSummary }) {
           {job.model ?? "-"} / {job.language ?? "-"} / {formatDuration(job.durationSeconds)}
         </div>
         <div className="mt-1 break-words font-semibold leading-5 text-[var(--muted)]">
-          创建 {formatDateTime(job.createdAt)} / 完成 {formatDateTime(job.completedAt)}
+          {tAdmin("users.drawer.createdCompleted", { created: formatDateTime(job.createdAt), completed: formatDateTime(job.completedAt) })}
         </div>
         {error ? (
           <div className="mt-2 flex min-w-0 items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 font-bold leading-5 text-red-700">
@@ -1736,7 +3687,7 @@ function AdminJobMetaRail({ job }: { job: AdminUserVideoJobSummary }) {
         {job.provider ?? "-"}
       </span>
       <span className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] px-2 py-2 text-center text-[11px] font-black leading-4 text-[var(--muted)]">
-        {formatNumber(job.outputCount)} 输出
+        {tAdmin("users.drawer.outputs", { count: formatNumber(job.outputCount) })}
       </span>
     </div>
   );
@@ -1771,16 +3722,16 @@ function AdminForbidden({ email, isBusy, onLogout }: { email?: string; isBusy: b
             <ShieldAlert size={24} />
           </div>
           <div>
-            <h1 className="m-0 text-xl font-black">没有后台权限</h1>
-            <p className="m-0 mt-2 text-xs font-semibold leading-5 text-[var(--muted)]">{email ?? "当前账号"} 不是项目方管理员。</p>
+            <h1 className="m-0 text-xl font-black">{tAdmin("forbidden.title")}</h1>
+            <p className="m-0 mt-2 text-xs font-semibold leading-5 text-[var(--muted)]">{tAdmin("forbidden.description", { email: email ?? tAdmin("forbidden.fallbackAccount") })}</p>
           </div>
           <div className="flex justify-center gap-2">
             <Button asChild>
-              <a href="/console">返回控制台</a>
+              <a href="/console">{tAdmin("forbidden.backToConsole")}</a>
             </Button>
             <Button variant="ghost" disabled={isBusy} onClick={onLogout}>
               <LogOut size={14} />
-              退出
+              {tAdmin("shell.logout")}
             </Button>
           </div>
         </div>
@@ -1825,7 +3776,7 @@ function buildGrowthOption(overview?: AdminOverview): EChartsOption {
       splitLine: { lineStyle: { color: "#ead7c4" } }
     },
     series: [{
-      name: "注册",
+      name: tAdmin("overview.charts.registrations"),
       type: "bar",
       barMaxWidth: 18,
       data: rows.map((row) => row.registrations),
@@ -1858,13 +3809,13 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
     },
     series: [
       {
-        name: "活跃用户",
+        name: tAdmin("overview.charts.activeUsers"),
         type: "line",
         smooth: true,
         data: rows.map((row) => row.activeUsers)
       },
       {
-        name: "事件",
+        name: tAdmin("overview.charts.events"),
         type: "bar",
         barMaxWidth: 16,
         data: rows.map((row) => row.events),
@@ -1877,6 +3828,19 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
   return readJsonResponse<T>(response);
+}
+
+async function loadAdminModule<T>(
+  moduleName: string,
+  load: () => Promise<T>,
+  apply: (value: T) => void,
+  failedModules: string[]
+): Promise<void> {
+  try {
+    apply(await load());
+  } catch {
+    failedModules.push(moduleName);
+  }
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -1936,15 +3900,215 @@ function formatDuration(value?: number) {
   return value === undefined ? "-" : `${value}s`;
 }
 
+function adminBusinessSpaceName(name?: string): string {
+  return (name ?? "-").replace(/工作区/g, "业务空间").replace(/\bWorkspace\b/g, "Space");
+}
+
+function adminSearchMatch(query: string, values: Array<string | undefined>): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return values.some((value) => (value ?? "").toLowerCase().includes(normalizedQuery));
+}
+
+function filterAdminContentProducts(products: AdminContentProductView[], query: string): AdminContentProductView[] {
+  return products.filter((product) => adminSearchMatch(query, [
+    product.sku,
+    product.title,
+    product.workspaceId,
+    product.workspaceName,
+    product.ownerEmail
+  ]));
+}
+
+function filterAdminUsers(users: AdminUserSummary[], query: string): AdminUserSummary[] {
+  return users.filter((user) => adminSearchMatch(query, [
+    user.id,
+    user.email,
+    user.displayName,
+    user.role
+  ]));
+}
+
+function filterAdminContentVideoJobs(videoJobs: AdminContentVideoJobView[], query: string): AdminContentVideoJobView[] {
+  return videoJobs.filter((job) => adminSearchMatch(query, [
+    job.id,
+    job.productSku,
+    job.productTitle,
+    job.workspaceId,
+    job.workspaceName,
+    job.ownerEmail,
+    job.status,
+    job.model
+  ]));
+}
+
+function filterAdminWallets(wallets: AdminWalletSummary[], query: string): AdminWalletSummary[] {
+  return wallets.filter((wallet) => adminSearchMatch(query, [
+    wallet.workspaceId,
+    wallet.workspaceName,
+    wallet.ownerEmail
+  ]));
+}
+
+function filterAdminRechargeOrders(orders: AdminRechargeOrderView[], query: string): AdminRechargeOrderView[] {
+  return orders.filter((order) => adminSearchMatch(query, [
+    order.id,
+    order.workspaceId,
+    order.workspaceName,
+    order.ownerEmail,
+    order.provider,
+    order.status
+  ]));
+}
+
+function filterAdminWalletTransactions(transactions: AdminWalletTransactionView[], query: string): AdminWalletTransactionView[] {
+  return transactions.filter((transaction) => adminSearchMatch(query, [
+    transaction.id,
+    transaction.workspaceId,
+    transaction.workspaceName,
+    transaction.ownerEmail,
+    transaction.type,
+    transaction.description,
+    transaction.jobId,
+    transaction.reservationId
+  ]));
+}
+
+function adminWorkspaceIdsForUserDetail(detail?: AdminUserDetail): Set<string> {
+  return new Set((detail?.workspaces ?? []).map((workspace) => workspace.id));
+}
+
+function adminWalletsForUserDetail(detail: AdminUserDetail | undefined, wallets: AdminWalletSummary[]): AdminWalletSummary[] {
+  const workspaceIds = adminWorkspaceIdsForUserDetail(detail);
+  return wallets.filter((wallet) => workspaceIds.has(wallet.workspaceId));
+}
+
+function adminRechargeOrdersForUserDetail(detail: AdminUserDetail | undefined, orders: AdminRechargeOrderView[]): AdminRechargeOrderView[] {
+  const workspaceIds = adminWorkspaceIdsForUserDetail(detail);
+  return orders.filter((order) => workspaceIds.has(order.workspaceId));
+}
+
+function adminWalletTransactionsForUserDetail(detail: AdminUserDetail | undefined, transactions: AdminWalletTransactionView[]): AdminWalletTransactionView[] {
+  const workspaceIds = adminWorkspaceIdsForUserDetail(detail);
+  return transactions.filter((transaction) => workspaceIds.has(transaction.workspaceId));
+}
+
+function adminUserFinanceSnapshot(
+  wallets: AdminWalletSummary[],
+  rechargeOrders: AdminRechargeOrderView[],
+  walletTransactions: AdminWalletTransactionView[]
+): { totalBalanceCny: number; totalRechargeCny: number; totalSpendCny: number } {
+  return {
+    totalBalanceCny: wallets.reduce((total, wallet) => total + wallet.balanceCny, 0),
+    totalRechargeCny: rechargeOrders
+      .filter((order) => order.status === "paid")
+      .reduce((total, order) => total + order.creditCny, 0),
+    totalSpendCny: walletTransactions
+      .filter((transaction) => transaction.amountCny < 0)
+      .reduce((total, transaction) => total + Math.abs(transaction.amountCny), 0)
+  };
+}
+
+function adminWalletTransactionDetailRows(
+  transaction: AdminWalletTransactionView,
+  metadata: Record<string, unknown>,
+  priceSnapshot: Record<string, unknown> | undefined
+): Array<{ label: string; value: React.ReactNode }> {
+  return [
+    { label: tAdmin("finance.transactionDetail.workspace"), value: `${adminBusinessSpaceName(transaction.workspaceName)} / ${transaction.ownerEmail ?? transaction.workspaceId}` },
+    { label: tAdmin("finance.transactionDetail.description"), value: transaction.description ?? transaction.id },
+    { label: tAdmin("finance.transactionDetail.billingMode"), value: adminDetailText(metadata.apiBillingMode) },
+    { label: tAdmin("finance.transactionDetail.usageKind"), value: adminDetailText(metadata.usageKind ?? priceSnapshot?.kind) },
+    { label: tAdmin("finance.transactionDetail.model"), value: adminDetailText(metadata.model ?? priceSnapshot?.requestedModel ?? priceSnapshot?.model) },
+    { label: tAdmin("finance.transactionDetail.serviceFee"), value: adminMoneyText(metadata.platformFeeCny) },
+    { label: tAdmin("finance.transactionDetail.upstreamCost"), value: adminMoneyText(metadata.upstreamActualCostCny ?? metadata.upstreamCostCny ?? metadata.upstreamEstimatedCostCny) },
+    { label: tAdmin("finance.transactionDetail.units"), value: adminDetailText(metadata.actualUnits ?? metadata.estimatedUnits ?? priceSnapshot?.totalTokens) },
+    { label: tAdmin("finance.transactionDetail.catalogVersion"), value: adminDetailText(priceSnapshot?.catalogVersion) },
+    { label: tAdmin("finance.transactionDetail.unitPrice"), value: adminMoneyText(priceSnapshot?.unitPriceCny ?? priceSnapshot?.inputPriceCnyPerMillion ?? priceSnapshot?.outputPriceCnyPerMillion ?? priceSnapshot?.videoTokenPriceCnyPerMillion) },
+    { label: tAdmin("finance.transactionDetail.source"), value: adminSourceLink(priceSnapshot?.sourceUrl) },
+    { label: tAdmin("finance.transactionDetail.job"), value: adminDetailText(transaction.jobId ?? transaction.reservationId) }
+  ];
+}
+
+function adminRecordValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function adminDetailText(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "-";
+  if (typeof value === "number") return formatNumber(value);
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+}
+
+function adminMoneyText(value: unknown): string {
+  return typeof value === "number" ? `¥${money(value)}` : adminDetailText(value);
+}
+
+function adminSourceLink(value: unknown): React.ReactNode {
+  const href = typeof value === "string" ? value : "";
+  if (!href) return "-";
+  return <a className="font-black text-[var(--accent)] hover:underline" href={href} target="_blank" rel="noreferrer">{href}</a>;
+}
+
 function adminWalletTransactionTypeLabel(type?: string) {
-  return ({
-    adjustment: "后台调整",
-    bonus: "赠送",
-    charge: "扣费",
-    recharge: "充值",
-    refund: "释放",
-    reserve: "冻结"
-  } as Record<string, string>)[type ?? ""] ?? "-";
+  if (type === "adjustment") return tAdmin("finance.transactionTypes.adjustment");
+  if (type === "bonus") return tAdmin("finance.transactionTypes.bonus");
+  if (type === "charge") return tAdmin("finance.transactionTypes.charge");
+  if (type === "recharge") return tAdmin("finance.transactionTypes.recharge");
+  if (type === "refund") return tAdmin("finance.transactionTypes.refund");
+  if (type === "reserve") return tAdmin("finance.transactionTypes.reserve");
+  return "-";
+}
+
+function rechargeOrderTone(status: string): "neutral" | "ok" | "danger" | "warn" {
+  if (status === "paid") return "ok";
+  if (status === "failed" || status === "expired") return "danger";
+  if (status === "pending") return "warn";
+  return "neutral";
+}
+
+function rechargeOrderStatusLabel(status: string): string {
+  if (status === "paid") return tAdmin("finance.rechargeStatus.paid");
+  if (status === "pending") return tAdmin("finance.rechargeStatus.pending");
+  if (status === "expired") return tAdmin("finance.rechargeStatus.expired");
+  if (status === "failed") return tAdmin("finance.rechargeStatus.failed");
+  return status;
+}
+
+function modelPricingKindLabel(kind: AdminModelPricingKind): string {
+  if (kind === "text") return tAdmin("modelPricing.kinds.text");
+  if (kind === "image") return tAdmin("modelPricing.kinds.image");
+  return tAdmin("modelPricing.kinds.video");
+}
+
+function modelPricingProviderLabel(providerId: AdminModelPricingProviderId): string {
+  if (providerId === "openai") return "OpenAI";
+  if (providerId === "deepseek") return "DeepSeek";
+  if (providerId === "gemini") return "Gemini";
+  return tAdmin("modelPricing.volcengine");
+}
+
+function modelPricingSourceLabel(source: AdminModelPricingCatalogResponse["active"]["source"]): string {
+  if (source === "database") return tAdmin("modelPricing.sources.database");
+  return tAdmin("modelPricing.sources.builtIn");
+}
+
+function nextModelPricingVersion(currentVersion: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return currentVersion === today ? `${today}-draft` : today;
+}
+
+function siteSettingsTone(status: "configured" | "attention" | "planned"): "neutral" | "ok" | "warn" {
+  if (status === "configured") return "ok";
+  if (status === "attention") return "warn";
+  return "neutral";
+}
+
+function siteSettingsStatusLabel(status: "configured" | "attention" | "planned"): string {
+  if (status === "configured") return tAdmin("siteSettings.status.configured");
+  if (status === "attention") return tAdmin("siteSettings.status.attention");
+  return tAdmin("siteSettings.status.planned");
 }
 
 function adminJobStatusTone(status: string): "neutral" | "ok" | "danger" | "warn" {
@@ -1963,13 +4127,12 @@ function adminJobStatusToneClass(status: string): string {
 }
 
 function adminJobStatusLabel(status: string) {
-  return ({
-    canceled: "已取消",
-    completed: "已完成",
-    expired: "已过期",
-    failed: "失败",
-    queued: "排队中",
-    running: "生成中",
-    unknown: "未知"
-  } as Record<string, string>)[status] ?? status;
+  if (status === "canceled") return tAdmin("jobStatus.canceled");
+  if (status === "completed") return tAdmin("jobStatus.completed");
+  if (status === "expired") return tAdmin("jobStatus.expired");
+  if (status === "failed") return tAdmin("jobStatus.failed");
+  if (status === "queued") return tAdmin("jobStatus.queued");
+  if (status === "running") return tAdmin("jobStatus.running");
+  if (status === "unknown") return tAdmin("jobStatus.unknown");
+  return status;
 }

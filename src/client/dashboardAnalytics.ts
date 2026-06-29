@@ -1,4 +1,6 @@
 import type { Ledger, VideoJob } from "./videoCreativeVersions.js";
+import type { AppLocale } from "../i18n/config.js";
+import { appText } from "../i18n/appText.js";
 
 export type DashboardRange = "24h" | "7d" | "30d" | "all";
 export type DashboardGranularity = "hour" | "day";
@@ -45,6 +47,7 @@ export function buildDashboardAnalytics(input: {
   videoJobs: VideoJob[];
   range: DashboardRange;
   granularity: DashboardGranularity;
+  locale?: AppLocale;
 }): DashboardAnalytics {
   const ledgerJobs = input.ledger?.jobs ?? input.ledger?.products.flatMap((group) => group.jobs) ?? [];
   const ledgerById = new Map(ledgerJobs.map((job) => [job.id, job]));
@@ -81,7 +84,7 @@ export function buildDashboardAnalytics(input: {
   const filteredRows = filterRowsByRange(usageRows, input.range);
   return {
     providerRows: buildProviderRows(filteredRows),
-    trend: buildTrendPoints(filteredRows, input.granularity),
+    trend: buildTrendPoints(filteredRows, input.granularity, input.locale),
     recent: [...filteredRows].sort(compareRecentRows).slice(0, 12),
     activeJobs: input.videoJobs.filter((job) => job.status === "queued" || job.status === "running").length,
     queuedJobs: input.videoJobs.filter((job) => job.status === "queued").length,
@@ -113,11 +116,11 @@ export function buildProviderRows(rows: DashboardRecentRow[]): DashboardProvider
   );
 }
 
-export function buildTrendPoints(rows: DashboardRecentRow[], granularity: DashboardGranularity): DashboardTrendPoint[] {
+export function buildTrendPoints(rows: DashboardRecentRow[], granularity: DashboardGranularity, locale?: AppLocale): DashboardTrendPoint[] {
   const buckets = new Map<string, DashboardTrendPoint>();
   const sorted = [...rows].sort((left, right) => rowTimestamp(left) - rowTimestamp(right));
   for (const row of sorted) {
-    const key = trendBucketKey(row.createdAt, granularity);
+    const key = trendBucketKey(row.createdAt, granularity, locale);
     const current = buckets.get(key) ?? {
       label: key,
       jobs: 0,
@@ -165,13 +168,13 @@ function rowTimestamp(row: DashboardRecentRow): number {
   return row.createdAt ? Date.parse(row.createdAt) || 0 : 0;
 }
 
-function trendBucketKey(value: string | undefined, granularity: DashboardGranularity): string {
+function trendBucketKey(value: string | undefined, granularity: DashboardGranularity, locale?: AppLocale): string {
   if (!value) {
-    return "历史";
+    return appText("dashboard.charts.historical", locale);
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "历史";
+    return appText("dashboard.charts.historical", locale);
   }
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");

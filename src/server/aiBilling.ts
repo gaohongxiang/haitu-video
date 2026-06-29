@@ -1,25 +1,45 @@
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { ModelStoredConfig } from "./modelConfigStore.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
+import {
+  estimateImageUpstreamCostCny,
+  estimateTextUpstreamCostCny,
+  modelPricingSnapshotForUsage,
+  type TextTokenUsage
+} from "./modelPricing.js";
 import { InsufficientWalletBalanceError, WalletStore } from "./walletStore.js";
 
 export type AiUsageKind = "text" | "image";
 
 export const aiInsufficientBalanceMessage = "余额不足，请先充值后再使用 AI 功能。";
 
+export interface MeteredAiActionResult<T> {
+  value: T;
+  metering?: {
+    textUsage?: TextTokenUsage;
+    units?: number;
+  };
+}
+
 export async function runMeteredAiAction<T>(input: {
   walletStore: WalletStore;
+  billingPolicyStore: BillingPolicyStore;
   kind: AiUsageKind;
   modelConfig?: Partial<ModelStoredConfig>;
   units?: number;
   reserveDescription: string;
   chargeDescription: string;
-  action: () => Promise<T>;
+  action: () => Promise<T | MeteredAiActionResult<T>>;
   actualUnits?: (result: T) => number;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
 }): Promise<T> {
   const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
-  const platformFeeCny = platformFeeCnyForAi(input.kind);
+  const billingRule = input.billingPolicyStore.getRule(input.kind);
+  const platformFeeCny = billingRule.serviceFeeCny;
   const estimatedUnits = Math.max(1, input.units ?? 1);
   const upstreamEstimatedCostCny = apiBillingMode === "platform"
-    ? estimatedAiUpstreamCostCny(input.kind, estimatedUnits)
+    ? estimateAiUpstreamCostCny(input.kind, input.modelConfig?.model, estimatedUnits, undefined, input.modelPricingCatalog)
     : 0;
   const reserveAmountCny = roundMoney(platformFeeCny * estimatedUnits + upstreamEstimatedCostCny);
   let reservation: ReturnType<WalletStore["reserve"]>;
@@ -45,10 +65,11 @@ export async function runMeteredAiAction<T>(input: {
     throw error;
   }
   try {
-    const result = await input.action();
+    const actionResult = normalizeMeteredAiActionResult(await input.action());
+    const result = actionResult.value;
     const actualUnits = Math.max(1, input.actualUnits?.(result) ?? estimatedUnits);
     const actualUpstreamCostCny = apiBillingMode === "platform"
-      ? estimatedAiUpstreamCostCny(input.kind, actualUnits)
+      ? estimateAiUpstreamCostCny(input.kind, input.modelConfig?.model, actualUnits, actionResult.metering?.textUsage, input.modelPricingCatalog)
       : 0;
     input.walletStore.capture({
       reservationId: reservation.reservationId,
@@ -64,7 +85,15 @@ export async function runMeteredAiAction<T>(input: {
         actualUnits,
         providerId: input.modelConfig?.providerId,
         configId: input.modelConfig?.configId,
-        model: input.modelConfig?.model
+        model: input.modelConfig?.model,
+        priceSnapshot: modelPricingSnapshotForUsage({
+          kind: input.kind,
+          model: input.modelConfig?.model,
+          units: actualUnits,
+          textUsage: actionResult.metering?.textUsage,
+          catalog: input.modelPricingCatalog,
+          catalogVersion: input.modelPricingCatalogVersion
+        })
       }
     });
     return result;
@@ -84,23 +113,34 @@ export async function runMeteredAiAction<T>(input: {
   }
 }
 
-function platformFeeCnyForAi(kind: AiUsageKind): number {
-  if (kind === "image") {
-    return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE, 0.3));
-  }
-  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT, 0.2));
+function estimateAiUpstreamCostCny(
+  kind: AiUsageKind,
+  model: string | undefined,
+  units: number,
+  textUsage?: TextTokenUsage,
+  modelPricingCatalog?: readonly ModelPricingEntry[]
+): number {
+  return kind === "image"
+    ? estimateImageUpstreamCostCny(model, units, modelPricingCatalog)
+    : estimateTextUpstreamCostCny(model, textUsage ?? units, modelPricingCatalog);
 }
 
-function estimatedAiUpstreamCostCny(kind: AiUsageKind, units: number): number {
-  if (kind === "image") {
-    return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE, 0.7) * units);
+function normalizeMeteredAiActionResult<T>(result: T | MeteredAiActionResult<T>): MeteredAiActionResult<T> {
+  if (isMeteredAiActionResult(result)) {
+    return result;
   }
-  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL, 0.2) * units);
+  return {
+    value: result
+  };
 }
 
-function numberFromEnv(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+function isMeteredAiActionResult<T>(value: T | MeteredAiActionResult<T>): value is MeteredAiActionResult<T> {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "value" in value &&
+    "metering" in value
+  );
 }
 
 function roundMoney(value: number): number {

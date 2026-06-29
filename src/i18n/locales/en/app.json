@@ -1,0 +1,1686 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "workflow": "Workflow",
+    "video": "Video Studio",
+    "image": "Image Studio",
+    "ledger": "Task Records",
+    "management": "Manage",
+    "wallet": "Balance Center",
+    "pricing": "Model Pricing",
+    "settings": "API Settings"
+  },
+  "commonActions": {
+    "add": "Add",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "refresh": "Refresh",
+    "save": "Save",
+    "saving": "Saving",
+    "confirmDelete": "Delete",
+    "notSelected": "Not selected"
+  },
+  "account": {
+    "fallback": "Account",
+    "menu": "Account menu",
+    "label": "Account",
+    "logout": "Sign out"
+  },
+  "auth": {
+    "title": "Haitu Account",
+    "email": "Email",
+    "emailPlaceholder": "Enter email",
+    "password": "Password",
+    "passwordPlaceholder": "Enter password",
+    "backToEntry": "Back to sign in",
+    "entry": {
+      "subtitle": "Sign in or create an account",
+      "submit": "Sign In / Create Account",
+      "newEmailHint": "New emails will be verified before account creation",
+      "forgotPassword": "Forgot password"
+    },
+    "verify": {
+      "subtitle": "Enter the email code to finish account creation",
+      "submit": "Verify Email and Enter"
+    },
+    "reset": {
+      "subtitle": "Reset your password with an email code",
+      "newPassword": "New password",
+      "newPasswordPlaceholder": "At least 8 characters",
+      "submit": "Reset Password",
+      "success": "Password reset. Sign in with your new password."
+    },
+    "otp": {
+      "label": "Verification code",
+      "placeholder": "6-digit code",
+      "send": "Send Code",
+      "resend": "Resend Code",
+      "cooldown": "Send again in {{seconds}}s"
+    }
+  },
+  "shell": {
+    "productName": "Haitu",
+    "tagline": "AI product video platform",
+    "loading": "Checking sign-in status...",
+    "toastTitle": "Notice",
+    "consoleLoading": "Loading {{label}}",
+    "consoleLoadingDetail": "Syncing model services, tasks, and account data.",
+    "consoleLoadFailed": "Failed to load {{label}}",
+    "sidebarExpand": "Expand sidebar",
+    "sidebarCollapse": "Collapse sidebar",
+    "navigationLabel": "Console navigation"
+  },
+  "dialogs": {
+    "closeConfirm": "Close confirmation dialog",
+    "closePayment": "Close payment dialog",
+    "closeToast": "Dismiss notice",
+    "payment": {
+      "ariaLabel": "Choose payment method",
+      "title": "Choose Payment Method",
+      "subtitle": "Confirm the amount, then continue to the payment provider.",
+      "rmb": "RMB Payment",
+      "crypto": "Crypto Payment",
+      "rmbEmpty": "RMB payments are not enabled yet",
+      "cryptoEmpty": "Crypto payments are not enabled yet",
+      "amount": "Payment Amount",
+      "credit": "Wallet Credit",
+      "selected": "Selected",
+      "selectable": "Available",
+      "notConfigured": "Not configured",
+      "disabled": "Disabled",
+      "unavailable": "This payment method is temporarily unavailable.",
+      "pay": "Pay"
+    }
+  },
+  "dashboard": {
+    "ariaLabel": "Dashboard",
+    "kpi": {
+      "products": "Products",
+      "productsHint": "Ready for creation",
+      "jobs": "Generation Records",
+      "completedHint": "{{count}} completed",
+      "paidJobs": "Paid Jobs",
+      "mockHint": "{{count}} internal",
+      "tokens": "Total Tokens",
+      "finalVideos": "Final Videos",
+      "finalVideosHint": "Downloadable videos",
+      "reusedRaw": "Reused raw",
+      "reusedRawHint": "Skipped one generation"
+    },
+    "range": {
+      "label": "Time range:",
+      "24h": "Last 24 hours",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "all": "All"
+    },
+    "granularity": {
+      "label": "Granularity:",
+      "hour": "Hourly",
+      "day": "Daily"
+    },
+    "badges": {
+      "active": "{{count}} active",
+      "failed": "{{count}} failed",
+      "channels": "{{count}} channels"
+    },
+    "charts": {
+      "occurrenceUnit": "times",
+      "providerSeries": "Model Mix",
+      "jobs": "Jobs",
+      "cost": "Cost",
+      "historical": "Historical"
+    },
+    "provider": {
+      "title": "Model Mix",
+      "model": "Model",
+      "requests": "Requests",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "active": "Active"
+    },
+    "trend": {
+      "title": "Token / Cost Trend",
+      "badge": "Token + CNY"
+    },
+    "recent": {
+      "title": "Recent Usage",
+      "empty": "No usage yet"
+    },
+    "empty": "No analytics data yet",
+    "kpiAriaLabel": "Task ledger"
+  },
+  "image": {
+    "ariaLabel": "Image Studio",
+    "empty": "Image Studio is coming soon"
+  },
+  "actions": {
+    "retry": "Retry"
+  },
+  "productLibrary": {
+    "ariaLabel": "Product Library",
+    "title": "Product Library",
+    "count": "{{count}} products",
+    "addProduct": "Add Product",
+    "columns": {
+      "product": "Product",
+      "facts": "Product Facts",
+      "enter": "Open"
+    },
+    "actions": {
+      "createVideo": "Create Video",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "empty": "No products yet. Add one first.",
+    "dialog": {
+      "editBadge": "Edit Facts",
+      "importBadge": "Paste Import",
+      "manualBadge": "Manual Entry",
+      "recommended": "Recommended",
+      "editTitle": "Edit Current Product",
+      "addTitle": "Add Product",
+      "close": "Close dialog",
+      "importTitle": "Import Product",
+      "importDescription": "Paste or enter the product title, category, materials, size/weight, selling points, and usage scenarios.",
+      "manualTitle": "New Product",
+      "manualDescription": "Fill in the title, materials, selling points, and reference images step by step.",
+      "pasteLabel": "Paste product information",
+      "pastePlaceholder": "Product title, category, materials, size/weight, selling points, usage scenarios...\nReference images can be uploaded separately",
+      "aiSave": "AI Organize and Save",
+      "saveProduct": "Save Product",
+      "saveChanges": "Save Changes"
+    },
+    "importPreview": {
+      "title": "Organized Product Facts",
+      "subtitle": "You can still edit manually. The saved product will use your changes.",
+      "manualEdit": "Manual Edit",
+      "titleJa": "Japanese Title",
+      "category": "Category",
+      "materials": "Materials",
+      "dimensions": "Size/Weight",
+      "references": "References",
+      "items": "{{count}} items",
+      "sellingPoints": "Verified Selling Points",
+      "usageScenes": "Usage Scenarios",
+      "forbiddenClaims": "Blocked Claims",
+      "notes": "Import Notes",
+      "qualityTitle": "Fact Readiness",
+      "verifiedFacts": "Verified Facts",
+      "missingFields": "Missing Info"
+    },
+    "emptyFact": "To be filled",
+    "draft": {
+      "basicTitle": "Basic Info",
+      "basicDescription": "Title, category, materials, and size are used directly in script and storyboard context.",
+      "titleJa": "Japanese Title",
+      "category": "Category",
+      "materials": "Materials",
+      "dimensions": "Size/Weight",
+      "factsTitle": "Creative Facts",
+      "factsDescription": "One item per line. Use the left side for usable benefits and scenarios; keep prohibited claims on the right.",
+      "sellingPoints": "Verified Selling Points",
+      "usageScenes": "Usage Scenarios",
+      "forbiddenClaims": "Blocked Claims",
+      "referenceTitle": "Reference Image Paths",
+      "referenceDescription": "One local path per line. Saved paths appear as reference assets on the product detail page.",
+      "pathCount": "{{count}} paths",
+      "referenceHint": "At least 3 reference images are recommended"
+    }
+  },
+  "productStatus": {
+    "readyStatus": "Ready to generate",
+    "referenceImages": "{{count}} reference images"
+  },
+  "fileImport": {
+    "title": "Import Product Facts",
+    "productCount": "{{count}} products",
+    "detailRows": "{{count}} detail rows",
+    "emptyProductCount": "0 products",
+    "defaultOne": "1 selected by default",
+    "selectedCount": "{{count}} selected",
+    "summaryWithProducts": "{{count}} products detected. One is selected by default; selecting one fills the current product, selecting multiple saves them to the product list.",
+    "summaryRowsOnly": "{{count}} detail rows detected, but no importable products.",
+    "summaryEmpty": "No importable products detected.",
+    "unsupportedFile": "Only CSV, XLSX, and XLS files are supported.",
+    "chooseFile": "Choose CSV/Excel File",
+    "chooseFileHint": "After parsing, one product is selected by default. A single selected row fills the product facts box.",
+    "summaryStats": "Savable {{ready}} · Needs AI {{needsAi}} · Duplicates {{duplicate}} · Failed {{failed}}",
+    "selectAll": "Select all importable products",
+    "table": {
+      "status": "Status",
+      "productId": "Product ID",
+      "productTitle": "Product Title",
+      "sourceRows": "Source Rows",
+      "images": "Images",
+      "quality": "Completeness",
+      "missing": "Missing"
+    },
+    "imageCount": "{{count}} images",
+    "emptyMessage": "No importable product facts were recognized. Make sure the export contains product title, product ID, description, or image fields. SKU-only detail files cannot be imported as product facts.",
+    "headersRead": "Headers read: {{headers}}{{suffix}}",
+    "ellipsis": "...",
+    "sourceRowsRange": "{{start}}-{{end}} ({{count}} rows)",
+    "rowStatus": {
+      "ready": "Not imported",
+      "needs-ai": "Not imported",
+      "needs-input": "Cannot import",
+      "duplicate": "Imported",
+      "failed": "Cannot import"
+    },
+    "fillCurrent": "Fill Current Product",
+    "importSelected": "Import {{count}} Selected Products"
+  },
+  "preflight": {
+    "title": "Generation Preflight",
+    "notGenerated": "Not generated",
+    "ready": "Preflight ready",
+    "stale": "Refresh needed",
+    "emptyTitle": "Generate preflight first",
+    "emptyDescription": "Estimated tokens, CNY cost, reference image state, script notes, and the Seedance prompt will appear here.",
+    "expectedCost": "Estimate",
+    "costRange": "Range ¥{{low}} - ¥{{high}}",
+    "expectedTokens": "Expected Tokens",
+    "upstreamCost": "Upstream Cost",
+    "officialModelPrice": "Estimated from the selected model's official pricing",
+    "byokUpstreamHint": "BYOK upstream cost is paid by the user",
+    "serviceFee": "Platform Service Fee",
+    "serviceFeeHint": "Configured in admin billing rules",
+    "duration": "Duration",
+    "provider": "Generation Channel",
+    "realModel": "Real model call",
+    "mockTask": "Internal task",
+    "currentEstimate": "This Estimate",
+    "currentEstimateHint": "Cost reference only; it will not block generation",
+    "historyEstimate": "History Estimate",
+    "historyEstimateHint": "Completed task total for reference",
+    "readyForPaid": "Product facts are ready for paid generation",
+    "notReadyForPaid": "Product facts are not ready for paid generation",
+    "blockingReasons": "Blocking reasons: {{reasons}}",
+    "referenceSummary": "References {{previewable}}/{{total}} previewable",
+    "referenceDetails": "{{missing}} missing · {{outside}} outside project · {{remote}} remote",
+    "scriptPoints": "Script Points"
+  },
+  "wallet": {
+    "ariaLabel": "Balance Center",
+    "title": "Balance Center",
+    "tabs": {
+      "ariaLabel": "Balance center sections",
+      "recharge": "Top-up Records",
+      "consumption": "Spending Details"
+    },
+    "balance": {
+      "account": "Account Balance",
+      "reserved": "Reserved",
+      "available": "Available"
+    },
+    "quickRecharge": "Quick Top Up",
+    "customRecharge": {
+      "inputAriaLabel": "Custom amount",
+      "placeholder": "50-1000"
+    },
+    "pay": "Pay",
+    "paySelected": "Pay ¥{{amount}}",
+    "recharge": "Top Up ¥{{amount}}",
+    "details": "Details",
+    "billingHint": "Platform-hosted models deduct official API cost plus service fee; your own API key only deducts platform service fees.",
+    "emptyTransactions": "No balance records yet",
+    "emptyRechargeTransactions": "No top-up records yet",
+    "emptyConsumptionTransactions": "No spending records yet",
+    "filters": {
+      "ariaLabel": "Spending detail filters",
+      "all": "All",
+      "charge": "Charges",
+      "reserve": "Reserved",
+      "refund": "Refunds",
+      "adjustment": "Adjustments"
+    },
+    "transactionTypes": {
+      "recharge": "Top-up",
+      "reserve": "Reserve",
+      "charge": "Charge",
+      "refund": "Refund",
+      "grant": "Grant",
+      "adjustment": "Adjustment"
+    },
+    "badges": {
+      "crypto": [
+        "USDT",
+        "USDC",
+        "Multi-chain",
+        "Low fees"
+      ],
+      "rmb": [
+        "Alipay",
+        "WeChat",
+        "Visa",
+        "Mastercard",
+        "Apple Pay"
+      ]
+    },
+    "transactionDescriptions": {
+      "infiniCryptoSettled": "Infini crypto top-up settled",
+      "cryptoSettled": "Crypto top-up settled",
+      "stripeSettled": "Stripe top-up settled",
+      "settled": "Top-up settled"
+    },
+    "detail": {
+      "title": "Bill Details",
+      "close": "Close bill details",
+      "amount": "Amount",
+      "balanceAfter": "Balance After",
+      "reservedAfter": "Reserved After",
+      "description": "Description",
+      "billingMode": "Billing Mode",
+      "usageKind": "Usage Kind",
+      "model": "Model",
+      "serviceFee": "Service Fee",
+      "upstreamCost": "Official Cost",
+      "units": "Usage",
+      "catalogVersion": "Catalog Version",
+      "unitPrice": "Catalog Unit Price",
+      "source": "Official Source",
+      "job": "Job/Reserve ID"
+    }
+  },
+  "pricing": {
+    "ariaLabel": "Model Pricing",
+    "verifiedCount": "{{count}} official prices",
+    "updated": "Updated {{date}}",
+    "activeCatalog": "Active catalog",
+    "builtInCatalog": "Built-in fallback",
+    "title": "Official Model Price Snapshot",
+    "subtitle": "Switch providers to review text, image, and video generation pricing.",
+    "notice": "Prices may change by region, plan, cache hit, or promotion. Use the official pricing page and your bill as the final source of truth.",
+    "providerTabs": "Model pricing providers",
+    "verified": "{{count}} verified prices",
+    "officialReference": "Official page reference",
+    "officialSource": "Official Source",
+    "viewSource": "View official source",
+    "input": "Input",
+    "billingEntry": "Billing Entry",
+    "output": "Output",
+    "generatedOutput": "Generated Output",
+    "note": "Note",
+    "billingNote": "Pricing basis",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "costFactors": "Cost factors",
+    "formula": "Official estimate formula",
+    "examples": "Typical prices",
+    "secondary": {
+      "video": "With input video",
+      "image": "Cached image input",
+      "text": "Cached input"
+    },
+    "catalog": {
+      "providers": {
+        "openai": {
+          "name": "OpenAI",
+          "summary": "The official API pricing page lists rates per 1M tokens, with cached input priced separately.",
+          "sourceLabel": "OpenAI API pricing"
+        },
+        "deepseek": {
+          "name": "DeepSeek",
+          "summary": "The official pricing page lists rates per 1M tokens and separates cache hits from cache misses.",
+          "sourceLabel": "DeepSeek Models & Pricing"
+        },
+        "gemini": {
+          "name": "Gemini",
+          "summary": "Google Gemini pricing is published by model and generation type. Haitu stores a CNY cost snapshot for wallet billing.",
+          "sourceLabel": "Gemini API pricing"
+        },
+        "volcengine": {
+          "name": "Volcengine",
+          "summary": "Volcengine Ark lists model prices in CNY. Video estimates also depend on resolution, duration, and whether input video is included.",
+          "sourceLabel": "Volcengine Ark model pricing"
+        }
+      },
+      "entries": {
+        "gpt55": {
+          "label": "Flagship text",
+          "unit": "/ 1M tokens",
+          "input": "US$5.00",
+          "cachedInput": "US$0.50",
+          "output": "US$30.00",
+          "note": "Standard short-context tier pricing. Long context, Flex, and Priority pricing may differ.",
+          "billingNote": "Default estimates use immediate standard pricing. Cached input is an automatic discount for repeated identical prompt prefixes; the first request is usually billed at the normal input price. Batch pricing is only for background batch jobs when the user does not need an immediate result.",
+          "costFactors": ["Text input tokens", "Cached input hit", "Generated output tokens"],
+          "formula": "Text total cost = input tokens / 1M × US$5.00 + output tokens / 1M × US$30.00; cached input uses tokens / 1M × US$0.50",
+          "examples": [
+            { "label": "100k input + 20k output", "value": "US$1.10" },
+            { "label": "100k cached input + 20k output", "value": "US$0.65" }
+          ]
+        },
+        "gptImage2": {
+          "label": "Image generation",
+          "unit": "/ 1M image tokens",
+          "input": "US$8.00",
+          "cachedInput": "US$2.00",
+          "output": "US$30.00",
+          "note": "Image generation is billed by image tokens. Text input is billed separately at gpt-5.5 text pricing.",
+          "billingNote": "Default estimates use immediate standard pricing. Cached image input is an automatic discount when the same image or prompt prefix is reused exactly; first generation is usually billed at the normal image input price. Batch pricing is only for background batch jobs when the user does not need an immediate result.",
+          "costFactors": ["Text input tokens", "Image input tokens", "Image output tokens", "Cached input hit"],
+          "formula": "Image total cost = text input tokens / 1M × US$5.00 + image input tokens / 1M × US$8.00 + image output tokens / 1M × US$30.00",
+          "examples": [
+            { "label": "10k text + 100k image input + 100k image output", "value": "US$3.85" },
+            { "label": "Cached 100k image input + 100k image output", "value": "US$3.20" }
+          ]
+        },
+        "gemini3ProImagePreview": {
+          "label": "Gemini quality image",
+          "unit": "/ image",
+          "input": "Estimated per image",
+          "output": "¥0.60 / image",
+          "note": "Reference price from Google's Gemini image-generation pricing. Runtime requests still use the real Gemini model ID through the OpenAI-compatible image endpoint."
+        },
+        "gemini25FlashImage": {
+          "label": "Gemini fast image",
+          "unit": "/ image",
+          "input": "Estimated per image",
+          "output": "¥0.30 / image",
+          "note": "Reference price from Google's Gemini image-generation pricing. Runtime requests still use the real Gemini model ID through the OpenAI-compatible image endpoint."
+        },
+        "deepseekV4Flash": {
+          "label": "Fast text",
+          "unit": "/ 1M tokens",
+          "input": "US$0.14",
+          "cachedInput": "US$0.0028",
+          "output": "US$0.28",
+          "note": "Corresponds to DeepSeek-V4-Flash in the official table. The legacy deepseek-chat model is deprecated after 2026-07-24.",
+          "costFactors": ["Cache miss input tokens", "Cache hit input tokens", "Generated output tokens"],
+          "formula": "Text total cost = cache miss input tokens / 1M × US$0.14 + cache hit input tokens / 1M × US$0.0028 + output tokens / 1M × US$0.28",
+          "examples": [
+            { "label": "100k cache miss input + 20k output", "value": "US$0.0196" },
+            { "label": "100k cache hit input + 20k output", "value": "US$0.00588" }
+          ]
+        },
+        "deepseekV4Pro": {
+          "label": "High-quality text",
+          "unit": "/ 1M tokens",
+          "input": "US$0.435",
+          "cachedInput": "US$0.003625",
+          "output": "US$0.87",
+          "note": "Corresponds to DeepSeek-V4-Pro in the official table. Suitable for heavier reasoning and generation tasks.",
+          "costFactors": ["Cache miss input tokens", "Cache hit input tokens", "Generated output tokens"],
+          "formula": "Text total cost = cache miss input tokens / 1M × US$0.435 + cache hit input tokens / 1M × US$0.003625 + output tokens / 1M × US$0.87",
+          "examples": [
+            { "label": "100k cache miss input + 20k output", "value": "US$0.0609" },
+            { "label": "100k cache hit input + 20k output", "value": "US$0.0177625" }
+          ]
+        },
+        "doubaoSeed20Pro": {
+          "label": "Doubao text",
+          "unit": "/ 1M tokens",
+          "input": "¥3.20",
+          "cachedInput": "¥0.017",
+          "output": "¥16.00",
+          "note": "Online inference pricing for input length [0,32k]. Longer input/output tiers increase by segment; cached output starts at ¥0.64/1M tokens.",
+          "costFactors": ["Text input tokens", "Cached input hit", "Generated output tokens", "Long-context tiering"],
+          "formula": "Text total cost = input tokens / 1M × ¥3.20 + output tokens / 1M × ¥16.00; cached input uses tokens / 1M × ¥0.017",
+          "examples": [
+            { "label": "100k input + 20k output", "value": "¥0.64" },
+            { "label": "100k cached input + 20k output", "value": "¥0.3217" }
+          ]
+        },
+        "doubaoSeedream50Lite": {
+          "label": "Image generation",
+          "unit": "/ image",
+          "input": "Per image",
+          "cachedInput": "Successful output",
+          "output": "¥0.22 / image",
+          "note": "The official page charges by successfully generated images. Multi-image jobs are billed by actual outputs; blocked or failed outputs are not charged.",
+          "costFactors": ["Successful output images", "Multi-image output count", "Failed or blocked outputs"],
+          "formula": "Image total cost = successful output images × ¥0.22",
+          "examples": [
+            { "label": "1 successful output", "value": "¥0.22" },
+            { "label": "4 successful outputs", "value": "¥0.88" }
+          ]
+        },
+        "doubaoSeedance20Fast": {
+          "label": "Fast video",
+          "unit": "/ 1M tokens",
+          "input": "¥37.00",
+          "cachedInput": "With input video ¥22.00",
+          "output": "480p 5s ¥1.86 / 720p 5s ¥4.00",
+          "note": "Official token-based pricing. Seedance 2.0 fast does not support 1080p output. Examples are 16:9, 5-second output without input video. Exact usage comes from API usage.completion_tokens.",
+          "costFactors": ["Output duration", "Output resolution", "Output aspect ratio", "Output frame rate", "Whether input video is included"],
+          "formula": "Cost = token unit price × (input video seconds + output video seconds) × output width × output height × frame rate / 1024",
+          "examples": [
+            { "label": "480p 16:9 5s", "value": "¥1.86 / video" },
+            { "label": "720p 16:9 5s", "value": "¥4.00 / video" },
+            { "label": "With input video 480p 5s", "value": "¥1.99-4.42 / video" },
+            { "label": "With input video 720p 5s", "value": "¥4.28-9.50 / video" }
+          ]
+        },
+        "doubaoSeedance20": {
+          "label": "High-quality video",
+          "unit": "/ 1M tokens",
+          "input": "¥46.00",
+          "cachedInput": "With input video ¥28.00",
+          "output": "480p 5s ¥2.31 / 720p 5s ¥4.97",
+          "note": "Official token-based pricing. Without input video, 480p/720p are ¥46/1M tokens, 1080p is ¥51/1M tokens, and 4K is ¥26/1M tokens. Examples are 16:9, 5-second output.",
+          "costFactors": ["Output duration", "Output resolution", "Output aspect ratio", "Output frame rate", "Whether input video is included"],
+          "formula": "Cost = token unit price × (input video seconds + output video seconds) × output width × output height × frame rate / 1024",
+          "examples": [
+            { "label": "480p 16:9 5s", "value": "¥2.31 / video" },
+            { "label": "720p 16:9 5s", "value": "¥4.97 / video" },
+            { "label": "1080p 16:9 5s", "value": "¥12.39 / video" },
+            { "label": "4K 16:9 5s", "value": "¥25.27 / video" }
+          ]
+        }
+      }
+    }
+  },
+  "ledger": {
+    "ariaLabel": "Task Records",
+    "jobs": {
+      "title": "Generation Tasks",
+      "active": "{{count}} active",
+      "channel": "Channel",
+      "duration": "Duration",
+      "template": "Video Type",
+      "callType": "Call Type",
+      "realModel": "Real model",
+      "mockTask": "Internal task",
+      "created": "Created",
+      "updated": "Updated",
+      "estimatedCost": "Estimated Cost",
+      "error": "Error",
+      "result": "Task Result",
+      "openVideo": "Open Video",
+      "downloadVideo": "Download Video",
+      "openReport": "View Report",
+      "cancelQueued": "Cancel Queue",
+      "redownload": "Download Again",
+      "retry": "Retry Task",
+      "empty": "No generation tasks yet",
+      "resultHints": {
+        "completed": "No final video entry yet",
+        "recoverableDownload": "The video was generated, but the server could not download it. Download it again.",
+        "failed": "Task failed. You can retry the original task.",
+        "canceled": "Task canceled",
+        "pending": "The final video and report will appear after the task completes"
+      },
+      "errors": {
+        "generationFailed": "Generation failed. Check your video model settings and try again.",
+        "referenceImageUnavailable": "Reference image {{index}} cannot be used for generation right now. Re-upload it, or delete it and use another image.",
+        "tooManyReferenceImagesWithCount": "Too many reference images: Seedance supports at most {{max}} images. This task has {{count}}. Generation will use the first {{used}} images only; reorder or remove extras and try again.",
+        "tooManyReferenceImages": "Too many reference images: Seedance supports at most {{max}} images. Generation will use the first {{used}} images only; reorder or remove extras and try again.",
+        "referenceSensitive": "A reference image may contain a real person, face, or private information, so the video provider rejected the request. Remove images with people or faces and retry with product-only images.",
+        "videoApiKeyMissing": "No video model API key is configured. Configure or choose a video model service in API Settings before generating video.",
+        "outputDownloadTimeout": "The video was generated, but the server timed out while downloading the final file. Click Download Again; repeated failures may indicate unstable network access to the video file server.",
+        "providerNetworkTimeout": "The video provider request timed out or failed on the network. Try again later; if it keeps failing, check the video model settings and reference image links.",
+        "rateLimited": "The video provider is receiving requests too frequently or has rate-limited this account. Try again later.",
+        "providerQuota": "The video provider account has insufficient quota or an abnormal balance. Check the Volcengine/Seedance account quota and try again.",
+        "providerBilling": "The video provider account is overdue or has an abnormal balance. Check the Volcengine/Seedance billing and balance before retrying.",
+        "promptTooLong": "The prompt is too long and the video provider rejected the request. Shorten the product description, selling points, or storyboard before retrying.",
+        "internalRule": "The video provider rejected this generation by internal policy. Start with the reference images: remove people, faces, QR codes, contact details, unclear brand authorization, or overly revealing images; then shorten claims and storyboard wording before retrying."
+      }
+    },
+    "providerUsage": {
+      "title": "Official Usage",
+      "readonly": "Read only",
+      "status": "Status",
+      "model": "Model",
+      "refresh": "Refresh Official Usage",
+      "officialTasks": "Official Tasks",
+      "usage": "Usage",
+      "estimatedCost": "Estimated Cost",
+      "unitPrice": "Unit Price",
+      "perMillionUsage": "million usage",
+      "empty": "The official API returned no matching tasks",
+      "initial": "Refresh official usage to show recent tasks for reconciliation",
+      "taskDetailsTitle": "Volcengine Official Task Details",
+      "usageListTitle": "Volcengine Official Usage List",
+      "taskCount": "Tasks",
+      "statusLine": "Status",
+      "modelLine": "Model",
+      "resolution": "Resolution",
+      "ratio": "Ratio",
+      "note": "Note",
+      "taskNote": "Querying a task does not create video; the official list usually keeps only the most recent 7 days.",
+      "usageNote": "Querying official usage only sends GET requests and does not create video."
+    },
+    "fees": {
+      "title": "Cost Summary",
+      "productCount": "{{count}} products",
+      "totalJobs": "Generations",
+      "paidJobs": "Paid Generations",
+      "mockJobs": "Internal Tasks",
+      "estimatedCost": "Estimated Cost",
+      "finalVideos": "Final Videos",
+      "byProduct": "Cost by Product",
+      "scopeHint": "Counts generations, paid runs, and estimated cost only.",
+      "empty": "No generation costs yet",
+      "table": {
+        "product": "Product",
+        "totalJobs": "Generations",
+        "paidJobs": "Paid Generations",
+        "mockJobs": "Internal Tasks",
+        "finalVideos": "Final Videos",
+        "estimatedCost": "Estimated Cost"
+      }
+    },
+    "reports": {
+      "title": "Generation Reports",
+      "filters": {
+        "product": "Product",
+        "allProducts": "All Products",
+        "provider": "Channel",
+        "allProviders": "All Channels",
+        "status": "Status",
+        "allStatuses": "All Statuses",
+        "finalOnly": "Final video only"
+      },
+      "noFinalVideo": "No final video",
+      "provider": "Channel",
+      "duration": "Duration",
+      "estimatedCost": "Estimated Cost",
+      "reusedRaw": "Reused raw",
+      "yes": "Yes",
+      "no": "No",
+      "reuseRaw": "Reuse raw manifest",
+      "queryUsage": "Query Usage",
+      "cancelQueued": "Cancel queued",
+      "empty": "No reports match the filters"
+    },
+    "audit": {
+      "title": "Audit Log",
+      "totalEvents": "Total Events",
+      "latestAction": "Latest Action",
+      "recordMode": "Record Mode",
+      "localJsonl": "Local JSONL",
+      "empty": "No audit records yet",
+      "loading": "Loading recent actions",
+      "actions": {
+        "auth.enter": "Account entry",
+        "auth.enter_failed": "Sign-in failed",
+        "auth.email_verified": "Email verified",
+        "auth.password_reset_requested": "Password reset requested",
+        "auth.password_reset": "Password reset",
+        "auth.logout": "Signed out",
+        "model_config.saved": "Saved model config",
+        "model_config.deleted": "Cleared model config",
+        "video_asset.deleted": "Deleted video file",
+        "video_history.deleted": "Deleted historical video",
+        "video_job.cancelled": "Canceled task",
+        "video_job.retried": "Retried task",
+        "publish_package.created": "Created package",
+        "publish_package.batch_created": "Batch packages",
+        "review.selected_final": "Selected final version",
+        "review.rated_version": "Rated version"
+      }
+    },
+    "storage": {
+      "title": "Storage & Backups",
+      "longTerm": "Long-term",
+      "createBackup": "Create Backup",
+      "backupSize": "Backup Size",
+      "fileCount": "Files",
+      "video": "Videos",
+      "references": "References",
+      "required": "Required",
+      "optional": "Optional",
+      "capacity": "Capacity",
+      "files": "Files",
+      "localBackups": "Local Backups",
+      "backupSummary": "{{count}} backups / {{size}}",
+      "loadingBackups": "Loading backups",
+      "downloadBackup": "Download Backup",
+      "emptyBackups": "No local backups yet",
+      "backupCommand": "Backup Command",
+      "loading": "Loading local storage and backup scope"
+    },
+    "assets": {
+      "title": "Video Assets",
+      "totalSize": "Total Size",
+      "final": "Final",
+      "raw": "Raw",
+      "publishPackage": "Package",
+      "missing": "Missing",
+      "sourcePublishPackage": "Package",
+      "sourceReport": "Generation report",
+      "openVideo": "Open Video",
+      "deleteFile": "Delete File",
+      "empty": "No local video assets yet",
+      "loading": "Loading local video assets"
+    }
+  },
+  "settings": {
+    "ariaLabel": "API Settings",
+    "title": "Model Service Settings",
+    "configuredCount": "{{count}} model services",
+    "groups": {
+      "text": {
+        "title": "Text Models",
+        "description": "Text reasoning for product facts, scripts, and storyboards.",
+        "badge": "Text"
+      },
+      "image": {
+        "title": "Image Models",
+        "description": "Product image and reference image capabilities.",
+        "badge": "Image"
+      },
+      "video": {
+        "title": "Video Models",
+        "description": "Final video generation capability.",
+        "badge": "Video"
+      }
+    },
+    "serviceMode": {
+      "label": "Service Mode",
+      "platform": {
+        "title": "Platform Hosted API",
+        "subtitle": "No keys to manage. The platform connects to official APIs, so you can choose text, image, and video model bundles directly.",
+        "badge": "Official API cost + platform service fee"
+      },
+      "byok": {
+        "title": "Bring Your Own API",
+        "subtitle": "Apply for API keys from model providers yourself. Provider usage is billed to your account; Haitu only charges the platform service fee.",
+        "badge": "Platform service fee"
+      },
+      "current": "Current",
+      "ready": "Ready",
+      "pending": "Setup needed"
+    },
+    "actions": {
+      "addService": "Add {{badge}} Service",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteBundle": "Delete {{label}}",
+      "save": "Save",
+      "cancel": "Cancel",
+      "refreshModels": "Refresh Models",
+      "test": "Test Config",
+      "testing": "Testing"
+    },
+    "serviceDialog": {
+      "addTitle": "Add {{badge}} Service",
+      "editTitle": "Edit {{badge}} Service",
+      "newMode": "NEW CONFIG",
+      "editMode": "EDIT CONFIG",
+      "editHint": "Leave the API key blank to keep the existing key.",
+      "addHint": "Start from a template to auto-fill a better base URL and default model.",
+      "nameLabel": "Config Name",
+      "vendorLabel": "Provider",
+      "apiKeyKeepPlaceholder": "Enter a new key to replace it, or leave blank to keep the current key",
+      "showApiKey": "Show API Key",
+      "hideApiKey": "Hide API Key",
+      "endpointPrefix": "Endpoint prefix:",
+      "officialModelId": "Official model ID is built in",
+      "modelVersions": "Model Versions",
+      "testingMessage": "Testing configuration..."
+    },
+    "bundles": {
+      "empty": "No available bundles",
+      "enable": "Enabled",
+      "disabled": "Disabled",
+      "incomplete": "Incomplete",
+      "draft": "Draft",
+      "ready": "Ready",
+      "new": "New Bundle",
+      "save": "Save Bundle",
+      "autoModel": "Auto",
+      "newIndexed": "New Bundle {{index}}",
+      "platformSaved": "Platform custom bundle saved.",
+      "platformEnabled": "Platform custom bundle enabled.",
+      "platformDisabled": "Platform custom bundle disabled.",
+      "byokSaved": "BYOK bundle saved.",
+      "byokEnabled": "BYOK bundle enabled.",
+      "byokDisabled": "BYOK bundle disabled."
+    },
+    "emptyServices": "No services configured yet. Enabled model services will appear here after you add an API key.",
+    "available": "{{count}} available",
+    "notConfigured": "Not configured",
+    "default": "Default",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "byokKey": "Your Key",
+    "common": {
+      "notSelected": "Not selected"
+    }
+  },
+  "status": {
+    "idle": "Waiting for action",
+    "loadingConsole": "Loading console.",
+    "formChanged": "The form changed. Generate preflight again before running.",
+    "selectProduct": "Select a product first",
+    "preflighting": "Running preflight...",
+    "batchJobsQueued": "Queued {{count}} generation records",
+    "batchJobLine": "{{version}}: {{id}} / {{status}} / {{outDir}}",
+    "jobCreated": "Generation task created: {{id}}\nStatus: {{status}}\nOutput folder: {{outDir}}",
+    "studioAutoRefreshTitle": "Current product studio refreshed",
+    "studioAutoRefreshCompleted": "New completed versions: {{count}}",
+    "studioAutoRefreshHistory": "History updated.",
+    "creatingJob": "Creating generation task...",
+    "textModelRequired": "Configure a text model before AI fact organization or storyboard generation.",
+    "imageModelRequired": "Configure an image model before generating reference images.",
+    "videoModelRequired": "Configure a video model before generating video.",
+    "settingsSaved": "API settings saved and applied to new task forms.",
+    "apiKeyRequired": "Enter an API key first.",
+    "modelVersionRequired": "Select at least one model version.",
+    "modelSaved": "Model service saved: {{preview}}",
+    "configured": "Configured",
+    "modelEnabled": "Model service enabled.",
+    "modelDisabled": "Model service disabled.",
+    "platformMode": "Switched to platform model mode.",
+    "byokMode": "Switched to BYOK API mode.",
+    "bundleSaved": "Model bundle saved.",
+    "bundleDeleted": "Model bundle deleted.",
+    "bundleIncomplete": "The model bundle is incomplete. Add text, image, and video models before using it for video creation.",
+    "testFailedApiKey": "Test failed: enter an API key first.",
+    "testing": "Testing configuration...",
+    "testSuccess": "Test succeeded: {{message}}\nModel: {{model}}",
+    "testFailed": "Test failed: {{message}}",
+    "refreshFailedApiKey": "Refresh failed: enter an API key first.",
+    "refreshingModels": "Refreshing available models...",
+    "refreshModelsSuccess": "Refresh complete: found {{total}} available models, including {{known}} in the official catalog.",
+    "refreshFailed": "Refresh failed: {{message}}",
+    "apiKeyCleared": "API key cleared.",
+    "paymentReturned": "Payment returned. Balance depends on settlement and will refresh shortly.",
+    "paymentCancelled": "Payment canceled. Wallet balance was not changed.",
+    "openingPayment": "Opening secure {{method}} payment page.",
+    "infiniSynced": "Infini top-up has settled.",
+    "waitingPayment": "Payment returned. Waiting for settlement confirmation.",
+    "authExpired": "Your session expired. Enter your email and password again.",
+    "storyboardApplied": "Filled from storyboard history: {{template}} / {{duration}}",
+    "storyboardDeleted": "Storyboard record deleted.",
+    "currentProduct": "Current product",
+    "productFactsRead": "Product facts loaded",
+    "autoSaved": "Facts auto-saved: {{title}}",
+    "autoSaveFailed": "Fact auto-save failed: {{message}}",
+    "productLoaded": "Loaded product into draft: {{title}}",
+    "enteredVideo": "Entered video creation: {{title}}",
+    "newProduct": "Switched to a new product. You can enter facts and add images now.",
+    "aiOrganized": "AI organized fact pack: {{title}}",
+    "deleteProductTitle": "Delete this product fact pack?",
+    "deleteProductDetail": "Existing videos and generation records will not be deleted.",
+    "productDeleted": "Product deleted: {{title}}",
+    "videoStarted": "Started creating {{count}} videos. The current product will refresh automatically when complete.",
+    "pasteProductFirst": "Paste product facts first.",
+    "importPreviewReady": "Product facts organized. Review them before saving to the product library.",
+    "importedAndEnteredVideo": "Imported product and entered video creation: {{title}}",
+    "importedProduct": "Imported product facts: {{title}}",
+    "batchImportDone": "Batch import complete: {{imported}}/{{total}} succeeded, {{failed}} failed",
+    "batchItemSaved": "#{{index}} saved {{title}}",
+    "batchItemFailed": "#{{index}} failed: {{error}}",
+    "filePreviewParsed": "Parsed {{count}} product candidates.",
+    "selectParsedRow": "Select a parsed product row first.",
+    "filledFromFile": "Filled the current product with file data: {{title}}",
+    "fileImportDone": "File import complete: {{imported}}/{{requested}} succeeded, {{failed}} failed",
+    "storyboardGenerated": "The text model generated a storyboard draft.",
+    "storyboardTimeout": "Text model generation timed out. Check API settings or try again later.",
+    "productUpdated": "Product facts updated",
+    "productSavedAndVideo": "Product saved and opened in video creation",
+    "productSaved": "Product facts saved",
+    "importedReferences": "Imported reference images: {{count}}",
+    "uploadedReferences": "Uploaded reference images: {{count}}",
+    "deletedReference": "Deleted reference image: {{reference}}",
+    "reorderedReferences": "Reference image order updated.",
+    "generatedReferences": "AI generated reference images: {{count}}",
+    "cancelledTask": "Canceled queued task: {{taskId}}",
+    "deletedVideoRecord": "Deleted video record: {{jobId}}",
+    "deletedHistoryVideo": "Deleted historical video record: {{jobId}}",
+    "retryTitle": "Retry this paid generation task?",
+    "retryDetail": "Retrying resubmits the original task and may charge again.",
+    "retryCancelled": "Paid retry canceled.",
+    "retriedTask": "Retried task: {{jobId}}",
+    "noRecoverableDownload": "This task has no recoverable final video download.",
+    "recoverDownloadStarted": "Started downloading the final video again without resubmitting generation.",
+    "backupCreated": "Backup created: {{fileName}}",
+    "size": "Size: {{size}}",
+    "path": "Path: {{path}}",
+    "assetMissing": "This video file no longer exists.",
+    "deleteAssetTitle": "Delete this local video file?",
+    "deleteAssetDetail": "Task records, costs, scripts, and reports will be kept.",
+    "assetDeleted": "Deleted video file: {{path}}\nFreed space: {{size}}\nTask metadata and cost records were kept.",
+    "jobStatuses": {
+      "queued": "Queued",
+      "running": "Generating",
+      "completed": "Completed",
+      "succeeded": "Completed",
+      "failed": "Failed",
+      "canceled": "Canceled",
+      "cancelled": "Canceled",
+      "all": "All"
+    },
+    "providers": {
+      "mock": "Internal task",
+      "volcengineSeedance": "seedance-2.0-fast"
+    },
+    "productFacts": {
+      "title": "Product Facts",
+      "productTitle": "Title",
+      "category": "Category",
+      "materials": "Materials",
+      "dimensions": "Size/Weight",
+      "sellingPoints": "Verified selling points:",
+      "usageScenes": "Usage scenarios:",
+      "forbiddenClaims": "Blocked claims:",
+      "referenceImages": "Reference images:",
+      "sourceFile": "Source file"
+    },
+    "preflightSummary": {
+      "complete": "Preflight complete",
+      "expectedCost": "Expected cost",
+      "historyEstimate": "History estimate: completed tasks total ¥{{amount}}",
+      "readiness": "Fact readiness",
+      "readyForPaid": "Ready for paid generation",
+      "notReadyForPaid": "Not ready for paid generation: {{reasons}}",
+      "reviewHint": "Review cost, references, script, and prompt before running."
+    },
+    "qc": {
+      "pass": "Check passed",
+      "warning": "Check warning",
+      "fail": "Check failed",
+      "missing": "Check missing",
+      "unknown": "Not checked"
+    }
+  },
+  "videoStudio": {
+    "actions": {
+      "cancel": "Cancel",
+      "deleting": "Deleting"
+    },
+    "autosave": {
+      "saving": "Saving",
+      "saved": "Saved",
+      "failed": "Save failed"
+    },
+    "controls": {
+      "modelScheme": "Model Scheme",
+      "template": "Video Style",
+      "duration": "Duration",
+      "resolution": "Resolution",
+      "aspectRatio": "Frame",
+      "finalLanguage": "Output Language",
+      "versionCount": "Videos"
+    },
+    "aspectRatios": {
+      "vertical": "Vertical 9:16",
+      "horizontal": "Horizontal 16:9"
+    },
+    "counts": {
+      "product": "{{count}} products",
+      "image": "{{count}} images",
+      "record": "{{count}} records",
+      "video": "{{count}}"
+    },
+    "costHints": {
+      "loading": "Estimating",
+      "estimated": "Est. ¥{{amount}}",
+      "detail": "{{mode}} · upstream ¥{{upstream}} · service fee ¥{{serviceFee}}",
+      "platformMode": "Platform hosted API",
+      "byokMode": "Your API key"
+    },
+    "deleteDialog": {
+      "cancelAndDeleteLabel": "Cancel and delete video",
+      "deleteLabel": "Delete video history record",
+      "cancelTitle": "Cancel and delete this video?",
+      "deleteTitle": "Delete this video record?",
+      "cancelDescription": "This will cancel generation and remove it from history.",
+      "ledgerDescription": "This will delete the history record and its local output folder.",
+      "historyDescription": "This will remove the record from history.",
+      "confirmCancelDelete": "Cancel and delete",
+      "confirmDelete": "Delete"
+    },
+    "facts": {
+      "title": "Product Facts",
+      "placeholder": "Paste or enter the product title, category, materials, size/weight, selling points, and usage scenarios.",
+      "organize": "AI Organize Facts",
+      "organizing": "Organizing",
+      "raw": "Raw facts",
+      "empty": "No facts yet",
+      "savedPackage": "Organized fact pack"
+    },
+    "generate": {
+      "button": "Generate Video",
+      "buttonWithCount": "Generate {{count}} Videos",
+      "submitting": "Submitting",
+      "queuedToast": "Added to history. You can cancel while it is generating, then preview and download when complete.",
+      "packageReadyToast": "Fact pack organized.",
+      "imageOnlyToast": "Only JPG, PNG, and WebP images are supported.",
+      "ignoredFileToast": "Non-image files were ignored."
+    },
+    "history": {
+      "title": "History",
+      "subtitle": "Videos generated for the current product appear here.",
+      "preview": "Preview",
+      "download": "Download",
+      "redownload": "Download Again",
+      "retry": "Retry",
+      "delete": "Delete",
+      "copyTags": "Copy Tags",
+      "empty": "No videos yet",
+      "downloadWindow": "Downloadable within 24 hours",
+      "deleteAt": "Deletes at {{time}}",
+      "noTagsToast": "No tags to copy yet.",
+      "tagsCopiedToast": "Tags copied."
+    },
+    "labels": {
+      "version": "Version {{index}}",
+      "video": "Video {{index}}"
+    },
+    "languages": {
+      "ja": "Japanese",
+      "zh": "Chinese",
+      "en": "English"
+    },
+    "modelChips": {
+      "text": "Txt",
+      "image": "Img",
+      "video": "Vid"
+    },
+    "models": {
+      "auto": "Auto",
+      "deleted": "Deleted model",
+      "unselected": "Not selected",
+      "platformQuality": "Platform · High quality",
+      "platformLowCost": "Platform · Low cost",
+      "platformCustom": "Platform · {{label}}",
+      "byokCustom": "Your key · {{label}}",
+      "current": "Current: {{label}}",
+      "textModel": "Text {{model}}",
+      "imageModel": "Image {{model}}",
+      "videoModel": "Video {{model}}"
+    },
+    "newProduct": {
+      "title": "New Product",
+      "versionCount": "{{count}} versions"
+    },
+    "previewDialog": {
+      "ariaLabel": "{{title}} preview",
+      "generatingTitle": "Video is still generating",
+      "downloadFailedTitle": "Final video download failed",
+      "failedTitle": "Video generation failed",
+      "noVideoTitle": "No playable video file yet",
+      "generatingDescription": "The preview will appear here automatically when generation finishes.",
+      "noVideoDescription": "This record does not have a final video file yet. You can keep it or delete it and generate again."
+    },
+    "productLibrary": {
+      "title": "Product Library",
+      "expand": "Expand product library",
+      "collapse": "Collapse product library",
+      "filteredCount": "{{shown}}/{{total}} products",
+      "importFile": "Import CSV/Excel",
+      "search": "Search products",
+      "clearSearch": "Clear search",
+      "deleteProduct": "Delete product",
+      "readyStatus": "Ready to generate",
+      "empty": "No products yet",
+      "noMatches": "No matching products"
+    },
+    "readiness": {
+      "saved": "Facts saved. Ready to generate video.",
+      "empty": "Fill in product facts first.",
+      "willOrganize": "The fact pack will be organized before generating video."
+    },
+    "reference": {
+      "title": "References",
+      "addSubtitle": "Add images",
+      "add": "Add Images",
+      "addHint": "Multi-select · Drag or paste images",
+      "generate": "AI Generate References",
+      "generateDisabledTitle": "Organize the fact pack before generating references",
+      "generateDisabledToast": "Organize the fact pack before generating references.",
+      "reorderTitle": "Drag to reorder references",
+      "preview": "Preview reference",
+      "importAsset": "Import asset",
+      "delete": "Delete reference",
+      "item": "Reference {{index}}",
+      "previewDialogTitle": "Reference Preview",
+      "previous": "Previous",
+      "next": "Next",
+      "previewPending": "Preview pending image",
+      "pending": "Pending {{index}}",
+      "pendingImageName": "Pending image {{index}}",
+      "removePending": "Remove pending image",
+      "emptyHint": "Reference images guide the product appearance, materials, and camera details. Drag or paste images here.",
+      "status": {
+        "previewable": "Previewable",
+        "missing": "File missing",
+        "outsideProjectRoot": "Outside project root",
+        "remote": "Remote image"
+      }
+    },
+    "storyboard": {
+      "title": "Storyboard",
+      "subtitle": "Optional. Leave blank to generate from product facts.",
+      "generate": "AI Generate Storyboard",
+      "generating": "Generating",
+      "history": "Storyboard History",
+      "deleteRecord": "Delete storyboard record",
+      "emptyHistory": "No AI history yet",
+      "emptyPreview": "Empty storyboard",
+      "default": "Default storyboard",
+      "ai": "AI storyboard",
+      "manual": "Manual storyboard",
+      "defaultDrafts": {
+        "scene": [
+          "Show the real usage environment and the full product appearance.",
+          "Move into a close usage action so the product naturally becomes the focus.",
+          "Show material, size, structure, and hand-operation details.",
+          "Return to the full usage scene and show the result and whole product."
+        ],
+        "painPoint": [
+          "Start with the inconvenience or pain point before using the product.",
+          "Cut to the product appearing and quickly solving the core problem.",
+          "Use close shots to reinforce the key benefit and operation process.",
+          "Show the easier end state and the whole product."
+        ],
+        "benefit": [
+          "Open directly on the most important benefit and result.",
+          "Use close shots to explain the structure or material behind that benefit.",
+          "Cut through the usage process and show multiple advantages in sequence.",
+          "End with color, full-product, or multi-angle shots to reinforce the buying reason."
+        ],
+        "ugc": [
+          "Open handheld or first-person, as if a real user just received the product.",
+          "Show and try the product with natural actions and first impressions.",
+          "Capture details, material, and small discoveries during use.",
+          "Close with an authentic after-use reaction shot."
+        ],
+        "unboxing": [
+          "Start from the package or tabletop with a clean pre-unboxing frame.",
+          "Open the package and take out the product so it naturally enters the shot.",
+          "Show accessories, material, size, and key details in sequence.",
+          "Place the product into a simple usage scene to finish the unboxing."
+        ]
+      }
+    },
+    "summary": {
+      "referenceImages": "{{count}} reference images"
+    },
+    "templates": {
+      "scene": "Scene",
+      "painPoint": "Pain Point",
+      "benefit": "Benefit",
+      "ugc": "UGC",
+      "unboxing": "Unboxing"
+    },
+    "videoStatus": {
+      "expired": "Expired",
+      "previewable": "Previewable",
+      "completed": "Completed",
+      "queued": "Queued",
+      "running": "Generating",
+      "failed": "Failed",
+      "canceled": "Canceled"
+    }
+  },
+  "admin": {
+    "auth": {
+      "subtitle": "Owner operations console",
+      "email": "Email",
+      "password": "Password",
+      "otp": "Verification code",
+      "emailPlaceholder": "Enter owner email",
+      "passwordPlaceholder": "Enter password",
+      "otpPlaceholder": "6-digit code",
+      "enterAdmin": "Enter Admin",
+      "verifyEmail": "Verify Email",
+      "backToLogin": "Back to Login",
+      "resendOtp": "Resend Code",
+      "cooldown": "{{seconds}}s"
+    },
+    "navigation": {
+      "overview": {
+        "label": "Overview",
+        "description": "Growth, activity, and task metrics"
+      },
+      "users": {
+        "label": "Users",
+        "description": "Accounts, ownership, and diagnostics"
+      },
+      "content": {
+        "label": "Creation Ops",
+        "description": "Video jobs, product assets, failures"
+      },
+      "finance": {
+        "label": "Finance Ledger",
+        "description": "Balances, top-ups, charges, adjustments"
+      },
+      "paymentBilling": {
+        "label": "Payments & Billing",
+        "description": "Payment methods, service fees, billing policy"
+      },
+      "modelServices": {
+        "label": "Model Services",
+        "description": "Platform model APIs, versions, keys"
+      },
+      "modelPricing": {
+        "label": "Model Pricing",
+        "description": "Official catalog, drafts, publishing"
+      },
+      "siteSettings": {
+        "label": "Site Settings",
+        "description": "Public pages, SEO/GEO, site switches"
+      },
+      "system": {
+        "label": "System",
+        "description": "Backups, audit logs, and runtime status"
+      }
+    },
+    "navigationGroups": {
+      "operate": "Operations",
+      "commercial": "Commercial",
+      "configuration": "Configuration",
+      "system": "System"
+    },
+    "shell": {
+      "title": "Owner Admin",
+      "navigationLabel": "Admin navigation",
+      "keyHint": "Platform keys are encrypted in admin only. Regular users only choose available bundles.",
+      "checkingSession": "Checking session",
+      "refreshing": "Refreshing data",
+      "refresh": "Refresh",
+      "logout": "Sign out",
+      "adminBadge": "Admin",
+      "globalSearch": "Search users, workspaces, orders, jobs",
+      "timeRange": "Time range",
+      "ranges": {
+        "24h": "Last 24h",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "all": "All"
+      }
+    },
+    "status": {
+      "authExpired": "Session expired. Sign in again.",
+      "noPlatformConfig": "No platform model configuration can be saved.",
+      "platformKeyRequired": "Enter the platform key first.",
+      "modelVersionRequired": "Select at least one model version.",
+      "platformSaved": "Platform model saved. The key is encrypted in the database and platform model settings were updated.",
+      "platformEnabled": "Platform model service enabled.",
+      "platformDisabled": "Platform model service disabled.",
+      "platformDeleted": "Platform model service deleted.",
+      "paymentEnabled": "Payment method enabled.",
+      "paymentDisabled": "Payment method disabled.",
+      "walletAdjusted": "Balance adjustment was written to the ledger.",
+      "billingSettingsSaved": "Generation billing rules saved.",
+      "modelPricingDraftSaved": "Model pricing draft {{version}} saved. It affects only new estimates and new jobs after publishing.",
+      "modelPricingPublished": "Model pricing catalog {{version}} published.",
+      "moduleSeparator": ", ",
+      "partialLoadFailed": "Some modules failed to load: {{modules}}. Overview and navigation are still available. Refresh or confirm the backend service has restarted."
+    },
+    "overview": {
+      "ariaLabel": "Admin overview",
+      "metricsAriaLabel": "Admin metrics",
+      "metricsPlaceholderAriaLabel": "Admin metric placeholders",
+      "registrationTrend": "Registration Trend",
+      "activityTrend": "Activity Trend",
+      "days30": "30 days",
+      "empty": "No data yet",
+      "metrics": {
+        "totalUsers": "Total Users",
+        "verifiedUsers": "{{count}} verified",
+        "newToday": "New Today",
+        "new7d": "7 days {{count}}",
+        "active7d": "7-day Active",
+        "activeHint": "Login / generation activity",
+        "workspaces": "Workspaces",
+        "siteWide": "Site-wide",
+        "products": "Products",
+        "productLibrary": "User libraries",
+        "videoJobs": "Video Jobs",
+        "generationRecords": "Generation records"
+      },
+      "charts": {
+        "registrations": "Registrations",
+        "activeUsers": "Active users",
+        "events": "Events"
+      }
+    },
+    "users": {
+      "ariaLabel": "User management",
+      "title": "User List",
+      "count": "{{count}} users",
+      "users": "Users",
+      "workspaces": "Spaces",
+      "siteWorkspaces": "All business spaces",
+      "videoJobs": "Video Jobs",
+      "userGeneratedRecords": "User generation records",
+      "active7d": "7-day Active",
+      "roleAdmin": "Admin",
+      "roleUser": "User",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "columns": {
+        "user": "User",
+        "status": "Status",
+        "workspace": "Workspace",
+        "products": "Products",
+        "videoJobs": "Video Jobs",
+        "createdAt": "Created",
+        "lastActive": "Last Active"
+      },
+      "workbench": {
+        "emptyTitle": "User Profile",
+        "emptyHint": "Select a user to inspect account status, recent creation activity, and finance summary.",
+        "title": "User Profile",
+        "pending": "Waiting for details",
+        "loadHint": "User details are not loaded yet. Select the user again or refresh.",
+        "spend": "Spend",
+        "tabs": {
+          "overview": "Overview",
+          "workspaces": "Spaces",
+          "videoJobs": "Video Jobs",
+          "finance": "Finance",
+          "products": "Products"
+        }
+      },
+      "drawer": {
+        "ariaLabel": "User details",
+        "close": "Close user details",
+        "closeButton": "Close",
+        "registered": "Created {{date}} / Last active {{lastActive}}",
+        "loading": "Loading user details",
+        "metricsAriaLabel": "User detail metrics",
+        "workspaces": "Spaces",
+        "products": "Products",
+        "videoJobs": "Video Jobs",
+        "lastSession": "Last Session",
+        "videoStatus": "Video Status",
+        "statusKinds": "{{count}} kinds",
+        "emptyVideoJobs": "No video jobs",
+      "workspaceCount": "{{count}} workspaces",
+      "members": "{{count}} members",
+      "membersLabel": "Members",
+      "tasks": "{{count}} tasks",
+        "completed": "{{count}} completed",
+        "failed": "{{count}} failed",
+        "emptyWorkspaces": "No workspaces",
+        "recentVideoJobs": "Recent Video Jobs",
+        "recentProducts": "Recent Products",
+        "updated": "Updated {{date}}",
+        "emptyProducts": "No products",
+        "createdCompleted": "Created {{created}} / Completed {{completed}}",
+        "outputs": "{{count}} outputs"
+      },
+      "profile": {
+        "emptyTitle": "User Profile",
+        "title": "User Profile",
+        "businessContext": "Business Context",
+        "contextSummary": "{{workspaces}} spaces / {{products}} products / {{jobs}} video jobs",
+        "videoHealth": "Creation Summary",
+        "recentLedger": "Recent Ledger",
+        "openContent": "Open Creation Ops",
+        "openFinance": "Open Finance Ledger"
+      }
+    },
+    "modelServices": {
+      "ariaLabel": "Platform models",
+      "title": "Platform Model Settings",
+      "configuredCount": "{{count}} platform services",
+      "hint": "Platform API keys are encrypted in the database. This uses the same model service configuration as BYOK, but the owner is platform-hosted.",
+      "keyBadge": "Platform Hosted",
+      "addService": "Add {{badge}} Service",
+      "empty": "No platform services yet. Enabled model services will appear after you add a platform API key.",
+      "dialogTitle": "Add {{badge}} Service",
+      "apiKeyLabel": "Platform API Key",
+      "groups": {
+        "text": {
+          "title": "Text Models",
+          "description": "Text calls for product organization, scripts, and storyboards.",
+          "badge": "Text"
+        },
+        "image": {
+          "title": "Image Models",
+          "description": "Image generation calls for product and asset images.",
+          "badge": "Image"
+        },
+        "video": {
+          "title": "Video Models",
+          "description": "Final video generation calls.",
+          "badge": "Video"
+        }
+      }
+    },
+    "content": {
+      "title": "Creation Ops",
+      "totalProducts": "Products",
+      "productHint": "Site-wide product facts",
+      "totalVideoJobs": "Video Jobs",
+      "completedFailed": "{{completed}} completed / {{failed}} failed",
+      "totalAssets": "Video Assets",
+      "assetHint": "Generated outputs and assets",
+      "totalStoryboards": "Storyboards",
+      "storyboardHint": "Saved user storyboards",
+      "statusDistribution": "Job Status Distribution",
+      "statusKinds": "{{count}} statuses",
+      "emptyStatus": "No job status data",
+      "products": "Products",
+      "productCount": "{{count}} products",
+      "videoJobs": "Video Jobs",
+      "jobCount": "{{count}} jobs",
+      "emptyProducts": "No products",
+      "emptyJobs": "No video jobs",
+      "productsWorkbenchHint": "Review site-wide product facts, linked jobs, and asset counts by workspace. This view is for operations triage, not editing user products.",
+      "videoJobsWorkbenchHint": "Review site-wide creation status, model usage, and output counts by task. Expired, failed, and queued jobs should be checked here first.",
+      "recentJobs": "Recent Jobs",
+      "productTable": {
+        "product": "Product",
+        "workspace": "Workspace",
+        "jobs": "Jobs",
+        "assets": "Assets",
+        "updatedAt": "Updated"
+      },
+      "jobTable": {
+        "job": "Job",
+        "workspace": "Workspace",
+        "status": "Status",
+        "model": "Model",
+        "assets": "Assets",
+        "createdAt": "Created"
+      }
+    },
+    "finance": {
+      "ariaLabel": "Finance Ledger",
+      "title": "Finance Ledger",
+      "totalBalance": "Total Balance",
+      "workspaceCount": "{{count}} workspaces",
+      "reserved": "Reserved",
+      "reservedHint": "Held by running generation tasks",
+      "paidRecharge": "Paid Top-ups",
+      "totalSpend": "Total Spend",
+      "rechargeCount": "{{count}} top-up orders",
+      "userBalances": "User Balances",
+      "walletTable": {
+        "workspace": "Workspace",
+        "user": "User",
+        "balance": "Balance",
+        "reserved": "Reserved",
+        "available": "Available",
+        "ledger": "Ledger",
+        "lastChange": "Last Change",
+        "action": "Action"
+      },
+      "emptyWallets": "No wallet data",
+      "adjustment": "Balance Adjustment",
+      "writeLedger": "Write Ledger",
+      "workspace": "Workspace",
+      "amount": "Amount",
+      "amountPlaceholder": "For example 10 or -3.5",
+      "reason": "Reason",
+      "reasonPlaceholder": "For example: compensate payment fee, reverse mistaken credit",
+      "submitAdjustment": "Submit Adjustment",
+      "cancelAdjustment": "Cancel",
+      "rechargeOrders": "Top-up Orders",
+      "orderCount": "{{count}} orders",
+      "walletTransactions": "Wallet Transactions",
+      "transactionCount": "{{count}} rows",
+      "emptyRechargeOrders": "No top-up orders",
+      "emptyWalletTransactions": "No wallet transactions",
+      "orderTable": {
+        "order": "Order",
+        "workspace": "Workspace",
+        "amount": "Amount",
+        "provider": "Provider",
+        "status": "Status",
+        "createdAt": "Created"
+      },
+      "transactionTable": {
+        "type": "Type",
+        "workspace": "Workspace",
+        "amount": "Amount",
+        "balance": "Balance",
+        "job": "Job/Reserve",
+        "createdAt": "Time",
+        "action": "Action",
+        "details": "Details"
+      },
+      "transactionDetail": {
+        "title": "Ledger Details",
+        "close": "Close ledger details",
+        "amount": "Amount",
+        "balanceAfter": "Balance After",
+        "reservedAfter": "Reserved After",
+        "workspace": "Workspace",
+        "description": "Description",
+        "billingMode": "Billing Mode",
+        "usageKind": "Usage Kind",
+        "model": "Model",
+        "serviceFee": "Service Fee",
+        "upstreamCost": "Official Cost",
+        "units": "Usage",
+        "catalogVersion": "Catalog Version",
+        "unitPrice": "Catalog Unit Price",
+        "source": "Official Source",
+        "job": "Job/Reserve ID"
+      },
+      "transactionTypes": {
+        "adjustment": "Admin adjustment",
+        "bonus": "Bonus",
+        "charge": "Charge",
+        "recharge": "Top-up",
+        "refund": "Release",
+        "reserve": "Reserve"
+      },
+      "rechargeStatus": {
+        "paid": "Paid",
+        "pending": "Pending",
+        "expired": "Expired",
+        "failed": "Failed"
+      }
+    },
+    "paymentBilling": {
+      "paymentMethods": "Payment Methods",
+      "configuredMethods": "{{count}} admin-configured",
+      "enabledCount": "{{enabled}}/{{total}} enabled",
+      "rmbPayment": "RMB Payment",
+      "cryptoPayment": "Crypto Payment",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "emptyPaymentMethods": "No payment methods",
+      "billingPolicy": "Billing Policy",
+      "serviceFees": "Platform Service Fees",
+      "meteredPolicy": "Metered Generation",
+      "serviceFee": "Platform Service Fee",
+      "officialCostHint": "Upstream cost is estimated from the model pricing catalog. Configure only platform service fees here; changes apply to new estimates and new job charges.",
+      "savePricing": "Save Fees",
+      "toggleOn": "On",
+      "toggleOff": "Off",
+      "usageKinds": {
+        "text": "Text Creation",
+        "image": "Image Creation",
+        "video": "Video Creation"
+      },
+      "serviceFeeUnits": {
+        "perTextCall": "Per text call",
+        "perImage": "Per image",
+        "perVideo": "Per video generation"
+      }
+    },
+    "modelPricing": {
+      "title": "Model Pricing",
+      "activeVersion": "Catalog Entries",
+      "providerEntries": "Provider entries",
+      "volcengine": "Volcengine",
+      "catalogEditor": "Official Pricing Catalog",
+      "draftReady": "Draft ready",
+      "noDraft": "No draft",
+      "publishPanel": "Publish Control",
+      "version": "New version",
+      "publishHint": "Save a draft to validate and preview changes. Publishing affects only new estimates and new job charges; historical ledgers keep their price snapshots.",
+      "saveDraft": "Save Draft",
+      "publish": "Publish",
+      "source": "Source",
+      "emptyEntries": "No model pricing entries",
+      "sources": {
+        "builtIn": "Built-in official catalog",
+        "database": "Admin-published catalog"
+      },
+      "table": {
+        "model": "Model",
+        "kind": "Kind",
+        "input": "Input CNY/1M",
+        "output": "Output CNY/1M",
+        "cached": "Cached CNY/1M",
+        "image": "Image CNY/each",
+        "video": "Video CNY/1M tokens",
+        "source": "Source"
+      },
+      "kinds": {
+        "text": "Text",
+        "image": "Image",
+        "video": "Video"
+      }
+    },
+    "siteSettings": {
+      "title": "Site Settings",
+      "sections": "Config Sections",
+      "sectionHint": "Site-level settings entry points",
+      "publicPages": "Public Pages",
+      "publicPageHint": "Home, pricing, auth, legal pages",
+      "modelPricing": "Pricing Entries",
+      "configSections": "Configuration Status",
+      "statusOnly": "Status only",
+      "sidePanel": "Site Status",
+      "seoGeo": "SEO/GEO roadmap",
+      "paymentMethods": "Payment Methods",
+      "billingRules": "{{count}} billing rules enabled",
+      "emptySections": "No config sections",
+      "emptyPublicPages": "No public pages",
+      "roadmapPath": "Roadmap Path",
+      "productionCheck": "Production Check",
+      "commerce": "Commerce Settings",
+      "table": {
+        "section": "Section",
+        "description": "Description",
+        "status": "Status"
+      },
+      "status": {
+        "configured": "Configured",
+        "attention": "Needs attention",
+        "planned": "Planned"
+      }
+    },
+    "system": {
+      "title": "System",
+      "badge": "Pending",
+      "items": [
+        "Backups",
+        "Audit Logs",
+        "Runtime Status"
+      ]
+    },
+    "forbidden": {
+      "title": "No Admin Access",
+      "description": "{{email}} is not an owner admin.",
+      "fallbackAccount": "Current account",
+      "backToConsole": "Back to Console"
+    },
+    "jobStatus": {
+      "canceled": "Canceled",
+      "completed": "Completed",
+      "expired": "Expired",
+      "failed": "Failed",
+      "queued": "Queued",
+      "running": "Generating",
+      "unknown": "Unknown"
+    }
+  }
+}

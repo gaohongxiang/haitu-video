@@ -1,5 +1,5 @@
 import type {
-  FileConsoleSettingsStore,
+  ConsoleSettingsStore,
   PaymentMethodId,
   PaymentMethodSettings
 } from "./consoleSettings.js";
@@ -19,7 +19,7 @@ export interface PaymentMethodUpdateRequest {
 }
 
 export async function listUserPaymentMethods(input: {
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   env?: NodeJS.ProcessEnv;
 }): Promise<{ methods: PaymentMethodView[] }> {
   const methods = await listPaymentMethods(input);
@@ -29,7 +29,7 @@ export async function listUserPaymentMethods(input: {
 }
 
 export async function listAdminPaymentMethods(input: {
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   env?: NodeJS.ProcessEnv;
 }): Promise<{ methods: PaymentMethodView[] }> {
   return {
@@ -38,7 +38,7 @@ export async function listAdminPaymentMethods(input: {
 }
 
 export async function saveAdminPaymentMethods(input: {
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   request: PaymentMethodUpdateRequest;
   env?: NodeJS.ProcessEnv;
 }): Promise<{ methods: PaymentMethodView[] }> {
@@ -61,7 +61,7 @@ export async function saveAdminPaymentMethods(input: {
 }
 
 export async function assertPaymentMethodCanCreateRechargeOrder(input: {
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   paymentMethodId?: string;
   env?: NodeJS.ProcessEnv;
 }): Promise<PaymentMethodView> {
@@ -84,7 +84,7 @@ export async function assertPaymentMethodCanCreateRechargeOrder(input: {
 }
 
 async function listPaymentMethods(input: {
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   env?: NodeJS.ProcessEnv;
 }): Promise<PaymentMethodView[]> {
   const settings = await input.settingsStore.read();

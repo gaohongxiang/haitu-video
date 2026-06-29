@@ -1,6 +1,9 @@
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { ReferenceImageUrlResolver } from "../providers/types.js";
-import { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
+import type { ModelPricingCatalogContext } from "./modelPricingCatalogContext.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import {
   canRecoverVideoJobDownload
 } from "./consoleVideoJobRecord.js";
@@ -20,17 +23,21 @@ import {
 } from "./consoleVideoJobPersistence.js";
 import type { VideoJobRecord, VideoJobRequest } from "./consoleVideoJobTypes.js";
 import type { DatabaseHandle } from "./db/client.js";
+import { tokenPriceCnyPerMillionForVideoModel } from "./videoJobBilling.js";
 
 export interface LocalVideoJobQueueOptions {
   rootDir: string;
   outputsDir: string;
   workspaceId?: string;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   fetchImpl?: typeof fetch;
   now?: () => Date;
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   databaseHandle?: DatabaseHandle;
+  billingPolicyStore?: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  getModelPricingCatalogContext?: () => ModelPricingCatalogContext;
 }
 
 export class LocalVideoJobQueue {
@@ -150,10 +157,13 @@ export class LocalVideoJobQueue {
     });
     try {
       const runPipeline = this.options.runMakeVideoPipeline ?? runMakeVideoPipeline;
+      const modelPricingCatalogContext = this.currentModelPricingCatalogContext();
+      const modelPricingCatalog = modelPricingCatalogContext?.catalog;
       const report = await runPipeline(createMakeVideoPipelineInput({
         record,
         fetchImpl: this.options.fetchImpl,
-        referenceImageUrlResolver: this.options.referenceImageUrlResolver
+        referenceImageUrlResolver: this.options.referenceImageUrlResolver,
+        tokenPriceCnyPerMillion: tokenPriceCnyPerMillionForVideoModel(record.providerModel, record.resolution, modelPricingCatalog)
       }));
       if ((await this.store.read(id)).status === "canceled") {
         await removeGeneratedVideoJobOutputs(record.outDir);
@@ -166,7 +176,10 @@ export class LocalVideoJobQueue {
         mediaUrlForPath: mediaUrl,
         databaseHandle: this.options.databaseHandle,
         workspaceId: this.options.workspaceId,
-        now: this.options.now
+        now: this.options.now,
+        billingPolicyStore: this.options.billingPolicyStore,
+        modelPricingCatalog,
+        modelPricingCatalogVersion: record.billingCatalogVersion ?? modelPricingCatalogContext?.version
       }));
     } catch (error) {
       if ((await this.store.read(id)).status === "canceled") {
@@ -177,7 +190,8 @@ export class LocalVideoJobQueue {
         record,
         error,
         completedAt: this.nowIso(),
-        reportUrlForPath: mediaUrl
+        reportUrlForPath: mediaUrl,
+        billingPolicyStore: this.options.billingPolicyStore
       }));
       releaseVideoJobWalletReservation({
         databaseHandle: this.options.databaseHandle,
@@ -203,6 +217,21 @@ export class LocalVideoJobQueue {
 
   private nowIso(): string {
     return (this.options.now ?? (() => new Date()))().toISOString();
+  }
+
+  private currentModelPricingCatalogContext(): ModelPricingCatalogContext | undefined {
+    const context = this.options.getModelPricingCatalogContext?.();
+    if (context) {
+      return context;
+    }
+    if (!this.options.modelPricingCatalog) {
+      return undefined;
+    }
+    return {
+      catalog: this.options.modelPricingCatalog,
+      version: "",
+      source: "built_in"
+    };
   }
 
   private expiresAtIso(createdAt: string): string {

@@ -14,8 +14,21 @@ export interface TextJsonRequest {
   temperature?: number;
 }
 
+export interface TextProviderUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cachedInputTokens?: number;
+}
+
+export interface TextJsonResult<T> {
+  value: T;
+  usage?: TextProviderUsage;
+}
+
 export interface TextProvider {
   generateJson<T>(request: TextJsonRequest): Promise<T>;
+  generateJsonWithUsage<T>(request: TextJsonRequest): Promise<TextJsonResult<T>>;
 }
 
 export function extractJsonObject(value: string): string {

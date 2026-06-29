@@ -1,0 +1,1686 @@
+{
+  "navigation": {
+    "dashboard": "仪表盘",
+    "workflow": "主流程",
+    "video": "视频创作",
+    "image": "图片创作",
+    "ledger": "任务记录",
+    "management": "管理",
+    "wallet": "余额中心",
+    "pricing": "模型价格",
+    "settings": "API 管理"
+  },
+  "commonActions": {
+    "add": "添加",
+    "cancel": "取消",
+    "close": "关闭",
+    "delete": "删除",
+    "edit": "编辑",
+    "refresh": "刷新",
+    "save": "保存",
+    "saving": "保存中",
+    "confirmDelete": "确认删除",
+    "notSelected": "未选择"
+  },
+  "account": {
+    "fallback": "账号",
+    "menu": "账号菜单",
+    "label": "账号",
+    "logout": "退出登录"
+  },
+  "auth": {
+    "title": "Haitu 账号入口",
+    "email": "邮箱",
+    "emailPlaceholder": "请输入邮箱",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "backToEntry": "返回账号入口",
+    "entry": {
+      "subtitle": "登录或创建账号",
+      "submit": "登录 / 创建账号",
+      "newEmailHint": "新邮箱首次登录会验证后创建",
+      "forgotPassword": "忘记密码"
+    },
+    "verify": {
+      "subtitle": "输入邮箱验证码完成账号创建",
+      "submit": "验证邮箱并进入"
+    },
+    "reset": {
+      "subtitle": "用邮箱验证码重置密码",
+      "newPassword": "新密码",
+      "newPasswordPlaceholder": "至少 8 位",
+      "submit": "重置密码",
+      "success": "密码已重置，请用新密码登录。"
+    },
+    "otp": {
+      "label": "验证码",
+      "placeholder": "6 位验证码",
+      "send": "发送验证码",
+      "resend": "重发验证码",
+      "cooldown": "{{seconds}} 秒后可重新发送"
+    }
+  },
+  "shell": {
+    "productName": "Haitu",
+    "tagline": "AI 商品视频平台",
+    "loading": "正在检查登录状态...",
+    "toastTitle": "操作提示",
+    "consoleLoading": "正在载入{{label}}",
+    "consoleLoadingDetail": "正在同步模型服务、任务和账户数据。",
+    "consoleLoadFailed": "{{label}}载入失败",
+    "sidebarExpand": "展开侧边栏",
+    "sidebarCollapse": "折叠侧边栏",
+    "navigationLabel": "控制台导航"
+  },
+  "dialogs": {
+    "closeConfirm": "关闭确认弹窗",
+    "closePayment": "关闭支付方式弹窗",
+    "closeToast": "关闭提示",
+    "payment": {
+      "ariaLabel": "选择支付方式",
+      "title": "选择支付方式",
+      "subtitle": "确认金额后跳转到支付服务完成付款。",
+      "rmb": "RMB支付",
+      "crypto": "数字货币支付",
+      "rmbEmpty": "后台暂未启用 RMB 支付",
+      "cryptoEmpty": "后台暂未启用数字货币支付",
+      "amount": "支付金额",
+      "credit": "到账余额",
+      "selected": "已选择",
+      "selectable": "可选择",
+      "notConfigured": "未配置",
+      "disabled": "未启用",
+      "unavailable": "该支付方式暂不可用，请稍后再试。",
+      "pay": "支付"
+    }
+  },
+  "dashboard": {
+    "ariaLabel": "仪表盘",
+    "kpi": {
+      "products": "商品",
+      "productsHint": "可创作商品",
+      "jobs": "生成记录",
+      "completedHint": "{{count}} 完成",
+      "paidJobs": "付费任务",
+      "mockHint": "{{count}} 内部任务",
+      "tokens": "总 Token",
+      "finalVideos": "最终视频",
+      "finalVideosHint": "可下载视频",
+      "reusedRaw": "复用 raw",
+      "reusedRawHint": "省一次生成"
+    },
+    "range": {
+      "label": "时间范围:",
+      "24h": "近24小时",
+      "7d": "近7天",
+      "30d": "近30天",
+      "all": "全部"
+    },
+    "granularity": {
+      "label": "粒度:",
+      "hour": "按小时",
+      "day": "按天"
+    },
+    "badges": {
+      "active": "{{count}} 个进行中",
+      "failed": "{{count}} 个失败",
+      "channels": "{{count}} 个通道"
+    },
+    "charts": {
+      "occurrenceUnit": "次",
+      "providerSeries": "模型分布",
+      "jobs": "任务",
+      "cost": "成本",
+      "historical": "历史"
+    },
+    "provider": {
+      "title": "模型分布",
+      "model": "模型",
+      "requests": "请求",
+      "tokens": "Token",
+      "cost": "成本",
+      "active": "活跃"
+    },
+    "trend": {
+      "title": "Token / 成本趋势",
+      "badge": "Token + 人民币"
+    },
+    "recent": {
+      "title": "最近使用",
+      "empty": "还没有使用记录"
+    },
+    "empty": "还没有可统计的数据",
+    "kpiAriaLabel": "任务台账"
+  },
+  "image": {
+    "ariaLabel": "图片创作",
+    "empty": "图片创作待上线"
+  },
+  "actions": {
+    "retry": "重试"
+  },
+  "productLibrary": {
+    "ariaLabel": "商品库",
+    "title": "商品库",
+    "count": "{{count}} 个商品",
+    "addProduct": "添加商品",
+    "columns": {
+      "product": "商品",
+      "facts": "商品资料",
+      "enter": "进入"
+    },
+    "actions": {
+      "createVideo": "创作视频",
+      "edit": "编辑",
+      "delete": "删除"
+    },
+    "empty": "还没有商品，先添加商品",
+    "dialog": {
+      "editBadge": "编辑资料",
+      "importBadge": "粘贴导入",
+      "manualBadge": "手动填写",
+      "recommended": "推荐",
+      "editTitle": "编辑当前商品",
+      "addTitle": "添加商品",
+      "close": "关闭弹窗",
+      "importTitle": "导入商品",
+      "importDescription": "粘贴或填写商品标题、分类、材质、尺寸/重量、卖点和使用场景。",
+      "manualTitle": "新增商品",
+      "manualDescription": "逐项填写标题、材质、卖点和参考图。",
+      "pasteLabel": "粘贴商品信息",
+      "pastePlaceholder": "商品标题、分类、材质、尺寸/重量、卖点、使用场景...\n参考图也可以单独上传",
+      "aiSave": "AI 整理并保存",
+      "saveProduct": "保存商品",
+      "saveChanges": "保存修改"
+    },
+    "importPreview": {
+      "title": "整理后的商品资料",
+      "subtitle": "可以继续手动编辑，保存时会使用修改后的内容。",
+      "manualEdit": "手动编辑",
+      "titleJa": "日语标题",
+      "category": "分类",
+      "materials": "材质",
+      "dimensions": "尺寸/重量",
+      "references": "参考图",
+      "items": "{{count}} 条",
+      "sellingPoints": "已验证卖点",
+      "usageScenes": "使用场景",
+      "forbiddenClaims": "不可用卖点",
+      "notes": "整理提示",
+      "qualityTitle": "资料是否够用",
+      "verifiedFacts": "已确认资料",
+      "missingFields": "缺失信息"
+    },
+    "emptyFact": "待补充",
+    "draft": {
+      "basicTitle": "基础信息",
+      "basicDescription": "标题、分类、材质和尺寸会直接进入脚本与分镜上下文。",
+      "titleJa": "日语标题",
+      "category": "分类",
+      "materials": "材质",
+      "dimensions": "尺寸/重量",
+      "factsTitle": "创作事实",
+      "factsDescription": "一行一条，左侧是能说的卖点和场景，右侧是不能写进广告里的内容。",
+      "sellingPoints": "已验证卖点",
+      "usageScenes": "使用场景",
+      "forbiddenClaims": "不可用卖点",
+      "referenceTitle": "参考图路径",
+      "referenceDescription": "一行一个本地路径；保存后会在商品信息页显示为参考图素材。",
+      "pathCount": "{{count}} 条路径",
+      "referenceHint": "建议至少 3 张参考图"
+    }
+  },
+  "productStatus": {
+    "readyStatus": "可生成视频",
+    "referenceImages": "参考图 {{count}} 张"
+  },
+  "fileImport": {
+    "title": "导入商品资料",
+    "productCount": "{{count}} 个商品",
+    "detailRows": "{{count}} 行明细",
+    "emptyProductCount": "0 个商品",
+    "defaultOne": "默认选 1 个",
+    "selectedCount": "已选 {{count}} 个",
+    "summaryWithProducts": "检测到 {{count}} 个商品。默认选择 1 个，单选会填入当前商品资料，勾选多个会保存到商品列表。",
+    "summaryRowsOnly": "检测到 {{count}} 行明细，0 个可导入商品。",
+    "summaryEmpty": "没有检测到可导入商品。",
+    "unsupportedFile": "只支持 CSV、XLSX、XLS 文件。",
+    "chooseFile": "选择 CSV/Excel 文件",
+    "chooseFileHint": "解析后默认选择一个商品；单选会把原始资料整理后填入商品资料框。",
+    "summaryStats": "可保存 {{ready}} · 建议整理 {{needsAi}} · 重复商品 {{duplicate}} · 失败 {{failed}}",
+    "selectAll": "全选可导入商品",
+    "table": {
+      "status": "状态",
+      "productId": "商品ID",
+      "productTitle": "商品标题",
+      "sourceRows": "来源行",
+      "images": "图片",
+      "quality": "完整度",
+      "missing": "缺失项"
+    },
+    "imageCount": "{{count}} 张",
+    "emptyMessage": "没有识别到可导入的商品资料。请确认导出文件包含商品标题、产品 ID、描述或图片字段；仅 SKU 明细文件不能作为商品资料导入。",
+    "headersRead": "已读取表头：{{headers}}{{suffix}}",
+    "ellipsis": "…",
+    "sourceRowsRange": "{{start}}-{{end}} ({{count}} 行)",
+    "rowStatus": {
+      "ready": "未导入",
+      "needs-ai": "未导入",
+      "needs-input": "不可导入",
+      "duplicate": "已导入",
+      "failed": "不可导入"
+    },
+    "fillCurrent": "填入当前商品",
+    "importSelected": "导入选中 {{count}} 个商品"
+  },
+  "preflight": {
+    "title": "生成预检",
+    "notGenerated": "未生成",
+    "ready": "已预检",
+    "stale": "需重预检",
+    "emptyTitle": "先生成预检",
+    "emptyDescription": "这里会展示预计 token、人民币成本、参考图状态、脚本要点和 Seedance prompt。",
+    "expectedCost": "预估",
+    "costRange": "区间 ¥{{low}} - ¥{{high}}",
+    "expectedTokens": "期望 Token",
+    "upstreamCost": "上游成本",
+    "officialModelPrice": "按所选模型官方价格估算",
+    "byokUpstreamHint": "自带 API 上游由用户自行承担",
+    "serviceFee": "平台服务费",
+    "serviceFeeHint": "后台计费规则配置",
+    "duration": "时长",
+    "provider": "生成通道",
+    "realModel": "真实模型调用",
+    "mockTask": "内部任务",
+    "currentEstimate": "本次预计",
+    "currentEstimateHint": "仅作成本参考，不会阻止生成",
+    "historyEstimate": "历史估算",
+    "historyEstimateHint": "已完成任务累计参考",
+    "readyForPaid": "商品资料可用于付费生成",
+    "notReadyForPaid": "商品资料暂不可付费生成",
+    "blockingReasons": "阻塞原因：{{reasons}}",
+    "referenceSummary": "参考图 {{previewable}}/{{total}} 可预览",
+    "referenceDetails": "{{missing}} 缺失 · {{outside}} 项目外 · {{remote}} 远程",
+    "scriptPoints": "脚本要点"
+  },
+  "wallet": {
+    "ariaLabel": "余额中心",
+    "title": "余额中心",
+    "tabs": {
+      "ariaLabel": "余额中心分区",
+      "recharge": "充值记录",
+      "consumption": "消费明细"
+    },
+    "balance": {
+      "account": "账户余额",
+      "reserved": "冻结金额",
+      "available": "可用余额"
+    },
+    "quickRecharge": "快速充值",
+    "customRecharge": {
+      "inputAriaLabel": "自定义金额",
+      "placeholder": "50-1000"
+    },
+    "pay": "支付",
+    "paySelected": "支付 ¥{{amount}}",
+    "recharge": "充值 ¥{{amount}}",
+    "details": "详情",
+    "billingHint": "平台托管模型会扣官方成本和服务费；自带 Key 只扣平台服务费。",
+    "emptyTransactions": "还没有余额记录",
+    "emptyRechargeTransactions": "还没有充值记录",
+    "emptyConsumptionTransactions": "还没有消费记录",
+    "filters": {
+      "ariaLabel": "消费明细筛选",
+      "all": "全部",
+      "charge": "扣费",
+      "reserve": "冻结",
+      "refund": "退款",
+      "adjustment": "调整"
+    },
+    "transactionTypes": {
+      "recharge": "充值",
+      "reserve": "冻结",
+      "charge": "扣费",
+      "refund": "退款",
+      "grant": "赠送",
+      "adjustment": "调整"
+    },
+    "badges": {
+      "crypto": [
+        "USDT",
+        "USDC",
+        "多链网络",
+        "低手续费"
+      ],
+      "rmb": [
+        "支付宝",
+        "微信",
+        "Visa",
+        "Mastercard",
+        "Apple Pay"
+      ]
+    },
+    "transactionDescriptions": {
+      "infiniCryptoSettled": "Infini 数字货币充值到账",
+      "cryptoSettled": "数字货币充值到账",
+      "stripeSettled": "Stripe 充值到账",
+      "settled": "充值到账"
+    },
+    "detail": {
+      "title": "账单详情",
+      "close": "关闭账单详情",
+      "amount": "变动金额",
+      "balanceAfter": "变动后余额",
+      "reservedAfter": "变动后冻结",
+      "description": "说明",
+      "billingMode": "计费模式",
+      "usageKind": "使用类型",
+      "model": "模型",
+      "serviceFee": "平台服务费",
+      "upstreamCost": "官方成本",
+      "units": "用量",
+      "catalogVersion": "价格目录版本",
+      "unitPrice": "目录单价",
+      "source": "官方来源",
+      "job": "任务/冻结 ID"
+    }
+  },
+  "pricing": {
+    "ariaLabel": "模型价格",
+    "verifiedCount": "{{count}} 条官方单价",
+    "updated": "更新 {{date}}",
+    "activeCatalog": "线上目录",
+    "builtInCatalog": "内置兜底",
+    "title": "官方模型价格快照",
+    "subtitle": "切换供应商查看文本、图片和视频生成单价。",
+    "notice": "价格会受区域、套餐、缓存命中和促销影响，正式成本以官方页面和账单为准。",
+    "providerTabs": "模型价格供应商",
+    "verified": "{{count}} 条已核价",
+    "officialReference": "官方页核验",
+    "officialSource": "官方来源",
+    "viewSource": "查看官方来源",
+    "input": "输入",
+    "billingEntry": "计费入口",
+    "output": "输出",
+    "generatedOutput": "生成输出",
+    "note": "说明",
+    "billingNote": "价格口径",
+    "expand": "展开",
+    "collapse": "收起",
+    "costFactors": "成本影响因素",
+    "formula": "官方估算公式",
+    "examples": "典型价格",
+    "secondary": {
+      "video": "含输入视频",
+      "image": "缓存图像输入",
+      "text": "缓存输入"
+    },
+    "catalog": {
+      "providers": {
+        "openai": {
+          "name": "OpenAI",
+          "summary": "官方 API 定价页按每 1M tokens 报价，缓存输入另计。",
+          "sourceLabel": "OpenAI API pricing"
+        },
+        "deepseek": {
+          "name": "DeepSeek",
+          "summary": "官方价格页按每 1M tokens 报价，并区分缓存命中与未命中。",
+          "sourceLabel": "DeepSeek Models & Pricing"
+        },
+        "gemini": {
+          "name": "Gemini",
+          "summary": "Google Gemini 官方价格页按模型和生成类型报价；本站按人民币成本快照入账。",
+          "sourceLabel": "Gemini API pricing"
+        },
+        "volcengine": {
+          "name": "火山引擎",
+          "summary": "火山方舟官方模型价格页按人民币报价；视频生成还需结合分辨率、时长和是否含输入视频估算。",
+          "sourceLabel": "火山方舟模型价格"
+        }
+      },
+      "entries": {
+        "gpt55": {
+          "label": "旗舰文本",
+          "unit": "/ 1M tokens",
+          "input": "US$5.00",
+          "cachedInput": "US$0.50",
+          "output": "US$30.00",
+          "note": "短上下文标准层价格；长上下文、Flex、Priority 会不同。",
+          "billingNote": "默认按即时标准价估算。缓存输入是重复的相同 prompt 前缀自动命中后的输入折扣，首次请求通常按输入价计费。批量异步价只适合后台批量任务，用户不需要马上拿结果时再考虑。",
+          "costFactors": ["文本输入 tokens", "缓存输入命中", "生成输出 tokens"],
+          "formula": "文本总成本 = 输入 tokens / 1M × US$5.00 + 输出 tokens / 1M × US$30.00；缓存命中输入按 tokens / 1M × US$0.50",
+          "examples": [
+            { "label": "100k 输入 + 20k 输出", "value": "US$1.10" },
+            { "label": "100k 缓存输入 + 20k 输出", "value": "US$0.65" }
+          ]
+        },
+        "gptImage2": {
+          "label": "图片生成",
+          "unit": "/ 1M image tokens",
+          "input": "US$8.00",
+          "cachedInput": "US$2.00",
+          "output": "US$30.00",
+          "note": "图片生成按图像 token 计费；文本输入另按 gpt-5.5 文本价格计费。",
+          "billingNote": "默认按即时标准价估算。缓存图像输入是重复使用完全相同的图片或 prompt 前缀时自动命中的输入折扣，首次生成通常按图片输入价计费。批量异步价只适合后台批量任务，用户不需要马上拿结果时再考虑。",
+          "costFactors": ["文本输入 tokens", "图片输入 tokens", "图片输出 tokens", "缓存输入命中"],
+          "formula": "图片总成本 = 文本输入 tokens / 1M × US$5.00 + 图片输入 tokens / 1M × US$8.00 + 图片输出 tokens / 1M × US$30.00",
+          "examples": [
+            { "label": "10k 文本 + 100k 图片输入 + 100k 图片输出", "value": "US$3.85" },
+            { "label": "缓存 100k 图片输入 + 100k 图片输出", "value": "US$3.20" }
+          ]
+        },
+        "gemini3ProImagePreview": {
+          "label": "Gemini 高质量图片",
+          "unit": "/ 张",
+          "input": "按张估算",
+          "output": "¥0.60 / 张",
+          "note": "Google 官方 Gemini 图片生成价格参考；通过 OpenAI-compatible 图片接口运行时，仍按真实 Gemini 模型名请求。"
+        },
+        "gemini25FlashImage": {
+          "label": "Gemini 快速图片",
+          "unit": "/ 张",
+          "input": "按张估算",
+          "output": "¥0.30 / 张",
+          "note": "Google 官方 Gemini 图片生成价格参考；通过 OpenAI-compatible 图片接口运行时，仍按真实 Gemini 模型名请求。"
+        },
+        "deepseekV4Flash": {
+          "label": "快速文本",
+          "unit": "/ 1M tokens",
+          "input": "US$0.14",
+          "cachedInput": "US$0.0028",
+          "output": "US$0.28",
+          "note": "官方表中对应 DeepSeek-V4-Flash；旧 deepseek-chat 将于 2026-07-24 后弃用。",
+          "costFactors": ["缓存未命中输入 tokens", "缓存命中输入 tokens", "生成输出 tokens"],
+          "formula": "文本总成本 = 缓存未命中输入 tokens / 1M × US$0.14 + 缓存命中输入 tokens / 1M × US$0.0028 + 输出 tokens / 1M × US$0.28",
+          "examples": [
+            { "label": "100k 未命中输入 + 20k 输出", "value": "US$0.0196" },
+            { "label": "100k 命中输入 + 20k 输出", "value": "US$0.00588" }
+          ]
+        },
+        "deepseekV4Pro": {
+          "label": "高质量文本",
+          "unit": "/ 1M tokens",
+          "input": "US$0.435",
+          "cachedInput": "US$0.003625",
+          "output": "US$0.87",
+          "note": "官方表中对应 DeepSeek-V4-Pro；适合更重的推理与生成任务。",
+          "costFactors": ["缓存未命中输入 tokens", "缓存命中输入 tokens", "生成输出 tokens"],
+          "formula": "文本总成本 = 缓存未命中输入 tokens / 1M × US$0.435 + 缓存命中输入 tokens / 1M × US$0.003625 + 输出 tokens / 1M × US$0.87",
+          "examples": [
+            { "label": "100k 未命中输入 + 20k 输出", "value": "US$0.0609" },
+            { "label": "100k 命中输入 + 20k 输出", "value": "US$0.0177625" }
+          ]
+        },
+        "doubaoSeed20Pro": {
+          "label": "豆包文本",
+          "unit": "/ 1M tokens",
+          "input": "¥3.20",
+          "cachedInput": "¥0.017",
+          "output": "¥16.00",
+          "note": "在线推理、输入长度 [0,32k] 价格；32k 以上输入/输出单价会分段升高，缓存输出按 ¥0.64/1M tokens 起。",
+          "costFactors": ["文本输入 tokens", "缓存输入命中", "生成输出 tokens", "长上下文分段"],
+          "formula": "文本总成本 = 输入 tokens / 1M × ¥3.20 + 输出 tokens / 1M × ¥16.00；缓存命中输入按 tokens / 1M × ¥0.017",
+          "examples": [
+            { "label": "100k 输入 + 20k 输出", "value": "¥0.64" },
+            { "label": "100k 缓存输入 + 20k 输出", "value": "¥0.3217" }
+          ]
+        },
+        "doubaoSeedream50Lite": {
+          "label": "图片生成",
+          "unit": "/ 张",
+          "input": "按张计费",
+          "cachedInput": "成功输出",
+          "output": "¥0.22 / 张",
+          "note": "官方价格页按成功输出图片数量计费；组图场景按实际生成张数计费，审核等原因未成功输出不计费。",
+          "costFactors": ["成功输出张数", "组图生成张数", "失败或拦截输出"],
+          "formula": "图片总成本 = 成功输出图片张数 × ¥0.22",
+          "examples": [
+            { "label": "1 张成功输出", "value": "¥0.22" },
+            { "label": "4 张组图成功输出", "value": "¥0.88" }
+          ]
+        },
+        "doubaoSeedance20Fast": {
+          "label": "快速视频",
+          "unit": "/ 1M tokens",
+          "input": "¥37.00",
+          "cachedInput": "含视频 ¥22.00",
+          "output": "480p 5s ¥1.86 / 720p 5s ¥4.00",
+          "note": "官方按 token 计费；Seedance 2.0 fast 不支持输出 1080p 视频。示例为输入不含视频、16:9 输出 5 秒，准确用量以 API 返回的 usage.completion_tokens 为准。",
+          "costFactors": ["输出视频时长", "输出视频分辨率", "输出视频宽高比", "输出视频帧率", "是否包含输入视频"],
+          "formula": "费用 = token 单价 × (输入视频时长 + 输出视频时长) × 输出宽 × 输出高 × 帧率 / 1024",
+          "examples": [
+            { "label": "480p 16:9 5s", "value": "¥1.86 / 条" },
+            { "label": "720p 16:9 5s", "value": "¥4.00 / 条" },
+            { "label": "含输入视频 480p 5s", "value": "¥1.99-4.42 / 条" },
+            { "label": "含输入视频 720p 5s", "value": "¥4.28-9.50 / 条" }
+          ]
+        },
+        "doubaoSeedance20": {
+          "label": "高质量视频",
+          "unit": "/ 1M tokens",
+          "input": "¥46.00",
+          "cachedInput": "含视频 ¥28.00",
+          "output": "480p 5s ¥2.31 / 720p 5s ¥4.97",
+          "note": "官方按 token 计费；480p/720p 输入不含视频为 ¥46/1M tokens，1080p 为 ¥51/1M tokens，4k 为 ¥26/1M tokens。示例为输入不含视频、16:9 输出 5 秒。",
+          "costFactors": ["输出视频时长", "输出视频分辨率", "输出视频宽高比", "输出视频帧率", "是否包含输入视频"],
+          "formula": "费用 = token 单价 × (输入视频时长 + 输出视频时长) × 输出宽 × 输出高 × 帧率 / 1024",
+          "examples": [
+            { "label": "480p 16:9 5s", "value": "¥2.31 / 条" },
+            { "label": "720p 16:9 5s", "value": "¥4.97 / 条" },
+            { "label": "1080p 16:9 5s", "value": "¥12.39 / 条" },
+            { "label": "4k 16:9 5s", "value": "¥25.27 / 条" }
+          ]
+        }
+      }
+    }
+  },
+  "ledger": {
+    "ariaLabel": "任务记录",
+    "jobs": {
+      "title": "生成任务记录",
+      "active": "{{count}} 个进行中",
+      "channel": "生成通道",
+      "duration": "时长",
+      "template": "视频类型",
+      "callType": "调用类型",
+      "realModel": "真实模型",
+      "mockTask": "内部任务",
+      "created": "创建",
+      "updated": "更新",
+      "estimatedCost": "估算成本",
+      "error": "错误",
+      "result": "任务结果",
+      "openVideo": "打开成片",
+      "downloadVideo": "下载成片",
+      "openReport": "查看报告",
+      "cancelQueued": "取消排队",
+      "redownload": "重新下载成片",
+      "retry": "重试任务",
+      "empty": "还没有生成任务",
+      "resultHints": {
+        "completed": "暂无成片入口",
+        "recoverableDownload": "视频已生成，但服务器下载成片失败，可重新下载成片",
+        "failed": "任务失败，可直接重试原任务",
+        "canceled": "任务已取消",
+        "pending": "任务完成后显示成片和报告"
+      },
+      "errors": {
+        "generationFailed": "生成失败，请检查视频模型配置后重试。",
+        "referenceImageUnavailable": "第 {{index}} 张参考图现在不能用于生成。请重新上传这张图，或删除后换一张图片再生成。",
+        "tooManyReferenceImagesWithCount": "参考图太多：Seedance 最多支持 {{max}} 张，本次有 {{count}} 张。生成时只使用前 {{used}} 张，请调整顺序或删除多余图片后重试。",
+        "tooManyReferenceImages": "参考图太多：Seedance 最多支持 {{max}} 张。生成时只使用前 {{used}} 张，请调整顺序或删除多余图片后重试。",
+        "referenceSensitive": "参考图里可能包含真人、人脸或隐私信息，视频平台已拒绝生成。请移除含人物或人脸的参考图，保留纯商品图后重试。",
+        "videoApiKeyMissing": "还没有配置视频模型 API Key。请先到 API 管理里配置或选择视频模型服务，再生成视频。",
+        "outputDownloadTimeout": "视频已经生成，但服务器下载成片超时。请点击重新下载成片；如果连续失败，可能是服务器到视频文件服务器的网络不稳定。",
+        "providerNetworkTimeout": "视频平台请求超时或网络连接失败，请稍后重试；如果连续失败，请检查视频模型配置和参考图链接。",
+        "rateLimited": "视频平台请求太频繁或触发限流，请稍后再试。",
+        "providerQuota": "视频平台账号额度不足或余额异常，请检查火山/Seedance 账号额度后再试。",
+        "providerBilling": "视频平台账号欠费或余额异常，请检查火山/Seedance 账号账单和余额后重试。",
+        "promptTooLong": "提示词太长，视频平台拒绝了这次生成。请缩短商品描述、卖点或分镜内容后重试。",
+        "internalRule": "视频平台根据内部规则拒绝了这次生成。优先处理参考图：删除真人、人脸、二维码、联系方式、品牌授权不明或过度暴露的图片；再缩短卖点和分镜，避免夸大功效、绝对化表述和敏感词后重试。"
+      }
+    },
+    "providerUsage": {
+      "title": "官方用量",
+      "readonly": "只读",
+      "status": "状态",
+      "model": "模型",
+      "refresh": "刷新官方用量",
+      "officialTasks": "官方任务",
+      "usage": "用量",
+      "estimatedCost": "估算成本",
+      "unitPrice": "单价",
+      "perMillionUsage": "百万用量",
+      "empty": "官方没有返回符合条件的任务",
+      "initial": "点击刷新官方用量后展示近期待对账任务",
+      "taskDetailsTitle": "火山官方任务详情",
+      "usageListTitle": "火山官方用量列表",
+      "taskCount": "任务数",
+      "statusLine": "状态",
+      "modelLine": "模型",
+      "resolution": "分辨率",
+      "ratio": "比例",
+      "note": "说明",
+      "taskNote": "查询任务不创建视频；官方列表通常只保留最近 7 天。",
+      "usageNote": "查询官方用量只发送 GET 请求，不创建视频。"
+    },
+    "fees": {
+      "title": "费用汇总",
+      "productCount": "{{count}} 个商品",
+      "totalJobs": "生成次数",
+      "paidJobs": "付费生成",
+      "mockJobs": "内部任务",
+      "estimatedCost": "估算费用",
+      "finalVideos": "最终视频",
+      "byProduct": "按商品费用",
+      "scopeHint": "只统计生成次数、付费次数和估算费用。",
+      "empty": "还没有生成费用",
+      "table": {
+        "product": "商品",
+        "totalJobs": "生成次数",
+        "paidJobs": "付费生成",
+        "mockJobs": "内部任务",
+        "finalVideos": "最终视频",
+        "estimatedCost": "估算费用"
+      }
+    },
+    "reports": {
+      "title": "生成报告",
+      "filters": {
+        "product": "商品",
+        "allProducts": "全部商品",
+        "provider": "生成通道",
+        "allProviders": "全部通道",
+        "status": "状态",
+        "allStatuses": "全部状态",
+        "finalOnly": "只看成片"
+      },
+      "noFinalVideo": "暂无最终视频",
+      "provider": "生成通道",
+      "duration": "时长",
+      "estimatedCost": "估算成本",
+      "reusedRaw": "复用 raw",
+      "yes": "是",
+      "no": "否",
+      "reuseRaw": "复用 raw manifest",
+      "queryUsage": "查官方用量",
+      "cancelQueued": "取消排队",
+      "empty": "没有符合筛选条件的报告"
+    },
+    "audit": {
+      "title": "操作审计",
+      "totalEvents": "总事件",
+      "latestAction": "最近操作",
+      "recordMode": "记录方式",
+      "localJsonl": "本地 JSONL",
+      "empty": "还没有操作审计记录",
+      "loading": "正在读取最近操作",
+      "actions": {
+        "auth.enter": "账号进入",
+        "auth.enter_failed": "登录失败",
+        "auth.email_verified": "邮箱验证",
+        "auth.password_reset_requested": "请求重置密码",
+        "auth.password_reset": "重置密码",
+        "auth.logout": "退出登录",
+        "model_config.saved": "保存模型配置",
+        "model_config.deleted": "清除模型配置",
+        "video_asset.deleted": "删除视频文件",
+        "video_history.deleted": "删除历史视频",
+        "video_job.cancelled": "取消任务",
+        "video_job.retried": "重试任务",
+        "publish_package.created": "创建素材包",
+        "publish_package.batch_created": "批量素材包",
+        "review.selected_final": "选择最终版本",
+        "review.rated_version": "人工评分"
+      }
+    },
+    "storage": {
+      "title": "存储与备份",
+      "longTerm": "长期保存",
+      "createBackup": "生成备份包",
+      "backupSize": "备份容量",
+      "fileCount": "文件数",
+      "video": "视频",
+      "references": "参考图",
+      "required": "必备份",
+      "optional": "可选",
+      "capacity": "容量",
+      "files": "文件",
+      "localBackups": "本地备份包",
+      "backupSummary": "{{count}} 个备份 / {{size}}",
+      "loadingBackups": "正在读取备份包",
+      "downloadBackup": "下载备份",
+      "emptyBackups": "还没有本地备份包",
+      "backupCommand": "备份命令",
+      "loading": "正在读取本地存储与备份范围"
+    },
+    "assets": {
+      "title": "视频资产",
+      "totalSize": "总容量",
+      "final": "成品",
+      "raw": "原始",
+      "publishPackage": "素材包",
+      "missing": "缺失",
+      "sourcePublishPackage": "素材包",
+      "sourceReport": "生成报告",
+      "openVideo": "打开视频",
+      "deleteFile": "删除文件",
+      "empty": "还没有本地视频资产",
+      "loading": "正在读取本地视频资产"
+    }
+  },
+  "settings": {
+    "ariaLabel": "API 管理",
+    "title": "模型服务设置",
+    "configuredCount": "{{count}} 条模型服务",
+    "groups": {
+      "text": {
+        "title": "文本模型",
+        "description": "商品整理、脚本分镜等文字推理能力。",
+        "badge": "文本"
+      },
+      "image": {
+        "title": "图片模型",
+        "description": "商品图和参考图能力。",
+        "badge": "图片"
+      },
+      "video": {
+        "title": "视频模型",
+        "description": "最终成片生成能力。",
+        "badge": "视频"
+      }
+    },
+    "serviceMode": {
+      "label": "服务模式",
+      "platform": {
+        "title": "平台托管 API",
+        "subtitle": "省心不用配 Key，不用自己申请和维护各家账号；平台已接入官方 API，直接选择文本、图片、视频模型组合。",
+        "badge": "官方 API 成本 + 平台服务费"
+      },
+      "byok": {
+        "title": "自带 API",
+        "subtitle": "需要去各模型服务商申请并配置 API Key，调用费由你的 API 账号结算，平台仅收服务费。",
+        "badge": "平台服务费"
+      },
+      "current": "当前",
+      "ready": "可用",
+      "pending": "待配置"
+    },
+    "actions": {
+      "addService": "添加{{badge}}服务",
+      "edit": "编辑",
+      "delete": "删除",
+      "deleteBundle": "删除{{label}}",
+      "save": "保存",
+      "cancel": "取消",
+      "refreshModels": "刷新可用模型",
+      "test": "测试配置",
+      "testing": "测试中"
+    },
+    "serviceDialog": {
+      "addTitle": "添加{{badge}}服务",
+      "editTitle": "编辑{{badge}}服务",
+      "newMode": "NEW CONFIG",
+      "editMode": "EDIT CONFIG",
+      "editHint": "不填写 API Key 时会保留原 Key。",
+      "addHint": "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。",
+      "nameLabel": "配置名称",
+      "vendorLabel": "模型商",
+      "apiKeyKeepPlaceholder": "输入新 Key 可替换，留空则保留原 Key",
+      "showApiKey": "显示 API Key",
+      "hideApiKey": "隐藏 API Key",
+      "endpointPrefix": "实际端点前缀:",
+      "officialModelId": "官方模型 ID 已内置",
+      "modelVersions": "模型版本",
+      "testingMessage": "测试配置中..."
+    },
+    "bundles": {
+      "empty": "暂无可用组合",
+      "enable": "启用",
+      "disabled": "停用",
+      "incomplete": "未完成",
+      "draft": "草稿",
+      "ready": "可启用",
+      "new": "新增组合",
+      "save": "保存组合",
+      "autoModel": "自动",
+      "newIndexed": "新增组合{{index}}",
+      "platformSaved": "平台自定义组合已保存。",
+      "platformEnabled": "平台自定义组合已启用。",
+      "platformDisabled": "平台自定义组合已停用。",
+      "byokSaved": "自带 API 组合已保存。",
+      "byokEnabled": "自带 API 组合已启用。",
+      "byokDisabled": "自带 API 组合已停用。"
+    },
+    "emptyServices": "还没有配置可用服务，添加 API Key 后这里会显示已启用的模型服务。",
+    "available": "{{count}} 条可用",
+    "notConfigured": "未配置",
+    "default": "默认",
+    "enabled": "启用",
+    "disabled": "停用",
+    "byokKey": "自带 Key",
+    "common": {
+      "notSelected": "未选择"
+    }
+  },
+  "status": {
+    "idle": "等待操作",
+    "loadingConsole": "正在载入控制台。",
+    "formChanged": "表单已变更，请重新生成预检后再运行。",
+    "selectProduct": "请选择商品",
+    "preflighting": "预检中...",
+    "batchJobsQueued": "已入队 {{count}} 个生成记录",
+    "batchJobLine": "{{version}}: {{id}} / {{status}} / {{outDir}}",
+    "jobCreated": "生成任务已创建: {{id}}\n状态: {{status}}\n输出目录: {{outDir}}",
+    "studioAutoRefreshTitle": "当前商品创作已刷新",
+    "studioAutoRefreshCompleted": "新完成版本: {{count}} 个",
+    "studioAutoRefreshHistory": "历史记录已更新。",
+    "creatingJob": "生成任务创建中...",
+    "textModelRequired": "请先配置文本模型，再使用 AI 整理或生成分镜。",
+    "imageModelRequired": "请先配置图片模型，再生成参考图。",
+    "videoModelRequired": "请先配置视频模型，再生成视频。",
+    "settingsSaved": "API 管理设置已保存，并已应用到新建任务表单。",
+    "apiKeyRequired": "请先填写 API Key。",
+    "modelVersionRequired": "请至少选择一个模型版本。",
+    "modelSaved": "模型服务已保存: {{preview}}",
+    "configured": "已配置",
+    "modelEnabled": "模型服务已启用。",
+    "modelDisabled": "模型服务已停用。",
+    "platformMode": "已切换为平台模型模式。",
+    "byokMode": "已切换为自带 API 模式。",
+    "bundleSaved": "模型组合已保存。",
+    "bundleDeleted": "模型组合已删除。",
+    "bundleIncomplete": "模型组合尚未配置完整，请补齐文本、图片和视频模型后再用于视频创作。",
+    "testFailedApiKey": "测试失败：请先填写 API Key。",
+    "testing": "测试配置中...",
+    "testSuccess": "测试成功：{{message}}\n模型: {{model}}",
+    "testFailed": "测试失败：{{message}}",
+    "refreshFailedApiKey": "刷新失败：请先填写 API Key。",
+    "refreshingModels": "刷新可用模型中...",
+    "refreshModelsSuccess": "刷新完成：发现 {{total}} 个可用模型，其中 {{known}} 个已在官方目录中。",
+    "refreshFailed": "刷新失败：{{message}}",
+    "apiKeyCleared": "已清除 API Key。",
+    "paymentReturned": "支付已返回，余额以到账通知为准，稍后会自动刷新。",
+    "paymentCancelled": "已取消支付，钱包余额未变化。",
+    "openingPayment": "正在打开 {{method}} 安全支付页。",
+    "infiniSynced": "Infini 充值已到账。",
+    "waitingPayment": "支付已返回，正在等待到账确认。",
+    "authExpired": "登录已过期，请重新输入邮箱和密码。",
+    "storyboardApplied": "已回填历史分镜: {{template}} / {{duration}}",
+    "storyboardDeleted": "分镜记录已删除。",
+    "currentProduct": "当前商品",
+    "productFactsRead": "商品资料已读取",
+    "autoSaved": "资料已自动保存: {{title}}",
+    "autoSaveFailed": "资料自动保存失败: {{message}}",
+    "productLoaded": "已载入商品到编辑草稿: {{title}}",
+    "enteredVideo": "已进入视频创作: {{title}}",
+    "newProduct": "已切换为新商品创作，可以直接填写资料并添加图片。",
+    "aiOrganized": "AI 已整理资料包: {{title}}",
+    "deleteProductTitle": "删除这个商品资料？",
+    "deleteProductDetail": "已有视频和生成记录不会被删除。",
+    "productDeleted": "商品已删除: {{title}}",
+    "videoStarted": "已开始制作 {{count}} 个视频，完成后会自动刷新当前商品。",
+    "pasteProductFirst": "请先粘贴商品资料。",
+    "importPreviewReady": "已整理出商品资料，请检查后保存到商品库。",
+    "importedAndEnteredVideo": "已导入商品并进入视频创作: {{title}}",
+    "importedProduct": "已导入商品资料: {{title}}",
+    "batchImportDone": "批量导入完成: 成功 {{imported}}/{{total}}，失败 {{failed}}",
+    "batchItemSaved": "#{{index}} 已保存 {{title}}",
+    "batchItemFailed": "#{{index}} 失败: {{error}}",
+    "filePreviewParsed": "已解析 {{count}} 个商品候选。",
+    "selectParsedRow": "请选择已解析出商品资料的行。",
+    "filledFromFile": "已把文件里的商品资料填入当前商品: {{title}}",
+    "fileImportDone": "文件导入完成: 成功 {{imported}}/{{requested}}，失败 {{failed}}",
+    "storyboardGenerated": "文本模型已生成脚本分镜草稿。",
+    "storyboardTimeout": "文本模型生成超时，请检查 API 配置或稍后重试。",
+    "productUpdated": "商品资料已更新",
+    "productSavedAndVideo": "商品已保存并进入视频创作",
+    "productSaved": "商品资料已保存",
+    "importedReferences": "已导入参考图: {{count}}",
+    "uploadedReferences": "已上传参考图: {{count}}",
+    "deletedReference": "已删除参考图: {{reference}}",
+    "reorderedReferences": "已调整参考图顺序。",
+    "generatedReferences": "AI 已生成参考图: {{count}}",
+    "cancelledTask": "已取消排队任务：{{taskId}}",
+    "deletedVideoRecord": "已删除视频记录: {{jobId}}",
+    "deletedHistoryVideo": "已删除历史视频记录: {{jobId}}",
+    "retryTitle": "重试这个付费生成任务？",
+    "retryDetail": "重试会重新提交原任务，可能再次扣费。",
+    "retryCancelled": "已取消重试付费任务。",
+    "retriedTask": "已重试任务: {{jobId}}",
+    "noRecoverableDownload": "这条任务没有可恢复的成片下载。",
+    "recoverDownloadStarted": "已开始重新下载成片，不会重新提交生成任务。",
+    "backupCreated": "备份包已生成: {{fileName}}",
+    "size": "大小: {{size}}",
+    "path": "路径: {{path}}",
+    "assetMissing": "该视频文件已经不存在。",
+    "deleteAssetTitle": "删除这个本地视频文件？",
+    "deleteAssetDetail": "任务记录、成本、脚本和报告会保留。",
+    "assetDeleted": "已删除视频文件: {{path}}\n释放空间: {{size}}\n任务元数据和成本记录已保留。",
+    "jobStatuses": {
+      "queued": "排队中",
+      "running": "生成中",
+      "completed": "已完成",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "canceled": "已取消",
+      "cancelled": "已取消",
+      "all": "全部"
+    },
+    "providers": {
+      "mock": "内部任务",
+      "volcengineSeedance": "seedance-2.0-fast"
+    },
+    "productFacts": {
+      "title": "商品资料",
+      "productTitle": "标题",
+      "category": "分类",
+      "materials": "材质",
+      "dimensions": "尺寸/重量",
+      "sellingPoints": "已验证卖点:",
+      "usageScenes": "使用场景:",
+      "forbiddenClaims": "不可用卖点:",
+      "referenceImages": "参考图片:",
+      "sourceFile": "源文件"
+    },
+    "preflightSummary": {
+      "complete": "预检完成",
+      "expectedCost": "预计成本",
+      "historyEstimate": "历史估算: 已完成任务累计 ¥{{amount}}",
+      "readiness": "资料状态",
+      "readyForPaid": "可付费生成",
+      "notReadyForPaid": "不可付费生成: {{reasons}}",
+      "reviewHint": "请检查成本、参考图、脚本和 prompt 后再决定是否运行。"
+    },
+    "qc": {
+      "pass": "检查通过",
+      "warning": "检查提醒",
+      "fail": "检查失败",
+      "missing": "检查缺失",
+      "unknown": "未检查"
+    }
+  },
+  "videoStudio": {
+    "actions": {
+      "cancel": "取消",
+      "deleting": "删除中"
+    },
+    "autosave": {
+      "saving": "保存中",
+      "saved": "已保存",
+      "failed": "保存失败"
+    },
+    "controls": {
+      "modelScheme": "模型方案",
+      "template": "视频风格",
+      "duration": "视频时长",
+      "resolution": "视频分辨率",
+      "aspectRatio": "画幅",
+      "finalLanguage": "成片语言",
+      "versionCount": "生成视频"
+    },
+    "aspectRatios": {
+      "vertical": "竖屏 9:16",
+      "horizontal": "横屏 16:9"
+    },
+    "counts": {
+      "product": "{{count}} 个商品",
+      "image": "{{count}} 张",
+      "record": "{{count}} 条",
+      "video": "{{count}} 个"
+    },
+    "costHints": {
+      "loading": "预估中",
+      "estimated": "预估 ¥{{amount}}",
+      "detail": "{{mode}} · 上游成本 ¥{{upstream}} · 平台服务费 ¥{{serviceFee}}",
+      "platformMode": "平台托管 API",
+      "byokMode": "自带 API"
+    },
+    "deleteDialog": {
+      "cancelAndDeleteLabel": "取消并删除视频",
+      "deleteLabel": "删除视频历史记录",
+      "cancelTitle": "取消并删除这个视频？",
+      "deleteTitle": "删除这个视频记录？",
+      "cancelDescription": "确认后会取消生成，并从历史记录中移除。",
+      "ledgerDescription": "确认后会删除这条历史记录，本地输出目录也会一起删除。",
+      "historyDescription": "确认后会从历史记录中移除。",
+      "confirmCancelDelete": "确认取消并删除",
+      "confirmDelete": "确认删除"
+    },
+    "facts": {
+      "title": "商品资料",
+      "placeholder": "可以直接粘贴或填写商品标题、分类、材质、尺寸/重量、卖点、使用场景。",
+      "organize": "AI 整理资料包",
+      "organizing": "整理中",
+      "raw": "原始资料",
+      "empty": "未填资料",
+      "savedPackage": "已整理资料包"
+    },
+    "generate": {
+      "button": "生成视频",
+      "buttonWithCount": "生成 {{count}} 个视频",
+      "submitting": "提交中",
+      "queuedToast": "已加入历史记录，生成中可删除取消，完成后可预览和下载。",
+      "packageReadyToast": "资料包已整理。",
+      "imageOnlyToast": "只支持 JPG、PNG、WebP 图片。",
+      "ignoredFileToast": "已忽略非图片文件。"
+    },
+    "history": {
+      "title": "历史记录",
+      "subtitle": "当前商品生成过的视频都会显示在这里。",
+      "preview": "预览视频",
+      "download": "下载视频",
+      "redownload": "重新下载成片",
+      "retry": "重试",
+      "delete": "删除",
+      "copyTags": "复制标签",
+      "empty": "还没有视频",
+      "downloadWindow": "24 小时内可下载",
+      "deleteAt": "将于 {{time}} 删除",
+      "noTagsToast": "还没有可复制的标签。",
+      "tagsCopiedToast": "标签已复制。"
+    },
+    "labels": {
+      "version": "版本 {{index}}",
+      "video": "视频 {{index}}"
+    },
+    "languages": {
+      "ja": "日文",
+      "zh": "中文",
+      "en": "英语"
+    },
+    "modelChips": {
+      "text": "文",
+      "image": "图",
+      "video": "视"
+    },
+    "models": {
+      "auto": "自动推荐",
+      "deleted": "已删除模型",
+      "unselected": "未选择",
+      "platformQuality": "平台 · 高质量",
+      "platformLowCost": "平台 · 低成本",
+      "platformCustom": "平台 · {{label}}",
+      "byokCustom": "自带 · {{label}}",
+      "current": "当前：{{label}}",
+      "textModel": "文本 {{model}}",
+      "imageModel": "图片 {{model}}",
+      "videoModel": "视频 {{model}}"
+    },
+    "newProduct": {
+      "title": "新商品",
+      "versionCount": "{{count}} 个版本"
+    },
+    "previewDialog": {
+      "ariaLabel": "{{title}} 预览",
+      "generatingTitle": "视频还在生成中",
+      "downloadFailedTitle": "成片下载失败",
+      "failedTitle": "视频生成失败",
+      "noVideoTitle": "暂无可播放视频文件",
+      "generatingDescription": "生成完成后这里会自动变成可播放预览。",
+      "noVideoDescription": "这个记录暂时没有成片文件，可以保留记录或删除后重新生成。"
+    },
+    "productLibrary": {
+      "title": "商品库",
+      "expand": "展开商品库",
+      "collapse": "折叠商品库",
+      "filteredCount": "{{shown}}/{{total}} 个商品",
+      "importFile": "导入 CSV/Excel",
+      "search": "搜索商品",
+      "clearSearch": "清空搜索",
+      "deleteProduct": "删除商品",
+      "readyStatus": "可生成视频",
+      "empty": "暂无商品",
+      "noMatches": "没有匹配的商品"
+    },
+    "readiness": {
+      "saved": "资料已保存，可生成视频。",
+      "empty": "请先填写商品资料。",
+      "willOrganize": "将先整理资料包，再生成视频。"
+    },
+    "reference": {
+      "title": "参考图",
+      "addSubtitle": "添加图片",
+      "add": "添加图片",
+      "addHint": "可多选 · 拖拽或粘贴图片",
+      "generate": "AI 生成参考图",
+      "generateDisabledTitle": "先整理资料包后可生成参考图",
+      "generateDisabledToast": "请先整理资料包，再生成参考图。",
+      "reorderTitle": "拖动参考图调整顺序",
+      "preview": "查看参考图",
+      "importAsset": "导入资产",
+      "delete": "删除参考图",
+      "item": "参考图 {{index}}",
+      "previewDialogTitle": "参考图预览",
+      "previous": "上一张",
+      "next": "下一张",
+      "previewPending": "查看待上传图片",
+      "pending": "待上传 {{index}}",
+      "pendingImageName": "待上传图片 {{index}}",
+      "removePending": "移除待上传图片",
+      "emptyHint": "参考图会影响商品外观、材质和镜头细节。支持拖拽或粘贴图片。",
+      "status": {
+        "previewable": "可预览",
+        "missing": "文件缺失",
+        "outsideProjectRoot": "项目外文件",
+        "remote": "远程图片"
+      }
+    },
+    "storyboard": {
+      "title": "脚本分镜",
+      "subtitle": "可选；留空会按商品资料生成。",
+      "generate": "AI 生成分镜",
+      "generating": "生成中",
+      "history": "分镜历史记录",
+      "deleteRecord": "删除分镜记录",
+      "emptyHistory": "还没有 AI 生成历史",
+      "emptyPreview": "空分镜",
+      "default": "默认分镜",
+      "ai": "AI 生成分镜",
+      "manual": "手动分镜",
+      "defaultDrafts": {
+        "scene": [
+          "展示商品所处的真实使用环境和整体外观。",
+          "切近景展示使用动作，让商品自然进入画面主体。",
+          "展示材质、尺寸、结构和手部操作细节。",
+          "回到完整使用场景，呈现使用后的效果和商品整体。"
+        ],
+        "painPoint": [
+          "先展示没有使用商品时的不便或痛点场景。",
+          "切到商品出现并快速解决核心问题。",
+          "用近景强化关键卖点和操作过程。",
+          "展示解决后的轻松状态和商品整体。"
+        ],
+        "benefit": [
+          "开场直接展示最重要的卖点和结果。",
+          "用近景说明卖点对应的结构或材质细节。",
+          "切换到使用过程，连续展示多个优势。",
+          "用整体彩色或多角度画面收束，强化购买理由。"
+        ],
+        "ugc": [
+          "以手持或第一视角开场，像真实用户刚拿到商品。",
+          "边展示边试用，用自然动作呈现第一感受。",
+          "近景拍摄细节、材质和使用中的小发现。",
+          "用真实使用后的评价式画面收尾。"
+        ],
+        "unboxing": [
+          "从包装或桌面开场，展示开箱前的整洁画面。",
+          "打开包装并取出商品，让主体自然进入镜头。",
+          "依次展示配件、材质、尺寸和关键细节。",
+          "摆放商品并进入简单使用场景，完成开箱收尾。"
+        ]
+      }
+    },
+    "summary": {
+      "referenceImages": "参考图 {{count}} 张"
+    },
+    "templates": {
+      "scene": "场景型",
+      "painPoint": "痛点型",
+      "benefit": "卖点型",
+      "ugc": "UGC 型",
+      "unboxing": "开箱型"
+    },
+    "videoStatus": {
+      "expired": "已过期",
+      "previewable": "可预览",
+      "completed": "已完成",
+      "queued": "排队中",
+      "running": "生成中",
+      "failed": "生成失败",
+      "canceled": "已取消"
+    }
+  },
+  "admin": {
+    "auth": {
+      "subtitle": "项目方用户运营后台",
+      "email": "邮箱",
+      "password": "密码",
+      "otp": "验证码",
+      "emailPlaceholder": "请输入项目方邮箱",
+      "passwordPlaceholder": "请输入密码",
+      "otpPlaceholder": "6 位验证码",
+      "enterAdmin": "进入后台",
+      "verifyEmail": "验证邮箱",
+      "backToLogin": "返回登录",
+      "resendOtp": "重发验证码",
+      "cooldown": "{{seconds}} 秒"
+    },
+    "navigation": {
+      "overview": {
+        "label": "概览",
+        "description": "增长、活跃、任务指标"
+      },
+      "users": {
+        "label": "用户管理",
+        "description": "账户档案、归属、诊断入口"
+      },
+      "content": {
+        "label": "创作运营",
+        "description": "视频任务、商品素材、失败排查"
+      },
+      "finance": {
+        "label": "财务账务",
+        "description": "余额、充值、消费、调账"
+      },
+      "paymentBilling": {
+        "label": "支付计费",
+        "description": "支付方式、服务费、计费策略"
+      },
+      "modelServices": {
+        "label": "模型配置",
+        "description": "平台模型 API、版本、Key"
+      },
+      "modelPricing": {
+        "label": "模型价格",
+        "description": "官方价格目录、草稿、发布"
+      },
+      "siteSettings": {
+        "label": "网站配置",
+        "description": "公开页、SEO/GEO、站点开关"
+      },
+      "system": {
+        "label": "系统",
+        "description": "备份、审计、运行状态"
+      }
+    },
+    "navigationGroups": {
+      "operate": "运营",
+      "commercial": "商业化",
+      "configuration": "配置",
+      "system": "系统"
+    },
+    "shell": {
+      "title": "项目方后台",
+      "navigationLabel": "后台导航",
+      "keyHint": "平台 Key 只在后台加密保存，普通用户只选择可用组合。",
+      "checkingSession": "检查登录状态",
+      "refreshing": "刷新数据中",
+      "refresh": "刷新",
+      "logout": "退出",
+      "adminBadge": "Admin",
+      "globalSearch": "搜索用户、业务空间、订单、任务",
+      "timeRange": "时间范围",
+      "ranges": {
+        "24h": "近 24 小时",
+        "7d": "近 7 天",
+        "30d": "近 30 天",
+        "all": "全部"
+      }
+    },
+    "status": {
+      "authExpired": "登录已过期，请重新登录。",
+      "noPlatformConfig": "没有可保存的平台模型配置。",
+      "platformKeyRequired": "请先填写平台 Key。",
+      "modelVersionRequired": "请至少选择一个模型版本。",
+      "platformSaved": "平台模型已保存，Key 已加密写入数据库，并已更新平台模型配置。",
+      "platformEnabled": "平台模型服务已启用。",
+      "platformDisabled": "平台模型服务已停用。",
+      "platformDeleted": "已删除平台模型服务。",
+      "paymentEnabled": "支付方式已启用。",
+      "paymentDisabled": "支付方式已停用。",
+      "walletAdjusted": "余额调整已写入流水。",
+      "billingSettingsSaved": "生成计费规则已保存。",
+      "modelPricingDraftSaved": "模型价格草稿 {{version}} 已保存，发布后只影响新估算和新任务。",
+      "modelPricingPublished": "模型价格目录 {{version}} 已发布。",
+      "moduleSeparator": "、",
+      "partialLoadFailed": "部分模块加载失败：{{modules}}。概览和导航仍可使用，请刷新或检查后端服务是否已重启。"
+    },
+    "overview": {
+      "ariaLabel": "后台概览",
+      "metricsAriaLabel": "后台指标",
+      "metricsPlaceholderAriaLabel": "后台指标占位",
+      "registrationTrend": "注册趋势",
+      "activityTrend": "活跃趋势",
+      "days30": "30 天",
+      "empty": "暂无数据",
+      "metrics": {
+        "totalUsers": "总用户",
+        "verifiedUsers": "{{count}} 已验证",
+        "newToday": "今日新增",
+        "new7d": "7 天 {{count}}",
+        "active7d": "7 天活跃",
+        "activeHint": "登录 / 生成活动",
+        "workspaces": "业务空间",
+        "siteWide": "全站",
+        "products": "商品",
+        "productLibrary": "用户资料库",
+        "videoJobs": "视频任务",
+        "generationRecords": "生成记录"
+      },
+      "charts": {
+        "registrations": "注册",
+        "activeUsers": "活跃用户",
+        "events": "事件"
+      }
+    },
+    "users": {
+      "ariaLabel": "用户管理",
+      "title": "用户列表",
+      "count": "{{count}} 人",
+      "users": "用户",
+      "workspaces": "业务空间",
+      "siteWorkspaces": "全站业务空间",
+      "videoJobs": "视频任务",
+      "userGeneratedRecords": "用户生成记录",
+      "active7d": "7 天活跃",
+      "roleAdmin": "管理员",
+      "roleUser": "用户",
+      "verified": "已验证",
+      "unverified": "未验证",
+      "columns": {
+        "user": "用户",
+        "status": "状态",
+        "workspace": "业务空间",
+        "products": "商品",
+        "videoJobs": "视频任务",
+        "createdAt": "注册时间",
+        "lastActive": "最近活跃"
+      },
+      "workbench": {
+        "emptyTitle": "用户档案",
+        "emptyHint": "选择一个用户，查看账户概况、最近创作和账务摘要。",
+        "title": "用户档案",
+        "pending": "等待详情",
+        "loadHint": "用户详情还没有载入，重新选择用户或刷新后再试。",
+        "spend": "消耗",
+        "tabs": {
+          "overview": "概览",
+          "workspaces": "空间",
+          "videoJobs": "视频任务",
+          "finance": "财务",
+          "products": "商品"
+        }
+      },
+      "drawer": {
+        "ariaLabel": "用户详情",
+        "close": "关闭用户详情",
+        "closeButton": "关闭",
+        "registered": "注册 {{date}} / 最近活跃 {{lastActive}}",
+        "loading": "正在载入用户详情",
+        "metricsAriaLabel": "用户详情指标",
+        "workspaces": "业务空间",
+        "products": "商品",
+        "videoJobs": "视频任务",
+        "lastSession": "最近会话",
+        "videoStatus": "视频状态",
+        "statusKinds": "{{count}} 类",
+        "emptyVideoJobs": "暂无视频任务",
+      "workspaceCount": "{{count}} 个",
+      "members": "{{count}} 成员",
+      "membersLabel": "成员",
+      "tasks": "{{count}} 任务",
+        "completed": "{{count}} 完成",
+        "failed": "{{count}} 失败",
+        "emptyWorkspaces": "暂无业务空间",
+        "recentVideoJobs": "最近视频任务",
+        "recentProducts": "最近商品",
+        "updated": "更新 {{date}}",
+        "emptyProducts": "暂无商品",
+        "createdCompleted": "创建 {{created}} / 完成 {{completed}}",
+        "outputs": "{{count}} 输出"
+      },
+      "profile": {
+        "emptyTitle": "用户档案",
+        "title": "用户档案",
+        "businessContext": "业务归属",
+        "contextSummary": "{{workspaces}} 个业务空间 / {{products}} 个商品 / {{jobs}} 个视频任务",
+        "videoHealth": "创作摘要",
+        "recentLedger": "最近账务",
+        "openContent": "查看创作运营",
+        "openFinance": "查看财务账务"
+      }
+    },
+    "modelServices": {
+      "ariaLabel": "平台模型",
+      "title": "平台模型配置",
+      "configuredCount": "{{count}} 条平台服务",
+      "hint": "平台 API Key 加密写入数据库；这里和用户自带 API 使用同一套模型服务配置，只是服务归属为平台托管。",
+      "keyBadge": "平台托管",
+      "addService": "添加{{badge}}服务",
+      "empty": "还没有配置平台服务，添加平台 API Key 后这里会显示已启用的模型服务。",
+      "dialogTitle": "添加{{badge}}服务",
+      "apiKeyLabel": "平台 API Key",
+      "groups": {
+        "text": {
+          "title": "文本模型",
+          "description": "商品整理、脚本分镜等文本调用。",
+          "badge": "文本"
+        },
+        "image": {
+          "title": "图片模型",
+          "description": "商品图、素材图等图片生成调用。",
+          "badge": "图片"
+        },
+        "video": {
+          "title": "视频模型",
+          "description": "成片生成调用。",
+          "badge": "视频"
+        }
+      }
+    },
+    "content": {
+      "title": "创作运营",
+      "totalProducts": "商品总数",
+      "productHint": "全站商品资料",
+      "totalVideoJobs": "视频任务",
+      "completedFailed": "{{completed}} 完成 / {{failed}} 失败",
+      "totalAssets": "视频资产",
+      "assetHint": "生成产物与素材",
+      "totalStoryboards": "分镜",
+      "storyboardHint": "用户保存分镜",
+      "statusDistribution": "任务状态分布",
+      "statusKinds": "{{count}} 类状态",
+      "emptyStatus": "暂无任务状态",
+      "products": "商品列表",
+      "productCount": "{{count}} 个商品",
+      "videoJobs": "视频任务",
+      "jobCount": "{{count}} 条任务",
+      "emptyProducts": "暂无商品",
+      "emptyJobs": "暂无视频任务",
+      "productsWorkbenchHint": "按业务空间查看全站商品资料、关联任务和素材数量。这里用于运营排查内容覆盖，不在这里编辑用户商品。",
+      "videoJobsWorkbenchHint": "按任务查看全站创作状态、模型和产物数量。过期、失败和排队任务优先在这里筛查。",
+      "recentJobs": "最近任务",
+      "productTable": {
+        "product": "商品",
+        "workspace": "业务空间",
+        "jobs": "任务",
+        "assets": "资产",
+        "updatedAt": "更新时间"
+      },
+      "jobTable": {
+        "job": "任务",
+        "workspace": "业务空间",
+        "status": "状态",
+        "model": "模型",
+        "assets": "资产",
+        "createdAt": "创建时间"
+      }
+    },
+    "finance": {
+      "ariaLabel": "财务账务",
+      "title": "财务账务",
+      "totalBalance": "总余额",
+      "workspaceCount": "{{count}} 个业务空间",
+      "reserved": "冻结金额",
+      "reservedHint": "正在生成任务占用",
+      "paidRecharge": "已到账充值",
+      "totalSpend": "总消耗",
+      "rechargeCount": "{{count}} 笔充值订单",
+      "userBalances": "用户余额",
+      "walletTable": {
+        "workspace": "业务空间",
+        "user": "用户",
+        "balance": "余额",
+        "reserved": "冻结",
+        "available": "可用",
+        "ledger": "流水",
+        "lastChange": "最后变动",
+        "action": "操作"
+      },
+      "emptyWallets": "暂无余额数据",
+      "adjustment": "余额调整",
+      "writeLedger": "写入流水",
+      "workspace": "业务空间",
+      "amount": "调整金额",
+      "amountPlaceholder": "例如 10 或 -3.5",
+      "reason": "原因",
+      "reasonPlaceholder": "例如：补偿充值手续费、扣回误发余额",
+      "submitAdjustment": "提交调整",
+      "cancelAdjustment": "取消",
+      "rechargeOrders": "充值订单",
+      "orderCount": "{{count}} 笔",
+      "walletTransactions": "账务流水",
+      "transactionCount": "{{count}} 条",
+      "emptyRechargeOrders": "暂无充值订单",
+      "emptyWalletTransactions": "暂无账务流水",
+      "orderTable": {
+        "order": "订单",
+        "workspace": "业务空间",
+        "amount": "金额",
+        "provider": "渠道",
+        "status": "状态",
+        "createdAt": "创建时间"
+      },
+      "transactionTable": {
+        "type": "类型",
+        "workspace": "业务空间",
+        "amount": "金额",
+        "balance": "余额",
+        "job": "任务/冻结",
+        "createdAt": "时间",
+        "action": "操作",
+        "details": "详情"
+      },
+      "transactionDetail": {
+        "title": "账务详情",
+        "close": "关闭账务详情",
+        "amount": "变动金额",
+        "balanceAfter": "变动后余额",
+        "reservedAfter": "变动后冻结",
+        "workspace": "业务空间",
+        "description": "说明",
+        "billingMode": "计费模式",
+        "usageKind": "使用类型",
+        "model": "模型",
+        "serviceFee": "平台服务费",
+        "upstreamCost": "官方成本",
+        "units": "用量",
+        "catalogVersion": "价格目录版本",
+        "unitPrice": "目录单价",
+        "source": "官方来源",
+        "job": "任务/冻结 ID"
+      },
+      "transactionTypes": {
+        "adjustment": "后台调整",
+        "bonus": "赠送",
+        "charge": "扣费",
+        "recharge": "充值",
+        "refund": "释放",
+        "reserve": "冻结"
+      },
+      "rechargeStatus": {
+        "paid": "已到账",
+        "pending": "待支付",
+        "expired": "已过期",
+        "failed": "失败"
+      }
+    },
+    "paymentBilling": {
+      "paymentMethods": "支付方式",
+      "configuredMethods": "{{count}} 个后台配置",
+      "enabledCount": "{{enabled}}/{{total}} 启用",
+      "rmbPayment": "RMB 支付",
+      "cryptoPayment": "数字货币支付",
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "emptyPaymentMethods": "暂无支付方式",
+      "billingPolicy": "计费策略",
+      "serviceFees": "平台服务费",
+      "meteredPolicy": "按次生成计费",
+      "serviceFee": "平台服务费",
+      "officialCostHint": "上游成本按模型价格目录自动估算；这里仅配置平台服务费，生效后用于新的估算和新的任务扣费。",
+      "savePricing": "保存服务费",
+      "toggleOn": "开",
+      "toggleOff": "关",
+      "usageKinds": {
+        "text": "文本创作",
+        "image": "图片创作",
+        "video": "视频创作"
+      },
+      "serviceFeeUnits": {
+        "perTextCall": "每次文本调用",
+        "perImage": "每张图片",
+        "perVideo": "每次视频生成"
+      }
+    },
+    "modelPricing": {
+      "title": "模型价格",
+      "activeVersion": "目录条目",
+      "providerEntries": "供应商条目",
+      "volcengine": "火山引擎",
+      "catalogEditor": "官方价格目录",
+      "draftReady": "草稿待发布",
+      "noDraft": "未保存草稿",
+      "publishPanel": "发布控制",
+      "version": "新版本号",
+      "publishHint": "保存草稿后先校验和生成差异；发布后只影响新的估算和新的任务扣费，历史流水保留当时价格快照。",
+      "saveDraft": "保存草稿",
+      "publish": "发布",
+      "source": "来源",
+      "emptyEntries": "暂无模型价格条目",
+      "sources": {
+        "builtIn": "内置官方目录",
+        "database": "后台发布目录"
+      },
+      "table": {
+        "model": "模型",
+        "kind": "类型",
+        "input": "输入 ¥/1M",
+        "output": "输出 ¥/1M",
+        "cached": "缓存 ¥/1M",
+        "image": "图片 ¥/张",
+        "video": "视频 ¥/1M tokens",
+        "source": "来源"
+      },
+      "kinds": {
+        "text": "文本",
+        "image": "图片",
+        "video": "视频"
+      }
+    },
+    "siteSettings": {
+      "title": "网站配置",
+      "sections": "配置模块",
+      "sectionHint": "站点级配置入口",
+      "publicPages": "公开页",
+      "publicPageHint": "首页、价格、登录、法律页",
+      "modelPricing": "价格条目",
+      "configSections": "配置状态",
+      "statusOnly": "只展示状态",
+      "sidePanel": "站点状态",
+      "seoGeo": "SEO/GEO 路线图",
+      "paymentMethods": "支付方式",
+      "billingRules": "{{count}} 条计费规则启用",
+      "emptySections": "暂无配置模块",
+      "emptyPublicPages": "暂无公开页",
+      "roadmapPath": "路线图路径",
+      "productionCheck": "上线检查",
+      "commerce": "商业化配置",
+      "table": {
+        "section": "模块",
+        "description": "说明",
+        "status": "状态"
+      },
+      "status": {
+        "configured": "已配置",
+        "attention": "需处理",
+        "planned": "待建设"
+      }
+    },
+    "system": {
+      "title": "系统",
+      "badge": "待接入",
+      "items": [
+        "备份",
+        "审计日志",
+        "运行状态"
+      ]
+    },
+    "forbidden": {
+      "title": "没有后台权限",
+      "description": "{{email}} 不是项目方管理员。",
+      "fallbackAccount": "当前账号",
+      "backToConsole": "返回控制台"
+    },
+    "jobStatus": {
+      "canceled": "已取消",
+      "completed": "已完成",
+      "expired": "已过期",
+      "failed": "失败",
+      "queued": "排队中",
+      "running": "生成中",
+      "unknown": "未知"
+    }
+  }
+}

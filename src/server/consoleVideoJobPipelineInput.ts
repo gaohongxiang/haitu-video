@@ -8,6 +8,7 @@ export function createMakeVideoPipelineInput(input: {
   record: VideoJobRecord;
   fetchImpl?: typeof fetch;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
+  tokenPriceCnyPerMillion?: number;
 }): MakeVideoPipelineInput {
   return {
     productPath: input.record.productPath,
@@ -17,6 +18,7 @@ export function createMakeVideoPipelineInput(input: {
     providerModel: input.record.providerModel,
     durationSeconds: input.record.durationSeconds ?? 8,
     resolution: input.record.resolution,
+    aspectRatio: input.record.aspectRatio,
     template: input.record.template ?? "scene",
     finalLanguage: input.record.finalLanguage,
     cta: input.record.cta ?? "今すぐチェック",
@@ -25,6 +27,7 @@ export function createMakeVideoPipelineInput(input: {
     confirmPaid: input.record.confirmPaid,
     reuseManifestPath: input.record.reuseManifest,
     fetchImpl: input.fetchImpl,
-    referenceImageUrlResolver: input.referenceImageUrlResolver
+    referenceImageUrlResolver: input.referenceImageUrlResolver,
+    tokenPriceCnyPerMillion: input.tokenPriceCnyPerMillion
   };
 }

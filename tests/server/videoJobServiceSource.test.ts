@@ -25,12 +25,18 @@ describe("video job service source boundaries", () => {
 
   it("centralizes video job enqueue variants in the service module", async () => {
     const serviceSource = await readFile(videoJobServicePath, "utf8");
+    const productRoutesSource = await readFile(productRoutesPath, "utf8");
+    const videoRoutesSource = await readFile(videoRoutesPath, "utf8");
 
     expect(serviceSource).toContain("export async function enqueueVideoJob(");
     expect(serviceSource).toContain("export async function enqueueBatchVideoJobs(");
     expect(serviceSource).toContain("export async function enqueueProductVideoJobsBySku(");
     expect(serviceSource).toContain("reserveVideoJobBilling");
     expect(serviceSource).toContain("resolveVideoRequestModel");
+    expect(serviceSource).toContain("modelPricingCatalog?: readonly ModelPricingEntry[]");
+    expect(serviceSource).toContain("modelPricingCatalog: options.modelPricingCatalog");
+    expect(productRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
+    expect(videoRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
   });
 
   it("reuses shared product readiness checks instead of duplicating paid generation rules", async () => {

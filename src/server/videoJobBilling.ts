@@ -1,11 +1,21 @@
 import { estimateCny } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import type { VideoAspectRatio, VideoResolution } from "../providers/types.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore, ModelStoredConfig } from "./modelConfigStore.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import type { VideoJobRecord, VideoJobRequest } from "./consoleVideoJobTypes.js";
 import { WalletStore } from "./walletStore.js";
 import { assertVideoModelConfigured, resolveVideoRequestModel } from "./modelConfigSelection.js";
+import {
+  estimateVideoUpstreamCostCny as estimateModelVideoUpstreamCostCny,
+  estimateVideoTokens as estimateModelVideoTokens,
+  modelPricingSnapshotForUsage,
+  type ModelPricingSnapshot,
+  videoTokenPriceCnyPerMillion
+} from "./modelPricing.js";
 
 interface VideoJobReader {
   get(id: string): Promise<VideoJobRecord>;
@@ -16,28 +26,49 @@ export function reserveVideoJobBilling(input: {
   provider: VideoProviderName | undefined;
   modelConfig?: Partial<ModelStoredConfig>;
   durationSeconds: number;
-}): Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId"> {
+  resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+}): Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId" | "billingCatalogVersion" | "billingPriceSnapshot"> {
   if (!input.provider || input.provider === "mock") {
     return {};
   }
   const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
-  const platformFeeCny = platformFeeCnyPerVideo();
-  const upstreamEstimatedCostCny = apiBillingMode === "platform" ? estimatedVideoUpstreamCostCny(input.durationSeconds) : 0;
+  const videoRule = input.billingPolicyStore.getRule("video");
+  const platformFeeCny = videoRule.serviceFeeCny;
+  const upstreamEstimatedCostCny = apiBillingMode === "platform"
+    ? estimatedVideoUpstreamCostCny(input.durationSeconds, input.modelConfig?.model, input.resolution, input.aspectRatio, input.modelPricingCatalog)
+    : 0;
+  const estimatedTokens = estimateVideoTokens(input.durationSeconds, input.resolution, input.aspectRatio).expected;
   const reserveAmountCny = roundMoney(platformFeeCny + upstreamEstimatedCostCny);
+  const priceSnapshot = modelPricingSnapshotForUsage({
+    kind: "video",
+    model: input.modelConfig?.model,
+    resolution: input.resolution,
+    aspectRatio: input.aspectRatio,
+    totalTokens: estimatedTokens,
+    catalog: input.modelPricingCatalog,
+    catalogVersion: input.modelPricingCatalogVersion
+  });
   const reservation = input.walletStore.reserve({
     amountCny: reserveAmountCny,
     description: "视频生成预扣",
     metadata: {
       apiBillingMode,
       platformFeeCny,
-      upstreamEstimatedCostCny
+      upstreamEstimatedCostCny,
+      priceSnapshot
     }
   });
   return {
     apiBillingMode,
     platformFeeCny,
     upstreamEstimatedCostCny,
-    walletReservationId: reservation.reservationId
+    walletReservationId: reservation.reservationId,
+    billingCatalogVersion: priceSnapshot.catalogVersion,
+    billingPriceSnapshot: priceSnapshot
   };
 }
 
@@ -48,7 +79,10 @@ export async function reserveRetryVideoJobBilling(input: {
   platformModelConfigStore?: ModelConfigStore;
   modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
-}): Promise<Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId">> {
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+}): Promise<Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId" | "billingCatalogVersion" | "billingPriceSnapshot">> {
   if (!input.record.provider || input.record.provider === "mock") {
     return {};
   }
@@ -67,7 +101,12 @@ export async function reserveRetryVideoJobBilling(input: {
     walletStore: input.walletStore,
     provider: input.record.provider,
     modelConfig: videoModel.config,
-    durationSeconds: input.record.durationSeconds ?? 8
+    durationSeconds: input.record.durationSeconds ?? 8,
+    resolution: input.record.resolution,
+    aspectRatio: input.record.aspectRatio,
+    billingPolicyStore: input.billingPolicyStore,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion
   });
 }
 
@@ -86,42 +125,41 @@ export async function assertRetryVideoJobAllowed(input: {
   return record;
 }
 
-export function estimateVideoTokens(durationSeconds: number): { low: number; expected: number; high: number } {
-  const expected = Math.round((80770 / 8) * durationSeconds);
-  return {
-    low: roundToThousand(expected * 0.75),
-    expected: roundToTen(expected),
-    high: roundToThousand(expected * 1.35)
-  };
+export function estimateVideoTokens(durationSeconds: number, resolution?: VideoResolution, aspectRatio?: VideoAspectRatio): { low: number; expected: number; high: number } {
+  return estimateModelVideoTokens({ durationSeconds, resolution, aspectRatio });
 }
 
 export function estimateVideoCostCny(durationSeconds: number): number {
-  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
-  return estimateCny(estimateVideoTokens(durationSeconds).expected, tokenPriceCnyPerMillion);
+  return estimatedVideoUpstreamCostCny(durationSeconds);
 }
 
-function platformFeeCnyPerVideo(): number {
-  return roundMoney(numberFromEnv(process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO, 1));
+export function estimatedVideoUpstreamCostCny(
+  durationSeconds: number,
+  model?: string,
+  resolution?: VideoResolution,
+  aspectRatio?: VideoAspectRatio,
+  modelPricingCatalog?: readonly ModelPricingEntry[]
+): number {
+  return estimateModelVideoUpstreamCostCny({
+    model,
+    resolution,
+    aspectRatio,
+    totalTokens: estimateVideoTokens(durationSeconds, resolution, aspectRatio).expected,
+    catalog: modelPricingCatalog
+  });
 }
 
-function estimatedVideoUpstreamCostCny(durationSeconds: number): number {
-  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
-  return estimateCny(estimateVideoTokens(durationSeconds).expected, tokenPriceCnyPerMillion);
-}
-
-function numberFromEnv(value: string | undefined, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+export function tokenPriceCnyPerMillionForVideoModel(model?: string, resolution?: VideoResolution, modelPricingCatalog?: readonly ModelPricingEntry[]): number {
+  return modelPricingCatalog
+    ? estimateModelVideoUpstreamCostCny({
+        model,
+        resolution,
+        totalTokens: 1_000_000,
+        catalog: modelPricingCatalog
+      })
+    : videoTokenPriceCnyPerMillion(model, resolution);
 }
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function roundToThousand(value: number): number {
-  return Math.round(value / 1000) * 1000;
-}
-
-function roundToTen(value: number): number {
-  return Math.round(value / 10) * 10;
 }

@@ -50,6 +50,33 @@ describe("dashboard chart option builders", () => {
     ]);
   });
 
+  it("accepts localized chart labels without changing data", () => {
+    const providerOption = buildProviderChartOption(
+      [{ name: "seedance", jobs: 3, completed: 2, active: 1, totalTokens: 1200, estimatedCostCny: 4.5 }],
+      { providerSeries: "Model Mix", occurrenceUnit: "times" }
+    );
+    const trendOption = buildTrendChartOption(
+      [{ label: "06-25", jobs: 2, totalTokens: 1500, estimatedCostCny: 3.25 }],
+      { jobs: "Jobs", cost: "Cost" }
+    );
+    const recentOption = buildRecentChartOption(
+      [{ id: "job-new", label: "06-25", productSku: "SKU-2", provider: "seedance", status: "completed", totalTokens: 2000, estimatedCostCny: 2 }],
+      { cost: "Cost" }
+    );
+
+    expect(providerOption.tooltip).toMatchObject({ formatter: "{b}: {c} times ({d}%)" });
+    expect(providerOption.series).toMatchObject([{ name: "Model Mix", data: [{ name: "seedance", value: 3 }] }]);
+    expect(trendOption.series).toMatchObject([
+      { name: "Token", data: [1500] },
+      { name: "Jobs", data: [2] },
+      { name: "Cost", data: [3.25] }
+    ]);
+    expect(recentOption.series).toMatchObject([
+      { name: "Token", data: [2000] },
+      { name: "Cost", data: [2] }
+    ]);
+  });
+
   it("keeps compact number and currency axis formatters stable", () => {
     const option = buildTrendChartOption([
       { label: "06-25", jobs: 1, totalTokens: 1_500_000, estimatedCostCny: 6 }

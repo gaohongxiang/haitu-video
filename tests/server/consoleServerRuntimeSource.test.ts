@@ -43,7 +43,8 @@ describe("console server runtime source boundaries", () => {
     expect(runtimeSource).toContain("getStorageRoots(");
     expect(runtimeSource).toContain("getWorkspacePaths(");
     expect(runtimeSource).toContain("new FileReviewStore(");
-    expect(runtimeSource).toContain("new FileConsoleSettingsStore(");
+    expect(runtimeSource).toContain("new SqliteConsoleSettingsStore(");
+    expect(runtimeSource).not.toContain("new FileConsoleSettingsStore(");
     expect(runtimeSource).toContain("new PublicAssetTokenStore(");
     expect(runtimeSource).toContain("new BetterAuthConsoleAuthStore(");
     expect(runtimeSource).toContain("new LocalVideoJobQueue(");

@@ -6,8 +6,10 @@ import {
   type ImportedProductPreview
 } from "../core/productImportCleaner.js";
 import { parseProductFacts } from "../core/productFacts.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { TextProvider } from "../providers/textProviderTypes.js";
 import { runMeteredAiAction } from "./aiBilling.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { DatabaseHandle } from "./db/client.js";
 import type { ModelStoredConfig } from "./modelConfigStore.js";
 import { normalizeAiProductFacts } from "./productImportAiNormalization.js";
@@ -69,7 +71,10 @@ export function buildImportedProductPreview(input: ImportProductPreviewRequest):
 
 export async function buildAiImportedProductPreview(input: {
   walletStore: WalletStore;
+  billingPolicyStore: BillingPolicyStore;
   createTextModelProvider: ProductImportTextModelProviderFactory;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
   input: ImportProductPreviewRequest;
 }): Promise<ImportedProductPreview> {
   const text = String(input.input.text ?? "").trim();
@@ -82,25 +87,36 @@ export async function buildAiImportedProductPreview(input: {
   try {
     const rawProduct = await runMeteredAiAction({
       walletStore: input.walletStore,
+      billingPolicyStore: input.billingPolicyStore,
       kind: "text",
       modelConfig: textModel.config,
+      modelPricingCatalog: input.modelPricingCatalog,
+      modelPricingCatalogVersion: input.modelPricingCatalogVersion,
       reserveDescription: "AI 资料整理预扣",
       chargeDescription: "AI 资料整理扣费",
-      action: () => textModel.provider.generateJson<unknown>({
-        system: [
-          "你是电商商品资料整理助手。",
-          "只输出 JSON object，不要 markdown。",
-          "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
-          "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
-          "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
-          "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
-          "价格、店铺名、物流信息不要写入商品资料。"
-        ].join("\n"),
-        user: [
-          "请整理这段商品资料：",
-          text
-        ].join("\n\n")
-      })
+      action: async () => {
+        const result = await textModel.provider.generateJsonWithUsage<unknown>({
+          system: [
+            "你是电商商品资料整理助手。",
+            "只输出 JSON object，不要 markdown。",
+            "把用户粘贴的商品资料整理成以下字段：sku, title_ja, category, materials, dimensions, verified_selling_points, usage_scenes, forbidden_claims, reference_images。",
+            "sku 可以从原文 SKU/商品番号/ID 提取；没有时生成一个稳定简短的 ITEM- 前缀内部编号。",
+            "只把可确认事实放入 verified_selling_points；普通商品功能词（如 接触冷感、通気性、紫外線対策、日焼け対策）如果原文有，不要放入 forbidden_claims。",
+            "forbidden_claims 只放高风险或明确未证明宣称：销量/排名/No.1、医用/治疗、防水/耐荷重、UV 具体数值、永久/完全等绝对化宣称。",
+            "价格、店铺名、物流信息不要写入商品资料。"
+          ].join("\n"),
+          user: [
+            "请整理这段商品资料：",
+            text
+          ].join("\n\n")
+        });
+        return {
+          value: result.value,
+          metering: {
+            textUsage: result.usage
+          }
+        };
+      }
     });
     const product = parseProductFacts(normalizeAiProductFacts(rawProduct, text));
     return {

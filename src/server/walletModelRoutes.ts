@@ -1,6 +1,6 @@
 import type { FileAuditLog } from "./auditLog.js";
 import { jsonResponse } from "./consoleHttpService.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
 import {
   assertPaymentMethodCanCreateRechargeOrder
@@ -14,6 +14,7 @@ import {
   infiniPaymentConfigFromEnv,
   syncInfiniCheckoutRechargeOrder
 } from "./infiniPaymentService.js";
+import { resolveRechargePaymentAmount } from "./rechargePaymentAmount.js";
 import { WalletRechargeOrderStore } from "./walletRechargeOrderStore.js";
 import {
   assertModelBundleConfigsExist,
@@ -26,11 +27,6 @@ import {
 } from "./modelServicePreferenceStore.js";
 import { ensurePlatformBundles } from "./platformModelProvisioning.js";
 
-interface WalletTopUpRequest {
-  amountCny?: number;
-  description?: string;
-}
-
 interface WalletRechargeOrderRequest {
   amountCny?: number;
   paymentMethodId?: string;
@@ -40,7 +36,7 @@ export async function handleWalletModelRoutes(input: {
   request: Request;
   url: URL;
   requestContext: ConsoleRequestContext;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   auditLog: FileAuditLog;
   fetchImpl?: typeof fetch;
 }): Promise<Response | undefined> {
@@ -49,40 +45,40 @@ export async function handleWalletModelRoutes(input: {
   if (request.method === "GET" && url.pathname === "/api/wallet") {
     return jsonResponse(requestContext.walletStore.getSummary());
   }
-  if (request.method === "POST" && url.pathname === "/api/wallet/top-up") {
-    const body = (await request.json()) as WalletTopUpRequest;
-    const wallet = requestContext.walletStore.topUp({
-      amountCny: Number(body.amountCny),
-      description: normalizeText(body.description) ?? "充值"
-    });
-    await auditLog.append({
-      action: "wallet.top_up",
-      metadata: {
-        workspaceId: requestContext.workspaceId,
-        amountCny: body.amountCny
-      }
-    });
-    return jsonResponse({ wallet });
-  }
   if (request.method === "POST" && url.pathname === "/api/wallet/recharge-orders") {
     const body = (await request.json()) as WalletRechargeOrderRequest;
+    const amountCny = normalizeRechargeOrderAmountCny(body.amountCny);
+    if (amountCny === undefined) {
+      return jsonResponse({ error: "充值金额必须是 50 到 1000 之间的整数。" }, 400);
+    }
     const paymentMethod = await assertPaymentMethodCanCreateRechargeOrder({
       settingsStore,
       paymentMethodId: body.paymentMethodId
     });
-    const currency = paymentMethod.id === "stripe"
+    const paymentCurrency = paymentMethod.id === "stripe"
       ? stripePaymentConfigFromEnv().currency
       : infiniPaymentConfigFromEnv().currency;
+    const paymentAmount = resolveRechargePaymentAmount({
+      creditCny: amountCny,
+      paymentCurrency
+    });
     const orderStore = new WalletRechargeOrderStore({
       handle: requestContext.databaseHandle
     });
     const order = orderStore.createPending({
       workspaceId: requestContext.workspaceId,
-      amountCny: Number(body.amountCny),
-      currency,
+      creditCny: paymentAmount.creditCny,
+      paymentCurrency: paymentAmount.paymentCurrency,
+      paymentAmountCents: paymentAmount.paymentAmountCents,
+      fxRateSnapshot: paymentAmount.fxRateSnapshot,
       provider: paymentMethod.id,
       metadata: {
-        provider: paymentMethod.id
+        provider: paymentMethod.id,
+        walletCurrency: paymentAmount.walletCurrency,
+        paymentCurrency: paymentAmount.paymentCurrency,
+        paymentAmountCents: paymentAmount.paymentAmountCents,
+        creditCents: paymentAmount.creditCents,
+        fxRateSnapshot: paymentAmount.fxRateSnapshot
       }
     });
     let providerSessionId: string;
@@ -91,10 +87,9 @@ export async function handleWalletModelRoutes(input: {
     let expiresAt: string | undefined;
     try {
       if (paymentMethod.id === "stripe") {
-        const config = stripePaymentConfigFromEnv();
         const session = await createStripeCheckoutRechargeSession({
           order,
-          config,
+          config: stripePaymentConfigFromEnv(),
           fetchImpl
         });
         providerSessionId = session.id;
@@ -102,10 +97,9 @@ export async function handleWalletModelRoutes(input: {
         checkoutUrl = session.url;
         expiresAt = session.expires_at ? new Date(session.expires_at * 1000).toISOString() : undefined;
       } else {
-        const config = infiniPaymentConfigFromEnv();
         const session = await createInfiniCheckoutRechargeSession({
           order,
-          config,
+          config: infiniPaymentConfigFromEnv(),
           fetchImpl
         });
         providerSessionId = session.order_id;
@@ -132,8 +126,10 @@ export async function handleWalletModelRoutes(input: {
         workspaceId: requestContext.workspaceId,
         provider: savedOrder.provider,
         providerSessionId: savedOrder.providerSessionId,
-        amountCny: savedOrder.amountCny,
-        currency: savedOrder.currency
+        creditCny: savedOrder.creditCny,
+        walletCurrency: savedOrder.walletCurrency,
+        paymentAmount: savedOrder.paymentAmount,
+        paymentCurrency: savedOrder.paymentCurrency
       }
     });
     return jsonResponse({
@@ -164,7 +160,9 @@ export async function handleWalletModelRoutes(input: {
         workspaceId: requestContext.workspaceId,
         provider: result.order.provider,
         providerSessionId: result.order.providerSessionId,
-        amountCny: result.order.amountCny,
+        creditCny: result.order.creditCny,
+        paymentAmount: result.order.paymentAmount,
+        paymentCurrency: result.order.paymentCurrency,
         status: result.order.status,
         synced: result.synced
       }
@@ -245,7 +243,10 @@ async function ensureMissingPlatformBundles(requestContext: ConsoleRequestContex
   });
 }
 
-function normalizeText(value: unknown): string | undefined {
-  const text = typeof value === "string" ? value.trim() : "";
-  return text || undefined;
+function normalizeRechargeOrderAmountCny(value: unknown): number | undefined {
+  const amount = Number(value);
+  if (!Number.isInteger(amount) || amount < 50 || amount > 1000) {
+    return undefined;
+  }
+  return amount;
 }

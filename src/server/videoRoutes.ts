@@ -1,6 +1,6 @@
 import { buildJobLedger } from "./jobLedger.js";
 import type { FileAuditLog } from "./auditLog.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
 import { runConsoleMakeVideo } from "./consoleMakeVideoService.js";
@@ -35,7 +35,7 @@ export async function handleVideoRoutes(input: {
   requestContext: ConsoleRequestContext;
   rootDir: string;
   dataDir: string;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   reviewStore: FileReviewStore;
   auditLog: FileAuditLog;
   fetchImpl?: typeof fetch;
@@ -59,7 +59,12 @@ export async function handleVideoRoutes(input: {
       preflight: await runConsolePreflight(body, {
         rootDir: dataDir,
         outputsDir: requestContext.outputsDir,
-        settingsStore
+        settingsStore,
+        billingPolicyStore: requestContext.billingPolicyStore,
+        modelConfigStore: requestContext.modelConfigStore,
+        platformModelConfigStore: requestContext.platformModelConfigStore,
+        modelBundleStore: requestContext.modelBundleStore,
+        modelServicePreferenceStore: requestContext.modelServicePreferenceStore
       })
     });
   }
@@ -75,7 +80,8 @@ export async function handleVideoRoutes(input: {
       modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
       fetchImpl,
       runMakeVideoPipeline,
-      referenceImageUrlResolver: requestContext.referenceImageUrlResolver
+      referenceImageUrlResolver: requestContext.referenceImageUrlResolver,
+      billingPolicyStore: requestContext.billingPolicyStore
     });
     return jsonResponse({ report });
   }
@@ -92,7 +98,10 @@ export async function handleVideoRoutes(input: {
         modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
-        videoJobQueue: requestContext.videoJobQueue
+        videoJobQueue: requestContext.videoJobQueue,
+        billingPolicyStore: requestContext.billingPolicyStore,
+        modelPricingCatalog: requestContext.modelPricingCatalog,
+        modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion
       })
     });
   }
@@ -107,7 +116,10 @@ export async function handleVideoRoutes(input: {
         modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
-        videoJobQueue: requestContext.videoJobQueue
+        videoJobQueue: requestContext.videoJobQueue,
+        billingPolicyStore: requestContext.billingPolicyStore,
+        modelPricingCatalog: requestContext.modelPricingCatalog,
+        modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion
       })
     });
   }
@@ -158,7 +170,9 @@ export async function handleVideoRoutes(input: {
       modelConfigStore: requestContext.modelConfigStore,
       platformModelConfigStore: requestContext.platformModelConfigStore,
       modelBundleStore: requestContext.modelBundleStore,
-      modelServicePreferenceStore: requestContext.modelServicePreferenceStore
+      modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+      billingPolicyStore: requestContext.billingPolicyStore,
+      modelPricingCatalog: requestContext.modelPricingCatalog
     });
     const job = await requestContext.videoJobQueue.retry(jobId, {
       confirmPaid: body.confirmPaid === true,

@@ -1,4 +1,5 @@
 import type { MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { DatabaseHandle } from "./db/client.js";
 import type { VideoJobRecord } from "./consoleVideoJobTypes.js";
 import {
@@ -10,6 +11,7 @@ import {
 import {
   captureVideoJobWalletCharge
 } from "./consoleVideoJobPersistence.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 
 export async function completeVideoJob(input: {
   record: VideoJobRecord;
@@ -19,6 +21,9 @@ export async function completeVideoJob(input: {
   databaseHandle?: DatabaseHandle;
   workspaceId?: string;
   now?: () => Date;
+  billingPolicyStore?: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
 }): Promise<Partial<VideoJobRecord>> {
   const hashtags = await readHashtagsFromRawManifest(input.report.raw.manifestPath);
   const patch = completedVideoJobPatch({
@@ -26,15 +31,19 @@ export async function completeVideoJob(input: {
     report: input.report,
     hashtags,
     completedAt: input.completedAt,
-    mediaUrlForPath: input.mediaUrlForPath
+    mediaUrlForPath: input.mediaUrlForPath,
+    billingPolicyStore: input.billingPolicyStore
   });
   captureVideoJobWalletCharge({
     databaseHandle: input.databaseHandle,
     workspaceId: input.workspaceId,
     now: input.now,
+    billingPolicyStore: input.billingPolicyStore,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion,
     record: {
       ...input.record,
-      estimatedCostCny: input.report.billing?.estimatedCostCny
+      estimatedCostCny: patch.upstreamEstimatedCostCny ?? input.report.billing?.estimatedCostCny
     }
   });
   return patch;

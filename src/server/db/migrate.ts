@@ -41,6 +41,22 @@ const migrations: Migration[] = [
   {
     id: "0009_wallet_recharge_orders",
     sql: readMigrationSql("0009_wallet_recharge_orders.sql")
+  },
+  {
+    id: "0010_billing_policies",
+    sql: readMigrationSql("0010_billing_policies.sql")
+  },
+  {
+    id: "0011_console_settings",
+    sql: readMigrationSql("0011_console_settings.sql")
+  },
+  {
+    id: "0012_billing_service_fees",
+    sql: readMigrationSql("0012_billing_service_fees.sql")
+  },
+  {
+    id: "0013_model_pricing_catalog_versions",
+    sql: readMigrationSql("0013_model_pricing_catalog_versions.sql")
   }
 ];
 

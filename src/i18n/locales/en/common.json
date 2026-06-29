@@ -1,0 +1,28 @@
+{
+  "brand": {
+    "name": "Haitu"
+  },
+  "language": {
+    "label": "Language",
+    "change": "Change language"
+  },
+  "navigation": {
+    "imageOptimization": "Images",
+    "video": "Video",
+    "models": "Models",
+    "console": "Console"
+  },
+  "seo": {
+    "home": "Home",
+    "faq": "FAQ",
+    "breadcrumbLabel": "Page path",
+    "footerLabel": "SEO page navigation",
+    "footerFeatures": "Features",
+    "footerPlatforms": "Platforms",
+    "footerTools": "Tools",
+    "footerUseCases": "Use cases",
+    "footerCategories": "Categories",
+    "footerCompare": "Compare",
+    "footerTrust": "Trust & support"
+  }
+}

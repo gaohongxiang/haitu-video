@@ -83,7 +83,7 @@ export async function resolveVideoRequestModel(input: ModelSelectionStores & {
   }
   return {
     providerModelConfigId: config.configId,
-    providerModel: input.body.providerModel ?? config.model,
+    providerModel: config.model,
     config
   };
 }

@@ -1,18 +1,24 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createHmac } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createConsoleServer as createRawConsoleServer, type ConsoleServerHandle, type ConsoleServerOptions } from "../../src/server/consoleServer.js";
+import { SqliteConsoleSettingsStore } from "../../src/server/consoleSettings.js";
 import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
 import { encryptSecret } from "../../src/server/db/crypto.js";
 import { importFileWorkspace } from "../../src/server/db/importFileWorkspace.js";
 import { runMigrations } from "../../src/server/db/migrate.js";
+import { WalletStore } from "../../src/server/walletStore.js";
 
 let tempDirs: string[] = [];
+
+beforeEach(() => {
+  vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1");
+});
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -247,7 +253,12 @@ describe("console API", () => {
     const mediaResponse = await server.fetch(`/media?path=${encodeURIComponent(dataMediaPath)}`);
     const outsideMedia = await server.fetch(`/media?path=${encodeURIComponent(join(root, "outside.jpg"))}`);
 
-    await expect(readFile(join(dataDir, "system", "console-settings.json"), "utf8")).resolves.toContain("詳しく見る");
+    const settingsRows = readConsoleSettingsRows(dataDir);
+    expect(settingsRows).toEqual([expect.objectContaining({
+      id: "global",
+      default_cta: "詳しく見る"
+    })]);
+    await expect(access(join(dataDir, "system", "console-settings.json"))).rejects.toThrow();
     await expect(readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8")).resolves.toContain("model_config.saved");
     const handle = openDatabase({ dataDir, env: process.env });
     try {
@@ -537,19 +548,19 @@ describe("console API", () => {
     expect(appSource).not.toContain("/api/auth/login");
     expect(appSource).not.toContain("/api/auth/register");
     expect(appSource).toContain("/api/auth/logout");
-    expect(appSource).toContain("Haitu 账号入口");
-    expect(appSource).toContain("登录或创建账号");
-    expect(appSource).toContain("邮箱");
-    expect(appSource).toContain("密码");
-    expect(appSource).toContain("登录 / 创建账号");
+    expect(appSource).toContain('tAuth("title")');
+    expect(appSource).toContain('tAuth("entry.subtitle")');
+    expect(appSource).toContain('tAuth("email")');
+    expect(appSource).toContain('tAuth("password")');
+    expect(appSource).toContain('tAuth("entry.submit")');
     expect(appSource).not.toContain("未注册邮箱会自动创建账号");
     expect(appSource).not.toContain("登录已有账号，或用新邮箱创建账号");
-    expect(appSource).toContain("忘记密码");
-    expect(appSource).toContain("验证邮箱并进入");
-    expect(appSource).toContain("发送验证码");
-    expect(appSource).toContain("重发验证码");
+    expect(appSource).toContain('tAuth("entry.forgotPassword")');
+    expect(appSource).toContain('tAuth("verify.submit")');
+    expect(appSource).toContain('tAuth("otp.label")');
+    expect(appSource).toContain("authOtpSendLabel");
     expect(appSource).not.toContain("重新发送验证码");
-    expect(appSource).toContain("秒后可重新发送");
+    expect(appSource).toContain('i18n.t("app:auth.otp.cooldown"');
     expect(appSource).toContain("authOtpCooldownSeconds");
     expect(appSource).toContain("startAuthOtpCooldown");
     expect(appSource).toContain("forgotPasswordOtpSent");
@@ -557,29 +568,29 @@ describe("console API", () => {
     expect(appSource).toContain("onResendVerificationCode");
     expect(appSource).toContain("function AuthOtpField");
     expect(appSource.split("<AuthOtpField")).toHaveLength(3);
-    expect(appSource).toContain("重置密码");
-    expect(appSource).toContain("至少 8 位");
+    expect(appSource).toContain('tAuth("reset.submit")');
+    expect(appSource).toContain('tAuth("reset.newPasswordPlaceholder")');
     expect(appSource).not.toContain("至少 12 位");
     const resetPasswordFormSource = appSource.slice(
       appSource.indexOf("onSubmit={onResetPassword}"),
-      appSource.indexOf("返回账号入口", appSource.indexOf("onSubmit={onResetPassword}"))
+      appSource.indexOf('tAuth("backToEntry")', appSource.indexOf("onSubmit={onResetPassword}"))
     );
-    expect(resetPasswordFormSource.indexOf('label="新密码"')).toBeLessThan(resetPasswordFormSource.indexOf("<AuthOtpField"));
+    expect(resetPasswordFormSource.indexOf('label={tAuth("reset.newPassword")}')).toBeLessThan(resetPasswordFormSource.indexOf("<AuthOtpField"));
     expect(appSource).not.toContain("验证码已发送到邮箱，请输入后继续。");
     expect(appSource).not.toContain("验证码已重新发送，请查看邮箱。");
     expect(appSource).not.toContain("验证码已发送到邮箱，请输入验证码和新密码。");
-    expect(appSource).toContain("密码已重置，请用新密码登录。");
+    expect(appSource).toContain('tApp("auth.reset.success")');
     expect(appSource).not.toContain("onSubmit={onRequestPasswordReset}");
     expect(appSource).toContain("setActiveSection(defaultConsoleSection)");
     expect(appSource).not.toContain("已退出登录");
     expect(appSource).not.toContain("管理员密码");
     expect(appSource).not.toContain("进入控制台");
-    expect(appSource).toContain("退出登录");
+    expect(appSource).toContain('tAccount("logout")');
     expect(appSource).toContain("function AccountMenu");
     expect(appSource).toContain("<AccountMenu");
     expect(appSource).toContain("authSession.user?.email");
-    expect(appSource).toContain("账号菜单");
-    expect(appSource).toContain("账号");
+    expect(appSource).toContain('tAccount("menu")');
+    expect(appSource).toContain('tAccount("label")');
     expect(appSource).not.toContain('onClick={() => void logout()} disabled={isBusy}');
     expect(appSource).toContain("setAuthSession");
     expect(appSource).toContain("Authentication required");
@@ -593,16 +604,16 @@ describe("console API", () => {
     expect(appSource).toContain("dashboardNavItems");
     expect(appSource).toContain("primaryNavItems");
     expect(appSource).toContain("managementNavItems");
-    expect(appSource).toContain("主流程");
-    expect(appSource).toContain("管理");
+    expect(appSource).toContain('labelKey: "workflow"');
+    expect(appSource).toContain('labelKey: "management"');
     const dashboardNavSource = appSource.slice(appSource.indexOf("const dashboardNavItems"), appSource.indexOf("const primaryNavItems"));
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
     const managementNavSource = appSource.slice(appSource.indexOf("const managementNavItems"), appSource.indexOf("const navItems"));
-    expect(dashboardNavSource).toContain("仪表盘");
+    expect(dashboardNavSource).toContain('labelKey: "dashboard"');
     expect(primaryNavSource).not.toContain("仪表盘");
-    expect(primaryNavSource).toContain("视频创作");
-    expect(primaryNavSource).toContain("图片创作");
-    expect(primaryNavSource).toContain("任务记录");
+    expect(primaryNavSource).toContain('labelKey: "video"');
+    expect(primaryNavSource).toContain('labelKey: "image"');
+    expect(primaryNavSource).toContain('labelKey: "ledger"');
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
@@ -611,10 +622,11 @@ describe("console API", () => {
     expect(managementNavSource).not.toContain("仪表盘");
     expect(managementNavSource).not.toContain("模板管理");
     expect(managementNavSource).not.toContain("任务记录");
-    expect(managementNavSource).toContain("充值中心");
-    expect(managementNavSource).toContain("模型价格");
+    expect(managementNavSource).toContain('labelKey: "wallet"');
+    expect(managementNavSource).not.toContain('labelKey: "transactions"');
+    expect(managementNavSource).toContain('labelKey: "pricing"');
     expect(managementNavSource).not.toContain("成本台账");
-    expect(managementNavSource).toContain("API 管理");
+    expect(managementNavSource).toContain('labelKey: "settings"');
     expect(managementNavSource).not.toContain("审核发布");
     expect(managementNavSource).not.toContain("品牌设置");
     expect(appSource).not.toContain('aria-label="品牌设置"');
@@ -626,13 +638,13 @@ describe("console API", () => {
     expect(appSource).not.toContain("当前模式");
     expect(appSource).not.toContain("运行状态");
     expect(appSource).not.toContain('aria-label="当前模块"');
-    expect(appSource).toContain('aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}');
+    expect(appSource).toContain('aria-label={sidebarCollapsed ? tApp("shell.sidebarExpand") : tApp("shell.sidebarCollapse")}');
     expect(appSource).toContain("sidebarCollapsed");
     expect(appSource).toContain("setSidebarCollapsed");
     expect(appSource).toContain("const floatingTooltipClass");
     expect(appSource).toContain("floatingTooltipClass,");
     expect(appSource).toContain("min-[900px]:grid-cols-[56px_minmax(0,1fr)]");
-    expect(appSource).toContain("min-[900px]:grid-cols-[184px_minmax(0,1fr)]");
+    expect(appSource).toContain("min-[900px]:grid-cols-[232px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[72px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[64px_minmax(0,1fr)]");
     expect(appSource).not.toContain("min-[900px]:grid-cols-[196px_minmax(0,1fr)]");
@@ -650,13 +662,13 @@ describe("console API", () => {
     expect(appSource).not.toContain("h-[34px] w-[34px] rounded-full");
     expect(appSource).not.toContain("left-[232px] top-[84px]");
     expect(appSource).not.toContain("mx-auto h-10 w-10 rounded-full");
-    expect(appSource).toContain('sidebarCollapsed ? "w-[56px]" : "w-[184px]"');
+    expect(appSource).toContain('sidebarCollapsed ? "w-[56px] overflow-visible" : "w-[232px] overflow-visible"');
     expect(appSource).toContain("h-[72px] items-center");
     expect(appSource).not.toContain("h-[72px] items-center border-b");
     expect(appSource).not.toContain("h-[84px] items-center border-b");
     expect(appSource).toContain('sidebarCollapsed ? "justify-center px-2" : "gap-2.5 px-3.5"');
     expect(appSource).toContain('sidebarCollapsed ? "px-1.5" : "px-2.5"');
-    expect(appSource).toContain('sidebarCollapsed ? "overflow-visible" : "overflow-y-auto"');
+    expect(appSource).toContain('sidebarCollapsed ? "overflow-visible" : "overflow-y-auto overflow-x-hidden"');
     expect(appSource).toContain("app-sidebar-nav-tooltip");
     expect(appSource).toContain("group-hover/sidebar-nav-item:opacity-100");
     expect(appSource).toContain("title={sidebarCollapsed ? label : undefined}");
@@ -690,36 +702,35 @@ describe("console API", () => {
     expect(appSource).toContain("contentScrollerRef");
     expect(appSource).toContain("replaceState");
     expect(appSource).toContain("aria-current");
-    expect(appSource).toContain("商品库");
     expect(appSource).toContain("product-library-shell");
     expect(appSource).toContain("product-library-list");
     expect(appSource).toContain("ProductLibraryDialog");
-    expect(appSource).toContain("关闭弹窗");
-    expect(appSource).toContain("添加商品");
-    expect(appSource).toContain("粘贴导入");
-    expect(appSource).toContain("创作视频");
-    expect(appSource).toContain("创作商品");
-    expect(appSource).toContain("新商品");
+    expect(appSource).toContain('tProductLibrary("title")');
+    expect(appSource).toContain('tProductLibrary("dialog.close")');
+    expect(appSource).toContain('tProductLibrary("addProduct")');
+    expect(appSource).toContain('tProductLibrary("dialog.importBadge")');
+    expect(appSource).toContain('tProductLibrary("actions.createVideo")');
+    expect(appSource).toContain('tVideo("newProduct.title")');
     expect(appSource).not.toContain("开始创作");
     expect(appSource).not.toContain("用此商品创作视频");
-    expect(appSource).toContain("粘贴商品信息");
-    expect(appSource).toContain("粘贴或填写商品标题、分类、材质、尺寸/重量、卖点和使用场景");
+    expect(appSource).toContain('tProductLibrary("dialog.pasteLabel")');
+    expect(appSource).toContain('tProductLibrary("dialog.importDescription")');
     expect(appSource).not.toContain("店小秘");
     expect(appSource).not.toContain("1688");
     expect(appSource).not.toContain("商品页");
-    expect(appSource).toContain("整理后的商品资料");
-    expect(appSource).toContain("资料是否够用");
-    expect(appSource).toContain("可生成视频");
-    expect(appSource).toContain("缺失信息");
-    expect(appSource).toContain("不可用卖点");
+    expect(appSource).toContain('tProductLibrary("importPreview.title")');
+    expect(appSource).toContain('tProductLibrary("importPreview.qualityTitle")');
+    expect(appSource).toContain('makeAppTranslator("productStatus")');
+    expect(appSource).toContain('tProductLibrary("importPreview.missingFields")');
+    expect(appSource).toContain('tProductLibrary("importPreview.forbiddenClaims")');
     expect(appSource).toContain("quality");
-    expect(appSource).toContain("可以继续手动编辑，保存时会使用修改后的内容。");
+    expect(appSource).toContain('tProductLibrary("importPreview.subtitle")');
     expect(appSource).not.toContain("检查结果没问题后保存到商品库。");
     ["商品资料草稿", "资料完整度", "拦截宣称", "禁用/未确认宣称", "手动微调", "禁止/未确认宣称", "生成资料草稿"].forEach((label) => {
       expect(appSource).not.toContain(label);
     });
-    expect(appSource).toContain("粘贴商品信息");
-    expect(appSource).toContain("AI 整理并保存");
+    expect(appSource).toContain('tProductLibrary("dialog.pasteLabel")');
+    expect(appSource).toContain('tProductLibrary("dialog.aiSave")');
     expect(appSource).toContain("ensureTextModelConfigured");
     expect(appSource).toContain("ensureImageModelConfigured");
     expect(appSource).toContain("ensureVideoModelConfigured");
@@ -731,20 +742,20 @@ describe("console API", () => {
     expect(appSource).toContain("setConsoleToast(undefined)");
     expect(appSource).toContain("window.setTimeout(onClose, 3000)");
     expect(appSource).toContain("window.clearTimeout(timeout)");
-    expect(appSource).toContain("操作提示");
+    expect(appSource).toContain('tApp("shell.toastTitle")');
     expect(appSource).toContain("readableVideoJobError");
     const providerErrorSource = await readFile(join(import.meta.dirname, "../../src/core/videoProviderErrors.ts"), "utf8");
     const creativeVersionsSource = await readFile(join(import.meta.dirname, "../../src/client/videoCreativeVersions.ts"), "utf8");
     const videoDisplayViewModelSource = await readFile(join(import.meta.dirname, "../../src/client/videoDisplayViewModel.ts"), "utf8");
     expect(creativeVersionsSource).toContain("errorDetails?: VideoJobErrorDetails");
-    expect(appSource).toContain("readableVideoJobError(job.error, job.errorDetails)");
-    expect(videoDisplayViewModelSource).toContain("readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails)");
+    expect(appSource).toContain("readableVideoJobError(job.error, job.errorDetails, appLocale)");
+    expect(videoDisplayViewModelSource).toContain("readableVideoJobError(job.videoJob?.error, job.videoJob?.errorDetails, locale)");
     expect(videoDisplayViewModelSource).toContain("rawMessage: details.message");
     expect(providerErrorSource).toContain("参考图太多：Seedance 最多支持");
     expect(providerErrorSource).toContain("参考图里可能包含真人、人脸或隐私信息");
-    expect(appSource).toContain("请先配置文本模型，再使用 AI 整理或生成分镜。");
-    expect(appSource).toContain("请先配置图片模型，再生成参考图。");
-    expect(appSource).toContain("请先配置视频模型，再生成视频。");
+    expect(appSource).toContain('tApp("status.textModelRequired")');
+    expect(appSource).toContain('tApp("status.imageModelRequired")');
+    expect(appSource).toContain('tApp("status.videoModelRequired")');
     expect(appSource).not.toContain("openApiManagementWithMessage");
     expect(appSource).not.toContain("ModelConfigNotice");
     expect(appSource).not.toContain("ConsoleStatusNotice");
@@ -758,9 +769,9 @@ describe("console API", () => {
     expect(appSource).toContain("/api/products/import-batch");
     expect(appSource).toContain("importProductAndSave");
     expect(appSource).toContain("/api/products/import-ai-preview");
-    expect(appSource).toContain("手动填写");
+    expect(appSource).toContain('tProductLibrary("dialog.manualBadge")');
     expect(appSource).toContain("importNotes");
-    expect(appSource).toContain("整理提示");
+    expect(appSource).toContain('tProductLibrary("importPreview.notes")');
     expect(appSource).toContain("/api/products/import-preview");
     expect(appSource).toContain("ProductDraftForm");
     expect(appSource).toContain("loadProductIntoDraft");
@@ -787,21 +798,24 @@ describe("console API", () => {
     expect(appSource).toContain("product-library-shell");
     expect(appSource).toContain("product-library-list");
     expect(appSource).toContain("ProductLibraryDialog");
-    expect(appSource).toContain("商品库");
-    expect(appSource).toContain("添加商品");
-    expect(appSource).toContain("创作视频");
+    expect(appSource).toContain('tProductLibrary("title")');
+    expect(appSource).toContain('tProductLibrary("addProduct")');
+    expect(appSource).toContain('tProductLibrary("actions.createVideo")');
     expect(appSource).not.toContain('case "products"');
     expect(appSource).not.toContain('aria-label="商品管理"');
     const productLibraryHome = appSource.slice(appSource.indexOf("function ProductLibraryHome"), appSource.indexOf("function ProductLibraryDialog"));
     expect(productLibraryHome).toContain("product-library-toolbar");
-    expect(productLibraryHome).toContain("商品资料");
-    expect(productLibraryHome).toContain("productLibraryStatus(product)");
+    expect(productLibraryHome).toContain('tProductLibrary("columns.facts")');
+    expect(productLibraryHome).toContain('const tProductStatus = makeAppTranslator("productStatus")');
+    expect(productLibraryHome).toContain("productLibraryStatus(product, tProductStatus)");
     expect(productLibraryHome).not.toContain("可创作");
     expect(productLibraryHome).not.toContain("待补图");
     expect(productLibraryHome).not.toContain("资料完整");
     expect(productLibraryHome).not.toContain("参考图 {referenceImageCount} 张");
     const productLibraryStatusSource = appSource.slice(appSource.indexOf("function productLibraryStatus"), appSource.indexOf("function videoAssetKindTone"));
-    expect(productLibraryStatusSource).toContain("可生成视频");
+    expect(productLibraryStatusSource).toContain('makeAppTranslator("productStatus")');
+    expect(productLibraryStatusSource).toContain('tProductStatus("readyStatus")');
+    expect(productLibraryStatusSource).toContain('tProductStatus("referenceImages"');
     expect(productLibraryStatusSource).not.toContain("需补参考图");
     expect(productLibraryStatusSource).not.toContain("资料待补");
     expect(productLibraryStatusSource).not.toContain("还差");
@@ -818,9 +832,9 @@ describe("console API", () => {
     expect(productLibraryHome).toContain("onEdit(product.sku)");
     expect(productLibraryHome).toContain("onDeleteProduct(product.sku)");
     expect(productLibraryHome).not.toContain("{product.sku}</div>");
-    expect(productLibraryHome).toContain("创作视频");
-    expect(productLibraryHome).toContain("编辑");
-    expect(productLibraryHome).toContain("删除");
+    expect(productLibraryHome).toContain('tProductLibrary("actions.createVideo")');
+    expect(productLibraryHome).toContain('tProductLibrary("actions.edit")');
+    expect(productLibraryHome).toContain('tProductLibrary("actions.delete")');
     expect(productLibraryHome).not.toContain('role="button"');
     expect(productLibraryHome).not.toContain("tabIndex={0}");
     expect(productLibraryHome).not.toContain("event.key === \"Enter\"");
@@ -831,7 +845,7 @@ describe("console API", () => {
     expect(productLibraryHome).not.toContain("cursor-pointer");
     expect(productLibraryHome).toContain("hover:bg-[var(--card)]");
     expect(productLibraryHome).not.toContain("onView(product.sku)");
-    expect(productLibraryHome).toContain("添加商品");
+    expect(productLibraryHome).toContain('tProductLibrary("addProduct")');
     expect(productLibraryHome).toContain("openProductDialog");
     expect(productLibraryHome).toContain('setDialogMode("import")');
     expect(productLibraryHome).not.toContain("导入商品");
@@ -840,19 +854,19 @@ describe("console API", () => {
     expect(productLibraryHome).not.toContain("openManualDialog");
     expect(productLibraryHome).not.toContain('setDialogMode("manual")');
     const productLibraryDialog = appSource.slice(appSource.indexOf("function ProductLibraryDialog"), appSource.indexOf("function ProductImportResultPreview"));
-    expect(productLibraryDialog).toContain("AI 整理并保存");
+    expect(productLibraryDialog).toContain('tProductLibrary("dialog.aiSave")');
     expect(appSource).toContain('type ProductLibraryDialogMode = ProductEditorMode | "edit" | undefined;');
     expect(appSource).toContain('setProductLibraryDialogMode("edit")');
     expect(productLibraryDialog).toContain('const isEditMode = mode === "edit";');
-    expect(productLibraryDialog).toContain('{isEditMode ? "编辑当前商品" : "添加商品"}');
+    expect(productLibraryDialog).toContain('isEditMode ? tProductLibrary("dialog.editTitle") : tProductLibrary("dialog.addTitle")');
     expect(productLibraryDialog).toContain('!isEditMode ? (');
     expect(productLibraryDialog).toContain('{!isEditMode && activeMode === "import" ? (');
-    expect(productLibraryDialog).toContain('submitLabel={isEditMode ? "保存修改" : "保存商品"}');
+    expect(productLibraryDialog).toContain('submitLabel={isEditMode ? tProductLibrary("dialog.saveChanges") : tProductLibrary("dialog.saveProduct")}');
     expect(productLibraryDialog).not.toContain("预览整理结果");
     expect(productLibraryDialog).not.toContain("批量保存");
-    expect(productLibraryDialog.split("AI 整理并保存")).toHaveLength(2);
+    expect(productLibraryDialog.split('tProductLibrary("dialog.aiSave")')).toHaveLength(2);
     const productImportResultPreview = appSource.slice(appSource.indexOf("function ProductImportResultPreview"), appSource.indexOf("function ProductImportQualityPanel"));
-    expect(productImportResultPreview).toContain("可以继续手动编辑，保存时会使用修改后的内容。");
+    expect(productImportResultPreview).toContain('tProductLibrary("importPreview.subtitle")');
     expect(productImportResultPreview).not.toContain("检查结果没问题后保存到商品库。");
     expect(productImportResultPreview).not.toContain("确认后可直接保存");
     expect(productImportResultPreview).not.toContain('label="SKU"');
@@ -862,9 +876,9 @@ describe("console API", () => {
     expect(productDraftFormSource).toContain("ProductDraftSection");
     expect(productDraftFormSource).toContain("ProductDraftTextareaGroup");
     expect(productDraftFormSource).toContain("ProductDraftReferencePaths");
-    expect(productDraftFormSource).toContain("基础信息");
-    expect(productDraftFormSource).toContain("创作事实");
-    expect(productDraftFormSource).toContain("参考图路径");
+    expect(productDraftFormSource).toContain('tProductLibrary("draft.basicTitle")');
+    expect(productDraftFormSource).toContain('tProductLibrary("draft.factsTitle")');
+    expect(productDraftFormSource).toContain('tProductLibrary("draft.referenceTitle")');
     expect(productDraftFormSource).toContain('<form className="grid gap-5"');
     expect(productDraftFormSource).not.toContain('<form className="grid gap-3"');
     const productDraftFactsSource = await readFile(join(import.meta.dirname, "../../src/client/productDraftFacts.ts"), "utf8");
@@ -882,9 +896,9 @@ describe("console API", () => {
     expect(appSource).not.toContain("useProductForVideo");
     expect(appSource).not.toContain("onUseForVideo");
     expect(appSource).not.toContain("用此商品做视频");
-    expect(appSource).toContain("视频创作");
+    expect(appSource).toContain('labelKey: "video"');
     expect(appSource).not.toContain('aria-label="商品管理"');
-    expect(appSource).toContain("历史记录");
+    expect(appSource).toContain('tVideo("history.title")');
     expect(appSource).not.toContain("高级新建任务");
     const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
     expect(videoCase).toContain("<ProductCreationWorkspace");
@@ -966,8 +980,8 @@ describe("console API", () => {
     expect(appSource).toContain('setStoryboardDraftSource("manual")');
     expect(storyboardDraftsSource).toContain("export function defaultStoryboardDraftForTemplate");
     expect(appSource).not.toContain("function defaultStoryboardDraftForTemplate");
-    expect(appSource).toContain("defaultStoryboardDraft(template, duration)");
-    expect(appSource).toContain("用户已手动编辑分镜时不覆盖");
+    expect(appSource).toContain("localizedDefaultStoryboardDraft(template, duration, appLocale)");
+    expect(appSource).toContain("Preserve the storyboard once the user edits it manually.");
     expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
     expect(creationComposerSource).toContain("video-workspace-shell");
     expect(creationComposerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
@@ -997,8 +1011,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("cursor-pointer");
     expect(creationComposerSource).toContain("opacity-0");
     expect(creationComposerSource).toContain("group-hover:opacity-100");
-    expect(creationComposerSource).toContain('aria-label={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
-    expect(creationComposerSource).toContain('title={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(creationComposerSource).toContain('aria-label={productLibraryCollapsed ? tVideo("productLibrary.expand") : tVideo("productLibrary.collapse")}');
+    expect(creationComposerSource).toContain('title={productLibraryCollapsed ? tVideo("productLibrary.expand") : tVideo("productLibrary.collapse")}');
     expect(creationComposerSource).toContain("onClick={() => setProductLibraryCollapsed((collapsed) => !collapsed)}");
     expect(creationComposerSource).not.toContain("拖动调整商品库宽度");
     expect(creationComposerSource).toContain("ProductCreationProductLibrary");
@@ -1013,21 +1027,25 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("grid min-h-full content-start gap-3");
     expect(creationComposerSource).toContain("video-generation-controls compact-generation-controls");
     expect(creationComposerSource).toContain("px-3 py-2");
-    expect(creationComposerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(98px,.72fr))]");
+    expect(creationComposerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))]");
     expect(creationComposerSource).toContain("model-scheme-control");
     expect(creationComposerSource).toContain("model-scheme-chip-row");
-    expect(creationComposerSource).toContain("min-[1180px]:col-span-6");
+    expect(creationComposerSource).toContain("min-[1180px]:col-span-7");
     expect(creationComposerSource).toContain("overflow-visible");
     expect(creationComposerSource).toContain("ModelSchemeChip");
     expect(creationComposerSource).toContain("{schemeSummary}");
     expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 truncate");
-    expect(creationComposerSource).toContain('label="视频分辨率"');
+    expect(creationComposerSource).toContain('label={tVideo("controls.resolution")}');
     expect(creationComposerSource).toContain("videoResolutionOptions");
     expect(creationComposerSource).toContain("selectedVideoResolution");
     expect(creationComposerSource).toContain("resolution: selectedVideoResolution");
+    expect(creationComposerSource).toContain('label={tVideo("controls.aspectRatio")}');
+    expect(creationComposerSource).toContain("videoAspectRatioOptions");
+    expect(creationComposerSource).toContain("selectedVideoAspectRatio");
+    expect(creationComposerSource).toContain("aspectRatio: selectedVideoAspectRatio");
     expect(creationComposerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
-    expect(appSource).toContain('if (value === "en") return "英语";');
+    expect(appSource).toContain('if (value === "en") return t("languages.en");');
     expect(queueProductVideoJobsSource).toContain("resolution: videoGenerationOptions.resolution ?? selectedVideoResolution");
     expect(creationComposerSource).toContain('density="compact"');
     expect(creationComposerSource).toContain("video-generate-summary");
@@ -1051,7 +1069,8 @@ describe("console API", () => {
     expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
     expect(productLibraryColumnSource).toContain("collapsed");
     expect(productLibraryColumnSource).toContain("onExpand");
-    expect(productLibraryColumnSource).toContain("productLibraryStatus(product)");
+    expect(productLibraryColumnSource).toContain('const tProductStatus = makeAppTranslator("productStatus")');
+    expect(productLibraryColumnSource).toContain("productLibraryStatus(product, tProductStatus)");
     expect(productLibraryColumnSource).toContain("onDeleteProduct(product.sku)");
     expect(productLibraryColumnSource).toContain("onSelectProduct(product)");
     expect(productWorkflowSource).toContain("export function productGenerationReadiness");
@@ -1060,7 +1079,7 @@ describe("console API", () => {
     expect(appSource).not.toContain("function productGenerationReadiness");
     expect(appSource).not.toContain("function productFactsStatusLabel");
     expect(appSource).not.toContain("function storyboardStatusLabel");
-    expect(creationComposerSource).toContain("const generationReadiness = productGenerationReadiness({");
+    expect(creationComposerSource).toContain("const generationReadiness = localizedProductGenerationReadiness({");
     expect(creationComposerSource).toContain("const generateVideoDisabled = packingDisabled || !generationReadiness.ready");
     expect(creationComposerSource).toContain("const storyboardProductReady = Boolean(selectedProduct || importText.trim())");
     expect(creationComposerSource).toContain("async function handleGenerateStoryboardDraft()");
@@ -1088,31 +1107,31 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("text-[var(--danger)]");
     expect(creationComposerSource).toContain('generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"');
     expect(creationComposerSource).toContain("{generationReadiness.label}");
-    expect(creationComposerSource).toContain("productFactsStatusLabel({");
-    expect(creationComposerSource).toContain("storyboardStatusLabel(storyboardDraftSource)");
-    expect(productWorkflowSource).toContain('return "原始资料"');
-    expect(productWorkflowSource).toContain('return "已整理资料包"');
+    expect(creationComposerSource).toContain("localizedProductFactsStatusLabel({");
+    expect(creationComposerSource).toContain("localizedStoryboardStatusLabel(storyboardDraftSource, tVideo)");
+    expect(productWorkflowSource).toContain('return appText("videoStudio.facts.raw", locale)');
+    expect(productWorkflowSource).toContain('return appText("videoStudio.facts.savedPackage", locale)');
     expect(productWorkflowSource).not.toContain('return "资料待补"');
-    expect(productWorkflowSource).toContain('return "默认分镜"');
-    expect(productWorkflowSource).toContain('return "AI 生成分镜"');
-    expect(productWorkflowSource).toContain('return "手动分镜"');
-    expect(productWorkflowSource).toContain('return { ready: true, label: "资料已保存，可生成视频。" };');
-    expect(productWorkflowSource).toContain('return { ready: true, label: "将先整理资料包，再生成视频。" };');
+    expect(productWorkflowSource).toContain('return appText("videoStudio.storyboard.default", locale)');
+    expect(productWorkflowSource).toContain('return appText("videoStudio.storyboard.ai", locale)');
+    expect(productWorkflowSource).toContain('return appText("videoStudio.storyboard.manual", locale)');
+    expect(productWorkflowSource).toContain('return { ready: true, label: appText("videoStudio.readiness.saved", locale) };');
+    expect(productWorkflowSource).toContain('return { ready: true, label: appText("videoStudio.readiness.willOrganize", locale) };');
     expect(creationComposerSource).toContain("generateVideoButtonLabel");
-    expect(creationComposerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(creationComposerSource).toContain('versionCount > 1 ? tVideo("generate.buttonWithCount", { count: versionCount }) : tVideo("generate.button")');
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
     expect(appSource).not.toContain("const videoModelConfigs");
     expect(appSource).not.toContain("defaultVideoModelChoice");
     expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
     expect(creationComposerSource).toContain("videoModelOptions");
     expect(creationComposerSource).toContain("imageModelOptions");
-    expect(creationComposerSource).toContain("modelSchemeSummary");
+    expect(creationComposerSource).toContain("localizedModelSchemeSummary");
     expect(creationComposerSource).toContain("schemeSummary");
     expect(creationComposerSource).toContain("activeModelSchemeId");
-    expect(creationComposerSource).toContain("modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)");
+    expect(creationComposerSource).toContain("localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)");
     expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
     expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
-    expect(creationComposerSource).toContain('label="模型方案"');
+    expect(creationComposerSource).toContain('label={tVideo("controls.modelScheme")}');
     expect(creationComposerSource).not.toContain('label="文本模型"');
     expect(creationComposerSource).not.toContain('label="图片模型"');
     expect(creationComposerSource).not.toContain('label="视频模型"');
@@ -1135,27 +1154,26 @@ describe("console API", () => {
     expect(appSource).not.toContain("window.prompt");
     expect(appSource).toContain("function ConfirmActionDialog");
     expect(appSource).toContain("<ConfirmActionDialog");
-    expect(appSource).toContain("删除这个商品资料？");
-    expect(appSource).toContain("重试这个付费生成任务？");
-    expect(appSource).toContain("删除这个本地视频文件？");
+    expect(appSource).toContain('tApp("status.deleteProductTitle")');
+    expect(appSource).toContain('tApp("status.retryTitle")');
+    expect(appSource).toContain('tApp("status.deleteAssetTitle")');
     expect(creationComposerSource).toContain("product-reference-inline");
     expect(appSource).toContain("ProductFileImportDialog");
     expect(appSource).toContain("/api/products/import-file-preview");
     expect(appSource).toContain("/api/products/import-file-commit");
-    expect(productLibraryColumnSource).toContain("导入 CSV/Excel");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.importFile")');
     expect(creationComposerSource).not.toContain("导入文件");
-    expect(appSource).toContain("默认选择 1 个，单选会填入当前商品资料，勾选多个会保存到商品列表。");
+    expect(appSource).toContain('tFileImport("summaryWithProducts"');
     expect(appSource).toContain("const nextText = row.sourceText.trim() || productDraftToComposerText(nextDraft);");
-    expect(appSource).toContain("导入选中 ${batchIds.length} 个商品");
-    expect(appSource).toContain("填入当前商品");
-    expect(appSource).toContain("默认选 1 个");
+    expect(appSource).toContain('tFileImport("importSelected"');
+    expect(appSource).toContain('tFileImport("fillCurrent")');
+    expect(appSource).toContain('tFileImport("defaultOne")');
     expect(appSource).not.toContain("ProductFileImportMode");
-    expect(productWorkflowSource).toContain('ready: "未导入"');
-    expect(productWorkflowSource).toContain('duplicate: "已导入"');
-    expect(productWorkflowSource).toContain('failed: "不可导入"');
-    expect(appSource).toContain("fileImportRowLabel(row.status)");
+    expect(productWorkflowSource).toContain('return appText(`fileImport.rowStatus.${status}`, locale)');
+    expect(appSource).toContain("fileImportRowLabel(row.status, locale)");
+    expect(appSource).toContain("fileImportSourceRowsLabel(row, locale)");
     expect(appSource).toContain("fileImportCanSelect(row)");
-    expect(appSource).toContain("全选可导入商品");
+    expect(appSource).toContain('tFileImport("selectAll")');
     expect(appSource).toContain("whitespace-nowrap");
     expect(creationComposerSource).toContain("acceptReferenceFiles");
     expect(creationComposerSource).toContain("isReferenceImageFile");
@@ -1166,16 +1184,16 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("clipboardData.files");
     expect(creationComposerSource).toContain("event.dataTransfer.files");
     expect(creationComposerSource).toContain("dragOver");
-    expect(creationComposerSource).toContain("拖拽或粘贴图片");
+    expect(creationComposerSource).toContain('tVideo("reference.addHint")');
     expect(creationComposerSource).toContain("pendingReferenceImageStatuses");
     expect(creationComposerSource).toContain("URL.createObjectURL");
     expect(creationComposerSource).toContain("URL.revokeObjectURL");
     expect(creationComposerSource).toContain('alt={`${fileName} preview`}');
-    expect(creationComposerSource).toContain("待上传");
+    expect(creationComposerSource).toContain('tVideo("reference.pending"');
     expect(creationComposerSource).toContain("previewableReferenceImages");
     expect(creationComposerSource).toContain("onPendingPreview");
     expect(creationComposerSource).toContain("onPendingPreview(index)");
-    expect(creationComposerSource).toContain('title="查看待上传图片"');
+    expect(creationComposerSource).toContain('title={tVideo("reference.previewPending")}');
     expect(creationComposerSource).toContain("clipboardReferenceFiles");
     expect(creationComposerSource).toContain("handleProductFactsPaste");
     expect(creationComposerSource).toContain("event.stopPropagation()");
@@ -1208,12 +1226,12 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("{submitHint ? (");
     expect(creationComposerSource).not.toContain("{submitHint}");
     expect(creationComposerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
-    expect(creationComposerSource).toContain('onToast("资料包已整理。", "ok")');
-    expect(creationComposerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
+    expect(creationComposerSource).toContain('onToast(tVideo("generate.packageReadyToast"), "ok")');
+    expect(creationComposerSource).toContain('onToast(tVideo("generate.queuedToast"), "ok")');
     expect(creationComposerSource).toContain("disabled:opacity-100");
     expect(creationComposerSource).not.toContain("productPackageButtonLabel");
     expect(creationComposerSource).not.toContain('"保存资料包"');
-    expect(creationComposerSource).toContain('"AI 整理资料包"');
+    expect(creationComposerSource).toContain('tVideo("facts.organize")');
     expect(creationComposerSource).not.toContain("创建生成任务中");
     expect(creationComposerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(creationComposerSource).not.toContain("max-h-[312px]");
@@ -1231,19 +1249,19 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("商品资料完整，可进入视频预检");
     expect(creationComposerSource).not.toContain("referenceReadiness(actionProduct)");
     expect(creationComposerSource).not.toContain("参考图 5 张 · 可生成视频");
-    expect(creationComposerSource).toContain("商品资料");
-    expect(creationComposerSource).toContain("添加图片");
+    expect(creationComposerSource).toContain('tVideo("facts.title")');
+    expect(creationComposerSource).toContain('tVideo("reference.add")');
     expect(creationComposerSource).toContain("onPreviewReferenceImage");
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("onReorderReferenceImage");
     expect(appSource).toContain("/reference-images/order");
     expect(creationComposerSource).toContain("aria-disabled={!product}");
-    expect(creationComposerSource).toContain("请先整理资料包，再生成参考图。");
-    expect(creationComposerSource).toContain("AI 整理资料包");
+    expect(creationComposerSource).toContain('tVideo("reference.generateDisabledToast")');
+    expect(creationComposerSource).toContain('tVideo("facts.organize")');
     expect(creationComposerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
-    expect(creationComposerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(creationComposerSource).toContain('{isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}');
     expect(creationComposerSource).toContain("productAutoSaveStatus");
-    expect(creationComposerSource).toContain("productAutoSaveStatusLabel(productAutoSaveStatus)");
+    expect(creationComposerSource).toContain("localizedProductAutoSaveStatusLabel(productAutoSaveStatus, tVideo)");
     expect(productWorkflowSource).toContain('export type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";');
     expect(appSource).toContain("const productAutoSaveTimerRef = useRef<number | undefined>(undefined);");
     expect(appSource).toContain("async function autoSaveProductFacts");
@@ -1254,13 +1272,13 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onFlushProductFactsAutoSave");
     expect(creationComposerSource).toContain("await onFlushProductFactsAutoSave()");
     expect(storyboardPanelSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
-    expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
+    expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
     expect(creationComposerSource).toContain("placeholder=\"\"");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
-    expect(creationComposerSource).toContain("视频风格");
-    expect(creationComposerSource).toContain("视频时长");
-    expect(creationComposerSource).toContain("成片语言");
-    expect(creationComposerSource).toContain("模型方案");
+    expect(creationComposerSource).toContain('label={tVideo("controls.template")}');
+    expect(creationComposerSource).toContain('label={tVideo("controls.duration")}');
+    expect(creationComposerSource).toContain('label={tVideo("controls.finalLanguage")}');
+    expect(creationComposerSource).toContain('label={tVideo("controls.modelScheme")}');
     expect(creationComposerSource).not.toContain('label="生成模型"');
     expect(creationComposerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain('from "./productComposerText.js"');
@@ -1282,7 +1300,7 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("lg:grid-cols-[minmax(220px,.34fr)_minmax(0,1fr)]");
     expect(creationComposerSource).not.toContain("上一步");
     expect(creationComposerSource).not.toContain("下一步");
-    expect(productLibraryColumnSource).toContain("商品库");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.title")');
     expect(productLibraryColumnSource).toContain("video-product-library-column");
     expect(productLibraryColumnSource).toContain("min-h-[68px]");
     expect(productLibraryColumnSource).not.toContain("已保存商品");
@@ -1290,27 +1308,27 @@ describe("console API", () => {
     expect(productLibraryColumnSource).not.toContain('aria-haspopup="listbox"');
     expect(productLibraryColumnSource).not.toContain('role="listbox"');
     expect(productLibraryColumnSource).not.toContain("handleProductPickerSelect");
-    expect(productLibraryColumnSource).toContain("新商品");
+    expect(productLibraryColumnSource).toContain('tVideo("newProduct.title")');
     expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
     expect(productLibraryColumnSource).toContain("draftTitle");
     expect(productLibraryColumnSource).toContain('const draftProductTitle = draftTitle?.trim() ?? "";');
     expect(productLibraryColumnSource).toContain("productLibrarySearchQuery");
     expect(productLibraryColumnSource).toContain("filterProductLibraryProducts(productOptions, productLibrarySearchQuery");
     expect(productLibraryColumnSource).toContain("product-library-search");
-    expect(productLibraryColumnSource).toContain('aria-label="搜索商品"');
-    expect(productLibraryColumnSource).toContain('placeholder="搜索商品"');
+    expect(productLibraryColumnSource).toContain('aria-label={tVideo("productLibrary.search")}');
+    expect(productLibraryColumnSource).toContain('placeholder={tVideo("productLibrary.search")}');
     expect(productLibraryColumnSource).not.toContain("搜索商品 / SKU");
     expect(productLibraryColumnSource).toContain("product-library-scroll min-h-0 overflow-y-auto");
     expect(productLibraryColumnSource).toContain("filteredProductOptions.map");
-    expect(productLibraryColumnSource).toContain("没有匹配的商品");
-    expect(productLibraryColumnSource).toContain("清空搜索");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.noMatches")');
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.clearSearch")');
     expect(productLibraryColumnSource).not.toContain("手动填写或粘贴商品资料");
     expect(productLibraryColumnSource).not.toContain("+ 新建商品");
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
     expect(referenceFigureSource).toContain("reference-image-actions");
     expect(referenceFigureSource).toContain("draggable");
-    expect(referenceFigureSource).toContain("拖动参考图");
+    expect(referenceFigureSource).toContain('tVideo("reference.reorderTitle")');
     expect(referenceFigureSource).toContain("onReorder");
     expect(referenceFigureSource).toContain("group-hover:opacity-100");
     expect(referenceFigureSource).toContain("relative grid grid-cols-[72px_minmax(0,1fr)]");
@@ -1318,7 +1336,7 @@ describe("console API", () => {
     expect(referenceFigureSource).toContain("absolute right-2 top-1/2");
     expect(referenceFigureSource).toContain("pointer-events-none");
     expect(referenceFigureSource).toContain("group-hover:pointer-events-auto");
-    expect(referenceFigureSource).toContain('title="删除参考图"');
+    expect(referenceFigureSource).toContain('title={tVideo("reference.delete")}');
     expect(referenceFigureSource).not.toContain("canDelete");
     expect(appSource).not.toContain("canDelete={images.length > 0}");
     expect(referencePreviewSource).toContain("onPrevious");
@@ -1326,7 +1344,7 @@ describe("console API", () => {
     expect(referencePreviewSource).toContain("touchStartXRef");
     expect(referencePreviewSource).toContain("ArrowLeft");
     expect(referencePreviewSource).toContain("ArrowRight");
-    expect(storyboardPanelSource).toContain("脚本分镜");
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain('className="min-h-0"');
@@ -1334,13 +1352,13 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("className=\"grid gap-2\"");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
-    expect(storyboardPanelSource).toContain("AI 生成分镜");
-    expect(storyboardPanelSource).toContain("分镜历史记录");
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.generate")');
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.history")');
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown");
     expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory");
     expect(storyboardPanelSource).toContain("onApplyStoryboardHistory(record)");
     expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory(record.id)");
-    expect(storyboardPanelSource).toContain("删除分镜记录");
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.deleteRecord")');
     expect(storyboardPanelSource).toContain("event.stopPropagation()");
     expect(storyboardPanelSource).not.toContain("回填");
     expect(storyboardPanelSource).not.toContain("补充要点");
@@ -1354,23 +1372,23 @@ describe("console API", () => {
     expect(storyboardPanelSource).not.toContain("时间线");
     expect(storyboardPanelSource).not.toContain("镜头脚本");
     expect(storyboardPanelSource).not.toContain("画面/旁白要点");
-    expect(videoHistorySource).toContain("历史记录");
-    expect(videoHistorySource).toContain("当前商品生成过的视频都会显示在这里。");
+    expect(videoHistorySource).toContain('tVideo("history.title")');
+    expect(videoHistorySource).toContain('tVideo("history.subtitle")');
     expect(videoHistorySource).toContain("generation-history-scroll");
     expect(videoHistorySource).toContain("max-h-[360px]");
     expect(videoHistorySource).toContain("overflow-y-auto");
-    expect(videoHistorySource).toContain("videoLabel(index)");
+    expect(videoHistorySource).toContain("localizedVideoLabel(index, tVideo)");
     expect(videoHistorySource).toContain("hasPlayableVideo(job)");
-    expect(videoHistorySource).toContain("creativeVersionLifecycleHint(job)");
+    expect(videoHistorySource).toContain("localizedCreativeVersionLifecycleHint(job, tVideo, appLocale)");
     expect(videoDisplayViewModelSource).toContain("export function creativeVersionLifecycleHint");
     expect(appSource).not.toContain("function creativeVersionLifecycleHint");
     expect(videoHistorySource).not.toContain("playableVideo ? videoExpiryLabel(job) : creativeVersionDisplayStatus(job)");
-    expect(videoDisplayViewModelSource).toContain('if (value === "failed") return "生成失败";');
+    expect(videoDisplayViewModelSource).toContain('appText("videoStudio.videoStatus.failed", locale)');
     expect(videoDisplayViewModelSource).toContain("formatDeletionTime");
-    expect(videoDisplayViewModelSource).toContain("将于");
+    expect(videoDisplayViewModelSource).toContain('appText("videoStudio.history.deleteAt"');
     expect(videoDisplayViewModelSource).toContain("export function formatAbsoluteMinuteTime");
     expect(appSource).not.toContain('return "刚刚"');
-    expect(videoHistorySource).toContain("const failureReason = creativeVersionFailureReason(job);");
+    expect(videoHistorySource).toContain("const failureReason = creativeVersionFailureReason(job, appLocale);");
     expect(videoHistorySource).toContain("{[...metaParts, failureReason ? \"\" : lifecycleLabel].filter(Boolean).join(\" · \")}");
     expect(videoHistorySource).toContain("<AlertTriangle");
     expect(videoHistorySource).toContain("<span>{failureReason}</span>");
@@ -1382,19 +1400,19 @@ describe("console API", () => {
     expect(formatDeletionTimeSource).not.toContain("今天");
     expect(formatDeletionTimeSource).not.toContain("明天");
     expect(appSource).not.toContain("剩余 ${remainingHours} 小时");
-    expect(videoHistorySource).toContain("预览视频");
-    expect(videoHistorySource).toContain("下载视频");
+    expect(videoHistorySource).toContain('tVideo("history.preview")');
+    expect(videoHistorySource).toContain('tVideo("history.download")');
     expect(videoHistorySource).toContain("download={videoDownloadFileName(job, productDownloadContext)}");
     expect(videoHistorySource).not.toContain("设为最终");
     expect(videoHistorySource).not.toContain("已设最终");
     expect(appSource).not.toContain("selectFinalVersion");
     expect(appSource).not.toContain("已选择最终版本");
-    expect(videoHistorySource).toContain("删除");
+    expect(videoHistorySource).toContain('tVideo("history.delete")');
     expect(videoHistorySource).toContain("onDelete(job)");
     expect(buildLatestCreativeJobsSource).toContain("new Set(productVideoJobs.map((job) => job.id))");
     expect(buildLatestCreativeJobsSource).not.toContain("new Set(matchingVideoJobs.map((job) => job.id))");
-    expect(appSource).toContain("确认删除");
-    expect(appSource).toContain("本地输出目录也会一起删除");
+    expect(appSource).toContain('tApp("commonActions.confirmDelete")');
+    expect(appSource).toContain('tVideo("deleteDialog.ledgerDescription")');
     expect(appSource).toContain("async function organizeProductPackage");
     expect(appSource).toContain("function startNewVideoProduct");
     expect(appSource).toContain("productImportText.trim()");
@@ -1411,7 +1429,7 @@ describe("console API", () => {
     expect(appSource).toContain("detectCompletedVideoJobTransitions");
     expect(appSource).toContain("refreshSelectedProductForStudio");
     expect(appSource).toContain("restoreProductStudioSku(productsResponse.products, currentStudioSku)");
-    expect(appSource).toContain("当前商品创作已刷新");
+    expect(appSource).toContain('tAppGlobal("status.studioAutoRefreshTitle")');
     expect(appSource).toContain("selectedProductGroup");
     expect(appSource).toContain("/video-jobs");
     expect(appSource).toContain("/storyboards");
@@ -1430,14 +1448,15 @@ describe("console API", () => {
     expect(appSource).not.toContain("haitu.storyboardHistory.v1");
     expect(appSource).not.toContain("loadStoryboardHistory");
     expect(appSource).not.toContain("saveStoryboardHistory");
-    expect(appSource).not.toContain("window.localStorage");
+    expect(appSource).toContain("clientLocaleStorageKey");
+    expect(appSource).not.toContain('window.localStorage.setItem("haitu.storyboardHistory.v1"');
     expect(appSource).not.toContain("haitu.productStudio.productSku.v1");
     expect(appSource).toContain("const selectedProductStoryboardHistory = selectedProduct");
     expect(appSource).not.toContain("record.productSku === selectedProduct.sku");
     expect(appSource).toContain("setTemplate(record.style)");
     expect(appSource).toContain("setDuration(record.duration)");
     expect(appSource).toContain('setStudioScriptDraft("");');
-    expect(appSource).toContain("setStudioStoryboardDraft(defaultStoryboardDraft(template, duration))");
+    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale))");
     expect(appSource).not.toContain("setStudioScriptDraft(defaultStudioScriptDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("setStudioStoryboardDraft(defaultStudioStoryboardDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
@@ -1468,35 +1487,35 @@ describe("console API", () => {
     expect(staticConsoleJs).not.toContain("审核发布");
     expect(staticConsoleJs).not.toContain("品牌设置");
     expect(staticConsoleJs).not.toContain("发布包");
-    expect(appSource).toContain("取消排队");
+    expect(appSource).toContain('tLedger("jobs.cancelQueued")');
     expect(appSource).toContain("/retry");
     expect(appSource).toContain("/recover-download");
-    expect(appSource).toContain("重试任务");
-    expect(appSource).toContain("重新下载成片");
+    expect(appSource).toContain('tLedger("jobs.retry")');
+    expect(appSource).toContain('tLedger("jobs.redownload")');
     expect(appSource).toContain("retryVideoJob");
     expect(appSource).toContain("recoverVideoJobDownload");
     expect(retryVideoJobSource).toContain("mergeVideoJobs([response.job], current)");
     expect(retryVideoJobSource).not.toContain("await refreshConsole()");
     expect(recoverVideoJobDownloadSource).toContain("mergeVideoJobs([response.job], current)");
     expect(recoverVideoJobDownloadSource).not.toContain("confirmPaid");
-    expect(appSource).toContain("重试会重新提交原任务，可能再次扣费。");
+    expect(appSource).toContain('tApp("status.retryDetail")');
     expect(appSource).toContain("videoDownloadFileName(job, videoJobDownloadProductContext(job, products))");
-    expect(appSource).toContain("任务结果");
-    expect(appSource).toContain("打开成片");
-    expect(appSource).toContain("下载成片");
-    expect(appSource).toContain("查看报告");
-    expect(videoDisplayViewModelSource).toContain("任务失败，可直接重试原任务");
+    expect(appSource).toContain('tLedger("jobs.result")');
+    expect(appSource).toContain('tLedger("jobs.openVideo")');
+    expect(appSource).toContain('tLedger("jobs.downloadVideo")');
+    expect(appSource).toContain('tLedger("jobs.openReport")');
+    expect(videoDisplayViewModelSource).toContain('appText("ledger.jobs.resultHints.failed", locale)');
     const videoJobsPanelSource = appSource.slice(appSource.indexOf("function VideoJobsPanel"), appSource.indexOf("function AuditLogPanel"));
     expect(videoJobsPanelSource).toContain("xl:grid-cols-[minmax(210px,1.05fr)_minmax(180px,.9fr)_minmax(240px,1.05fr)_minmax(260px,1.05fr)]");
     expect(videoJobsPanelSource).not.toContain("_auto");
     expect(appSource).toContain("estimatedCostCny");
-    expect(appSource).toContain("模型分布");
-    expect(appSource).toContain("Token / 成本趋势");
-    expect(appSource).toContain("最近使用");
+    expect(appSource).toContain('tDashboard("provider.title")');
+    expect(appSource).toContain('tDashboard("trend.title")');
+    expect(appSource).toContain('tDashboard("recent.title")');
     expect(consoleApiClientSource).toContain("/api/qc-summary");
-    expect(appSource).toContain("检查失败");
+    expect(appSource).toContain('tAppGlobal("status.qc.fail")');
     expect(appSource).toContain("qcTone");
-    expect(appSource).toContain("官方用量");
+    expect(appSource).toContain('tLedger("providerUsage.title")');
     expect(appSource).toContain("/api/provider-tasks?");
     const ledgerCase = appSource.slice(appSource.indexOf('case "ledger"'), appSource.indexOf('case "settings"'));
     expect(ledgerCase).toContain("<VideoJobsPanel");
@@ -1510,14 +1529,14 @@ describe("console API", () => {
     expect(ledgerCase).not.toContain("<ProviderTaskPanel");
     expect(ledgerCase).not.toContain("<InternalValidationPanel");
     const dashboardCase = appSource.slice(appSource.indexOf('case "dashboard"'), appSource.indexOf('case "video"'));
-    expect(dashboardCase).toContain('aria-label="仪表盘"');
-    expect(appSource).toContain('{ id: "dashboard", label: "仪表盘"');
+    expect(dashboardCase).toContain('aria-label={tApp("dashboard.ariaLabel")}');
+    expect(appSource).toContain('{ id: "dashboard", labelKey: "dashboard"');
     expect(appSource.indexOf("dashboardNavItems")).toBeLessThan(appSource.indexOf("primaryNavItems"));
     expect(appSource).not.toContain("运营概览");
     const feeSummaryPanelSource = appSource.slice(appSource.indexOf("function FeeSummaryPanel"), appSource.indexOf("function ReportsPanel"));
-    expect(feeSummaryPanelSource).toContain("费用汇总");
-    expect(feeSummaryPanelSource).toContain("按商品费用");
-    ["Raw", "Task", "manifest", "复用 raw", "取消 queued", "生成报告"].forEach((label) => {
+    expect(feeSummaryPanelSource).toContain('tLedger("fees.title")');
+    expect(feeSummaryPanelSource).toContain('tLedger("fees.byProduct")');
+    ["复用 raw", "取消 queued", "生成报告"].forEach((label) => {
       expect(feeSummaryPanelSource).not.toContain(label);
     });
     expect(videoCase).not.toContain("<ReportsPanel");
@@ -1527,21 +1546,21 @@ describe("console API", () => {
     expect(consoleApiClientSource).toContain("/api/storage-backup");
     expect(consoleApiClientSource).toContain("/api/backups");
     expect(appSource).toContain("StorageBackupPanel");
-    expect(appSource).toContain("存储与备份");
-    expect(appSource).toContain("长期保存");
-    expect(appSource).toContain("备份命令");
-    expect(appSource).toContain("生成备份包");
-    expect(appSource).toContain("下载备份");
+    expect(appSource).toContain('tLedger("storage.title")');
+    expect(appSource).toContain('tLedger("storage.longTerm")');
+    expect(appSource).toContain('tLedger("storage.backupCommand")');
+    expect(appSource).toContain('tLedger("storage.createBackup")');
+    expect(appSource).toContain('tLedger("storage.downloadBackup")');
     expect(consoleApiClientSource).toContain("/api/audit-log");
     expect(appSource).toContain("AuditLogPanel");
-    expect(appSource).toContain("操作审计");
-    expect(appSource).toContain("最近操作");
+    expect(appSource).toContain('tLedger("audit.title")');
+    expect(appSource).toContain('tLedger("audit.latestAction")');
     expect(consoleApiClientSource).toContain("/api/video-assets");
     expect(appSource).toContain("VideoAssetsPanel");
     expect(appSource).toContain("formatBytes");
-    expect(appSource).toContain("视频资产");
+    expect(appSource).toContain('tLedger("assets.title")');
     expect(appSource).toContain("deleteVideoAsset");
-    expect(appSource).toContain("删除文件");
+    expect(appSource).toContain('tLedger("assets.deleteFile")');
     expect(appSource).not.toContain("/api/reviews/rate-version");
     expect(appSource).not.toContain("ProductGroupsPanel");
     expect(appSource).not.toContain("PublishPackagesPanel");
@@ -1552,7 +1571,7 @@ describe("console API", () => {
     expect(appSource).not.toContain("导出素材表");
     expect(appSource).not.toContain("/api/publish-packages/export.csv");
     expect(appSource).not.toContain("haitu-publish-packages.csv");
-    expect(appSource).toContain("视频类型");
+    expect(appSource).toContain('tLedger("jobs.template")');
     expect(appSource).not.toContain("/api/templates");
     expect(appSource).not.toContain("TemplateManagementPanel");
     expect(appSource).not.toContain("启用风格");
@@ -1566,15 +1585,17 @@ describe("console API", () => {
     expect(walletCase).toContain("<WalletRechargePanel");
     expect(walletCase).toContain("wallet={wallet}");
     expect(walletCase).toContain("onRequestRecharge={openRechargeDialog}");
+    expect(walletCase).not.toContain("<WalletTransactionsPanel");
+    expect(walletCase).not.toContain('tApp("transactions.ariaLabel")');
     expect(walletCase).not.toContain("onTopUpWallet={topUpWallet}");
     expect(consoleApiClientSource).toContain("/api/payment-methods");
     expect(appSource).toContain("paymentMethodsResponse");
     expect(appSource).toContain("setPaymentMethods(paymentMethodsResponse.methods)");
     expect(appSource).toContain("PaymentMethodDialog");
     expect(appSource).toContain("pendingRechargeAmountCny");
-    expect(appSource).toContain("选择支付方式");
-    expect(appSource).toContain("RMB支付");
-    expect(appSource).toContain("数字货币支付");
+    expect(appSource).toContain('tPayment("title")');
+    expect(appSource).toContain('tPayment("rmb")');
+    expect(appSource).toContain('tPayment("crypto")');
     expect(appSource).toContain('if (id === "infini") return "Infini";');
     expect(appSource).toContain("selectedPaymentKind");
     expect(appSource).toContain("payment-kind-card-grid");
@@ -1582,10 +1603,11 @@ describe("console API", () => {
     expect(appSource).toContain("payment-kind-card-heading-icon");
     expect(appSource).not.toContain('className="grid grid-cols-2 rounded-[10px] border border-[var(--border)] bg-[var(--field)] p-1 text-xs font-black"');
     expect(appSource).not.toContain("继续支付");
+    expect(appSource).toContain('tPayment("pay")');
     expect(appSource).toContain("fixed right-5 top-[86px] z-[100]");
     expect(appSource).not.toContain("fixed right-5 top-[86px] z-[70]");
     expect(appSource).toContain("recharge-transaction-type-badge");
-    expect(appSource).toContain("md:grid-cols-[68px_minmax(0,1fr)_96px_150px]");
+    expect(appSource).toContain("md:grid-cols-[56px_minmax(0,1fr)_104px_128px_72px]");
     expect(appSource).not.toContain("disabled={cryptoMethods.length === 0}");
     expect(appSource).not.toContain("disabled={rmbMethods.length === 0}");
     expect(appSource).toContain("Stripe");
@@ -1600,10 +1622,10 @@ describe("console API", () => {
     expect(apiManagementSource).not.toContain("不要让普通用户在这里填写他们自己的密钥");
     expect(apiManagementSource).not.toContain("HAITU_DATA_DIR");
     expect(apiManagementSource).not.toContain("环境变量");
-    expect(appSource).toContain("已清除 API Key");
-    expect(apiManagementSource).toContain("文本模型");
-    expect(apiManagementSource).toContain("图片模型");
-    expect(apiManagementSource).toContain("视频模型");
+    expect(appSource).toContain('tApp("status.apiKeyCleared")');
+    expect(apiManagementSource).toContain('tSettings("groups.text.title")');
+    expect(apiManagementSource).toContain('tSettings("groups.image.title")');
+    expect(apiManagementSource).toContain('tSettings("groups.video.title")');
     expect(apiManagementSource).not.toContain("默认生成设置");
     expect(sharedModelConfigSource).toContain("Base URL");
     expect(sharedModelConfigSource).not.toContain("优先级");
@@ -1612,24 +1634,24 @@ describe("console API", () => {
     expect(sharedModelConfigSource).toContain('label={<ModelVersionFieldLabel testStatus={testStatus} isTesting={isTesting} />}');
     expect(sharedModelConfigSource).toContain("function ModelVersionFieldLabel");
     expect(sharedModelConfigSource).toContain('type="checkbox"');
-    expect(sharedModelConfigSource).toContain("官方模型 ID 已内置");
-    expect(appSource).toContain("请至少选择一个模型版本。");
+    expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.officialModelId")');
+    expect(appSource).toContain('tApp("status.modelVersionRequired")');
     expect(sharedModelConfigSource).toContain("models: nextModels");
     expect(appSource).not.toContain("const finalModels = nextModels.length > 0 ? nextModels");
     expect(sharedModelConfigSource).toContain("catalogEntriesForVendor(providerId, draft.vendor)");
     expect(apiManagementSource).not.toContain("模型版本（逗号或换行分隔）");
     expect(apiManagementSource).not.toContain("模型（逗号分隔）");
-    expect(sharedModelConfigSource).toContain("实际端点前缀");
-    expect(sharedModelConfigSource).toContain("测试配置");
-    expect(sharedModelConfigSource).toContain("编辑");
-    expect(sharedModelConfigSource).toContain("删除");
-    expect(apiManagementSource).toContain("条模型服务");
-    expect(sharedModelConfigSource).toContain("条可用");
-    expect(sharedModelConfigSource).toContain("默认");
+    expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.endpointPrefix")');
+    expect(sharedModelConfigSource).toContain('tSettings("actions.test")');
+    expect(sharedModelConfigSource).toContain('tSettings("actions.edit")');
+    expect(sharedModelConfigSource).toContain('tSettings("actions.delete")');
+    expect(apiManagementSource).toContain('tSettings("configuredCount"');
+    expect(sharedModelConfigSource).toContain('tSettings("available"');
+    expect(sharedModelConfigSource).toContain('tSettings("default")');
     expect(sharedModelConfigSource).toContain("const configuredModels = models.filter((model) => model.configured);");
     expect(sharedModelConfigSource).toContain("const configuredServices = groupConfiguredModelServices(providerId, configuredModels);");
     expect(sharedModelConfigSource).toContain("configuredServices.length === 0");
-    expect(sharedModelConfigSource).toContain("还没有配置可用服务");
+    expect(sharedModelConfigSource).toContain('tSettings("emptyServices")');
     expect(sharedModelConfigSource).toContain("{configuredServices.map((service, index) => (");
     expect(sharedModelConfigSource).toContain("{service.serviceLabel}");
     ["Key 来源", "Key 预览", "Token 单价", "估算秒价", "接口地址"].forEach((label) => {
@@ -1640,19 +1662,19 @@ describe("console API", () => {
     });
     expect(appSource).not.toContain('aria-label="视频风格后台"');
     expect(appSource).not.toContain("风格后台");
-    expect(appSource).toContain("参考图");
+    expect(appSource).toContain('tVideo("reference.title")');
     expect(appSource).not.toContain("/api/internal-validation/export.csv");
     expect(appSource).not.toContain("导出审核表");
     expect(appSource).toContain("finalVideoUrl");
     expect(appSource).toContain('method: "DELETE"');
     expect(appSource).toContain("maxEstimatedCostCnyPerVideo");
     expect(appSource).toContain("testCreditBalanceCny");
-    expect(appSource).toContain("本次预计");
-    expect(appSource).toContain("历史估算");
+    expect(appSource).toContain('tPreflight("currentEstimate")');
+    expect(appSource).toContain('tPreflight("historyEstimate")');
     expect(appSource).not.toContain("额度状态");
     expect(appSource).not.toContain("请先生成预检并勾选确认允许付费请求");
     expect(appSource).not.toContain("paidRunBlockedReason");
-    expect(appSource).toContain("商品资料暂不可付费生成");
+    expect(appSource).toContain('tPreflight("notReadyForPaid")');
     expect(appSource).not.toContain("剩余测试额度不足");
     expect(consoleApiClientSource).toContain("/api/provider-config");
     expect(consoleApiClientSource).toContain("/api/wallet");
@@ -1660,11 +1682,48 @@ describe("console API", () => {
     expect(consoleApiClientSource).toContain("/api/model-service-preference");
     expect(apiManagementSource).not.toContain("钱包余额");
     expect(apiManagementSource).not.toContain("充值 ¥50");
-    expect(appSource).toContain("充值中心");
+    expect(appSource).toContain('tWallet("title")');
     expect(appSource).toContain("WalletRechargePanel");
-    expect(apiManagementSource).toContain("服务模式");
-    expect(apiManagementSource).toContain("平台托管 API");
-    expect(apiManagementSource).toContain("自带 API");
+    expect(appSource).toContain('tWallet("tabs.consumption")');
+    expect(appSource).toContain("wallet-balance-hero");
+    expect(appSource).toContain("wallet-balance-actions");
+    expect(appSource).toContain("wallet-balance-summary");
+    expect(appSource).toContain("wallet-recharge-panel");
+    expect(appSource).toContain("min-[900px]:border-l");
+    expect(appSource).not.toContain('tWallet("availableBadge"');
+    expect(appSource).toContain('tWallet("quickRecharge")');
+    expect(appSource).toContain("wallet-recharge-options");
+    expect(appSource).toContain("lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(170px,1.2fr)]");
+    expect(appSource).toContain("wallet-recharge-option");
+    expect(appSource).toContain("wallet-custom-recharge-option");
+    expect(appSource).toContain("selectedRechargeAmountCny");
+    expect(appSource).toContain("setSelectedRechargeAmountCny(amount)");
+    expect(appSource).toContain("selectedRechargePaymentAmountCny");
+    expect(appSource).toContain("wallet-selected-recharge-pay");
+    expect(appSource).toContain('tWallet("pay")');
+    expect(appSource).toContain('tWallet("paySelected"');
+    expect(appSource).toContain('tWallet("customRecharge.inputAriaLabel")');
+    expect(appSource).toContain("customRechargeAmountValid");
+    expect(appSource).toContain("normalizeCustomRechargeAmountCny");
+    expect(appSource).not.toContain('tWallet("customRecharge.label")');
+    expect(appSource).not.toContain('tWallet("customRecharge.submitAriaLabel")');
+    expect(appSource).not.toContain("<ChevronRight size={15}");
+    expect(appSource).not.toContain('Field className="min-w-[150px] flex-1" label={tWallet("customRecharge.label")}');
+    expect(appSource).not.toContain('tWallet("customRecharge.pay")');
+    expect(appSource).not.toContain('tWallet("customRecharge.hint")');
+    expect(appSource).toContain("wallet-tab-strip");
+    expect(appSource).toContain("wallet-transaction-row");
+    expect(appSource).toContain("wallet-transaction-empty");
+    expect(appSource).toContain("walletRechargeTransactions");
+    expect(appSource).toContain("showTypeBadge={false}");
+    expect(appSource).toContain("walletConsumptionTransactions");
+    expect(appSource).not.toContain("min-[900px]:grid-cols-[minmax(340px,1fr)_minmax(360px,520px)]");
+    expect(appSource).not.toContain("shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent)]");
+    expect(appSource).not.toContain('className="mt-4 flex flex-wrap gap-2 rounded-lg border');
+    expect(appSource).not.toContain("WalletTransactionsPanel");
+    expect(apiManagementSource).toContain('tSettings("serviceMode.label")');
+    expect(apiManagementSource).toContain('tSettings("serviceMode.platform.title")');
+    expect(apiManagementSource).toContain('tSettings("serviceMode.byok.title")');
     expect(apiManagementSource).toContain("ModelServiceOwnerPanel");
     expect(apiManagementSource).not.toContain("PlatformModelModePanel");
     expect(apiManagementSource).not.toContain("ByokModelModePanel");
@@ -1678,7 +1737,7 @@ describe("console API", () => {
     expect(appSource).toContain("const selectedSchemeOwner = effectiveSelectedModelSchemeId ? modelSchemeOwner(effectiveSelectedModelSchemeId, modelSchemeOptions) ?? apiOwner : apiOwner");
     expect(appSource).toContain('const textModelOptions = selectedSchemeOwner === "platform" ? platformTextModelOptions : byokTextModelOptions');
     expect(appSource).toContain("const activeModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)");
-    expect(appSource).toContain("const schemeSummary = modelSchemeSummary({");
+    expect(appSource).toContain("const schemeSummary = localizedModelSchemeSummary({");
     const ownerModeSource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelServiceOwnerPanel"), apiManagementSource.indexOf("function ModelBundleSummary"));
     const bundleSummarySource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelBundleSummary"), apiManagementSource.indexOf("function ByokBundleManager"));
     expect(ownerModeSource).toContain("if (apiOwner === \"platform\")");
@@ -1697,11 +1756,11 @@ describe("console API", () => {
     expect(ownerModeSource).not.toContain("保存当前组合");
     expect(apiManagementSource).not.toContain("模型自选组合");
     expect(appSource).toContain("ApiModelConfigPanel");
-    expect(appSource).toContain("API Key");
+    expect(apiManagementSource).toContain("API Key");
     expect(sharedModelConfigSource).toContain("showApiKey");
     expect(appSource).toContain("revealModelConfigApiKey");
     expect(sharedModelConfigSource).toContain("storedApiKeyMask");
-    expect(sharedModelConfigSource).toContain("输入新 Key 可替换，留空则保留原 Key");
+    expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.apiKeyKeepPlaceholder")');
     expect(sharedModelConfigSource).toContain("const apiKeyInputPlaceholder = isEditingExisting");
     expect(sharedModelConfigSource).toContain("const isShowingStoredApiKey = hasStoredApiKey && !isEditingApiKey && !draft.apiKey;");
     expect(sharedModelConfigSource).toContain("const apiKeyFieldValue = isShowingStoredApiKey");
@@ -1717,33 +1776,33 @@ describe("console API", () => {
     expect(appSource).not.toContain("const apiKeyDisplayValue = draft.apiKey;");
     expect(appSource).not.toContain("draft.apiKey || storedApiKeyMask");
     expect(appSource).not.toContain("apiKey: response.apiKey");
-    expect(sharedModelConfigSource).toContain('aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}');
+    expect(sharedModelConfigSource).toContain('aria-label={showApiKey ? tSettings("serviceDialog.hideApiKey") : tSettings("serviceDialog.showApiKey")}');
     expect(sharedModelConfigSource).toContain('{showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}');
     expect(apiManagementSource).toContain("draftFromProviderConfig(providerId, model, models)");
     expect(sharedModelConfigSource).toContain("const relatedModels = model.credentialId");
     expect(sharedModelConfigSource).toContain("item.credentialId === model.credentialId");
-    expect(sharedModelConfigSource).toContain("配置名称");
-    expect(appSource).toContain("保存模型配置");
-    expect(appSource).toContain("清除模型配置");
+    expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.nameLabel")');
+    expect(appSource).toContain('tLedger(`audit.actions.${action}`)');
     expect(appSource).toContain('`/api/model-configs/${providerId}/test`');
     expect(appSource).toContain("testModelConfig");
-    expect(appSource).toContain("测试配置中");
+    expect(appSource).toContain('tApp("status.testing")');
     expect(appSource).toContain("testStatus");
     expect(sharedModelConfigSource).toContain("{isTesting ? <RefreshCcw className=\"h-4 w-4 animate-spin\" /> : null}");
-    expect(sharedModelConfigSource).toContain("{isTesting ? \"测试中\" : \"测试配置\"}");
-    expect(sharedModelConfigSource).toContain("模型版本");
+    expect(sharedModelConfigSource).toContain('{isTesting ? tSettings("actions.testing") : tSettings("actions.test")}');
+    expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.modelVersions")');
     expect(sharedModelConfigSource).toContain("inlineStatus.message");
     expect(sharedModelConfigSource).not.toContain("{!isTesting && testStatus ? (");
-    expect(appSource).toContain("测试成功");
-    expect(appSource).toContain("测试失败");
+    expect(appSource).toContain('tApp("status.testSuccess"');
+    expect(appSource).toContain('tApp("status.testFailed"');
     expect(appSource).toContain("setModelConfigTestStatus");
     expect(appSource).toContain("productStudioLoadError");
     expect(appSource).toContain("loadError={productStudioLoadError}");
     expect(appSource).toContain("selectedTextModelConfigId");
     expect(appSource).toContain("selectedImageModelConfigId");
     expect(appSource).toContain("selectedVideoModelConfigId");
-    expect(appSource).toContain("modelConfigChoiceLabel");
-    expect(modelServiceBundlesSource).toContain('return "自动推荐";');
+    expect(appSource).toContain("localizedModelConfigChoiceLabel");
+    expect(modelServiceBundlesSource).toContain("export function modelConfigChoiceLabel");
+    expect(modelServiceBundlesSource).toContain('return appText("videoStudio.models.auto", locale);');
     const buildModelSchemeOptionsSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function buildModelSchemeOptions"), modelServiceBundlesSource.indexOf("export function sortSelectableModelBundles"));
     expect(buildModelSchemeOptionsSource).not.toContain("自动推荐");
     expect(appSource).toContain("textModelConfigId: selectedTextModelConfigId");
@@ -1752,10 +1811,10 @@ describe("console API", () => {
     expect(appSource).toContain("textModelOptions");
     expect(appSource).toContain("imageModelOptions");
     expect(appSource).toContain("videoModelOptions");
-    expect(appSource).toContain('label="模型方案"');
-    expect(apiManagementSource).toContain('title: "文本模型"');
-    expect(apiManagementSource).toContain('title: "图片模型"');
-    expect(apiManagementSource).toContain('title: "视频模型"');
+    expect(appSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(apiManagementSource).toContain('title: tSettings("groups.text.title")');
+    expect(apiManagementSource).toContain('title: tSettings("groups.image.title")');
+    expect(apiManagementSource).toContain('title: tSettings("groups.video.title")');
     expect(appSource).not.toContain('label="生成模型"');
     expect(appSource).not.toContain("InlineProductFactsFields");
     expect(appSource).toContain("ProductComposerReferenceTray");
@@ -1776,9 +1835,9 @@ describe("console API", () => {
     expect(modelPresetSource).toContain("catalogVendorsForProvider(providerId)");
     expect(modelPresetSource).toContain("modelConfigDraftFromVendor(providerId, vendor.value)");
     expect(modelPresetSource).not.toContain(".map(modelConfigDraftFromCatalogEntry)");
-    const modelCatalogSource = await readFile(join(process.cwd(), "src", "providers", "modelCatalog.ts"), "utf8");
-    expect(modelCatalogSource).toContain("doubao-seedance-2-0-fast-260128");
-    expect(modelCatalogSource).toContain("doubao-seedance-2-0-260128");
+    const officialPricingCatalogSource = await readFile(join(process.cwd(), "src", "modelPricing", "officialModelPricingCatalog.ts"), "utf8");
+    expect(officialPricingCatalogSource).toContain("doubao-seedance-2-0-fast-260128");
+    expect(officialPricingCatalogSource).toContain("doubao-seedance-2-0-260128");
     expect(modelPresetSource).not.toContain("doubao-seedance-1-5-pro-251215");
     [
       "ChatFire 推荐-文本",
@@ -2199,7 +2258,7 @@ describe("console API", () => {
         body: JSON.stringify({
           apiKey: "sqlite-secret-seedance-provider-key-9999",
           baseUrl: "https://ark.sqlite.example",
-          model: "seedance-sqlite-model"
+          model: "seedance-2.0-fast"
         })
       });
 
@@ -2232,7 +2291,7 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "sqli...9999",
         baseUrl: "https://ark.sqlite.example",
-        model: "seedance-sqlite-model"
+        model: "doubao-seedance-2-0-fast-260128"
       }));
     } finally {
       restoreEnv("HAITU_SECRET_KEY", previousSecretKey);
@@ -2253,13 +2312,7 @@ describe("console API", () => {
       transactions: []
     }));
 
-    const toppedUp = await server.fetchJson("/api/wallet/top-up", {
-      method: "POST",
-      body: JSON.stringify({
-        amountCny: 20,
-        description: "manual test recharge"
-      })
-    });
+    const toppedUp = await creditTestWallet(server, 20, "manual test recharge");
     const wallet = await server.fetchJson("/api/wallet");
 
     expect(toppedUp.wallet).toEqual(expect.objectContaining({
@@ -2281,13 +2334,7 @@ describe("console API", () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-admin-wallet-adjustment-"));
     tempDirs.push(root);
     const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
-    await server.fetchJson("/api/wallet/top-up", {
-      method: "POST",
-      body: JSON.stringify({
-        amountCny: 20,
-        description: "user recharge before adjustment"
-      })
-    });
+    await creditTestWallet(server, 20, "user recharge before adjustment");
 
     const before = await server.fetchJson("/api/admin/wallets");
     const adjusted = await server.fetchJson("/api/admin/wallet-adjustments", {
@@ -2327,10 +2374,93 @@ describe("console API", () => {
     }));
   });
 
+  it("lets admins review, draft, preview, and publish model pricing catalogs", async () => {
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
+    const root = await mkdtemp(join(tmpdir(), "haitu-admin-model-pricing-catalog-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    const active = await server.fetchJson("/api/admin/model-pricing-catalog");
+    const draft = await server.fetchJson("/api/admin/model-pricing-catalog/draft", {
+      method: "PUT",
+      body: JSON.stringify({
+        version: "2026-06-29",
+        entries: active.active.entries.map((entry: { model: string; imagePriceCnyPerImage?: number }) => (
+          entry.model === "gpt-image-2"
+            ? { ...entry, imagePriceCnyPerImage: 0.31 }
+            : entry
+        ))
+      })
+    });
+    const diff = await server.fetchJson(`/api/admin/model-pricing-catalog/draft/${encodeURIComponent(draft.draft.id)}/diff`);
+    const published = await server.fetchJson("/api/admin/model-pricing-catalog/publish", {
+      method: "POST",
+      body: JSON.stringify({ draftId: draft.draft.id })
+    });
+    const publicCatalog = await server.fetchJson("/api/model-pricing-catalog");
+
+    expect(active.active).toEqual(expect.objectContaining({
+      source: "built_in",
+      entries: expect.arrayContaining([
+        expect.objectContaining({ model: "gpt-image-2" })
+      ])
+    }));
+    expect(diff.changed).toEqual([
+      expect.objectContaining({
+        model: "gpt-image-2",
+        changedFields: expect.arrayContaining(["imagePriceCnyPerImage"])
+      })
+    ]);
+    expect(published.active).toEqual(expect.objectContaining({
+      source: "database",
+      version: "2026-06-29"
+    }));
+    expect(publicCatalog.active).toEqual(expect.objectContaining({
+      source: "database",
+      version: "2026-06-29",
+      entries: expect.arrayContaining([
+        expect.objectContaining({
+          model: "gpt-image-2",
+          imagePriceCnyPerImage: 0.31
+        })
+      ])
+    }));
+  });
+
+  it("serves every endpoint required by the admin shell refresh", async () => {
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
+    const root = await mkdtemp(join(tmpdir(), "haitu-admin-shell-refresh-"));
+    tempDirs.push(root);
+    const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    const endpoints = [
+      "/api/admin/overview",
+      "/api/admin/platform-model-configs",
+      "/api/admin/payment-methods",
+      "/api/admin/wallets",
+      "/api/admin/wallet-transactions",
+      "/api/admin/recharge-orders",
+      "/api/admin/billing-settings",
+      "/api/admin/content/summary",
+      "/api/admin/content/products",
+      "/api/admin/content/video-jobs",
+      "/api/admin/model-pricing-catalog",
+      "/api/admin/site-settings"
+    ];
+
+    const statuses = await Promise.all(endpoints.map(async (endpoint) => {
+      const response = await server.fetch(endpoint);
+      return [endpoint, response.status] as const;
+    }));
+
+    expect(statuses).toEqual(endpoints.map((endpoint) => [endpoint, 200]));
+  });
+
   it("creates Stripe recharge orders without crediting the wallet until webhook completion", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_recharge_order");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_recharge_order");
     vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1.1");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-recharge-order-"));
     tempDirs.push(root);
@@ -2345,12 +2475,14 @@ describe("console API", () => {
       const params = new URLSearchParams(String(init?.body));
       expect(params.get("mode")).toBe("payment");
       expect(params.get("currency")).toBe("hkd");
-      expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5000");
+      expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5500");
       expect(params.get("line_items[0][price_data][currency]")).toBe("hkd");
       expect(params.has("automatic_payment_methods[enabled]")).toBe(false);
       expect(params.get("metadata[walletCreditCents]")).toBe("5000");
       expect(params.get("success_url")).toContain("payment=stripe-success");
       expect(params.get("cancel_url")).toContain("payment=stripe-cancel");
+      expect(params.get("success_url")).toContain("https://haitu.online/console?");
+      expect(params.get("cancel_url")).toContain("https://haitu.online/console?");
       return jsonResponse({
         id: "cs_test_wallet_recharge",
         url: "https://checkout.stripe.com/c/pay/cs_test_wallet_recharge",
@@ -2371,8 +2503,15 @@ describe("console API", () => {
       order: expect.objectContaining({
         provider: "stripe",
         providerSessionId: "cs_test_wallet_recharge",
-        amountCny: 50,
-        currency: "hkd",
+        creditCny: 50,
+        paymentAmount: 55,
+        paymentCurrency: "hkd",
+        walletCurrency: "cny",
+        fxRateSnapshot: expect.objectContaining({
+          from: "cny",
+          to: "hkd",
+          rate: 1.1
+        }),
         status: "pending"
       })
     }));
@@ -2382,6 +2521,26 @@ describe("console API", () => {
       availableCny: 0,
       transactions: []
     }));
+  });
+
+  it("rejects recharge order amounts outside the supported integer range", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-recharge-amount-validation-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => jsonResponse({ id: "should-not-create" })) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    for (const amountCny of [49, 1001, 88.5]) {
+      const response = await server.fetch("/api/wallet/recharge-orders", {
+        method: "POST",
+        body: JSON.stringify({ amountCny })
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "充值金额必须是 50 到 1000 之间的整数。"
+      });
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("lets admins control which recharge payment methods users can choose", async () => {
@@ -2553,6 +2712,8 @@ describe("console API", () => {
         pay_methods: [1]
       }));
       expect(payload.success_url).toContain("payment=infini-success");
+      expect(payload.success_url).toContain("https://haitu.online/console?");
+      expect(payload.failure_url).toContain("https://haitu.online/console?");
       expect(payload.failure_url).toContain("payment=infini-cancel");
       return jsonResponse({
         order_id: "infini_order_wallet_recharge",
@@ -2574,8 +2735,10 @@ describe("console API", () => {
       order: expect.objectContaining({
         provider: "infini",
         providerSessionId: "infini_order_wallet_recharge",
-        amountCny: 50,
-        currency: "hkd",
+        creditCny: 50,
+        paymentAmount: 50,
+        paymentCurrency: "hkd",
+        walletCurrency: "cny",
         status: "pending"
       })
     }));
@@ -2702,7 +2865,7 @@ describe("console API", () => {
       order: expect.objectContaining({
         provider: "infini",
         providerSessionId: "infini_order_enveloped_wallet",
-        amountCny: 100,
+        creditCny: 100,
         status: "pending"
       })
     }));
@@ -3613,11 +3776,7 @@ describe("console API", () => {
 
   it("persists model service mode and uses the selected platform bundle for AI calls", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
-    const previousTextFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
-    const previousUpstream = process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
-    process.env.HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL = "0.2";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-service-mode-platform-"));
       tempDirs.push(root);
@@ -3646,6 +3805,14 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "text", serviceFeeCny: 0.2 }
+          ]
+        })
+      });
       await server.fetchJson("/api/platform/model-configs/openai-compatible-text", {
         method: "PUT",
         body: JSON.stringify({
@@ -3708,13 +3875,7 @@ describe("console API", () => {
           platformBundleId: savedBundle.bundle.bundleId
         })
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 2,
-          description: "platform bundle balance"
-        })
-      });
+      await creditTestWallet(server, 2, "platform bundle balance");
 
       const preview = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
@@ -3747,24 +3908,20 @@ describe("console API", () => {
         authorization: "Bearer platform-text-secret-9999"
       }));
       expect(wallet).toEqual(expect.objectContaining({
-        balanceCny: 1.6,
+        balanceCny: 1.79,
         reservedCny: 0,
-        availableCny: 1.6
+        availableCny: 1.79
       }));
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousTextFee);
-      restoreEnv("HAITU_PLATFORM_TEXT_UPSTREAM_CNY_PER_CALL", previousUpstream);
     }
   });
 
   it("uses the selected BYOK bundle when the service mode is own API", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
     delete process.env.TEXT_MODEL_API_KEY;
     delete process.env.OPENAI_API_KEY;
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-service-mode-byok-"));
       tempDirs.push(root);
@@ -3850,13 +4007,7 @@ describe("console API", () => {
           byokBundleId: savedBundle.bundle.bundleId
         })
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 1,
-          description: "byok bundle balance"
-        })
-      });
+      await creditTestWallet(server, 1, "byok bundle balance");
 
       const preview = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
@@ -3879,17 +4030,16 @@ describe("console API", () => {
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousFee);
     }
   });
 
   it("charges only the platform service fee when users generate video with their own BYOK API", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     delete process.env.SEEDANCE_API_KEY;
     delete process.env.ARK_API_KEY;
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1.5";
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-wallet-byok-video-"));
       tempDirs.push(root);
@@ -3931,6 +4081,14 @@ describe("console API", () => {
           reportPath: join(input.outDir, "make-video-report.json")
         })
       });
+      await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "video", serviceFeeCny: 1.5 }
+          ]
+        })
+      });
       await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
@@ -3941,13 +4099,7 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 5,
-          description: "BYOK service fee balance"
-        })
-      });
+      await creditTestWallet(server, 5, "BYOK service fee balance");
 
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
@@ -3981,15 +4133,13 @@ describe("console API", () => {
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
   });
 
   it("lets admins provide platform model configs and charges wallet for platform-hosted video generation", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-wallet-platform-video-"));
       tempDirs.push(root);
@@ -4021,12 +4171,12 @@ describe("console API", () => {
               outputPath: join(input.outDir, "raw", "video.mp4")
             },
             billing: {
-              tokenPriceCnyPerMillion: 37,
+              tokenPriceCnyPerMillion: 46,
               totalTokens: 60000,
-              estimatedCostCny: 2.22
+              estimatedCostCny: 2.76
             },
             totalCost: {
-              amount: 2.22,
+              amount: 2.76,
               currency: "CNY"
             },
             reusedRawManifest: false,
@@ -4034,6 +4184,14 @@ describe("console API", () => {
             reportPath: join(input.outDir, "make-video-report.json")
           };
         }
+      });
+      await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "video", serviceFeeCny: 1 }
+          ]
+        })
       });
       await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
         method: "PUT",
@@ -4043,14 +4201,15 @@ describe("console API", () => {
           vendor: "volcengine",
           priority: 10,
           baseUrl: "https://platform-video.example.test",
-          model: "doubao-seedance-2-0-fast-260128"
+          model: "doubao-seedance-2-0-260128"
         })
       });
       const providerConfig = await server.fetchJson("/api/provider-config");
       const platformVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
       expect(platformVideo).toEqual(expect.objectContaining({
         apiOwner: "platform",
-        model: "doubao-seedance-2-0-fast-260128"
+        model: "doubao-seedance-2-0-260128",
+        tokenPriceCnyPerMillion: 46
       }));
 
       const blocked = await server.fetch("/api/video-jobs", {
@@ -4069,13 +4228,7 @@ describe("console API", () => {
         error: "余额不足，请先充值后再生成视频。"
       });
 
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 10,
-          description: "platform video balance"
-        })
-      });
+      await creditTestWallet(server, 10, "platform video balance");
       const queued = await server.fetchJson("/api/video-jobs", {
         method: "POST",
         body: JSON.stringify({
@@ -4092,22 +4245,22 @@ describe("console API", () => {
 
       expect(capturedInputs[0]).toEqual(expect.objectContaining({
         apiKey: "platform-video-secret-9999",
-        providerBaseUrl: "https://platform-video.example.test"
+        providerBaseUrl: "https://platform-video.example.test",
+        tokenPriceCnyPerMillion: 46
       }));
       expect(wallet).toEqual(expect.objectContaining({
-        balanceCny: 6.78,
+        balanceCny: 6.24,
         reservedCny: 0,
-        availableCny: 6.78
+        availableCny: 6.24
       }));
       expect(wallet.transactions.map((tx: { type: string; amountCny: number }) => [tx.type, tx.amountCny])).toEqual([
-        ["refund", 0.77],
-        ["charge", -3.22],
-        ["reserve", -3.99],
+        ["refund", 0.95],
+        ["charge", -3.76],
+        ["reserve", -4.71],
         ["recharge", 10]
       ]);
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
     }
   });
 
@@ -4362,10 +4515,8 @@ describe("console API", () => {
   it("charges only the platform service fee for BYOK AI product import", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT;
     delete process.env.TEXT_MODEL_API_KEY;
     delete process.env.OPENAI_API_KEY;
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_TEXT = "0.2";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-wallet-byok-text-"));
       tempDirs.push(root);
@@ -4416,13 +4567,7 @@ describe("console API", () => {
       await expect(blocked.json()).resolves.toEqual({
         error: "余额不足，请先充值后再使用 AI 功能。"
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 1,
-          description: "BYOK text balance"
-        })
-      });
+      await creditTestWallet(server, 1, "BYOK text balance");
 
       const preview = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
@@ -4446,17 +4591,12 @@ describe("console API", () => {
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_TEXT", previousFee);
     }
   });
 
   it("charges platform fee and upstream estimate for platform-hosted image generation", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE;
-    const previousUpstream = process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_IMAGE = "0.3";
-    process.env.HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE = "0.7";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-wallet-platform-image-"));
       tempDirs.push(root);
@@ -4476,6 +4616,14 @@ describe("console API", () => {
         })
       ) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl, autoStartSavedJobs: false });
+      await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "image", serviceFeeCny: 0.3 }
+          ]
+        })
+      });
       await server.fetchJson("/api/platform/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
@@ -4505,13 +4653,7 @@ describe("console API", () => {
       await expect(blocked.json()).resolves.toEqual({
         error: "余额不足，请先充值后再使用 AI 功能。"
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 5,
-          description: "platform image balance"
-        })
-      });
+      await creditTestWallet(server, 5, "platform image balance");
 
       const generated = await server.fetchJson("/api/products/IMG-WALLET-001/reference-images/generate", {
         method: "POST",
@@ -4528,19 +4670,17 @@ describe("console API", () => {
         authorization: "Bearer platform-image-secret-9999"
       }));
       expect(wallet).toEqual(expect.objectContaining({
-        balanceCny: 3,
+        balanceCny: 3.8,
         reservedCny: 0,
-        availableCny: 3
+        availableCny: 3.8
       }));
       expect(wallet.transactions.map((tx: { type: string; amountCny: number; description?: string }) => [tx.type, tx.amountCny, tx.description])).toEqual([
-        ["charge", -2, "AI 图片生成扣费"],
-        ["reserve", -2, "AI 图片生成预扣"],
+        ["charge", -1.2, "AI 图片生成扣费"],
+        ["reserve", -1.2, "AI 图片生成预扣"],
         ["recharge", 5, "platform image balance"]
       ]);
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_IMAGE", previousFee);
-      restoreEnv("HAITU_PLATFORM_IMAGE_UPSTREAM_CNY_PER_IMAGE", previousUpstream);
     }
   });
 
@@ -4564,10 +4704,10 @@ describe("console API", () => {
           configId: "unified-text",
           apiKey: "legacy-text-secret-123456",
           name: "Unified Text",
-          vendor: "legacy",
+          vendor: "deepseek",
           priority: 5,
-          baseUrl: "https://legacy.example/",
-          model: "legacy-model",
+          baseUrl: "https://api.deepseek.com/",
+          model: "deepseek-v4-pro",
           apiMode: "chat_completions",
           enabled: true
         })
@@ -4581,8 +4721,8 @@ describe("console API", () => {
         configured: true,
         keySource: "LOCAL_BYOK",
         keyPreview: "lega...3456",
-        baseUrl: "https://legacy.example",
-        model: "legacy-model",
+        baseUrl: "https://api.deepseek.com",
+        model: "deepseek-v4-pro",
         apiMode: "chat_completions"
       }));
 
@@ -4609,7 +4749,7 @@ describe("console API", () => {
         });
         handle.sqlite.prepare(`
           UPDATE model_variants
-          SET model = 'sqlite-first-model'
+          SET model = 'gpt-5.5'
           WHERE provider_id = 'openai-compatible-text'
             AND config_id = 'unified-text'
             AND workspace_id = @workspaceId
@@ -4626,7 +4766,7 @@ describe("console API", () => {
       expect(secondConfig.textModels[0]).toEqual(expect.objectContaining({
         keyPreview: "dbfi...9999",
         baseUrl: "https://sqlite-first.example",
-        model: "sqlite-first-model",
+        model: "gpt-5.5",
         apiMode: "responses_stream"
       }));
     } finally {
@@ -4653,11 +4793,11 @@ describe("console API", () => {
         method: "PUT",
         body: JSON.stringify({
           apiKey: "text-model-secret-key-123456",
-          name: "ChatFire 推荐-文本",
-          vendor: "chatfire",
+          name: "DeepSeek 推荐-文本",
+          vendor: "deepseek",
           priority: 8,
-          baseUrl: "https://api.chatfire.site/",
-          model: "gemini-3-pro-preview",
+          baseUrl: "https://api.deepseek.com/",
+          model: "deepseek-v4-pro",
           apiMode: "chat_completions"
         })
       });
@@ -4687,8 +4827,8 @@ describe("console API", () => {
       const storedImageKey = await readStoredModelCredential(root, "openai-compatible-image");
       expect(storedTextKey).toEqual(expect.objectContaining({
         key_preview: "text...3456",
-        base_url: "https://api.chatfire.site",
-        model: "gemini-3-pro-preview",
+        base_url: "https://api.deepseek.com",
+        model: "deepseek-v4-pro",
         api_mode: "chat_completions"
       }));
       expect(storedImageKey).toEqual(expect.objectContaining({
@@ -4701,10 +4841,10 @@ describe("console API", () => {
       expect(JSON.stringify(config)).not.toContain("text-model-secret-key-123456");
       expect(JSON.stringify(config)).not.toContain("image-model-secret-key-abcdef");
       expect(config.textModels[0]).toEqual(expect.objectContaining({
-        label: "ChatFire 推荐-文本",
-        providerLabel: "chatfire",
-        baseUrl: "https://api.chatfire.site",
-        model: "gemini-3-pro-preview",
+        label: "DeepSeek 推荐-文本",
+        providerLabel: "deepseek",
+        baseUrl: "https://api.deepseek.com",
+        model: "deepseek-v4-pro",
         apiMode: "chat_completions",
         configured: true,
         keySource: "LOCAL_BYOK",
@@ -4757,7 +4897,7 @@ describe("console API", () => {
           vendor: "deepseek",
           priority: 7,
           baseUrl: "https://api.deepseek.com/",
-          model: "deepseek-v4-pro, deepseek-v4-flash\ndeepseek-v4-lite",
+          model: "deepseek-v4-pro, deepseek-v4-flash",
           apiMode: "chat_completions"
         })
       });
@@ -4772,14 +4912,12 @@ describe("console API", () => {
         keySource: "LOCAL_BYOK",
         keyPreview: "text...3456"
       }));
-      expect(config.textModels).toHaveLength(3);
+      expect(config.textModels).toHaveLength(2);
       expect(config.textModels.map((item: { model: string }) => item.model)).toEqual([
         "deepseek-v4-pro",
-        "deepseek-v4-flash",
-        "deepseek-v4-lite"
+        "deepseek-v4-flash"
       ]);
       expect(config.textModels.map((item: { label: string }) => item.label)).toEqual([
-        "DeepSeek 文本",
         "DeepSeek 文本",
         "DeepSeek 文本"
       ]);
@@ -4793,7 +4931,7 @@ describe("console API", () => {
         apiMode: "chat_completions",
         modelKind: "text"
       })));
-      expect(new Set(config.textModels.map((item: { configId: string }) => item.configId)).size).toBe(3);
+      expect(new Set(config.textModels.map((item: { configId: string }) => item.configId)).size).toBe(2);
       expect(stored.credentials).toEqual([
         expect.objectContaining({
           key_preview: "text...3456",
@@ -4806,8 +4944,7 @@ describe("console API", () => {
       expect(stored.credentials[0]?.encrypted_key).not.toContain("text-variant-secret-key-123456");
       expect(stored.variants.map((row) => row.model)).toEqual([
         "deepseek-v4-pro",
-        "deepseek-v4-flash",
-        "deepseek-v4-lite"
+        "deepseek-v4-flash"
       ]);
       expect(new Set(stored.variants.map((row) => row.credential_id))).toEqual(new Set([stored.credentials[0]?.credential_id]));
     } finally {
@@ -5168,23 +5305,17 @@ describe("console API", () => {
       tempDirs.push(root);
       const fetchImpl = vi.fn(async () =>
         jsonResponse({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  sku: "MULTI-001",
-                  title_ja: "優先モデル テスト商品",
-                  category: "テスト",
-                  materials: ["ABS"],
-                  dimensions: "10x10x10cm",
-                  verified_selling_points: ["整理しやすい"],
-                  usage_scenes: ["デスク"],
-                  forbidden_claims: ["防水未確認"],
-                  reference_images: ["multi-01.jpg"]
-                })
-              }
-            }
-          ],
+          output_text: JSON.stringify({
+            sku: "MULTI-001",
+            title_ja: "優先モデル テスト商品",
+            category: "テスト",
+            materials: ["ABS"],
+            dimensions: "10x10x10cm",
+            verified_selling_points: ["整理しやすい"],
+            usage_scenes: ["デスク"],
+            forbidden_claims: ["防水未確認"],
+            reference_images: ["multi-01.jpg"]
+          }),
           usage: {
             total_tokens: 123
           }
@@ -5199,8 +5330,8 @@ describe("console API", () => {
           name: "旧文本服务",
           vendor: "openai",
           priority: 100,
-          baseUrl: "https://low.example.test",
-          model: "low-model"
+          baseUrl: "https://api.deepseek.com",
+          model: "deepseek-v4-flash"
         })
       });
       await sleep(5);
@@ -5209,10 +5340,10 @@ describe("console API", () => {
         body: JSON.stringify({
           apiKey: "newer-text-secret-9999",
           name: "新文本服务",
-          vendor: "chatfire",
+          vendor: "openai",
           priority: 1,
-          baseUrl: "https://high.example.test/",
-          model: "high-model"
+          baseUrl: "https://api.openai.com/",
+          model: "gpt-5.5"
         })
       });
 
@@ -5233,12 +5364,12 @@ describe("console API", () => {
         })
       });
 
-      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://high.example.test/v1/chat/completions");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/responses");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
         authorization: "Bearer newer-text-secret-9999"
       }));
       const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
-      expect(body.model).toBe("high-model");
+      expect(body.model).toBe("gpt-5.5");
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
@@ -5289,9 +5420,9 @@ describe("console API", () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
 
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
-    expect(primaryNavSource).toContain("视频创作");
-    expect(primaryNavSource).toContain("图片创作");
-    expect(primaryNavSource).toContain("任务记录");
+    expect(primaryNavSource).toContain('labelKey: "video"');
+    expect(primaryNavSource).toContain('labelKey: "image"');
+    expect(primaryNavSource).toContain('labelKey: "ledger"');
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
     expect(primaryNavSource).not.toContain("商品项目");
@@ -5312,8 +5443,8 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<VideoAssetsPanel");
 
     const imageCase = appSource.slice(appSource.indexOf('case "image"'), appSource.indexOf('case "ledger"'));
-    expect(imageCase).toContain('aria-label="图片创作"');
-    expect(imageCase).toContain("图片创作待上线");
+    expect(imageCase).toContain('aria-label={tApp("image.ariaLabel")}');
+    expect(imageCase).toContain('tApp("image.empty")');
 
     const productCreationWorkspace = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     expect(productCreationWorkspace).toContain("<ProductCreationComposer");
@@ -5338,22 +5469,22 @@ describe("console API", () => {
     const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     expect(appSource).not.toContain("product-studio-topbar");
     expect(appSource).not.toContain("ProductStudioProductPicker");
-    expect(productLibraryColumnSource).toContain("商品库");
-    expect(productLibraryColumnSource).toContain("新商品");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.title")');
+    expect(productLibraryColumnSource).toContain('tVideo("newProduct.title")');
     expect(productLibraryColumnSource).toContain("dedupeProductSummaries(products)");
     expect(productLibraryColumnSource).toContain("productLibrarySearchQuery");
     expect(productLibraryColumnSource).toContain("filterProductLibraryProducts(productOptions, productLibrarySearchQuery");
     expect(productLibraryColumnSource).toContain("product-library-search");
-    expect(productLibraryColumnSource).toContain('aria-label="搜索商品"');
-    expect(productLibraryColumnSource).toContain('placeholder="搜索商品"');
+    expect(productLibraryColumnSource).toContain('aria-label={tVideo("productLibrary.search")}');
+    expect(productLibraryColumnSource).toContain('placeholder={tVideo("productLibrary.search")}');
     expect(productLibraryColumnSource).not.toContain("搜索商品 / SKU");
     expect(productLibraryColumnSource).toContain("product-library-scroll min-h-0 overflow-y-auto");
     expect(productLibraryColumnSource).toContain("filteredProductOptions.map");
-    expect(productLibraryColumnSource).toContain("没有匹配的商品");
-    expect(productLibraryColumnSource).toContain("清空搜索");
-    expect(productLibraryColumnSource).toContain("productLibraryStatus(product)");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.noMatches")');
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.clearSearch")');
+    expect(productLibraryColumnSource).toContain("productLibraryStatus(product, tProductStatus)");
     expect(productLibraryColumnSource).toContain("onDeleteProduct");
-    expect(productLibraryColumnSource).toContain("删除商品");
+    expect(productLibraryColumnSource).toContain('tVideo("productLibrary.deleteProduct")');
     expect(productLibraryColumnSource).toContain("onDeleteProduct(product.sku)");
     expect(productLibraryColumnSource).toContain("event.stopPropagation()");
     expect(productLibraryColumnSource).not.toContain("删除当前商品");
@@ -5440,8 +5571,8 @@ describe("console API", () => {
     expect(composerSource).toContain("cursor-pointer");
     expect(composerSource).toContain("opacity-0");
     expect(composerSource).toContain("group-hover:opacity-100");
-    expect(composerSource).toContain('aria-label={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
-    expect(composerSource).toContain('title={productLibraryCollapsed ? "展开商品库" : "折叠商品库"}');
+    expect(composerSource).toContain('aria-label={productLibraryCollapsed ? tVideo("productLibrary.expand") : tVideo("productLibrary.collapse")}');
+    expect(composerSource).toContain('title={productLibraryCollapsed ? tVideo("productLibrary.expand") : tVideo("productLibrary.collapse")}');
     expect(composerSource).toContain("onClick={() => setProductLibraryCollapsed((collapsed) => !collapsed)}");
     expect(composerSource).not.toContain("拖动调整商品库宽度");
     expect(composerSource).toContain("ProductCreationProductLibrary");
@@ -5456,21 +5587,25 @@ describe("console API", () => {
     expect(composerSource).not.toContain("grid min-h-full content-start gap-3");
     expect(composerSource).toContain("video-generation-controls compact-generation-controls");
     expect(composerSource).toContain("px-3 py-2");
-    expect(composerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(98px,.72fr))]");
+    expect(composerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))]");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain("model-scheme-chip-row");
-    expect(composerSource).toContain("min-[1180px]:col-span-6");
+    expect(composerSource).toContain("min-[1180px]:col-span-7");
     expect(composerSource).toContain("overflow-visible");
     expect(composerSource).toContain("ModelSchemeChip");
     expect(composerSource).toContain("{schemeSummary}");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 truncate");
-    expect(composerSource).toContain('label="视频分辨率"');
+    expect(composerSource).toContain('label={tVideo("controls.resolution")}');
     expect(composerSource).toContain("videoResolutionOptions");
     expect(composerSource).toContain("selectedVideoResolution");
     expect(composerSource).toContain("resolution: selectedVideoResolution");
+    expect(composerSource).toContain('label={tVideo("controls.aspectRatio")}');
+    expect(composerSource).toContain("videoAspectRatioOptions");
+    expect(composerSource).toContain("selectedVideoAspectRatio");
+    expect(composerSource).toContain("aspectRatio: selectedVideoAspectRatio");
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
-    expect(appSource).toContain('if (value === "en") return "英语";');
+    expect(appSource).toContain('if (value === "en") return t("languages.en");');
     expect(composerSource).toContain('density="compact"');
     expect(composerSource).toContain("video-generate-summary");
     expect(composerSource).toContain("{generateVideoSummary}");
@@ -5491,20 +5626,20 @@ describe("console API", () => {
     expect(composerSource).not.toContain("footer={");
     expect(composerSource.indexOf("video-generate-bar")).toBeLessThan(composerSource.indexOf("<VideoHistoryPanel"));
     expect(composerSource).toContain("generateVideoButtonLabel");
-    expect(composerSource).toContain('versionCount > 1 ? `生成 ${versionCount} 个视频` : "生成视频"');
+    expect(composerSource).toContain('versionCount > 1 ? tVideo("generate.buttonWithCount", { count: versionCount }) : tVideo("generate.button")');
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
     expect(appSource).not.toContain("const videoModelConfigs");
     expect(appSource).not.toContain("defaultVideoModelChoice");
     expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
     expect(composerSource).toContain("videoModelOptions");
     expect(composerSource).toContain("imageModelOptions");
-    expect(composerSource).toContain("modelSchemeSummary");
+    expect(composerSource).toContain("localizedModelSchemeSummary");
     expect(composerSource).toContain("schemeSummary");
     expect(composerSource).toContain("activeModelSchemeId");
-    expect(composerSource).toContain("modelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions)");
+    expect(composerSource).toContain("localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)");
     expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
     expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
-    expect(composerSource).toContain('label="模型方案"');
+    expect(composerSource).toContain('label={tVideo("controls.modelScheme")}');
     expect(composerSource).not.toContain('label="文本模型"');
     expect(composerSource).not.toContain('label="图片模型"');
     expect(composerSource).not.toContain('label="视频模型"');
@@ -5538,12 +5673,12 @@ describe("console API", () => {
     expect(composerSource).not.toContain("{submitHint ? (");
     expect(composerSource).not.toContain("{submitHint}");
     expect(composerSource).not.toContain('<div className="min-h-5 truncate text-xs font-bold text-[var(--accent)]">{submitHint}</div>');
-    expect(composerSource).toContain('onToast("资料包已整理。", "ok")');
-    expect(composerSource).toContain('onToast("已加入历史记录，生成中可删除取消，完成后可预览和下载。", "ok")');
+    expect(composerSource).toContain('onToast(tVideo("generate.packageReadyToast"), "ok")');
+    expect(composerSource).toContain('onToast(tVideo("generate.queuedToast"), "ok")');
     expect(composerSource).toContain("disabled:opacity-100");
     expect(composerSource).not.toContain("productPackageButtonLabel");
     expect(composerSource).not.toContain('"保存资料包"');
-    expect(composerSource).toContain('"AI 整理资料包"');
+    expect(composerSource).toContain('tVideo("facts.organize")');
     expect(composerSource).not.toContain("创建生成任务中");
     expect(composerSource).not.toContain("product-facts-body h-full min-h-[520px]");
     expect(composerSource).not.toContain("max-h-[312px]");
@@ -5565,46 +5700,47 @@ describe("console API", () => {
     expect(composerSource).not.toContain("商品资料完整，可进入视频预检");
     expect(composerSource).not.toContain("referenceReadiness(actionProduct)");
     expect(composerSource).not.toContain("参考图 5 张 · 可生成视频");
-    expect(composerSource).toContain("商品资料");
-    expect(composerSource).toContain("添加图片");
+    expect(composerSource).toContain('tVideo("facts.title")');
+    expect(composerSource).toContain('tVideo("reference.add")');
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).toContain("aria-disabled={!product}");
-    expect(composerSource).toContain("请先整理资料包，再生成参考图。");
-    expect(composerSource).toContain("AI 整理资料包");
+    expect(composerSource).toContain('tVideo("reference.generateDisabledToast")');
+    expect(composerSource).toContain('tVideo("facts.organize")');
     expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
-    expect(composerSource).toContain('{isPacking ? "整理中" : "AI 整理资料包"}');
+    expect(composerSource).toContain('{isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}');
     expect(composerSource).toContain("productAutoSaveStatus");
-    expect(composerSource).toContain("productAutoSaveStatusLabel(productAutoSaveStatus)");
+    expect(composerSource).toContain("localizedProductAutoSaveStatusLabel(productAutoSaveStatus, tVideo)");
     expect(appSource).toContain("onFlushProductFactsAutoSave={flushProductFactsAutoSave}");
     expect(composerSource).toContain("onFlushProductFactsAutoSave");
     expect(composerSource).toContain("await onFlushProductFactsAutoSave()");
     expect(composerSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={15} />');
-    expect(composerSource).toContain('{isGeneratingStoryboard ? "生成中" : "AI 生成分镜"}');
+    expect(composerSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
     expect(composerSource).toContain("placeholder=\"\"");
     expect(composerSource).not.toContain("整理资料并生成视频");
-    expect(composerSource).toContain("视频风格");
-    expect(composerSource).toContain("视频时长");
-    expect(composerSource).toContain("成片语言");
-    expect(composerSource).toContain("模型方案");
+    expect(composerSource).toContain('label={tVideo("controls.template")}');
+    expect(composerSource).toContain('label={tVideo("controls.duration")}');
+    expect(composerSource).toContain('label={tVideo("controls.finalLanguage")}');
+    expect(composerSource).toContain('label={tVideo("controls.modelScheme")}');
     expect(composerSource).not.toContain('label="生成模型"');
-    expect(composerSource).toContain("生成视频");
+    expect(composerSource).toContain('tVideo("generate.button")');
     expect(composerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain('from "./productComposerText.js"');
     expect(composerSource).toContain("storyboard-history-dropdown");
     expect(composerSource).not.toContain("补充要点");
     expect(composerSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
-    expect(composerSource).toContain("脚本分镜");
-    expect(composerSource).toContain("AI 生成分镜");
-    expect(composerSource).toContain("历史记录");
-    expect(composerSource).toContain("creativeVersionLifecycleHint(job)");
+    expect(composerSource).toContain('tVideo("storyboard.title")');
+    expect(composerSource).toContain('tVideo("storyboard.generate")');
+    expect(composerSource).toContain('tVideo("history.title")');
+    expect(composerSource).toContain("localizedCreativeVersionLifecycleHint(job, tVideo, appLocale)");
     const videoDisplayViewModelSource = await readFile(join(process.cwd(), "src", "client", "videoDisplayViewModel.ts"), "utf8");
-    expect(videoDisplayViewModelSource).toContain('if (value === "failed") return "生成失败";');
-    expect(composerSource).toContain("预览视频");
-    expect(composerSource).toContain("下载视频");
+    expect(videoDisplayViewModelSource).toContain('return appText(`status.jobStatuses.${value}`, locale);');
+    expect(videoDisplayViewModelSource).toContain('if (value === "failed") return appText("videoStudio.videoStatus.failed", locale);');
+    expect(composerSource).toContain('tVideo("history.preview")');
+    expect(composerSource).toContain('tVideo("history.download")');
     expect(appSource).toContain("VideoHashtagChips");
-    expect(appSource).toContain("复制标签");
-    expect(appSource).toContain("日文标签已复制。");
+    expect(appSource).toContain('tVideo("history.copyTags")');
+    expect(appSource).toContain('tVideo("history.tagsCopiedToast")');
     expect(appSource).toContain("normalizeDisplayHashtags");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
     expect(composerSource).toContain("previewReferenceIndex");
@@ -6759,15 +6895,78 @@ describe("console API", () => {
         expect.objectContaining({ id: "infini", enabled: true, kind: "crypto" })
       ]
     });
-    await expect(readFile(join(testSystemDir(root), "console-settings.json"), "utf8")).resolves.toContain(
-      "\"maxEstimatedCostCnyPerVideo\": 12.5"
-    );
-    await expect(readFile(join(testSystemDir(root), "console-settings.json"), "utf8")).resolves.toContain(
-      "\"testCreditBalanceCny\": 20"
-    );
+    expect(readConsoleSettingsRows(testDataDir(root))).toEqual([expect.objectContaining({
+      id: "global",
+      default_cta: "プロフィールからチェック",
+      max_estimated_cost_cents_per_video: 1250,
+      test_credit_balance_cents: 2000
+    })]);
+    await expect(access(join(testSystemDir(root), "console-settings.json"))).rejects.toThrow();
     await expect(server.fetchJson("/api/settings")).resolves.toEqual({
       settings: response.settings
     });
+  });
+
+  it("initializes database-backed console settings on startup", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-settings-startup-"));
+    tempDirs.push(root);
+
+    createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+    expect(readConsoleSettingsRows(testDataDir(root))).toEqual([expect.objectContaining({
+      id: "global",
+      default_cta: "今すぐチェック",
+      max_estimated_cost_cents_per_video: 500,
+      test_credit_balance_cents: 0
+    })]);
+  });
+
+  it("lets admins manage database-backed generation billing settings", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-billing-settings-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      const initial = await server.fetchJson("/api/admin/billing-settings");
+      expect(initial.settings).toEqual({
+        policy: expect.objectContaining({
+          policyId: "metered-generation",
+          mode: "metered_generation",
+          enabled: true
+        }),
+        rules: [
+          expect.objectContaining({ usageKind: "text", serviceFeeCny: 0.2 }),
+          expect.objectContaining({ usageKind: "image", serviceFeeCny: 0.3 }),
+          expect.objectContaining({ usageKind: "video", serviceFeeCny: 1 })
+        ]
+      });
+
+      const updated = await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "text", serviceFeeCny: 0.25 },
+            { usageKind: "image", serviceFeeCny: 0.45 },
+            { usageKind: "video", serviceFeeCny: 1.25 }
+          ]
+        })
+      });
+      const listed = await server.fetchJson("/api/admin/billing-settings");
+
+      expect(updated.settings.rules.map((rule: { usageKind: string; serviceFeeCny: number }) => [
+        rule.usageKind,
+        rule.serviceFeeCny
+      ])).toEqual([
+        ["text", 0.25],
+        ["image", 0.45],
+        ["video", 1.25]
+      ]);
+      expect(listed.settings).toEqual(updated.settings);
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
   });
 
   it("manages built-in video templates and rejects disabled templates for preflight", async () => {
@@ -7352,8 +7551,8 @@ describe("console API", () => {
           name: "手动选择图片",
           vendor: "openai",
           priority: 100,
-          baseUrl: "https://low-image.example.test",
-          model: "low-image-model"
+          baseUrl: "https://api.openai.com",
+          model: "gpt-image-2"
         })
       });
       await sleep(5);
@@ -7362,14 +7561,14 @@ describe("console API", () => {
         body: JSON.stringify({
           apiKey: "default-image-secret-9999",
           name: "默认图片",
-          vendor: "chatfire",
+          vendor: "gemini",
           priority: 1,
-          baseUrl: "https://high-image.example.test/",
-          model: "high-image-model"
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+          model: "gemini-2.5-flash-image"
         })
       });
       const providerConfig = await server.fetchJson("/api/provider-config");
-      const lowImageConfig = providerConfig.imageModels.find((model: { model: string }) => model.model === "low-image-model");
+      const lowImageConfig = providerConfig.imageModels.find((model: { model: string }) => model.model === "gpt-image-2");
       expect(lowImageConfig).toBeDefined();
 
       await topUpWalletForAiUsage(server);
@@ -7391,12 +7590,12 @@ describe("console API", () => {
       ]);
       await expect(readFile(generatedPath, "utf8")).resolves.toBe("generated-reference-image");
       expect(response.product.reference_images).toEqual(["main.jpg", generatedReference]);
-      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://low-image.example.test/v1/images/generations");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/images/generations");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
         authorization: "Bearer selected-image-secret-0001"
       }));
       const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
-      expect(body.model).toBe("low-image-model");
+      expect(body.model).toBe("gpt-image-2");
       expect(body.prompt).toContain("接触冷感アームカバー");
       expect(body.n).toBe(1);
     } finally {
@@ -7459,6 +7658,7 @@ describe("console API", () => {
         productPath,
         provider: "volcengine-seedance",
         duration: 8,
+        aspectRatio: "16:9",
         template: "scene",
         cta: "今すぐチェック"
       })
@@ -7470,17 +7670,17 @@ describe("console API", () => {
         productSku: "TK-001",
         provider: "volcengine-seedance",
         durationSeconds: 8,
-        aspectRatio: "9:16",
+        aspectRatio: "16:9",
         paidProvider: true,
         requiresPaidConfirmation: true,
         estimatedTokens: {
-          low: 61000,
-          expected: 80770,
+          low: 60000,
+          expected: 80640,
           high: 109000
         },
         estimatedCostCny: {
-          low: 2.26,
-          expected: 2.99,
+          low: 2.22,
+          expected: 2.98,
           high: 4.03
         },
         assetSummary: {
@@ -7500,6 +7700,7 @@ describe("console API", () => {
     });
     expect(response.preflight.script.voiceover).toContain("折りたたみ収納ボックス");
     expect(response.preflight.prompt).toContain("Duration: 8 seconds");
+    expect(response.preflight.prompt).toContain("Aspect ratio: 16:9");
     expect(response.preflight.prompt).toContain("Do not claim or imply");
     expect(response.preflight.referenceImages[0]).toEqual(expect.objectContaining({
       original: "main.jpg",
@@ -7620,7 +7821,7 @@ describe("console API", () => {
       testCreditBalanceCny: 5,
       usedEstimatedCostCny: 1,
       availableEstimatedCostCny: 4,
-      estimatedCostCny: 2.99,
+      estimatedCostCny: 2.98,
       enoughCredit: true
     });
   });
@@ -9163,7 +9364,13 @@ describe("console API", () => {
     await writeFile(join(productDir, "product.json"), JSON.stringify({ sku: "TK-001", workspaceId: "default" }), "utf8");
     await writeFile(join(productDir, "refs", "reference-01.jpg"), Buffer.from("image"));
     await writeFile(join(settingsDir, "workspace-settings.json"), JSON.stringify({ locale: "ja-JP" }), "utf8");
-    await writeFile(join(systemDir, "console-settings.json"), JSON.stringify({ defaultCta: "check" }), "utf8");
+    const handle = openDatabase({ dataDir, env: process.env });
+    try {
+      runMigrations(handle);
+      await new SqliteConsoleSettingsStore({ handle }).write({ defaultCta: "check" });
+    } finally {
+      closeDatabase(handle);
+    }
     await writeFile(join(jobDir, "job.json"), JSON.stringify({ id: "job-1", workspaceId: "default" }), "utf8");
     await writeFile(join(jobDir, "make-video-report.json"), JSON.stringify({ productSku: "TK-001" }), "utf8");
     await writeFile(join(jobDir, "raw", "source.mp4"), Buffer.from("raw-video"));
@@ -9185,7 +9392,7 @@ describe("console API", () => {
     expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/product.json");
     expect(archiveList.stdout).toContain("workspaces/default/products/TK-001/refs/reference-01.jpg");
     expect(archiveList.stdout).toContain("workspaces/default/settings/workspace-settings.json");
-    expect(archiveList.stdout).toContain("system/console-settings.json");
+    expect(archiveList.stdout).toContain("haitu.sqlite");
     expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/job.json");
     expect(archiveList.stdout).toContain("workspaces/default/jobs/job-1/make-video-report.json");
     expect(archiveList.stdout).not.toContain("workspaces/default/jobs/job-1/raw/source.mp4");
@@ -9498,6 +9705,7 @@ describe("console API", () => {
         provider: "mock",
         duration: 8,
         resolution: "1080p",
+        aspectRatio: "16:9",
         template: "scene",
         cta: "今すぐチェック"
       })
@@ -9509,6 +9717,7 @@ describe("console API", () => {
       provider: "mock",
       durationSeconds: 8,
       resolution: "1080p",
+      aspectRatio: "16:9",
       confirmPaid: false
     }));
 
@@ -9525,6 +9734,7 @@ describe("console API", () => {
       id: queued.job.id,
       status: "completed",
       productSku: "TK-001",
+      aspectRatio: "16:9",
       resolution: "1080p",
       reportPath: join(outputsDir, queued.job.id, "make-video-report.json")
     }));
@@ -9533,6 +9743,9 @@ describe("console API", () => {
     );
     await expect(readFile(jobFilePath(outputsDir, queued.job.id), "utf8")).resolves.toContain(
       "\"resolution\": \"1080p\""
+    );
+    await expect(readFile(jobFilePath(outputsDir, queued.job.id), "utf8")).resolves.toContain(
+      "\"aspectRatio\": \"16:9\""
     );
   });
 
@@ -9586,7 +9799,7 @@ describe("console API", () => {
           vendor: "volcengine",
           priority: 100,
           baseUrl: "https://low-video.example.test",
-          model: "low-video-model"
+          model: "seedance-2.0-fast"
         })
       });
       await sleep(5);
@@ -9598,7 +9811,7 @@ describe("console API", () => {
           vendor: "volcengine",
           priority: 1,
           baseUrl: "https://high-video.example.test/",
-          model: "high-video-model"
+          model: "seedance-2.0"
         })
       });
       await topUpWalletForPaidVideo(server);
@@ -9627,7 +9840,7 @@ describe("console API", () => {
       expect(capturedInputs[0]).toEqual(expect.objectContaining({
         apiKey: "newer-video-secret-9999",
         providerBaseUrl: "https://high-video.example.test",
-        providerModel: "high-video-model",
+        providerModel: "doubao-seedance-2-0-260128",
         finalLanguage: "ja"
       }));
     } finally {
@@ -11120,10 +11333,10 @@ describe("console API", () => {
   it("reserves and charges wallet again when retrying confirmed paid video jobs", async () => {
     const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
     const previousArkKey = process.env.ARK_API_KEY;
-    const previousFee = process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO;
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     delete process.env.SEEDANCE_API_KEY;
     delete process.env.ARK_API_KEY;
-    process.env.HAITU_PLATFORM_FEE_CNY_PER_VIDEO = "1.5";
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
       const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-retry-wallet-"));
       tempDirs.push(root);
@@ -11172,6 +11385,14 @@ describe("console API", () => {
           };
         }
       });
+      await server.fetchJson("/api/admin/billing-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          rules: [
+            { usageKind: "video", serviceFeeCny: 1.5 }
+          ]
+        })
+      });
       await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
@@ -11182,13 +11403,7 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
-      await server.fetchJson("/api/wallet/top-up", {
-        method: "POST",
-        body: JSON.stringify({
-          amountCny: 5,
-          description: "retry paid video balance"
-        })
-      });
+      await creditTestWallet(server, 5, "retry paid video balance");
       const first = await server.fetchJson("/api/video-jobs", {
         method: "POST",
         body: JSON.stringify({
@@ -11248,7 +11463,7 @@ describe("console API", () => {
     } finally {
       restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
       restoreEnv("ARK_API_KEY", previousArkKey);
-      restoreEnv("HAITU_PLATFORM_FEE_CNY_PER_VIDEO", previousFee);
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
   });
 
@@ -11530,9 +11745,37 @@ function testDataDir(root: string): string {
   return join(root, "data");
 }
 
+function readConsoleSettingsRows(dataDir: string): Array<{
+  id: string;
+  default_cta: string;
+  max_estimated_cost_cents_per_video: number;
+  test_credit_balance_cents: number;
+}> {
+  const handle = openDatabase({ dataDir, env: process.env });
+  try {
+    return handle.sqlite.prepare(`
+      SELECT
+        id,
+        default_cta,
+        max_estimated_cost_cents_per_video,
+        test_credit_balance_cents
+      FROM console_settings
+      ORDER BY id ASC
+    `).all() as Array<{
+      id: string;
+      default_cta: string;
+      max_estimated_cost_cents_per_video: number;
+      test_credit_balance_cents: number;
+    }>;
+  } finally {
+    closeDatabase(handle);
+  }
+}
+
 type TestConsoleServerHandle = ConsoleServerHandle & {
   raw: ConsoleServerHandle;
   authCookie: string;
+  dataDir: string;
   workspaceId: string;
 };
 
@@ -11569,6 +11812,7 @@ function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleSer
   const server: TestConsoleServerHandle = {
     raw,
     authCookie: "",
+    dataDir,
     workspaceId: "",
     async fetch(path: string, init: RequestInit = {}): Promise<Response> {
       if (isAuthOrPublicPath(path)) {
@@ -11874,23 +12118,34 @@ async function writeFileReport(path: string, report: unknown): Promise<void> {
 }
 
 async function topUpWalletForPaidVideo(server: TestConsoleServerHandle, amountCny = 100): Promise<void> {
-  await server.fetchJson("/api/wallet/top-up", {
-    method: "POST",
-    body: JSON.stringify({
-      amountCny,
-      description: "test paid video balance"
-    })
-  });
+  await creditTestWallet(server, amountCny, "test paid video balance");
 }
 
 async function topUpWalletForAiUsage(server: TestConsoleServerHandle, amountCny = 10): Promise<void> {
-  await server.fetchJson("/api/wallet/top-up", {
-    method: "POST",
-    body: JSON.stringify({
-      amountCny,
-      description: "test AI usage balance"
-    })
-  });
+  await creditTestWallet(server, amountCny, "test AI usage balance");
+}
+
+async function creditTestWallet(
+  server: TestConsoleServerHandle,
+  amountCny: number,
+  description: string
+): Promise<{ wallet: ReturnType<WalletStore["getSummary"]> }> {
+  await server.fetchJson("/api/wallet");
+  const handle = openDatabase({ dataDir: server.dataDir, env: process.env });
+  try {
+    const walletStore = new WalletStore({
+      handle,
+      workspaceId: server.workspaceId
+    });
+    return {
+      wallet: walletStore.topUp({
+        amountCny,
+        description
+      })
+    };
+  } finally {
+    closeDatabase(handle);
+  }
 }
 
 async function configurePaidVideoModel(server: TestConsoleServerHandle): Promise<void> {

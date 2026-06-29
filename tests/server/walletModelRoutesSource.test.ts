@@ -33,7 +33,9 @@ describe("wallet and model bundle routes source boundaries", () => {
 
     expect(routesSource).toContain("export async function handleWalletModelRoutes(");
     expect(routesSource).toContain('url.pathname === "/api/wallet"');
-    expect(routesSource).toContain('url.pathname === "/api/wallet/top-up"');
+    expect(routesSource).not.toContain('url.pathname === "/api/wallet/top-up"');
+    expect(routesSource).not.toContain("WalletTopUpRequest");
+    expect(routesSource).not.toContain("wallet.top_up");
     expect(routesSource).toContain('url.pathname === "/api/wallet/recharge-orders"');
     expect(routesSource).toContain('url.pathname === "/api/model-bundles"');
     expect(routesSource).toContain('url.pathname === "/api/model-service-preference"');

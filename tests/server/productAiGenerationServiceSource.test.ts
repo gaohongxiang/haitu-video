@@ -23,6 +23,7 @@ describe("product AI generation service source boundaries", () => {
 
   it("centralizes product AI storyboard drafts and reference image generation", async () => {
     const serviceSource = await readFile(servicePath, "utf8");
+    const productRoutesSource = await readFile(productRoutesPath, "utf8");
 
     expect(serviceSource).toContain("export async function buildAiStoryboardDraft(");
     expect(serviceSource).toContain("export async function generateProductReferenceImages(");
@@ -34,5 +35,11 @@ describe("product AI generation service source boundaries", () => {
     expect(serviceSource).not.toContain("function buildChineseStoryboardFallback(");
     expect(serviceSource).not.toContain("function hasJapaneseOutsideAllowedProductNames(");
     expect(serviceSource).toContain("runMeteredAiAction");
+    expect(serviceSource).toContain("modelPricingCatalog?: readonly ModelPricingEntry[]");
+    expect(serviceSource).toContain("modelPricingCatalogVersion?: string");
+    expect(serviceSource).toContain("modelPricingCatalog: input.modelPricingCatalog");
+    expect(serviceSource).toContain("modelPricingCatalogVersion: input.modelPricingCatalogVersion");
+    expect(productRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
+    expect(productRoutesSource).toContain("modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion");
   });
 });

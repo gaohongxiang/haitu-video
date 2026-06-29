@@ -8,6 +8,7 @@ APP_USER="${HAITU_DEPLOY_USER:-haitu}"
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 ENV_FILE="${HAITU_DEPLOY_ENV_FILE:-/etc/haitu-video.env}"
 HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"
+PUBLIC_BASE_URL="${HAITU_PUBLIC_BASE_URL:-${BETTER_AUTH_URL:-https://haitu.online}}"
 
 cd "$(dirname "$0")/../.."
 
@@ -17,6 +18,7 @@ if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
   set +a
   HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"
+  PUBLIC_BASE_URL="${HAITU_PUBLIC_BASE_URL:-${BETTER_AUTH_URL:-https://haitu.online}}"
 fi
 
 run_app() {
@@ -37,6 +39,7 @@ run_app_env() {
       HAITU_DB_PATH="${HAITU_DB_PATH:-}" \
       HAITU_SECRET_KEY="${HAITU_SECRET_KEY:-}" \
       HAITU_ADMIN_EMAIL="${HAITU_ADMIN_EMAIL:-}" \
+      HAITU_PUBLIC_BASE_URL="${HAITU_PUBLIC_BASE_URL:-}" \
       BETTER_AUTH_URL="${BETTER_AUTH_URL:-}" \
       HAITU_AUTH_EMAIL_FROM="${HAITU_AUTH_EMAIL_FROM:-}" \
       RESEND_API_KEY="${RESEND_API_KEY:-}" \
@@ -71,6 +74,8 @@ echo "==> Waiting for health check"
 for _ in $(seq 1 30); do
   if curl -fsS "$HEALTH_URL"; then
     echo
+    echo "==> Running public SEO/GEO check against ${PUBLIC_BASE_URL}"
+    run_app_env npm run seo:check -- --base "$PUBLIC_BASE_URL"
     echo "==> Deployment complete"
     exit 0
   fi

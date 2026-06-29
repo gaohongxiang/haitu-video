@@ -1,12 +1,14 @@
 import { KeyRound, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 
+import { i18n } from "../../i18n/client.js";
 import {
   bundleIdForPreference,
   bundleModelLabel,
   byokConfiguredModels,
   isCompleteModelBundle,
   isPlatformPresetBundle,
+  localizedModelSchemeBundleLabel,
   nextModelBundleLabel,
   ownerModelsForGroup,
   platformConfiguredModels,
@@ -16,6 +18,7 @@ import {
   type ModelBundleSaveInput,
   type ModelServicePreference
 } from "../modelServiceBundles.js";
+import type { AppLocale } from "../../i18n/config.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
@@ -38,6 +41,8 @@ import {
   type ProviderConfigLedger
 } from "./modelServiceConfig.js";
 
+const tSettings = (key: string, options?: Record<string, unknown>) => i18n.t(`app:settings.${key}`, options);
+const currentAppLocale = (): AppLocale => i18n.language === "en" ? "en" : "zh";
 const bundleTitleInputClass = "h-7 min-h-0 min-w-0 border-0 bg-transparent p-0 text-[14px] font-black text-[var(--text)] shadow-none outline-none focus-visible:ring-0";
 const bundleGridClass = "grid gap-2 min-[760px]:grid-cols-2 min-[1180px]:grid-cols-3";
 const bundleCardClass = "byok-bundle-card flex min-h-[190px] flex-col gap-3 rounded-lg border bg-[var(--card2)] p-3";
@@ -47,7 +52,7 @@ const bundleModelRowClass = "grid min-h-11 min-w-0 grid-cols-[44px_minmax(0,1fr)
 type BundleModelSelectionDraft = Partial<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">>;
 
 function bundleTitleInputWidth(value: string) {
-  const visualWidth = Array.from(value || "组合").reduce((total, char) => total + (char.charCodeAt(0) > 127 ? 2 : 1), 0);
+  const visualWidth = Array.from(value || tSettings("bundles.new")).reduce((total, char) => total + (char.charCodeAt(0) > 127 ? 2 : 1), 0);
   return `${Math.min(Math.max(visualWidth + 1, 6), 20)}ch`;
 }
 
@@ -106,27 +111,27 @@ export function ApiModelConfigPanel({
   const groups: ModelServiceGroup[] = [
     {
       kind: "text" as const,
-      title: "文本模型",
-      description: "商品整理、脚本分镜等文字推理能力。",
+      title: tSettings("groups.text.title"),
+      description: tSettings("groups.text.description"),
       models: config.textModels,
       providerId: "openai-compatible-text" as const,
-      badge: "文本"
+      badge: tSettings("groups.text.badge")
     },
     {
       kind: "image" as const,
-      title: "图片模型",
-      description: "商品图和参考图能力。",
+      title: tSettings("groups.image.title"),
+      description: tSettings("groups.image.description"),
       models: config.imageModels,
       providerId: "openai-compatible-image" as const,
-      badge: "图片"
+      badge: tSettings("groups.image.badge")
     },
     {
       kind: "video" as const,
-      title: "视频模型",
-      description: "最终成片生成能力。",
+      title: tSettings("groups.video.title"),
+      description: tSettings("groups.video.description"),
       models: config.videoModels,
       providerId: "volcengine-seedance" as const,
-      badge: "视频"
+      badge: tSettings("groups.video.badge")
     }
   ];
   const editingGroup = groups.find((group) => group.providerId === editingProviderId);
@@ -139,8 +144,8 @@ export function ApiModelConfigPanel({
   const activeMode = servicePreference.serviceMode;
   return (
     <Card id="API Key" className="grid gap-4 bg-[var(--card)]">
-      <PanelTitle icon={<KeyRound size={16} />} right={<Badge>{configuredCount} 条模型服务</Badge>}>
-        模型服务设置
+      <PanelTitle icon={<KeyRound size={16} />} right={<Badge>{tSettings("configuredCount", { count: configuredCount })}</Badge>}>
+        {tSettings("title")}
       </PanelTitle>
       <ApiServiceModeCards
         serviceMode={activeMode}
@@ -179,7 +184,8 @@ export function ApiModelConfigPanel({
       />
       {editingGroup ? (
         <SharedModelConfigDialog
-          title={`添加${editingGroup.badge}服务`}
+          title={tSettings("serviceDialog.addTitle", { badge: editingGroup.badge })}
+          editTitle={tSettings("serviceDialog.editTitle", { badge: editingGroup.badge })}
           badge={editingGroup.badge}
           providerId={editingGroup.providerId}
           draft={drafts[editingGroup.providerId]}
@@ -218,22 +224,22 @@ function ApiServiceModeCards({
   const modes = [
     {
       id: "platform" as const,
-      title: "平台托管 API",
-      subtitle: "省心不用配 Key，不用自己申请和维护各家账号；平台已接入官方 API，直接选择文本、图片、视频模型组合。",
-      badge: "官方 API 成本 + 平台服务费",
+      title: tSettings("serviceMode.platform.title"),
+      subtitle: tSettings("serviceMode.platform.subtitle"),
+      badge: tSettings("serviceMode.platform.badge"),
       ready: platformReady
     },
     {
       id: "byok" as const,
-      title: "自带 API",
-      subtitle: "需要去各模型服务商申请并配置 API Key，调用费由你的 API 账号结算，平台仅收服务费。",
-      badge: "平台服务费",
+      title: tSettings("serviceMode.byok.title"),
+      subtitle: tSettings("serviceMode.byok.subtitle"),
+      badge: tSettings("serviceMode.byok.badge"),
       ready: byokReady
     }
   ];
   return (
-    <section className="grid gap-2" aria-label="服务模式">
-      <div className="text-[12px] font-black text-[var(--muted)]">服务模式</div>
+    <section className="grid gap-2" aria-label={tSettings("serviceMode.label")}>
+      <div className="text-[12px] font-black text-[var(--muted)]">{tSettings("serviceMode.label")}</div>
       <div className="grid gap-2 md:grid-cols-2">
         {modes.map((mode) => {
           const active = serviceMode === mode.id;
@@ -252,7 +258,7 @@ function ApiServiceModeCards({
             >
               <span className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[16px] font-black text-[var(--text)]">{mode.title}</span>
-                <Badge tone={active ? "ok" : "neutral"}>{active ? "当前" : mode.ready ? "可用" : "待配置"}</Badge>
+                <Badge tone={active ? "ok" : "neutral"}>{active ? tSettings("serviceMode.current") : mode.ready ? tSettings("serviceMode.ready") : tSettings("serviceMode.pending")}</Badge>
               </span>
               <span className="text-[12px] font-semibold leading-5 text-[var(--muted)]">{mode.subtitle}</span>
               <span className="text-[11px] font-black text-[var(--accent)]">{mode.badge}</span>
@@ -327,7 +333,7 @@ function ModelServiceOwnerPanel({
           providerId={group.providerId}
           models={group.models}
           apiOwner="byok"
-          keyBadgeLabel="自带 Key"
+          keyBadgeLabel={tSettings("byokKey")}
           onClear={canManageServices ? onClear : undefined}
           onAdd={canManageServices ? () => onAdd(group.providerId) : undefined}
           onEdit={canManageServices ? (model) => onEdit(group.providerId, model, group.models) : undefined}
@@ -371,7 +377,7 @@ function ModelBundleSummary({
       <div className={bundleGridClass}>
         {presetBundles.length === 0 ? (
           <div className={cn(bundleCardClass, "justify-center border-dashed text-center text-[12px] font-semibold leading-5 text-[var(--muted)]")}>
-            暂无可用组合
+            {tSettings("bundles.empty")}
           </div>
         ) : null}
         {presetBundles.map((bundle) => {
@@ -379,9 +385,9 @@ function ModelBundleSummary({
             <div key={bundle.bundleId} className={cn(bundleCardClass, "border-[var(--border)]")}>
               <BundleCardHeader bundle={bundle} />
               <div className={bundleModelRowsClass}>
-                <BundleModelRow kindLabel="文本" modelLabel={bundleModelLabel(allModels, bundle.textModelConfigId)} />
-                <BundleModelRow kindLabel="图片" modelLabel={bundleModelLabel(allModels, bundle.imageModelConfigId)} />
-                <BundleModelRow kindLabel="视频" modelLabel={bundleModelLabel(allModels, bundle.videoModelConfigId)} />
+                <BundleModelRow kindLabel={tSettings("groups.text.badge")} modelLabel={bundleModelLabel(allModels, bundle.textModelConfigId, currentAppLocale())} />
+                <BundleModelRow kindLabel={tSettings("groups.image.badge")} modelLabel={bundleModelLabel(allModels, bundle.imageModelConfigId, currentAppLocale())} />
+                <BundleModelRow kindLabel={tSettings("groups.video.badge")} modelLabel={bundleModelLabel(allModels, bundle.videoModelConfigId, currentAppLocale())} />
               </div>
             </div>
           );
@@ -418,7 +424,7 @@ function PlatformBundleManager({
   const customImageModels = platformConfiguredModels(config.imageModels);
   const customVideoModels = platformConfiguredModels(config.videoModels);
   const sortedBundles = sortByokModelBundlesForDisplay(bundles);
-  const defaultDraftLabel = nextModelBundleLabel(bundles);
+  const defaultDraftLabel = nextModelBundleLabel(bundles, currentAppLocale());
   const [platformBundleDraftLabel, setPlatformBundleDraftLabel] = useState(defaultDraftLabel);
   const [draftLabelEdited, setDraftLabelEdited] = useState(false);
   const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
@@ -443,10 +449,10 @@ function PlatformBundleManager({
       imageModelConfigId: draft.imageModelConfigId,
       videoModelConfigId: draft.videoModelConfigId,
       enabled: true,
-      statusText: "平台自定义组合已保存。"
+      statusText: tSettings("bundles.platformSaved")
     });
     if (saved) {
-      setPlatformBundleDraftLabel(nextModelBundleLabel([...bundles, saved]));
+      setPlatformBundleDraftLabel(nextModelBundleLabel([...bundles, saved], currentAppLocale()));
       setDraftLabelEdited(false);
       setDraft({});
       setShowDraft(false);
@@ -464,9 +470,9 @@ function PlatformBundleManager({
           videoModels={customVideoModels}
           selected={preference.platformBundleId === bundle.bundleId}
           isBusy={isBusy}
-          saveStatusText="平台自定义组合已保存。"
-          enabledStatusText="平台自定义组合已启用。"
-          disabledStatusText="平台自定义组合已停用。"
+          saveStatusText={tSettings("bundles.platformSaved")}
+          enabledStatusText={tSettings("bundles.platformEnabled")}
+          disabledStatusText={tSettings("bundles.platformDisabled")}
           onSaveBundle={onSaveBundle}
           onDeleteBundle={onDeleteBundle}
         />
@@ -520,7 +526,7 @@ function ByokBundleManager({
   const imageModels = byokConfiguredModels(config.imageModels);
   const videoModels = byokConfiguredModels(config.videoModels);
   const sortedBundles = sortByokModelBundlesForDisplay(bundles);
-  const defaultDraftLabel = nextModelBundleLabel(bundles);
+  const defaultDraftLabel = nextModelBundleLabel(bundles, currentAppLocale());
   const [byokBundleDraftLabel, setByokBundleDraftLabel] = useState(defaultDraftLabel);
   const [draftLabelEdited, setDraftLabelEdited] = useState(false);
   const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
@@ -543,10 +549,10 @@ function ByokBundleManager({
       imageModelConfigId: draft.imageModelConfigId,
       videoModelConfigId: draft.videoModelConfigId,
       enabled: true,
-      statusText: "自带 API 组合已保存。"
+      statusText: tSettings("bundles.byokSaved")
     });
     if (saved) {
-      setByokBundleDraftLabel(nextModelBundleLabel([...bundles, saved]));
+      setByokBundleDraftLabel(nextModelBundleLabel([...bundles, saved], currentAppLocale()));
       setDraftLabelEdited(false);
       setDraft({});
       setShowDraft(false);
@@ -565,9 +571,9 @@ function ByokBundleManager({
             videoModels={videoModels}
             selected={preference.byokBundleId === bundle.bundleId}
             isBusy={isBusy}
-            saveStatusText="自带 API 组合已保存。"
-            enabledStatusText="自带 API 组合已启用。"
-            disabledStatusText="自带 API 组合已停用。"
+            saveStatusText={tSettings("bundles.byokSaved")}
+            enabledStatusText={tSettings("bundles.byokEnabled")}
+            disabledStatusText={tSettings("bundles.byokDisabled")}
             onSaveBundle={onSaveBundle}
             onDeleteBundle={onDeleteBundle}
           />
@@ -678,21 +684,21 @@ function EditableBundleCard({
       </div>
       <div className={bundleModelRowsClass}>
         <CustomBundleModelSelect
-          label="文本"
+          label={tSettings("groups.text.badge")}
           value={textModelConfigId}
           models={textModels}
           disabled={isBusy}
           onChange={setTextModelConfigId}
         />
         <CustomBundleModelSelect
-          label="图片"
+          label={tSettings("groups.image.badge")}
           value={imageModelConfigId}
           models={imageModels}
           disabled={isBusy}
           onChange={setImageModelConfigId}
         />
         <CustomBundleModelSelect
-          label="视频"
+          label={tSettings("groups.video.badge")}
           value={videoModelConfigId}
           models={videoModels}
           disabled={isBusy}
@@ -728,8 +734,8 @@ function BundleTitleActions({
         size="icon"
         variant="ghost"
         type="button"
-        aria-label="保存"
-        title="保存"
+        aria-label={tSettings("actions.save")}
+        title={tSettings("actions.save")}
         disabled={isBusy || !canSave}
         onClick={onSave}
       >
@@ -740,8 +746,8 @@ function BundleTitleActions({
         size="icon"
         variant="ghost"
         type="button"
-        aria-label={`删除${originalLabel}`}
-        title="删除"
+        aria-label={tSettings("actions.deleteBundle", { label: originalLabel })}
+        title={tSettings("actions.delete")}
         disabled={isBusy}
         onClick={onDelete}
       >
@@ -760,7 +766,7 @@ function BundleStatusToggle({
   isBusy?: boolean;
   onToggle: () => void;
 }) {
-  const label = enabled ? "启用" : "停用";
+  const label = enabled ? tSettings("bundles.enable") : tSettings("bundles.disabled");
   return (
     <EnabledSwitchButton
       enabled={enabled}
@@ -802,25 +808,25 @@ function BundleDraftCard({
     <div className={cn(bundleCardClass, "border-dashed border-[var(--border)]")}>
       <div className={bundleHeaderClass}>
         <BundleTitleField value={label} onChange={onLabelChange} disabled={isBusy} />
-        <Badge tone={complete ? "ok" : canCreateBundle ? "warn" : "neutral"}>{complete ? "可启用" : canCreateBundle ? "草稿" : "未完成"}</Badge>
+        <Badge tone={complete ? "ok" : canCreateBundle ? "warn" : "neutral"}>{complete ? tSettings("bundles.ready") : canCreateBundle ? tSettings("bundles.draft") : tSettings("bundles.incomplete")}</Badge>
       </div>
       <div className={bundleModelRowsClass}>
         <CustomBundleModelSelect
-          label="文本"
+          label={tSettings("groups.text.badge")}
           value={draft.textModelConfigId}
           models={textModels}
           disabled={isBusy}
           onChange={(textModelConfigId) => onDraftChange({ textModelConfigId })}
         />
         <CustomBundleModelSelect
-          label="图片"
+          label={tSettings("groups.image.badge")}
           value={draft.imageModelConfigId}
           models={imageModels}
           disabled={isBusy}
           onChange={(imageModelConfigId) => onDraftChange({ imageModelConfigId })}
         />
         <CustomBundleModelSelect
-          label="视频"
+          label={tSettings("groups.video.badge")}
           value={draft.videoModelConfigId}
           models={videoModels}
           disabled={isBusy}
@@ -829,11 +835,11 @@ function BundleDraftCard({
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-end gap-2">
         <Button className="w-fit" size="sm" variant="ghost" type="button" disabled={isBusy} onClick={onCancel}>
-          取消
+          {tSettings("actions.cancel")}
         </Button>
         <Button className="w-fit" size="sm" type="button" disabled={isBusy || !canCreateBundle} onClick={onSave}>
           <Plus size={13} />
-          保存组合
+          {tSettings("bundles.save")}
         </Button>
       </div>
     </div>
@@ -853,7 +859,7 @@ function AddBundleCard({ isBusy, onAdd }: { isBusy?: boolean; onAdd: () => void 
     >
       <span className="flex items-center gap-2">
         <Plus size={15} />
-        新增组合
+        {tSettings("bundles.new")}
       </span>
     </button>
   );
@@ -897,9 +903,9 @@ function BundleCardHeader({ bundle }: { bundle: ModelBundleItem }) {
   const complete = isCompleteModelBundle(bundle);
   return (
     <div className={bundleHeaderClass}>
-      <div className="min-w-0 truncate text-[14px] font-black text-[var(--text)]">{bundle.label}</div>
+      <div className="min-w-0 truncate text-[14px] font-black text-[var(--text)]">{localizedModelSchemeBundleLabel(bundle, currentAppLocale())}</div>
       <Badge className="shrink-0" tone={bundle.enabled ? complete ? "ok" : "warn" : "neutral"}>
-        {bundle.enabled ? complete ? "启用" : "未完成" : "停用"}
+        {bundle.enabled ? complete ? tSettings("bundles.enable") : tSettings("bundles.incomplete") : tSettings("bundles.disabled")}
       </Badge>
     </div>
   );
@@ -927,7 +933,7 @@ function CustomBundleModelSelect({
       label={label}
       value={selectedValue}
       options={options}
-      formatOption={(configId) => configId ? bundleModelLabel(models, configId) : "未选择"}
+      formatOption={(configId) => configId ? bundleModelLabel(models, configId, currentAppLocale()) : tSettings("common.notSelected")}
       onChange={onChange}
       disabled={disabled || models.length === 0}
       layout="inline"

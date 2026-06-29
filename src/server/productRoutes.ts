@@ -30,7 +30,7 @@ import {
   type ProductVideoJobRequest
 } from "./videoJobService.js";
 import type { FileAuditLog } from "./auditLog.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
 
@@ -40,7 +40,7 @@ export async function handleProductRoutes(input: {
   requestContext: ConsoleRequestContext;
   rootDir: string;
   dataDir: string;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   auditLog: FileAuditLog;
   fetchImpl?: typeof fetch;
 }): Promise<Response | undefined> {
@@ -100,7 +100,10 @@ export async function handleProductRoutes(input: {
         modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
-        videoJobQueue: requestContext.videoJobQueue
+        videoJobQueue: requestContext.videoJobQueue,
+        billingPolicyStore: requestContext.billingPolicyStore,
+        modelPricingCatalog: requestContext.modelPricingCatalog,
+        modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion
       })
     });
   }
@@ -116,6 +119,9 @@ export async function handleProductRoutes(input: {
       modelBundleStore: requestContext.modelBundleStore,
       modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
       walletStore: requestContext.walletStore,
+      billingPolicyStore: requestContext.billingPolicyStore,
+      modelPricingCatalog: requestContext.modelPricingCatalog,
+      modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion,
       fetchImpl,
       input: (await request.json()) as StoryboardDraftRequest
     }));
@@ -233,6 +239,9 @@ export async function handleProductRoutes(input: {
         modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
+        billingPolicyStore: requestContext.billingPolicyStore,
+        modelPricingCatalog: requestContext.modelPricingCatalog,
+        modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion,
         fetchImpl,
         sku: decodeURIComponent(generateProductAssetsMatch[1] ?? ""),
         input: (await request.json()) as GenerateProductReferenceImagesRequest

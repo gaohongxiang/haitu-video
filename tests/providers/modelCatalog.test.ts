@@ -67,7 +67,8 @@ describe("modelCatalog", () => {
     }));
     expect(catalogVendorsForProvider("openai-compatible-image").map((vendor) => vendor.value)).toEqual([
       "openai",
-      "gemini"
+      "gemini",
+      "doubao"
     ]);
     expect(catalogEntriesForVendor("openai-compatible-image", "gemini").map((entry) => entry.modelId)).toEqual([
       "gemini-3-pro-image-preview",
@@ -88,6 +89,9 @@ describe("modelCatalog", () => {
       "doubao-seed-2-0-pro-260215"
     ]);
     expect(modelIdsFromInput(["gpt-image-2"], "openai-compatible-image")).toEqual(["gpt-image-2"]);
+    expect(modelIdsFromInput(["doubao-seedream-5.0-lite"], "openai-compatible-image")).toEqual([
+      "doubao-seedream-5-0-lite"
+    ]);
     expect(modelIdsFromInput(["seedance-2.0-fast", "seedance-2.0"], "volcengine-seedance")).toEqual([
       "doubao-seedance-2-0-fast-260128",
       "doubao-seedance-2-0-260128"

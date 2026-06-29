@@ -95,7 +95,7 @@ export class OpenAiCompatibleImageProvider {
 
 function imagesBaseUrl(value: string): string {
   const trimmed = value.replace(/\/+$/, "");
-  return trimmed.endsWith("/v1") || trimmed.endsWith("/v1beta/openai") ? trimmed : `${trimmed}/v1`;
+  return trimmed.endsWith("/v1") || trimmed.endsWith("/api/v3") || trimmed.endsWith("/v1beta/openai") ? trimmed : `${trimmed}/v1`;
 }
 
 function clampImageCount(value: unknown): number {

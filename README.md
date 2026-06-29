@@ -20,6 +20,10 @@ The mock provider is free and writes placeholder files. It exists so the pipelin
 npm install
 ```
 
+## 文档
+
+长期架构、模块、运维和 SEO/GEO 文档见 [docs/README.md](docs/README.md)。
+
 ## Test
 
 ```bash

@@ -9,10 +9,11 @@ import {
   staticResponse
 } from "./consoleHttpService.js";
 import {
+  matchMarketingRoute,
+  renderLlmsTxt,
   renderMarketingPage,
   renderRobotsTxt,
-  renderSitemapXml,
-  resolveMarketingRoute
+  renderSitemapXml
 } from "../marketing/renderMarketingPage.js";
 import type { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
 
@@ -62,12 +63,24 @@ export function handleMarketingRoutes(input: {
       headers: { "content-type": "text/plain; charset=utf-8" }
     });
   }
+  if (url.pathname === "/llms.txt") {
+    return new Response(request.method === "HEAD" ? undefined : renderLlmsTxt(url.origin), {
+      headers: { "content-type": "text/plain; charset=utf-8" }
+    });
+  }
   if (url.pathname === "/sitemap.xml") {
     return new Response(request.method === "HEAD" ? undefined : renderSitemapXml(url.origin), {
       headers: { "content-type": "application/xml; charset=utf-8" }
     });
   }
-  const route = resolveMarketingRoute(url);
+  const routeMatch = matchMarketingRoute(url);
+  if (routeMatch.redirectPath) {
+    return new Response(undefined, {
+      status: 301,
+      headers: { location: routeMatch.redirectPath }
+    });
+  }
+  const route = routeMatch.route;
   if (!route) {
     return undefined;
   }
@@ -98,7 +111,10 @@ export async function handleConsoleAssetRoutes(input: {
       ? undefined
       : withNoindexRobots(await readConsoleIndex(consoleDistDir));
     return new Response(indexHtml, {
-      headers: { "content-type": "text/html; charset=utf-8" }
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "x-robots-tag": "noindex, nofollow"
+      }
     });
   }
   if (canReadAsset && url.pathname === "/favicon.svg") {

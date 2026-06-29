@@ -67,21 +67,24 @@ export async function createStripeCheckoutRechargeSession(input: {
   fetchImpl?: typeof fetch;
 }): Promise<StripeCheckoutSession> {
   const fetcher = input.fetchImpl ?? fetch;
-  const successUrl = `${input.config.appUrl}/?section=wallet&payment=stripe-success&orderId=${encodeURIComponent(input.order.id)}`;
-  const cancelUrl = `${input.config.appUrl}/?section=wallet&payment=stripe-cancel&orderId=${encodeURIComponent(input.order.id)}`;
+  const successUrl = `${input.config.appUrl}/console?section=wallet&payment=stripe-success&orderId=${encodeURIComponent(input.order.id)}`;
+  const cancelUrl = `${input.config.appUrl}/console?section=wallet&payment=stripe-cancel&orderId=${encodeURIComponent(input.order.id)}`;
   const params = new URLSearchParams();
   params.set("mode", "payment");
-  params.set("currency", input.order.currency);
+  params.set("currency", input.order.paymentCurrency);
   params.set("success_url", successUrl);
   params.set("cancel_url", cancelUrl);
   params.set("client_reference_id", input.order.id);
   params.set("metadata[walletRechargeOrderId]", input.order.id);
   params.set("metadata[workspaceId]", input.order.workspaceId);
   params.set("metadata[walletCreditCents]", String(input.order.creditCents));
+  params.set("metadata[walletCurrency]", input.order.walletCurrency);
+  params.set("metadata[paymentCurrency]", input.order.paymentCurrency);
+  params.set("metadata[paymentAmountCents]", String(input.order.paymentAmountCents));
   params.set("line_items[0][quantity]", "1");
-  params.set("line_items[0][price_data][currency]", input.order.currency);
-  params.set("line_items[0][price_data][unit_amount]", String(input.order.amountCents));
-  params.set("line_items[0][price_data][product_data][name]", "海兔 AI 余额充值");
+  params.set("line_items[0][price_data][currency]", input.order.paymentCurrency);
+  params.set("line_items[0][price_data][unit_amount]", String(input.order.paymentAmountCents));
+  params.set("line_items[0][price_data][product_data][name]", "嗨兔 AI 余额充值");
   params.set("line_items[0][price_data][product_data][description]", `到账余额 ${input.order.creditCny.toFixed(2)}`);
   let response: Response;
   try {
@@ -225,11 +228,11 @@ function handleCheckoutCompleted(input: {
     throw new Error("Stripe 充值订单不存在。");
   }
   const amountTotal = Number(session.amount_total);
-  if (amountTotal !== order.amountCents) {
+  if (amountTotal !== order.paymentAmountCents) {
     throw new Error("Stripe 充值金额不匹配。");
   }
   const currency = normalizeCurrency(session.currency);
-  if (currency !== order.currency) {
+  if (currency !== order.paymentCurrency) {
     throw new Error("Stripe 充值币种不匹配。");
   }
   if (order.status === "paid") {
@@ -251,8 +254,11 @@ function handleCheckoutCompleted(input: {
       rechargeOrderId: order.id,
       stripeSessionId: session.id,
       stripePaymentIntentId: session.payment_intent ?? undefined,
-      currency: order.currency,
-      amountCents: order.amountCents
+      walletCurrency: order.walletCurrency,
+      creditCents: order.creditCents,
+      paymentCurrency: order.paymentCurrency,
+      paymentAmountCents: order.paymentAmountCents,
+      fxRateSnapshot: order.fxRateSnapshot
     }
   });
   input.orderStore.markPaid({

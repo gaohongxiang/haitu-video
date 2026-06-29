@@ -31,6 +31,7 @@ describe("product import service source boundaries", () => {
 
   it("centralizes text, AI, batch, and file product import workflows in the service module", async () => {
     const serviceSource = await readFile(productImportServicePath, "utf8");
+    const productImportRoutesSource = await readFile(productImportRoutesPath, "utf8");
 
     expect(serviceSource).toContain("export function buildImportedProductPreview(");
     expect(serviceSource).toContain("export async function buildAiImportedProductPreview(");
@@ -43,6 +44,12 @@ describe("product import service source boundaries", () => {
     expect(serviceSource).not.toContain("selectedFileImportRows(");
     expect(serviceSource).toContain("runMeteredAiAction");
     expect(serviceSource).toContain("saveProductFactPackage");
+    expect(serviceSource).toContain("modelPricingCatalog?: readonly ModelPricingEntry[]");
+    expect(serviceSource).toContain("modelPricingCatalogVersion?: string");
+    expect(serviceSource).toContain("modelPricingCatalog: input.modelPricingCatalog");
+    expect(serviceSource).toContain("modelPricingCatalogVersion: input.modelPricingCatalogVersion");
+    expect(productImportRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
+    expect(productImportRoutesSource).toContain("modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion");
   });
 
   it("centralizes product file import preview, existing SKU lookup, and commit workflows", async () => {

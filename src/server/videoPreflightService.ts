@@ -9,15 +9,25 @@ import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/vi
 import { maxSeedanceReferenceImages } from "../core/videoProviderErrors.js";
 import type { MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
+import type { VideoAspectRatio, VideoResolution } from "../providers/types.js";
+import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { listNamedFiles, resolveWithin } from "./consoleAssetService.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import {
   buildPaidGenerationReadiness,
   describeReferenceImages,
   summarizeReferenceImages
 } from "./productReadiness.js";
-import { estimateVideoTokens } from "./videoJobBilling.js";
+import {
+  estimateVideoTokens,
+  tokenPriceCnyPerMillionForVideoModel
+} from "./videoJobBilling.js";
 import { assertTemplateEnabled } from "./videoTemplateService.js";
+import type { ModelBundleStore } from "./modelBundleStore.js";
+import type { ModelConfigStore } from "./modelConfigStore.js";
+import { resolveVideoRequestModel } from "./modelConfigSelection.js";
+import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 
 export interface PreflightRequest {
   productPath: string;
@@ -27,6 +37,9 @@ export interface PreflightRequest {
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
   cta?: string;
+  providerModel?: string;
+  resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
   scriptLines?: string[];
   storyboardLines?: string[];
 }
@@ -36,7 +49,12 @@ export async function runConsolePreflight(
   options: {
     rootDir: string;
     outputsDir: string;
-    settingsStore: FileConsoleSettingsStore;
+    settingsStore: ConsoleSettingsStore;
+    billingPolicyStore?: BillingPolicyStore;
+    modelConfigStore?: ModelConfigStore;
+    platformModelConfigStore?: ModelConfigStore;
+    modelBundleStore?: ModelBundleStore;
+    modelServicePreferenceStore?: ModelServicePreferenceStore;
   }
 ) {
   const productPath = resolveWithin(options.rootDir, body.productPath);
@@ -44,11 +62,23 @@ export async function runConsolePreflight(
   const product = parseProductFacts(rawProduct);
   const settings = await options.settingsStore.read();
   const durationSeconds = body.duration ?? settings.defaultDurationSeconds;
+  const resolution = normalizeVideoResolution(body.resolution);
+  const aspectRatio = normalizeVideoAspectRatio(body.aspectRatio);
   const template = body.template ?? settings.defaultTemplate;
   await assertTemplateEnabled({ template }, options.settingsStore);
   const provider = body.provider ?? settings.defaultProvider;
   const cta = body.cta ?? settings.defaultCta;
   const finalLanguage = normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage);
+  const videoModel = await preflightVideoModel({
+    provider,
+    body,
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelBundleStore: options.modelBundleStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore
+  });
+  const apiBillingMode = videoModel.config?.apiOwner === "platform" ? "platform" : "byok";
+  const platformServiceFeeCny = paidProviderServiceFee(options.billingPolicyStore);
   const referenceImages = await describeReferenceImages(product.reference_images, {
     productFilePath: productPath,
     rootDir: options.rootDir
@@ -67,30 +97,44 @@ export async function runConsolePreflight(
   });
   const prompt = generateVideoPrompt(productWithResolvedImages, {
     durationSeconds,
-    aspectRatio: "9:16",
+    aspectRatio,
     template,
     storyboardLines: sanitizeLines(body.storyboardLines),
     finalLanguage
   });
   const paidProvider = provider !== "mock";
-  const estimatedTokens = estimateVideoTokens(durationSeconds);
-  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
+  const estimatedTokens = estimateVideoTokens(durationSeconds, resolution, aspectRatio);
+  const providerModel = videoModel.providerModel;
+  const tokenPriceCnyPerMillion = tokenPriceCnyPerMillionForVideoModel(providerModel, resolution);
   const assetSummary = summarizeReferenceImages(referenceImages);
   const readiness = buildPaidGenerationReadiness(product, assetSummary);
-  const estimatedCostCny = {
-    low: estimateCny(estimatedTokens.low, tokenPriceCnyPerMillion),
-    expected: estimateCny(estimatedTokens.expected, tokenPriceCnyPerMillion),
-    high: estimateCny(estimatedTokens.high, tokenPriceCnyPerMillion)
+  const upstreamEstimatedCostCny = {
+    low: paidProvider ? estimateCny(estimatedTokens.low, tokenPriceCnyPerMillion) : 0,
+    expected: paidProvider ? estimateCny(estimatedTokens.expected, tokenPriceCnyPerMillion) : 0,
+    high: paidProvider ? estimateCny(estimatedTokens.high, tokenPriceCnyPerMillion) : 0
+  };
+  const serviceFeeCny = {
+    low: paidProvider ? platformServiceFeeCny : 0,
+    expected: paidProvider ? platformServiceFeeCny : 0,
+    high: paidProvider ? platformServiceFeeCny : 0
+  };
+  const estimatedCostCny = upstreamEstimatedCostCny;
+  const walletEstimatedChargeCny = {
+    low: roundMoney((apiBillingMode === "platform" ? upstreamEstimatedCostCny.low : 0) + serviceFeeCny.low),
+    expected: roundMoney((apiBillingMode === "platform" ? upstreamEstimatedCostCny.expected : 0) + serviceFeeCny.expected),
+    high: roundMoney((apiBillingMode === "platform" ? upstreamEstimatedCostCny.high : 0) + serviceFeeCny.high)
   };
   return {
     productSku: product.sku,
     title_ja: product.title_ja,
     provider,
     durationSeconds,
-    aspectRatio: "9:16",
+    resolution,
+    aspectRatio,
     template,
     cta,
     paidProvider,
+    apiBillingMode,
     requiresPaidConfirmation: paidProvider,
     referenceImages,
     assetSummary,
@@ -98,6 +142,9 @@ export async function runConsolePreflight(
     prompt,
     estimatedTokens,
     tokenPriceCnyPerMillion,
+    upstreamEstimatedCostCny,
+    serviceFeeCny,
+    walletEstimatedChargeCny,
     estimatedCostCny,
     credit: await summarizeTestCredit(options.outputsDir, {
       testCreditBalanceCny: settings.testCreditBalanceCny,
@@ -106,6 +153,57 @@ export async function runConsolePreflight(
     readiness,
     warnings: buildPreflightWarnings(assetSummary)
   };
+}
+
+async function preflightVideoModel(input: {
+  provider: VideoProviderName;
+  body: Pick<PreflightRequest, "providerModelConfigId" | "providerModel">;
+  modelConfigStore?: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+}): Promise<{ providerModel?: string; config?: { apiOwner?: string } }> {
+  if (input.provider === "mock" || !input.modelConfigStore) {
+    return {
+      providerModel: input.provider === "mock" ? input.body.providerModel : undefined
+    };
+  }
+  try {
+    const resolved = await resolveVideoRequestModel({
+      modelConfigStore: input.modelConfigStore,
+      platformModelConfigStore: input.platformModelConfigStore,
+      modelBundleStore: input.modelBundleStore,
+      modelServicePreferenceStore: input.modelServicePreferenceStore,
+      provider: input.provider,
+      body: input.body
+    });
+    return {
+      providerModel: resolved.providerModel,
+      config: resolved.config
+    };
+  } catch {
+    return {
+      providerModel: undefined
+    };
+  }
+}
+
+function paidProviderServiceFee(store?: BillingPolicyStore): number {
+  if (!store) {
+    return 0;
+  }
+  try {
+    return store.getRule("video").serviceFeeCny;
+  } catch {
+    return 0;
+  }
+}
+
+function normalizeVideoResolution(value: unknown): VideoResolution {
+  if (value === "720p" || value === "1080p" || value === "4k") {
+    return value;
+  }
+  return "480p";
 }
 
 function buildPreflightWarnings(assetSummary: ReturnType<typeof summarizeReferenceImages>): string[] {
@@ -160,6 +258,10 @@ async function sumPaidEstimatedCostCny(outputsDir: string): Promise<number> {
 
 function estimateCny(tokens: number, tokenPriceCnyPerMillion: number): number {
   return Math.round((tokens / 1_000_000) * tokenPriceCnyPerMillion * 100) / 100;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function sanitizeLines(lines?: string[]): string[] | undefined {

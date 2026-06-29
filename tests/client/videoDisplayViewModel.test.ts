@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   creativeVersionDisplayStatus,
+  creativeVersionFailureReason,
   creativeVersionLifecycleHint,
   formatAbsoluteMinuteTime,
   formatCreativeVersionTime,
   formatHistoryTime,
   historyPreview,
+  readableVideoJobError,
   statusLabel,
   videoDownloadProductContext,
   videoExpiryLabel,
@@ -88,11 +90,32 @@ describe("video display view-model helpers", () => {
     expect(statusLabel("cancelled")).toBe("已取消");
     expect(statusLabel("custom")).toBe("custom");
     expect(videoLabel(2)).toBe("视频 3");
+    expect(statusLabel("queued", "en")).toBe("Queued");
+    expect(videoLabel(2, "en")).toBe("Video 3");
     expect(videoJobResultHint(videoJob({ status: "completed" }))).toBe("暂无成片入口");
     expect(videoJobResultHint(videoJob({ status: "failed", canRecoverDownload: true }))).toBe("视频已生成，但服务器下载成片失败，可重新下载成片");
     expect(videoJobResultHint(videoJob({ status: "failed" }))).toBe("任务失败，可直接重试原任务");
     expect(videoJobResultHint(videoJob({ status: "canceled" }))).toBe("任务已取消");
     expect(videoJobResultHint(videoJob({ status: "running" }))).toBe("任务完成后显示成片和报告");
+  });
+
+  it("localizes video task result hints and known provider errors for English UI", () => {
+    expect(videoJobResultHint(videoJob({ status: "completed" }), "en")).toBe("No final video entry yet");
+    expect(videoJobResultHint(videoJob({ status: "failed", canRecoverDownload: true }), "en")).toBe("The video was generated, but the server could not download it. Download it again.");
+    expect(videoJobResultHint(videoJob({ status: "failed" }), "en")).toBe("Task failed. You can retry the original task.");
+    expect(videoJobResultHint(videoJob({ status: "canceled" }), "en")).toBe("Task canceled");
+    expect(videoJobResultHint(videoJob({ status: "running" }), "en")).toBe("The final video and report will appear after the task completes");
+
+    const localizedError = readableVideoJobError(
+      "视频平台拒绝了这次生成请求。请检查商品资料、参考图和视频模型配置后重试。",
+      {
+        message: 'Volcengine Seedance API error: {"error":{"code":"InvalidParameter","message":"The format of parameter content[1].image_url is illegal: resource download failed"}}'
+      },
+      "en"
+    );
+    expect(localizedError).toBe("Reference image 1 cannot be used for generation right now. Re-upload it, or delete it and use another image.");
+    expect(localizedError).not.toContain("参考图");
+    expect(creativeVersionFailureReason(creativeVersion({ status: "failed", videoJob: videoJob({ status: "failed" }) }), "en")).toBe("Generation failed. Check your video model settings and try again.");
   });
 
   it("formats history, expiry, and creative version times without relative labels", () => {
@@ -102,10 +125,13 @@ describe("video display view-model helpers", () => {
     expect(formatHistoryTime("bad-date", { currentYear: 2026 })).toBe("bad-date");
     expect(historyPreview(" 第一行 \n 第二行 \n 第三行 ")).toBe("第一行\n第二行");
     expect(historyPreview("   ")).toBe("空分镜");
+    expect(historyPreview("   ", "en")).toBe("Empty storyboard");
     expect(videoExpiryLabel({ expired: true }, { currentYear: 2026 })).toBe("已过期");
     expect(videoExpiryLabel({}, { currentYear: 2026 })).toBe("24 小时内可下载");
+    expect(videoExpiryLabel({}, { currentYear: 2026, locale: "en" })).toBe("Downloadable within 24 hours");
     expect(videoExpiryLabel({ expiresAt: "bad-date" }, { currentYear: 2026 })).toBe("24 小时内可下载");
     expect(videoExpiryLabel({ expiresAt: "2026-12-25T08:09:00.000Z" }, { currentYear: 2026 })).toContain("将于");
+    expect(videoExpiryLabel({ expiresAt: "2026-12-25T08:09:00.000Z" }, { currentYear: 2026, locale: "en" })).toContain("Deletes at");
     expect(formatCreativeVersionTime(creativeVersion({ status: "running", createdAt: "2026-06-25T08:09:00.000Z" }), { currentYear: 2026 })).toBe("");
     expect(formatCreativeVersionTime(creativeVersion({ status: "completed", completedAt: "2026-06-25T08:09:00.000Z" }), { currentYear: 2026 })).toContain("06/25");
   });
@@ -115,6 +141,7 @@ describe("video display view-model helpers", () => {
     expect(creativeVersionDisplayStatus(creativeVersion({ finalVideoUrl: "/video.mp4", hasFinalVideo: true }))).toBe("可预览");
     expect(creativeVersionDisplayStatus(creativeVersion({ status: "completed" }))).toBe("已完成");
     expect(creativeVersionDisplayStatus(creativeVersion({ status: "failed" }))).toBe("生成失败");
+    expect(creativeVersionDisplayStatus(creativeVersion({ status: "failed" }), "en")).toBe("Failed");
     expect(creativeVersionLifecycleHint(creativeVersion({ status: "failed", videoJob: videoJob({ status: "failed", error: "provider failed" }) }))).toBe("provider failed");
     expect(creativeVersionLifecycleHint(creativeVersion({ finalVideoUrl: "/video.mp4", hasFinalVideo: true }))).toBe("24 小时内可下载");
   });

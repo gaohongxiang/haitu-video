@@ -17,7 +17,7 @@ describe("model config service source boundaries", () => {
     expect(consoleServerSource).not.toContain('from "./modelConfigService.js"');
     expect(routesSource).toContain('from "./modelConfigService.js"');
     expect(consoleServerSource).not.toContain("async function buildProviderConfig(");
-    expect(consoleServerSource).not.toContain("async function buildPlatformModelAdminConfig(");
+    expect(consoleServerSource).not.toContain("async function buildModelServiceAdminConfig(");
     expect(consoleServerSource).not.toContain("function platformModelConfigInput(");
     expect(consoleServerSource).not.toContain("async function testProviderConfig(");
     expect(consoleServerSource).not.toContain("async function refreshProviderModels(");
@@ -32,7 +32,7 @@ describe("model config service source boundaries", () => {
     const serviceSource = await readFile(servicePath, "utf8");
 
     expect(serviceSource).not.toContain("export async function buildProviderConfig(");
-    expect(serviceSource).not.toContain("export async function buildPlatformModelAdminConfig(");
+    expect(serviceSource).not.toContain("export async function buildModelServiceAdminConfig(");
     expect(serviceSource).not.toContain("function buildTextModelConfigs(");
     expect(serviceSource).not.toContain("function buildImageModelConfigs(");
     expect(serviceSource).not.toContain("function buildVideoModelConfigs(");

@@ -24,7 +24,7 @@ describe("console recoverable download source boundaries", () => {
     expect(queueSource).not.toContain("runBasicQc");
     expect(queueSource).not.toContain("generateJapaneseHashtags");
     expect(queueSource).not.toContain("maxSeedanceReferenceImages");
-    expect(queueSource).not.toContain("estimateCny(");
+    expect(queueSource).not.toContain("estimateVideoUpstreamCostCny(");
   });
 
   it("centralizes recoverable download manifest and failed report assembly", async () => {
@@ -39,6 +39,6 @@ describe("console recoverable download source boundaries", () => {
     expect(serviceSource).toContain("runBasicQc");
     expect(serviceSource).toContain("generateJapaneseHashtags");
     expect(serviceSource).toContain("maxSeedanceReferenceImages");
-    expect(serviceSource).toContain("estimateCny(");
+    expect(serviceSource).toContain("estimateVideoUpstreamCostCny(");
   });
 });

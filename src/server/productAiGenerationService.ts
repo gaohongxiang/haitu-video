@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import { parseProductFacts } from "../core/productFacts.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import {
   isScriptTemplate,
   videoTemplateDefinitions
@@ -17,6 +18,7 @@ import {
   normalizeStringArray
 } from "./productAiGenerationContent.js";
 import { createImageModelProvider, createTextModelProvider } from "./modelProviderService.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { ModelBundleStore } from "./modelBundleStore.js";
 import { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
@@ -54,6 +56,9 @@ export async function buildAiStoryboardDraft(input: {
   modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   walletStore: WalletStore;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
   fetchImpl?: typeof fetch;
   input: StoryboardDraftRequest;
 }): Promise<{ scriptLines: string[]; storyboardLines: string[]; storyboardCnLines: string[]; notes: string[] }> {
@@ -75,43 +80,54 @@ export async function buildAiStoryboardDraft(input: {
   const templateDefinition = videoTemplateDefinitions.find((item) => item.id === template);
   const draft = await runMeteredAiAction({
     walletStore: input.walletStore,
+    billingPolicyStore: input.billingPolicyStore,
     kind: "text",
     modelConfig: textModel.config,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion,
     reserveDescription: "AI 分镜预扣",
     chargeDescription: "AI 分镜扣费",
-    action: () => textModel.provider.generateJson<{
-      scriptLines?: unknown;
-      storyboardLines?: unknown;
-      storyboardCnLines?: unknown;
-      notes?: unknown;
-    }>({
-      system: [
-        "你是 TikTok 商品短视频脚本分镜助手。",
-        "只输出 JSON object，不要 markdown。",
-        "输出字段必须是 scriptLines、storyboardLines、storyboardCnLines、notes，四者都是字符串数组。",
-        "scriptLines 必须使用简体中文，是给操作员参考的画面要点，不写字幕时间轴，不写 CTA。",
-        "storyboardLines 必须使用简体中文，是视频分镜脚本，按秒数描述画面顺序、卖点出现位置和镜头节奏。",
-        "storyboardCnLines 必须使用简体中文，是 storyboardLines 对应的生成说明，逐条解释镜头意图和注意点，不新增未经确认卖点。",
-        "不要在 scriptLines、storyboardLines、storyboardCnLines 中使用英文句子或日文句子；商品名可保留原文。",
-        "必须遵守 forbidden_claims，不要使用未确认功效、销量、排名、UV 数值等宣称。"
-      ].join("\n"),
-      user: [
-        `视频类型: ${template}`,
-        `视频类型说明: ${templateDefinition?.purpose ?? ""}`,
-        `视频时长: ${duration}s`,
-        "商品资料 JSON:",
-        JSON.stringify({
-          title_ja: product.title_ja,
-          category: product.category,
-          materials: product.materials,
-          dimensions: product.dimensions,
-          verified_selling_points: product.verified_selling_points,
-          usage_scenes: product.usage_scenes,
-          forbidden_claims: product.forbidden_claims,
-          reference_images: product.reference_images
-        }, null, 2)
-      ].join("\n")
-    })
+    action: async () => {
+      const result = await textModel.provider.generateJsonWithUsage<{
+        scriptLines?: unknown;
+        storyboardLines?: unknown;
+        storyboardCnLines?: unknown;
+        notes?: unknown;
+      }>({
+        system: [
+          "你是 TikTok 商品短视频脚本分镜助手。",
+          "只输出 JSON object，不要 markdown。",
+          "输出字段必须是 scriptLines、storyboardLines、storyboardCnLines、notes，四者都是字符串数组。",
+          "scriptLines 必须使用简体中文，是给操作员参考的画面要点，不写字幕时间轴，不写 CTA。",
+          "storyboardLines 必须使用简体中文，是视频分镜脚本，按秒数描述画面顺序、卖点出现位置和镜头节奏。",
+          "storyboardCnLines 必须使用简体中文，是 storyboardLines 对应的生成说明，逐条解释镜头意图和注意点，不新增未经确认卖点。",
+          "不要在 scriptLines、storyboardLines、storyboardCnLines 中使用英文句子或日文句子；商品名可保留原文。",
+          "必须遵守 forbidden_claims，不要使用未确认功效、销量、排名、UV 数值等宣称。"
+        ].join("\n"),
+        user: [
+          `视频类型: ${template}`,
+          `视频类型说明: ${templateDefinition?.purpose ?? ""}`,
+          `视频时长: ${duration}s`,
+          "商品资料 JSON:",
+          JSON.stringify({
+            title_ja: product.title_ja,
+            category: product.category,
+            materials: product.materials,
+            dimensions: product.dimensions,
+            verified_selling_points: product.verified_selling_points,
+            usage_scenes: product.usage_scenes,
+            forbidden_claims: product.forbidden_claims,
+            reference_images: product.reference_images
+          }, null, 2)
+        ].join("\n")
+      });
+      return {
+        value: result.value,
+        metering: {
+          textUsage: result.usage
+        }
+      };
+    }
   });
   const scriptLines = normalizeStringArray(draft.scriptLines);
   const storyboardLines = normalizeStringArray(draft.storyboardLines);
@@ -152,6 +168,9 @@ export async function generateProductReferenceImages(input: {
   modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   walletStore: WalletStore;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
   fetchImpl?: typeof fetch;
   input: GenerateProductReferenceImagesRequest;
 }): Promise<{
@@ -176,8 +195,11 @@ export async function generateProductReferenceImages(input: {
   });
   const images = await runMeteredAiAction({
     walletStore: input.walletStore,
+    billingPolicyStore: input.billingPolicyStore,
     kind: "image",
     modelConfig: imageModel.config,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion,
     units: count,
     reserveDescription: "AI 图片生成预扣",
     chargeDescription: "AI 图片生成扣费",

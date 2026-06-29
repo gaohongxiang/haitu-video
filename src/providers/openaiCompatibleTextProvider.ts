@@ -3,7 +3,9 @@ import {
   openAiCompatibleBaseUrl,
   trimTrailingSlash,
   type TextJsonRequest,
+  type TextJsonResult,
   type TextProvider,
+  type TextProviderUsage,
   type TextProviderOptions
 } from "./textProviderTypes.js";
 import {
@@ -21,6 +23,14 @@ interface ChatCompletionResponse {
       content?: string;
     };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    prompt_tokens_details?: {
+      cached_tokens?: number;
+    };
+  };
   error?: {
     message?: string;
   };
@@ -40,6 +50,10 @@ export class OpenAiCompatibleTextProvider implements TextProvider {
   }
 
   async generateJson<T>(request: TextJsonRequest): Promise<T> {
+    return (await this.generateJsonWithUsage<T>(request)).value;
+  }
+
+  async generateJsonWithUsage<T>(request: TextJsonRequest): Promise<TextJsonResult<T>> {
     if (!this.apiKey) {
       throw new Error("请先在 API 管理配置文本模型 API Key。");
     }
@@ -68,7 +82,10 @@ export class OpenAiCompatibleTextProvider implements TextProvider {
     if (!content) {
       throw new Error(completion.error?.message ?? "文本模型没有返回内容。");
     }
-    return JSON.parse(extractJsonObject(content)) as T;
+    return {
+      value: JSON.parse(extractJsonObject(content)) as T,
+      usage: textProviderUsageFromChatUsage(completion.usage)
+    };
   }
 }
 
@@ -86,4 +103,23 @@ export function imageModelBaseUrl(): string {
 
 export function imageModelName(): string {
   return defaultImageModelId();
+}
+
+function textProviderUsageFromChatUsage(usage: ChatCompletionResponse["usage"]): TextProviderUsage | undefined {
+  if (!usage) {
+    return undefined;
+  }
+  return compactUsage({
+    inputTokens: usage.prompt_tokens,
+    outputTokens: usage.completion_tokens,
+    totalTokens: usage.total_tokens,
+    cachedInputTokens: usage.prompt_tokens_details?.cached_tokens
+  });
+}
+
+function compactUsage(usage: TextProviderUsage): TextProviderUsage | undefined {
+  const next = Object.fromEntries(
+    Object.entries(usage).filter(([, value]) => typeof value === "number" && Number.isFinite(value))
+  ) as TextProviderUsage;
+  return Object.keys(next).length > 0 ? next : undefined;
 }

@@ -98,16 +98,16 @@ export async function createInfiniCheckoutRechargeSession(input: {
   const fetcher = input.fetchImpl ?? fetch;
   const path = "/v1/acquiring/order";
   const body = JSON.stringify({
-    amount: input.order.amountCny.toFixed(2),
+    amount: input.order.paymentAmount.toFixed(2),
     request_id: input.order.id,
     client_reference: input.order.id,
     order_desc: "Haitu 余额充值",
     expires_in: 3600,
     merchant_alias: input.config.merchantAlias,
-    success_url: `${input.config.appUrl}/?section=wallet&payment=infini-success&orderId=${encodeURIComponent(input.order.id)}`,
-    failure_url: `${input.config.appUrl}/?section=wallet&payment=infini-cancel&orderId=${encodeURIComponent(input.order.id)}`,
+    success_url: `${input.config.appUrl}/console?section=wallet&payment=infini-success&orderId=${encodeURIComponent(input.order.id)}`,
+    failure_url: `${input.config.appUrl}/console?section=wallet&payment=infini-cancel&orderId=${encodeURIComponent(input.order.id)}`,
     pay_methods: [1],
-    currency: input.order.currency.toUpperCase()
+    currency: input.order.paymentCurrency.toUpperCase()
   });
   let response: Response;
   try {
@@ -432,11 +432,11 @@ function handleInfiniOrderCompleted(input: {
     throw new Error("Infini 充值订单不存在。");
   }
   const amountCents = decimalAmountToCents(input.event.amount);
-  if (!Number.isFinite(amountCents) || amountCents !== order.amountCents) {
+  if (!Number.isFinite(amountCents) || amountCents !== order.paymentAmountCents) {
     throw new Error("Infini 充值金额不匹配。");
   }
   const currency = normalizeCurrency(input.event.currency);
-  if (currency !== order.currency) {
+  if (currency !== order.paymentCurrency) {
     throw new Error("Infini 充值币种不匹配。");
   }
   if (order.status === "paid") {
@@ -457,8 +457,11 @@ function handleInfiniOrderCompleted(input: {
       provider: "infini",
       rechargeOrderId: order.id,
       infiniOrderId: input.event.orderId,
-      currency: order.currency,
-      amountCents: order.amountCents,
+      walletCurrency: order.walletCurrency,
+      creditCents: order.creditCents,
+      paymentCurrency: order.paymentCurrency,
+      paymentAmountCents: order.paymentAmountCents,
+      fxRateSnapshot: order.fxRateSnapshot,
       amountConfirmed: input.event.amountConfirmed,
       amountConfirming: input.event.amountConfirming
     }

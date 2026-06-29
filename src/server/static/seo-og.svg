@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Haitu AI 商品视频与图片素材平台</title>
+  <desc id="desc">Haitu helps ecommerce teams optimize product images and generate product videos.</desc>
+  <rect width="1200" height="630" fill="#f3e6d8"/>
+  <rect x="58" y="58" width="1084" height="514" rx="28" fill="#fffaf3" stroke="#dbc2ab" stroke-width="2"/>
+  <circle cx="1000" cy="140" r="118" fill="#d7f0ea" opacity=".75"/>
+  <circle cx="248" cy="510" r="160" fill="#ffefd9" opacity=".9"/>
+  <g transform="translate(96 96)">
+    <rect width="74" height="74" rx="18" fill="#e0b286"/>
+    <rect x="17" y="17" width="17" height="17" rx="5" fill="#6f442c"/>
+    <rect x="42" y="16" width="14" height="42" rx="7" fill="#fffaf3"/>
+    <rect x="17" y="43" width="28" height="15" rx="7" fill="#fffaf3" opacity=".86"/>
+    <text x="96" y="49" fill="#2a211b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="38" font-weight="800">Haitu</text>
+  </g>
+  <text x="96" y="265" fill="#6f442c" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="44" font-weight="760">商品图优化与视频生成</text>
+  <text x="96" y="345" fill="#2a211b" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="70" font-weight="820">AI 创作平台</text>
+  <text x="100" y="420" fill="#76685c" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="26" font-weight="560">Product image optimization · Product video generation · Hosted or own models</text>
+  <g transform="translate(735 175)">
+    <rect width="330" height="272" rx="18" fill="#fff5e9" stroke="#dbc2ab" stroke-width="2"/>
+    <rect x="28" y="30" width="274" height="150" rx="14" fill="#f8ede1" stroke="#ead7c4"/>
+    <rect x="162" y="54" width="98" height="112" rx="28" fill="#e0b286"/>
+    <rect x="210" y="118" width="68" height="60" rx="10" fill="#6f442c"/>
+    <rect x="52" y="58" width="84" height="36" rx="18" fill="#d7f0ea" stroke="#b7d8d0"/>
+    <rect x="28" y="202" width="84" height="42" rx="8" fill="#d7f0ea"/>
+    <rect x="124" y="202" width="84" height="42" rx="8" fill="#ffefd9"/>
+    <rect x="220" y="202" width="84" height="42" rx="8" fill="#e0b286"/>
+  </g>
+</svg>

@@ -1,3 +1,6 @@
+import type { AppLocale } from "../i18n/config.js";
+import { appText } from "../i18n/appText.js";
+
 export type ProductAutoSaveStatus = "idle" | "dirty" | "saving" | "saved" | "failed";
 export type StoryboardDraftSource = "default" | "ai" | "manual";
 export type ProductFileImportRowStatus = "ready" | "needs-ai" | "needs-input" | "duplicate" | "failed";
@@ -78,27 +81,24 @@ export function isProductImportFile(file: { name: string }): boolean {
   return name.endsWith(".csv") || name.endsWith(".xlsx") || name.endsWith(".xls");
 }
 
-export function fileImportRowLabel(status: ProductFileImportRowStatus): string {
-  const labels: Record<ProductFileImportRowStatus, string> = {
-    ready: "未导入",
-    "needs-ai": "未导入",
-    "needs-input": "不可导入",
-    duplicate: "已导入",
-    failed: "不可导入"
-  };
-  return labels[status];
+export function fileImportRowLabel(status: ProductFileImportRowStatus, locale?: AppLocale): string {
+  return appText(`fileImport.rowStatus.${status}`, locale);
 }
 
 export function fileImportCanSelect(row: ProductFileImportRow): boolean {
   return Boolean(row.product) && row.status !== "failed" && row.status !== "needs-input" && row.status !== "duplicate";
 }
 
-export function fileImportSourceRowsLabel(row: ProductFileImportRow): string {
+export function fileImportSourceRowsLabel(row: ProductFileImportRow, locale?: AppLocale): string {
   const rows = row.sourceRowNumbers?.length ? row.sourceRowNumbers : [row.rowNumber];
   if (rows.length === 1) {
     return String(rows[0]);
   }
-  return `${rows[0]}-${rows[rows.length - 1]} (${rows.length} 行)`;
+  return appText("fileImport.sourceRowsRange", locale, {
+    start: rows[0],
+    end: rows[rows.length - 1],
+    count: rows.length
+  });
 }
 
 export function fileImportProductIdLabel(row: ProductFileImportRow): string {
@@ -117,58 +117,62 @@ export function fileImportRowTone(status: ProductFileImportRowStatus): "neutral"
 }
 
 export function productGenerationReadiness({
+  locale,
   selectedProduct,
   importText
 }: {
+  locale?: AppLocale;
   selectedProduct?: ProductDetail;
   importText: string;
 }): { ready: boolean; label: string } {
   if (selectedProduct) {
-    return { ready: true, label: "资料已保存，可生成视频。" };
+    return { ready: true, label: appText("videoStudio.readiness.saved", locale) };
   }
   if (!importText.trim()) {
-    return { ready: false, label: "请先填写商品资料。" };
+    return { ready: false, label: appText("videoStudio.readiness.empty", locale) };
   }
-  return { ready: true, label: "将先整理资料包，再生成视频。" };
+  return { ready: true, label: appText("videoStudio.readiness.willOrganize", locale) };
 }
 
 export function productFactsStatusLabel({
+  locale,
   selectedProduct,
   importText
 }: {
+  locale?: AppLocale;
   selectedProduct?: ProductDetail;
   importText: string;
 }): string {
   if (!selectedProduct) {
     if (importText.trim()) {
-      return "原始资料";
+      return appText("videoStudio.facts.raw", locale);
     }
-    return "未填资料";
+    return appText("videoStudio.facts.empty", locale);
   }
-  return "已整理资料包";
+  return appText("videoStudio.facts.savedPackage", locale);
 }
 
-export function productAutoSaveStatusLabel(status: ProductAutoSaveStatus): string {
+export function productAutoSaveStatusLabel(status: ProductAutoSaveStatus, locale?: AppLocale): string {
   if (status === "saving") {
-    return "保存中";
+    return appText("videoStudio.autosave.saving", locale);
   }
   if (status === "saved") {
-    return "已保存";
+    return appText("videoStudio.autosave.saved", locale);
   }
   if (status === "failed") {
-    return "保存失败";
+    return appText("videoStudio.autosave.failed", locale);
   }
   return "";
 }
 
-export function storyboardStatusLabel(storyboardDraftSource: StoryboardDraftSource): string {
+export function storyboardStatusLabel(storyboardDraftSource: StoryboardDraftSource, locale?: AppLocale): string {
   if (storyboardDraftSource === "default") {
-    return "默认分镜";
+    return appText("videoStudio.storyboard.default", locale);
   }
   if (storyboardDraftSource === "ai") {
-    return "AI 生成分镜";
+    return appText("videoStudio.storyboard.ai", locale);
   }
-  return "手动分镜";
+  return appText("videoStudio.storyboard.manual", locale);
 }
 
 export function dedupeProductSummaries(products: ProductSummary[]): ProductSummary[] {

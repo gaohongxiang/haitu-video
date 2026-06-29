@@ -1,4 +1,5 @@
 import { normalizeFinalVideoLanguage } from "../core/videoLanguage.js";
+import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
 import type { ConsoleSettings } from "./consoleSettings.js";
 import type { VideoJobRecord, VideoJobRequest } from "./consoleVideoJobTypes.js";
 
@@ -23,6 +24,7 @@ export function createQueuedVideoJobRecord(input: {
     providerModel: request.providerModel,
     durationSeconds: request.duration ?? settings.defaultDurationSeconds,
     resolution: request.resolution,
+    aspectRatio: normalizeVideoAspectRatio(request.aspectRatio),
     template: request.template ?? settings.defaultTemplate,
     finalLanguage: normalizeFinalVideoLanguage(request.finalLanguage ?? settings.defaultLanguage),
     cta: request.cta ?? settings.defaultCta,
@@ -33,6 +35,8 @@ export function createQueuedVideoJobRecord(input: {
     platformFeeCny: request.platformFeeCny,
     upstreamEstimatedCostCny: request.upstreamEstimatedCostCny,
     walletReservationId: request.walletReservationId,
+    billingCatalogVersion: request.billingCatalogVersion,
+    billingPriceSnapshot: request.billingPriceSnapshot,
     reuseManifest: request.reuseManifest,
     outDir,
     createdAt,

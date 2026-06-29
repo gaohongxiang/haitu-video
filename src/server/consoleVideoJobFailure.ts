@@ -1,4 +1,5 @@
 import type { VideoJobRecord } from "./consoleVideoJobTypes.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import {
   persistRecoverableDownloadFailure
 } from "./consoleRecoverableDownload.js";
@@ -13,6 +14,7 @@ export async function failedVideoJobPatch(input: {
   error: unknown;
   completedAt: string;
   reportUrlForPath: (path: string) => string;
+  billingPolicyStore?: BillingPolicyStore;
 }): Promise<Partial<VideoJobRecord>> {
   const errorDetails = {
     ...serializeVideoJobError(input.error),
@@ -28,7 +30,8 @@ export async function failedVideoJobPatch(input: {
     record: input.record,
     error: input.error,
     errorDetails,
-    reportUrlForPath: input.reportUrlForPath
+    reportUrlForPath: input.reportUrlForPath,
+    billingPolicyStore: input.billingPolicyStore
   });
   const mergedErrorDetails = {
     ...errorDetails,

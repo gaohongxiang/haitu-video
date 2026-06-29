@@ -1,0 +1,28 @@
+{
+  "brand": {
+    "name": "Haitu"
+  },
+  "language": {
+    "label": "语言",
+    "change": "切换语言"
+  },
+  "navigation": {
+    "imageOptimization": "商品图优化",
+    "video": "商品视频",
+    "models": "模型接入",
+    "console": "控制台"
+  },
+  "seo": {
+    "home": "首页",
+    "faq": "常见问题",
+    "breadcrumbLabel": "页面路径",
+    "footerLabel": "SEO 页面导航",
+    "footerFeatures": "功能",
+    "footerPlatforms": "平台",
+    "footerTools": "工具",
+    "footerUseCases": "场景",
+    "footerCategories": "类目",
+    "footerCompare": "对比",
+    "footerTrust": "信任与支持"
+  }
+}

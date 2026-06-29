@@ -1,5 +1,6 @@
 import type { ProductFacts } from "./productFacts.js";
 import type { ScriptTemplate } from "./scriptGenerator.js";
+import type { VideoAspectRatio } from "../providers/types.js";
 import {
   defaultFinalVideoLanguage,
   finalVideoLanguageLabel,
@@ -9,7 +10,7 @@ import {
 
 export interface VideoPromptOptions {
   durationSeconds: number;
-  aspectRatio: "9:16";
+  aspectRatio: VideoAspectRatio;
   template: ScriptTemplate;
   storyboardLines?: string[];
   finalLanguage?: FinalVideoLanguage;

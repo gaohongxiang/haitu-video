@@ -13,7 +13,8 @@ import {
 import { defaultFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import type { BasicQcReport } from "../qc/basicQc.js";
 import { runBasicQc } from "../qc/basicQc.js";
-import type { MoneyAmount, VideoProvider, VideoProviderResult, VideoResolution } from "../providers/types.js";
+import type { MoneyAmount, VideoAspectRatio, VideoProvider, VideoProviderResult, VideoResolution } from "../providers/types.js";
+import { defaultVideoResolution, normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
 
 export interface ProductJobManifest {
   jobId: string;
@@ -57,11 +58,13 @@ export async function runProductJob(input: {
   template: ScriptTemplate;
   durationSeconds?: number;
   resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
   scriptLines?: string[];
   storyboardLines?: string[];
   finalLanguage?: FinalVideoLanguage;
 }): Promise<ProductJobManifest> {
   const durationSeconds = input.durationSeconds ?? 8;
+  const aspectRatio = normalizeVideoAspectRatio(input.aspectRatio);
   const finalLanguage = input.finalLanguage ?? defaultFinalVideoLanguage;
   const jobId = `${input.product.sku}-v${input.version}`;
   const outputDir = join(input.outputRoot, input.product.sku, `v${input.version}`);
@@ -79,7 +82,7 @@ export async function runProductJob(input: {
   };
   const prompt = generateVideoPrompt(generationProduct, {
     durationSeconds,
-    aspectRatio: "9:16",
+    aspectRatio,
     template: input.template,
     storyboardLines: input.storyboardLines,
     finalLanguage
@@ -90,7 +93,7 @@ export async function runProductJob(input: {
     prompt,
     script: script.voiceover,
     durationSeconds,
-    aspectRatio: "9:16",
+    aspectRatio,
     resolution: input.resolution,
     outputDir,
     referenceImages: generationProduct.reference_images,
@@ -100,7 +103,9 @@ export async function runProductJob(input: {
     product: input.product,
     script,
     output: providerResult.output,
-    targetDurationSeconds: durationSeconds
+    targetDurationSeconds: durationSeconds,
+    targetAspectRatio: aspectRatio,
+    targetResolution: input.resolution ?? defaultVideoResolution
   });
   const hashtags = generateJapaneseHashtags({
     product: input.product,

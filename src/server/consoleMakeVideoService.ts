@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { normalizeFinalVideoLanguage } from "../core/videoLanguage.js";
 import { runMakeVideoPipeline, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { ReferenceImageUrlResolver } from "../providers/types.js";
+import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { resolveWithin } from "./consoleAssetService.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { selectedVideoModelConfig } from "./modelConfigSelection.js";
@@ -13,13 +15,14 @@ import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.
 import { assertPaidProductReady } from "./productReadiness.js";
 import type { MakeVideoRequest } from "./videoJobService.js";
 import { assertTemplateEnabled } from "./videoTemplateService.js";
+import { tokenPriceCnyPerMillionForVideoModel } from "./videoJobBilling.js";
 
 export async function runConsoleMakeVideo(
   body: MakeVideoRequest,
   options: {
     rootDir: string;
     outputsDir: string;
-    settingsStore: FileConsoleSettingsStore;
+    settingsStore: ConsoleSettingsStore;
     modelConfigStore: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
     modelBundleStore?: ModelBundleStore;
@@ -27,6 +30,7 @@ export async function runConsoleMakeVideo(
     fetchImpl?: typeof fetch;
     runMakeVideoPipeline?: typeof runMakeVideoPipeline;
     referenceImageUrlResolver?: ReferenceImageUrlResolver;
+    billingPolicyStore?: BillingPolicyStore;
   }
 ): Promise<MakeVideoReport> {
   const productPath = resolveWithin(options.rootDir, body.productPath);
@@ -54,6 +58,8 @@ export async function runConsoleMakeVideo(
     outDir: join(options.outputsDir, outDirName),
     providerName,
     durationSeconds: body.duration ?? settings.defaultDurationSeconds,
+    resolution: body.resolution,
+    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio),
     template: body.template ?? settings.defaultTemplate,
     finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
     cta: body.cta ?? settings.defaultCta,
@@ -63,8 +69,9 @@ export async function runConsoleMakeVideo(
     reuseManifestPath: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined,
     apiKey: providerConfig.apiKey,
     providerBaseUrl: providerConfig.baseUrl,
-    providerModelConfigId: body.providerModelConfigId,
-    providerModel: body.providerModel ?? providerConfig.model,
+    providerModelConfigId: providerConfig.configId,
+    providerModel: providerConfig.model,
+    tokenPriceCnyPerMillion: tokenPriceCnyPerMillionForVideoModel(providerConfig.model, body.resolution),
     fetchImpl: options.fetchImpl,
     referenceImageUrlResolver: options.referenceImageUrlResolver
   });

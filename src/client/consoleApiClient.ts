@@ -3,6 +3,15 @@ export async function getJson<T>(path: string): Promise<T> {
   return readJsonResponse<T>(response);
 }
 
+async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<T> {
+  try {
+    const response = await fetch(path, { signal });
+    return await readJsonResponse<T>(response);
+  } catch (error) {
+    throw new Error(`控制台初始化接口失败 ${path}: ${fetchErrorMessage(error)}`);
+  }
+}
+
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
@@ -52,11 +61,14 @@ export interface ConsoleSnapshotTypes {
   videoJobsResponse: unknown;
   walletResponse: unknown;
   paymentMethodsResponse: unknown;
+  modelPricingCatalogResponse: unknown;
   modelBundlesResponse: unknown;
   modelServicePreferenceResponse: unknown;
 }
 
 export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Promise<T> {
+  const consoleSnapshotRequestTimeoutMs = 8000;
+  const signal = AbortSignal.timeout(consoleSnapshotRequestTimeoutMs);
   const [
     productsResponse,
     reportsResponse,
@@ -71,24 +83,26 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     videoJobsResponse,
     walletResponse,
     paymentMethodsResponse,
+    modelPricingCatalogResponse,
     modelBundlesResponse,
     modelServicePreferenceResponse
   ] = await Promise.all([
-    getJson<T["productsResponse"]>("/api/products"),
-    getJson<T["reportsResponse"]>("/api/reports"),
-    getJson<T["ledgerResponse"]>("/api/job-ledger"),
-    getJson<T["qcSummaryResponse"]>("/api/qc-summary"),
-    getJson<T["videoAssetsResponse"]>("/api/video-assets"),
-    getJson<T["storageBackupResponse"]>("/api/storage-backup"),
-    getJson<T["localBackupsResponse"]>("/api/backups"),
-    getJson<T["auditLogResponse"]>("/api/audit-log"),
-    getJson<T["providerConfigResponse"]>("/api/provider-config"),
-    getJson<T["settingsResponse"]>("/api/settings"),
-    getJson<T["videoJobsResponse"]>("/api/video-jobs"),
-    getJson<T["walletResponse"]>("/api/wallet"),
-    getJson<T["paymentMethodsResponse"]>("/api/payment-methods"),
-    getJson<T["modelBundlesResponse"]>("/api/model-bundles"),
-    getJson<T["modelServicePreferenceResponse"]>("/api/model-service-preference")
+    getJsonWithSignal<T["productsResponse"]>("/api/products", signal),
+    getJsonWithSignal<T["reportsResponse"]>("/api/reports", signal),
+    getJsonWithSignal<T["ledgerResponse"]>("/api/job-ledger", signal),
+    getJsonWithSignal<T["qcSummaryResponse"]>("/api/qc-summary", signal),
+    getJsonWithSignal<T["videoAssetsResponse"]>("/api/video-assets", signal),
+    getJsonWithSignal<T["storageBackupResponse"]>("/api/storage-backup", signal),
+    getJsonWithSignal<T["localBackupsResponse"]>("/api/backups", signal),
+    getJsonWithSignal<T["auditLogResponse"]>("/api/audit-log", signal),
+    getJsonWithSignal<T["providerConfigResponse"]>("/api/provider-config", signal),
+    getJsonWithSignal<T["settingsResponse"]>("/api/settings", signal),
+    getJsonWithSignal<T["videoJobsResponse"]>("/api/video-jobs", signal),
+    getJsonWithSignal<T["walletResponse"]>("/api/wallet", signal),
+    getJsonWithSignal<T["paymentMethodsResponse"]>("/api/payment-methods", signal),
+    getJsonWithSignal<T["modelPricingCatalogResponse"]>("/api/model-pricing-catalog", signal),
+    getJsonWithSignal<T["modelBundlesResponse"]>("/api/model-bundles", signal),
+    getJsonWithSignal<T["modelServicePreferenceResponse"]>("/api/model-service-preference", signal)
   ]);
   return {
     productsResponse,
@@ -104,6 +118,7 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     videoJobsResponse,
     walletResponse,
     paymentMethodsResponse,
+    modelPricingCatalogResponse,
     modelBundlesResponse,
     modelServicePreferenceResponse
   } as T;
@@ -115,4 +130,11 @@ export async function readJsonResponse<T>(response: Response): Promise<T> {
     throw new Error(body.error || `HTTP ${response.status}`);
   }
   return body as T;
+}
+
+function fetchErrorMessage(error: unknown): string {
+  if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+    return "请求超时";
+  }
+  return error instanceof Error ? error.message : String(error);
 }

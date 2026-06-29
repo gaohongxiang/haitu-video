@@ -208,6 +208,70 @@ export const paymentWebhookEvents = sqliteTable("payment_webhook_events", {
   payloadJson: text("payload_json")
 });
 
+export const billingPolicies = sqliteTable("billing_policies", {
+  id: text("id").primaryKey(),
+  mode: text("mode").notNull(),
+  label: text("label").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
+export const billingPriceRules = sqliteTable("billing_price_rules", {
+  id: text("id").primaryKey(),
+  policyId: text("policy_id").notNull().references(() => billingPolicies.id, { onDelete: "cascade" }),
+  usageKind: text("usage_kind").notNull(),
+  serviceFeeCents: integer("service_fee_cents").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+}, (table) => ({
+  policyKindUnique: uniqueIndex("billing_price_rules_policy_kind_unique").on(table.policyId, table.usageKind),
+  policyIndex: index("billing_price_rules_policy_idx").on(table.policyId, table.enabled)
+}));
+
+export const modelPricingCatalogVersions = sqliteTable("model_pricing_catalog_versions", {
+  id: text("id").primaryKey(),
+  version: text("version").notNull(),
+  status: text("status").notNull(),
+  catalogJson: text("catalog_json").notNull(),
+  source: text("source").notNull(),
+  createdBy: text("created_by"),
+  createdAt: text("created_at").notNull(),
+  publishedAt: text("published_at").notNull()
+}, (table) => ({
+  statusIndex: index("model_pricing_catalog_versions_status_idx").on(table.status, table.publishedAt)
+}));
+
+export const modelPricingCatalogDrafts = sqliteTable("model_pricing_catalog_drafts", {
+  id: text("id").primaryKey(),
+  baseVersionId: text("base_version_id").references(() => modelPricingCatalogVersions.id, { onDelete: "set null" }),
+  version: text("version").notNull(),
+  catalogJson: text("catalog_json").notNull(),
+  createdBy: text("created_by"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+}, (table) => ({
+  updatedIndex: index("model_pricing_catalog_drafts_updated_idx").on(table.updatedAt)
+}));
+
+export const consoleSettings = sqliteTable("console_settings", {
+  id: text("id").primaryKey(),
+  defaultLanguage: text("default_language").notNull(),
+  defaultDurationSeconds: integer("default_duration_seconds").notNull(),
+  defaultTemplate: text("default_template").notNull(),
+  enabledTemplatesJson: text("enabled_templates_json").notNull(),
+  defaultCta: text("default_cta").notNull(),
+  defaultProvider: text("default_provider").notNull(),
+  maxEstimatedCostCentsPerVideo: integer("max_estimated_cost_cents_per_video").notNull(),
+  testCreditBalanceCents: integer("test_credit_balance_cents").notNull(),
+  forbiddenWordsJson: text("forbidden_words_json").notNull(),
+  exaggerationRulesJson: text("exaggeration_rules_json").notNull(),
+  paymentMethodsJson: text("payment_methods_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
 export const modelBundles = sqliteTable("model_bundles", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -265,10 +329,14 @@ export const userSessions = sqliteTable("user_sessions", {
 
 export const schema = {
   auditLogs,
+  billingPolicies,
+  billingPriceRules,
   productAssets,
   products,
   modelBundles,
   modelCredentials,
+  modelPricingCatalogDrafts,
+  modelPricingCatalogVersions,
   modelServicePreferences,
   modelVariants,
   storyboards,

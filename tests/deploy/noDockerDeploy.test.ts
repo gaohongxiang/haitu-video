@@ -14,11 +14,12 @@ describe("no-Docker VPS deployment package", () => {
     const envExample = await readFile(join(root, "deploy", "env", "haitu-video.env.example"), "utf8");
     const deployScript = await readFile(join(root, "deploy", "scripts", "deploy-from-github.sh"), "utf8");
     const tunnel = await readFile(join(root, "deploy", "cloudflare", "tunnel-config.example.yml"), "utf8");
-    const guide = await readFile(join(root, "docs", "deployment", "vps-no-docker.md"), "utf8");
+    const guide = await readFile(join(root, "docs", "operations", "vps-no-docker.md"), "utf8");
 
     expect(packageJson.scripts["start:console"]).toBe("tsx src/cli/console.ts");
     expect(packageJson.scripts.start).toBe("npm run start:console");
     expect(packageJson.scripts["deploy:check"]).toBe("npm run typecheck && npm test && npm run build:console");
+    expect(packageJson.scripts["seo:check"]).toBe("tsx scripts/check-seo-geo-production.ts");
     expect(packageJson.scripts["deploy:vps"]).toBe("ssh openclaw-ghxServer 'cd /opt/haitu-video && sudo ./deploy/scripts/deploy-from-github.sh'");
 
     expect(service).toContain("Description=Haitu Video Console");
@@ -37,6 +38,7 @@ describe("no-Docker VPS deployment package", () => {
     expect(envExample).toContain("HAITU_DATA_DIR=/var/lib/haitu-video");
     expect(envExample).toContain("HAITU_SECRET_KEY=replace-with-at-least-32-random-bytes");
     expect(envExample).toContain("HAITU_ADMIN_EMAIL=");
+    expect(envExample).toContain("HAITU_PUBLIC_BASE_URL=https://haitu.online");
     expect(envExample).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(envExample).toContain("HAITU_AUTH_EMAIL_FROM=");
     expect(envExample).toContain("RESEND_API_KEY=");
@@ -62,13 +64,16 @@ describe("no-Docker VPS deployment package", () => {
     expect(deployScript).toContain('APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"');
     expect(deployScript).toContain('ENV_FILE="${HAITU_DEPLOY_ENV_FILE:-/etc/haitu-video.env}"');
     expect(deployScript).toContain('source "$ENV_FILE"');
+    expect(deployScript).toContain('PUBLIC_BASE_URL="${HAITU_PUBLIC_BASE_URL:-${BETTER_AUTH_URL:-https://haitu.online}}"');
     expect(deployScript).toContain('sudo -u "$APP_USER" HOME="$APP_HOME" "$@"');
     expect(deployScript).toContain("run_app_env()");
     expect(deployScript).toContain('HAITU_DB_PATH="${HAITU_DB_PATH:-}"');
     expect(deployScript).toContain('HAITU_ADMIN_EMAIL="${HAITU_ADMIN_EMAIL:-}"');
+    expect(deployScript).toContain('HAITU_PUBLIC_BASE_URL="${HAITU_PUBLIC_BASE_URL:-}"');
     expect(deployScript).toContain('systemctl restart "$SERVICE"');
     expect(deployScript).toContain('HEALTH_URL="http://127.0.0.1:${HAITU_PORT:-4173}/api/health"');
     expect(deployScript).toContain('curl -fsS "$HEALTH_URL"');
+    expect(deployScript).toContain('run_app_env npm run seo:check -- --base "$PUBLIC_BASE_URL"');
     expect(deployScript).not.toContain("/var/lib/haitu-video");
 
     expect(tunnel).toContain("tunnel: <你的隧道编号>");
@@ -92,6 +97,7 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("Cloudflare R2");
     expect(guide).toContain("HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes");
     expect(guide).toContain("HAITU_ADMIN_EMAIL=you@haitu.online");
+    expect(guide).toContain("HAITU_PUBLIC_BASE_URL=https://haitu.online");
     expect(guide).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(guide).toContain("HAITU_AUTH_EMAIL_FROM=login@haitu.online");
     expect(guide).not.toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
@@ -122,5 +128,6 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("GitHub 是生产代码来源");
     expect(guide).toContain("npm run deploy:vps");
     expect(guide).toContain("deploy/scripts/deploy-from-github.sh");
+    expect(guide).toContain("npm run seo:check -- --base \"$PUBLIC_BASE_URL\"");
   });
 });

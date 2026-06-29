@@ -44,15 +44,18 @@ async function readStatic(fileName: string): Promise<string> {
 
 export async function staticResponse(fileName: string): Promise<Response> {
   const safeName = sanitizePathSegment(fileName);
-  const content = await readStatic(safeName);
+  const content = await readFile(join(import.meta.dirname, "static", safeName));
   const type = safeName.endsWith(".css")
     ? "text/css; charset=utf-8"
     : safeName.endsWith(".js")
       ? "text/javascript; charset=utf-8"
       : safeName.endsWith(".svg")
         ? "image/svg+xml"
-        : "text/plain; charset=utf-8";
-  return new Response(content, {
+        : safeName.endsWith(".png")
+          ? "image/png"
+          : "text/plain; charset=utf-8";
+  const body = content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength);
+  return new Response(body, {
     headers: { "content-type": type }
   });
 }

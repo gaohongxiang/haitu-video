@@ -39,6 +39,42 @@ describe("runBasicQc", () => {
     expect(report.result).toBe("pass");
   });
 
+  it("passes a 16:9 output when the target aspect ratio is horizontal", () => {
+    const report = runBasicQc({
+      product,
+      script,
+      targetAspectRatio: "16:9",
+      output: {
+        path: "mock.txt",
+        width: 1920,
+        height: 1080,
+        durationSeconds: 15,
+        mimeType: "text/plain"
+      }
+    });
+
+    expect(report.result).toBe("pass");
+    expect(report.checks.find((check) => check.name === "aspect_ratio_16_9")?.passed).toBe(true);
+  });
+
+  it("fails a horizontal target when the output is vertical", () => {
+    const report = runBasicQc({
+      product,
+      script,
+      targetAspectRatio: "16:9",
+      output: {
+        path: "mock.txt",
+        width: 1080,
+        height: 1920,
+        durationSeconds: 15,
+        mimeType: "text/plain"
+      }
+    });
+
+    expect(report.result).toBe("fail");
+    expect(report.checks.find((check) => check.name === "aspect_ratio_16_9")?.passed).toBe(false);
+  });
+
   it("passes an 8 second output when the target duration is 8 seconds", () => {
     const report = runBasicQc({
       product,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { DatabaseHandle } from "./db/client.js";
 import { centsToCny, cnyToCents } from "./walletLedger.js";
+import type { RechargeFxRateSnapshot } from "./rechargePaymentAmount.js";
 
 export type WalletRechargeOrderStatus = "pending" | "paid" | "expired" | "failed";
 export type WalletRechargeProvider = "stripe" | "infini";
@@ -12,11 +13,13 @@ export interface WalletRechargeOrder {
   provider: WalletRechargeProvider;
   providerSessionId?: string;
   providerPaymentIntentId?: string;
-  amountCny: number;
-  amountCents: number;
-  currency: string;
+  paymentAmount: number;
+  paymentAmountCents: number;
+  paymentCurrency: string;
+  walletCurrency: "cny";
   creditCny: number;
   creditCents: number;
+  fxRateSnapshot?: RechargeFxRateSnapshot;
   status: WalletRechargeOrderStatus;
   checkoutUrl?: string;
   failureReason?: string;
@@ -56,18 +59,32 @@ export class WalletRechargeOrderStore {
 
   createPending(input: {
     workspaceId: string;
-    amountCny: number;
-    currency: string;
+    creditCny: number;
+    paymentCurrency: string;
+    paymentAmountCents: number;
+    fxRateSnapshot?: RechargeFxRateSnapshot;
     provider?: WalletRechargeProvider;
     metadata?: Record<string, unknown>;
   }): WalletRechargeOrder {
-    const amountCents = cnyToCents(Number(input.amountCny));
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    const creditCents = cnyToCents(Number(input.creditCny));
+    if (!Number.isFinite(creditCents) || creditCents <= 0) {
       throw new Error("充值金额必须大于 0。");
     }
-    const currency = normalizeCurrency(input.currency);
+    const paymentAmountCents = Math.round(Number(input.paymentAmountCents));
+    if (!Number.isFinite(paymentAmountCents) || paymentAmountCents <= 0) {
+      throw new Error("充值支付金额必须大于 0。");
+    }
+    const paymentCurrency = normalizeCurrency(input.paymentCurrency);
     const now = this.nowIso();
     const id = `wallet-recharge-${randomUUID()}`;
+    const metadata = rechargeOrderMetadata({
+      metadata: input.metadata,
+      walletCurrency: "cny",
+      paymentCurrency,
+      paymentAmountCents,
+      creditCents,
+      fxRateSnapshot: input.fxRateSnapshot
+    });
     this.input.handle.sqlite.prepare(`
       INSERT INTO wallet_recharge_orders (
         id,
@@ -96,10 +113,10 @@ export class WalletRechargeOrderStore {
       id,
       workspaceId: input.workspaceId,
       provider: input.provider ?? "stripe",
-      amountCents,
-      currency,
-      creditCents: amountCents,
-      metadataJson: input.metadata ? JSON.stringify(input.metadata) : null,
+      amountCents: paymentAmountCents,
+      currency: paymentCurrency,
+      creditCents,
+      metadataJson: JSON.stringify(metadata),
       createdAt: now,
       updatedAt: now
     });
@@ -285,11 +302,13 @@ export function walletRechargeOrderFromRow(row: WalletRechargeOrderRow): WalletR
     provider: row.provider,
     providerSessionId: row.provider_session_id ?? undefined,
     providerPaymentIntentId: row.provider_payment_intent_id ?? undefined,
-    amountCny: centsToCny(row.amount_cents),
-    amountCents: row.amount_cents,
-    currency: row.currency,
+    paymentAmount: centsToCny(row.amount_cents),
+    paymentAmountCents: row.amount_cents,
+    paymentCurrency: row.currency,
+    walletCurrency: "cny",
     creditCny: centsToCny(row.credit_cents),
     creditCents: row.credit_cents,
+    fxRateSnapshot: fxRateSnapshotFromMetadata(row.metadata_json),
     status: row.status,
     checkoutUrl: row.checkout_url ?? undefined,
     failureReason: row.failure_reason ?? undefined,
@@ -299,6 +318,40 @@ export function walletRechargeOrderFromRow(row: WalletRechargeOrderRow): WalletR
     completedAt: row.completed_at ?? undefined,
     expiresAt: row.expires_at ?? undefined
   };
+}
+
+function rechargeOrderMetadata(input: {
+  metadata?: Record<string, unknown>;
+  walletCurrency: "cny";
+  paymentCurrency: string;
+  paymentAmountCents: number;
+  creditCents: number;
+  fxRateSnapshot?: RechargeFxRateSnapshot;
+}): Record<string, unknown> {
+  return {
+    ...(input.metadata ?? {}),
+    walletCurrency: input.walletCurrency,
+    paymentCurrency: input.paymentCurrency,
+    paymentAmountCents: input.paymentAmountCents,
+    creditCents: input.creditCents,
+    fxRateSnapshot: input.fxRateSnapshot
+  };
+}
+
+function fxRateSnapshotFromMetadata(metadataJson: string | null): RechargeFxRateSnapshot | undefined {
+  const metadata = parseMetadata(metadataJson);
+  const snapshot = metadata?.fxRateSnapshot;
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return undefined;
+  }
+  const record = snapshot as Partial<RechargeFxRateSnapshot>;
+  return record.from === "cny" && typeof record.to === "string" && typeof record.rate === "number"
+    ? {
+        from: "cny",
+        to: record.to,
+        rate: record.rate
+      }
+    : undefined;
 }
 
 export function normalizeCurrency(value: unknown): string {

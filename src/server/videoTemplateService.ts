@@ -4,14 +4,14 @@ import {
   isScriptTemplate,
   normalizeEnabledTemplates
 } from "../core/templateCatalog.js";
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 
 export interface TemplateManagementRequest {
   defaultTemplate?: unknown;
   enabledTemplates?: unknown;
 }
 
-export async function listVideoTemplates(settingsStore: FileConsoleSettingsStore) {
+export async function listVideoTemplates(settingsStore: ConsoleSettingsStore) {
   const settings = await settingsStore.read();
   return buildTemplateCatalogState({
     enabledTemplates: settings.enabledTemplates,
@@ -20,7 +20,7 @@ export async function listVideoTemplates(settingsStore: FileConsoleSettingsStore
 }
 
 export async function saveVideoTemplates(
-  settingsStore: FileConsoleSettingsStore,
+  settingsStore: ConsoleSettingsStore,
   input: TemplateManagementRequest
 ) {
   const enabledTemplates = normalizeEnabledTemplates(input.enabledTemplates);
@@ -40,7 +40,7 @@ export async function saveVideoTemplates(
 
 export async function assertTemplateEnabled(
   body: Pick<{ template?: ScriptTemplate }, "template">,
-  settingsStore: FileConsoleSettingsStore
+  settingsStore: ConsoleSettingsStore
 ): Promise<void> {
   const settings = await settingsStore.read();
   const template = body.template ?? settings.defaultTemplate;

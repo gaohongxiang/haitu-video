@@ -130,6 +130,35 @@ describe("runProductJob", () => {
     expect(providerRequest?.resolution).toBe("1080p");
   });
 
+  it("passes the requested video aspect ratio through prompt, provider request, and QC", async () => {
+    const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-aspect-ratio-"));
+    tempDirs.push(outDir);
+    let providerRequest: VideoProviderRequest | undefined;
+    const provider: VideoProvider = {
+      async generateVideo(request) {
+        providerRequest = request;
+        return new MockVideoProvider().generateVideo(request);
+      }
+    };
+
+    const manifest = await runProductJob({
+      product,
+      version: 1,
+      outputRoot: outDir,
+      provider,
+      cta: "今すぐチェック",
+      template: "pain-point",
+      resolution: "720p",
+      aspectRatio: "16:9"
+    });
+
+    expect(providerRequest?.aspectRatio).toBe("16:9");
+    expect(manifest.prompt).toContain("Aspect ratio: 16:9");
+    expect(manifest.output.width).toBe(1280);
+    expect(manifest.output.height).toBe(720);
+    expect(manifest.qc.checks.find((check) => check.name === "aspect_ratio_16_9")?.passed).toBe(true);
+  });
+
   it("keeps product core hashtags stable while varying discovery tags by video version", async () => {
     const outDir = await mkdtemp(join(tmpdir(), "haitu-pipeline-hashtag-rotation-"));
     tempDirs.push(outDir);

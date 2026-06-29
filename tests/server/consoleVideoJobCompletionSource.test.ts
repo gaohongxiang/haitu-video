@@ -29,6 +29,7 @@ describe("console video job completion source boundaries", () => {
     expect(completionSource).toContain("readHashtagsFromRawManifest(");
     expect(completionSource).toContain("completedVideoJobPatch(");
     expect(completionSource).toContain("captureVideoJobWalletCharge(");
-    expect(completionSource).toContain("estimatedCostCny: input.report.billing?.estimatedCostCny");
+    expect(completionSource).toContain("billingPolicyStore: input.billingPolicyStore");
+    expect(completionSource).toContain("estimatedCostCny: patch.upstreamEstimatedCostCny ?? input.report.billing?.estimatedCostCny");
   });
 });

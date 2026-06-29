@@ -1,0 +1,3187 @@
+{
+  "marketplaces": "TikTok Shop, Amazon, Shopee, Lazada, and Shopify",
+  "pageOrder": [
+    "",
+    "features/ai-product-video-generator",
+    "features/product-image-optimization",
+    "features/ai-product-image-generator",
+    "features/image-to-product-video",
+    "features/product-copy-generator",
+    "features/batch-product-creative-generation",
+    "features/hosted-ai-models",
+    "features/bring-your-own-model",
+    "features/product-image-background-cleanup",
+    "features/product-reference-image-management",
+    "features/product-video-storyboard-generator",
+    "features/product-creative-workflow",
+    "features/product-creative-review-workflow",
+    "features/ecommerce-video-localization",
+    "features/model-cost-control",
+    "platforms/tiktok-shop",
+    "platforms/amazon",
+    "platforms/shopee",
+    "platforms/shopify",
+    "platforms/lazada",
+    "platforms/etsy",
+    "tools/product-title-generator",
+    "tools/product-video-script-generator",
+    "use-cases/cross-border-ecommerce",
+    "use-cases/tiktok-shop-product-video",
+    "use-cases/amazon-product-image-optimization",
+    "use-cases/fashion-product-video",
+    "use-cases/home-goods-product-video",
+    "use-cases/beauty-product-short-video",
+    "categories/apparel-product-video",
+    "categories/home-goods-product-video",
+    "categories/beauty-product-video",
+    "categories/electronics-product-video",
+    "categories/pet-supplies-product-video",
+    "categories/kitchen-product-video",
+    "categories/jewelry-product-video",
+    "categories/baby-products-video",
+    "categories/sports-outdoor-product-video",
+    "categories/car-accessories-product-video",
+    "compare/ai-product-video-generator-vs-general-video-generator",
+    "compare/haitu-vs-canva-for-product-video",
+    "compare/haitu-vs-manual-product-video-production",
+    "terms",
+    "privacy",
+    "refund",
+    "contact"
+  ],
+  "pageMeta": {
+    "": {
+      "priority": "1.0",
+      "changefreq": "weekly"
+    },
+    "features/ai-product-video-generator": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/product-image-optimization": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/ai-product-image-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/image-to-product-video": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/product-copy-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/batch-product-creative-generation": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/hosted-ai-models": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/bring-your-own-model": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/tiktok-shop": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/amazon": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/shopee": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/shopify": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/lazada": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/etsy": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "tools/product-title-generator": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "tools/product-video-script-generator": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "terms": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "privacy": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "refund": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "contact": {
+      "priority": "0.4",
+      "changefreq": "yearly"
+    },
+    "use-cases/cross-border-ecommerce": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "use-cases/tiktok-shop-product-video": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "use-cases/amazon-product-image-optimization": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/fashion-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/home-goods-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/beauty-product-short-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "compare/ai-product-video-generator-vs-general-video-generator": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "compare/haitu-vs-canva-for-product-video": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "compare/haitu-vs-manual-product-video-production": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "categories/apparel-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/home-goods-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/beauty-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/electronics-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/pet-supplies-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/kitchen-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "features/product-image-background-cleanup": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-reference-image-management": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-video-storyboard-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-creative-workflow": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-creative-review-workflow": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/ecommerce-video-localization": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/model-cost-control": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/jewelry-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/baby-products-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/sports-outdoor-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/car-accessories-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    }
+  },
+  "preview": {
+    "ariaLabel": "Product creative studio preview",
+    "source": "Product photos",
+    "sourceMeta": "Hero / lifestyle / references",
+    "engine": "AI image optimization",
+    "engineMeta": "Cutout · Lighting · Scenes · Texture",
+    "output": "Product videos",
+    "outputMeta": "Scenes · Scripts · Final assets",
+    "metricOne": "Batch SKUs",
+    "metricTwo": "Image optimization",
+    "metricThree": "Video generation",
+    "workspace": "Image and video studio",
+    "board": "Product asset overview",
+    "batch": "Image optimization queue",
+    "market": "Video formats",
+    "review": "Review & publish",
+    "script": "Video storyboard",
+    "image": "Optimized hero image",
+    "title": "Ad image variants",
+    "model": "Model mode",
+    "hostedModel": "Hosted models",
+    "customModel": "Own model",
+    "status": "Generating"
+  },
+  "homepage": {
+    "capability": {
+      "eyebrow": "Capabilities",
+      "title": "A workflow for product images and short videos",
+      "body": "Haitu organizes product data, references, selling points, and model configuration before script generation, image optimization, product video generation, review, and publishing. Full image creation will be added later, and this page keeps the current boundary clear.",
+      "items": [
+        {
+          "heading": "Product data and reference images",
+          "body": "Upload product photos, references, titles, materials, dimensions, and blocked claims into reusable product packets.",
+          "bullets": [
+            "Image library",
+            "Reference capture",
+            "Claim constraints"
+          ]
+        },
+        {
+          "heading": "Marketing scripts and product videos",
+          "body": "Generate short-video scripts, storyboards, caption direction, and product video assets from verified product facts.",
+          "bullets": [
+            "Script cleanup",
+            "Storyboards",
+            "Video generation"
+          ]
+        },
+        {
+          "heading": "Hosted models or your own models",
+          "body": "Lean teams can start with Haitu hosted models; teams with model resources can connect their own models inside the same product workflow.",
+          "bullets": [
+            "Hosted models",
+            "Own models",
+            "Unified settings"
+          ]
+        }
+      ]
+    },
+    "payment": {
+      "eyebrow": "Billing",
+      "title": "Top up wallet balance and consume actual AI services",
+      "body": "Users choose a top-up amount in the billing center and pay through Stripe Checkout with WeChat Pay, Alipay, or cards. After payment succeeds, wallet balance is credited and used for product image optimization, video generation, script organization, and other digital SaaS services.",
+      "note": "Haitu is a digital service and does not sell physical goods.",
+      "steps": [
+        {
+          "label": "01",
+          "title": "Choose a top-up amount",
+          "body": "Create a Stripe Checkout order from the wallet page in the console."
+        },
+        {
+          "label": "02",
+          "title": "Pay online",
+          "body": "Use WeChat Pay, Alipay, or cards when those methods are available through Stripe."
+        },
+        {
+          "label": "03",
+          "title": "Balance is credited",
+          "body": "Successful payment credits wallet balance for product image optimization, video, and script services."
+        }
+      ]
+    },
+    "trust": {
+      "eyebrow": "Trust",
+      "title": "Create with confidence, with billing and rules made clear",
+      "items": [
+        {
+          "heading": "Built for digital content work",
+          "body": "Haitu helps cross-border ecommerce sellers, brand operators, and creators optimize product images, organize scripts, and produce product videos."
+        },
+        {
+          "heading": "Transparent wallet usage",
+          "body": "Wallet balance is used for product image optimization, video generation, script organization, and other digital services, with usage records in the account."
+        },
+        {
+          "heading": "Unused balance support",
+          "body": "If balance has not been used, contact support for manual refund handling; consumed AI services are generally non-refundable."
+        },
+        {
+          "heading": "Review before publishing",
+          "body": "Before publishing AI output, review product facts, marketplace rules, ad compliance, and intellectual property risks."
+        }
+      ]
+    },
+    "finalCta": {
+      "title": "Ready to turn product assets into a repeatable workflow?",
+      "body": "Bring product data, references, and model mode into Haitu, then create scripts, optimize image assets, and generate product videos step by step.",
+      "primaryCta": "Open console",
+      "secondaryCta": "Contact Haitu"
+    }
+  },
+  "defaultSections": [
+    {
+      "heading": "Generated from real product photos and facts",
+      "body": "Haitu starts with product photos, references, categories, materials, dimensions, and allowed selling points before optimizing images and generating videos.",
+      "bullets": [
+        "Structured product images",
+        "Reference-aware generation",
+        "Separated blocked claims",
+        "Image-video consistency"
+      ]
+    },
+    {
+      "heading": "Designed for acquisition and conversion",
+      "body": "Each page and tool matches ecommerce search intent, then moves users from image optimization and ad variants into product video workflows.",
+      "bullets": [
+        "Image and video keywords",
+        "Reusable templates",
+        "Batch SKU workflows",
+        "Connected app experience"
+      ]
+    }
+  ],
+  "defaultFaqs": [
+    {
+      "question": "Can these assets be used directly on marketplaces?",
+      "answer": "Haitu optimizes images and generates video assets from product facts. Teams should still review against each marketplace policy before publishing."
+    },
+    {
+      "question": "Can Haitu process products in batches?",
+      "answer": "Yes. Haitu is designed to organize product libraries, ERP data, and product sheets into marketplace-ready image assets and product video assets."
+    }
+  ],
+  "geoAnswers": {
+    "default": {
+      "question": "Who is Haitu for?",
+      "answer": "Haitu is for cross-border ecommerce sellers, brand operators, content creators, and agency teams that need to organize product data, optimize product images, create marketing scripts, and generate product short videos.",
+      "points": [
+        "Built for ecommerce product creative workflows",
+        "Supports hosted models and bring-your-own-model mode",
+        "Keeps user product content in the language users provide",
+        "Wallet balance is used for digital SaaS services"
+      ]
+    },
+    "home": {
+      "question": "What is Haitu?",
+      "answer": "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers. It helps users manage product data and reference images, then create marketing scripts, storyboards, and product short videos. Haitu is not a physical goods marketplace or a general entertainment video generator.",
+      "points": [
+        "Upload and manage product facts, SKUs, selling points, and references",
+        "Optimize product images and organize scripts and storyboards",
+        "Use hosted platform models or connect your own models",
+        "Wallet balance is used for image optimization, video generation, and script services"
+      ]
+    },
+    "features-ai-product-image-generator": {
+      "question": "What is the current status of Haitu AI product image generation?",
+      "answer": "The full image studio is not live yet. Haitu currently supports product image organization, reference management, and product video generation, then will add hero image, lifestyle scene, and ad image generation to the same product creative workflow later.",
+      "points": [
+        "Current release supports product image organization",
+        "Current release supports reference management and video generation",
+        "Haitu does not present planned image features as fully shipped",
+        "This page becomes the full generator entry after the image studio ships"
+      ]
+    },
+    "features-image-to-product-video": {
+      "question": "What is Haitu image-to-product-video?",
+      "answer": "Haitu image-to-product-video uses product facts, selling points, and reference images to create ecommerce short-video scripts, storyboards, and product video assets. It is not a general entertainment video generator; it is designed around SKUs, product photos, selling-point scripts, storyboards, and marketplace creative needs.",
+      "points": [
+        "Uses product photos, references, and product facts as inputs",
+        "Creates short-video scripts, storyboards, and product video assets",
+        "Fits TikTok Shop, Amazon, Shopee, Shopify, and other ecommerce channels",
+        "Supports batch SKU product creative workflows"
+      ]
+    },
+    "features-ai-product-video-generator": {
+      "question": "What problem does the Haitu AI product video generator solve?",
+      "answer": "The Haitu AI product video generator turns product titles, selling points, usage scenes, and reference images into short-video scripts, storyboards, and generation tasks so ecommerce teams can create product videos for many SKUs faster.",
+      "points": [
+        "Creates product video assets from product facts and references",
+        "Fits marketplace listings, ads, and short-video commerce",
+        "Supports hosted models and bring-your-own video models",
+        "Keeps human review before and after generation"
+      ]
+    },
+    "features-product-image-optimization": {
+      "question": "What does Haitu product image optimization do?",
+      "answer": "Haitu product image optimization organizes product photos, references, materials, dimensions, selling points, and blocked claims so later image optimization, video generation, and ad creative expansion are based on more reliable product facts.",
+      "points": [
+        "Stores original product photos and references",
+        "Organizes materials, dimensions, and trusted selling points",
+        "Reduces wrong products and exaggerated generation",
+        "Connects image assets to video generation and future image creation"
+      ]
+    },
+    "features-product-copy-generator": {
+      "question": "What content can Haitu product copy generation create?",
+      "answer": "Haitu product copy generation turns raw product facts into titles, selling points, descriptions, ad scripts, short-video caption direction, and localized copy for cross-border ecommerce teams that manage many products.",
+      "points": [
+        "Generates copy from product facts",
+        "Supports titles, selling points, descriptions, and scripts",
+        "Can produce localized copy for target markets",
+        "Does not automatically change the language of uploaded product data"
+      ]
+    },
+    "features-batch-product-creative-generation": {
+      "question": "How does Haitu support batch product creative generation?",
+      "answer": "Haitu combines product packets, reference images, script storyboards, model configuration, and review workflows so teams can optimize product images, generate videos, and organize copy for many SKUs in one batch workflow.",
+      "points": [
+        "Designed for large SKU creative operations",
+        "Manages product images, references, and selling points together",
+        "Generates scripts and product video assets in batches",
+        "Helps teams review outputs and reuse templates"
+      ]
+    },
+    "features-hosted-ai-models": {
+      "question": "Who should use Haitu hosted AI models?",
+      "answer": "Haitu hosted AI models are for lean ecommerce teams that want to test product creative workflows without applying for multiple model provider accounts or maintaining API keys before they start organizing product facts, scripts, storyboards, and videos.",
+      "points": [
+        "No need to apply for multiple model provider accounts first",
+        "Fits cross-border sellers that are testing AI creative workflows",
+        "Haitu maintains default model configuration and bundles",
+        "Teams can still switch to their own models later"
+      ]
+    },
+    "features-bring-your-own-model": {
+      "question": "What does bring-your-own-model mean in Haitu?",
+      "answer": "Bring-your-own-model in Haitu lets teams with existing provider accounts or internal pipelines connect their own text, image, or video model APIs to the same ecommerce product creative workflow while keeping control of cost, model versions, and generation strategy.",
+      "points": [
+        "Supports user-owned API keys and model configuration",
+        "Fits teams that already have model resources",
+        "Keeps product facts and creative workflows consistent",
+        "Hosted models and own models can coexist"
+      ]
+    },
+    "platforms-tiktok-shop": {
+      "question": "How does Haitu help TikTok Shop sellers?",
+      "answer": "Haitu helps TikTok Shop sellers organize product facts around short videos, image optimization needs, ad selling points, and localized copy so SKUs can become social commerce creative assets faster.",
+      "points": [
+        "Organizes TikTok Shop selling points and references",
+        "Generates short-video scripts and product video assets",
+        "Supports localized titles, selling points, and ad scripts",
+        "Fits batch SKU workflows for content commerce"
+      ]
+    },
+    "platforms-amazon": {
+      "question": "How does Haitu support Amazon sellers?",
+      "answer": "Haitu helps Amazon sellers prepare product images, references, selling points, scripts, and video assets for listings, A+ content, and external ads while keeping product facts and creative expression consistent.",
+      "points": [
+        "Fits Amazon listing and ad creative preparation",
+        "Organizes product images, selling points, and description direction",
+        "Creates video scripts and product short-video assets",
+        "Outputs still need review against Amazon policies before publishing"
+      ]
+    },
+    "platforms-shopee": {
+      "question": "How does Haitu support Shopee cross-border sellers?",
+      "answer": "Haitu helps Shopee cross-border sellers organize product images, selling points, references, and short-video scripts for Southeast Asian ecommerce teams that need product page and ad creative assets in batches.",
+      "points": [
+        "Fits Shopee product image and short-video assets",
+        "Organizes content around Southeast Asian ecommerce scenarios",
+        "Supports batch SKU creative preparation",
+        "Works with localized copy workflows"
+      ]
+    },
+    "platforms-shopify": {
+      "question": "How does Haitu support Shopify stores?",
+      "answer": "Haitu helps Shopify teams start from product facts and references to prepare more consistent images, copy, and video assets for product pages, landing pages, and paid campaigns.",
+      "points": [
+        "Fits independent store product page assets",
+        "Supports ad image needs and short-video scripts",
+        "Reduces distortion by anchoring output to product facts",
+        "Works with multilingual market content"
+      ]
+    },
+    "platforms-lazada": {
+      "question": "How does Haitu help Lazada sellers prepare product creatives?",
+      "answer": "Haitu helps Lazada sellers organize product photos, references, selling points, target-market language, and video scripts for Southeast Asian product pages, ad creatives, and short-video content.",
+      "points": [
+        "Fits Lazada product pages and ads",
+        "Organizes selling points for Southeast Asian markets",
+        "Supports image optimization and short-video scripts",
+        "Site language switching does not automatically translate product data"
+      ]
+    },
+    "platforms-etsy": {
+      "question": "How does Haitu help Etsy sellers prepare product creatives?",
+      "answer": "Haitu helps Etsy sellers organize product facts, references, handmade details, materials, personalization notes, image optimization requests, titles, scripts, and short-video assets for handmade, craft, vintage, and personalized product listings.",
+      "points": [
+        "Fits handmade, craft, vintage, and personalized product listings",
+        "Organizes material, craft, and usage details",
+        "Supports product image optimization and short videos",
+        "Sellers still review product facts and marketplace rules"
+      ]
+    },
+    "compare-ai-product-video-generator-vs-general-video-generator": {
+      "question": "How is Haitu different from a general AI video generator?",
+      "answer": "Haitu is built for ecommerce product creative workflows. It organizes SKUs, product images, references, selling points, scripts, and marketplace requirements before generating product videos, while general AI video generators are usually broader creative or entertainment tools.",
+      "points": [
+        "Haitu starts from product facts and SKUs",
+        "Connects image optimization, scripts, and video generation",
+        "Keeps marketplace review in the workflow",
+        "General video tools fit broader creative content"
+      ]
+    },
+    "compare-haitu-vs-canva-for-product-video": {
+      "question": "How is Haitu different from Canva for product video workflows?",
+      "answer": "Canva is useful for general design and layout work. Haitu focuses on product facts, reference images, scripts, model workflows, and ecommerce video generation for teams that need product creative assets from SKU data.",
+      "points": [
+        "Canva fits general design and templates",
+        "Haitu works from product data and references",
+        "Haitu connects scripts, models, and video generation",
+        "Teams can choose based on workflow stage"
+      ]
+    },
+    "compare-haitu-vs-manual-product-video-production": {
+      "question": "How is Haitu different from manual product video production?",
+      "answer": "Manual production fits high-budget, highly customized brand videos. Haitu fits cross-border ecommerce teams that need to structure product photos, selling points, scripts, and short-video assets for many SKUs before human review and refinement.",
+      "points": [
+        "Haitu fits batch SKU creative preparation",
+        "Manual production fits highly customized projects",
+        "AI outputs still need team review",
+        "Human effort can focus on key products and final approval"
+      ]
+    },
+    "tools-product-title-generator": {
+      "question": "What does the Haitu product title generator do?",
+      "answer": "The Haitu product title generator creates ecommerce titles from product names, categories, materials, selling points, and target markets, then connects those titles to copy, script, and video workflows.",
+      "points": [
+        "Generates titles from product facts",
+        "Adapts wording to target market language",
+        "Supports search intent and conversion",
+        "Connects to product copy and video scripts"
+      ]
+    },
+    "tools-product-video-script-generator": {
+      "question": "What does the Haitu product video script generator do?",
+      "answer": "The Haitu product video script generator turns product facts, selling points, pain points, and usage scenes into short-video scripts, storyboard structures, caption direction, and product video generation inputs.",
+      "points": [
+        "Creates opening hooks, selling point order, shots, and CTAs",
+        "Constrains video generation with product facts",
+        "Fits batch SKU video script preparation",
+        "Connects directly to product video generation workflows"
+      ]
+    },
+    "use-cases-cross-border-ecommerce": {
+      "question": "How does Haitu help cross-border ecommerce teams create product assets in batches?",
+      "answer": "Haitu starts from product facts, product images, selling points, and references, then helps teams organize product data, optimize images, create marketing scripts, storyboards, and product short videos for multi-marketplace SKU workflows.",
+      "points": [
+        "Unified product packets",
+        "Connects image optimization and video generation",
+        "Supports hosted and own models",
+        "Wallet balance is used for digital SaaS services"
+      ]
+    },
+    "use-cases-tiktok-shop-product-video": {
+      "question": "How does Haitu help TikTok Shop sellers create product videos?",
+      "answer": "Haitu turns TikTok Shop product photos, references, selling points, usage scenes, and target-market wording into short-video scripts, storyboards, localized selling points, and product video assets.",
+      "points": [
+        "Product photos guide video creation",
+        "Creates short-video scripts and storyboards",
+        "Fits social commerce selling points",
+        "Keeps marketplace review before publishing"
+      ]
+    },
+    "use-cases-amazon-product-image-optimization": {
+      "question": "How does Haitu help Amazon sellers optimize product images and video assets?",
+      "answer": "Haitu helps Amazon sellers organize product images, references, selling points, description direction, scripts, and short-video assets for listings, A+ content, and off-site ads.",
+      "points": [
+        "Fits listing creative preparation",
+        "Organizes product images and selling points",
+        "Connects scripts and short-video assets",
+        "Outputs still need Amazon policy review"
+      ]
+    },
+    "use-cases-fashion-product-video": {
+      "question": "How does Haitu create fashion product videos?",
+      "answer": "Haitu organizes style, material, color, size, detail images, outfit scenes, and selling points into short-video scripts, storyboards, and product video assets for fashion products.",
+      "points": [
+        "Organizes style and material facts",
+        "Highlights outfit scenes",
+        "Creates scripts and video assets",
+        "Human review checks color and style consistency"
+      ]
+    },
+    "use-cases-home-goods-product-video": {
+      "question": "How does Haitu turn home goods product images into videos?",
+      "answer": "Haitu organizes home goods images, dimensions, capacity, materials, usage methods, and scene references into short-video scripts, storyboards, and product video assets.",
+      "points": [
+        "Organizes dimensions and materials",
+        "Creates scripts from usage scenes",
+        "Fits home and daily-use products",
+        "Supports batch SKU workflows"
+      ]
+    },
+    "use-cases-beauty-product-short-video": {
+      "question": "How does Haitu support beauty product short videos?",
+      "answer": "Haitu organizes beauty and personal care selling points, usage steps, texture, scenarios, and blocked claims into short-video scripts, caption direction, and product video assets.",
+      "points": [
+        "Separates trusted claims and blocked wording",
+        "Creates step-by-step short-video scripts",
+        "Fits beauty and personal care creatives",
+        "Keeps advertising compliance review"
+      ]
+    },
+    "categories-apparel-product-video": {
+      "question": "How does Haitu help apparel sellers create product videos?",
+      "answer": "Haitu organizes apparel style, fit, material, color, size, detail images, and outfit scenes into product video scripts, storyboards, and short-video assets for cross-border fashion sellers.",
+      "points": [
+        "Organizes style and size facts",
+        "Highlights materials, details, and outfit scenes",
+        "Creates scripts, storyboards, and video assets",
+        "Keeps human review for color and fit"
+      ]
+    },
+    "categories-home-goods-product-video": {
+      "question": "How does Haitu turn home goods product images into videos?",
+      "answer": "Haitu organizes home goods dimensions, capacity, materials, before-and-after storage scenes, usage methods, and references into short-video scripts, storyboards, and product video assets.",
+      "points": [
+        "Organizes dimensions, capacity, and materials",
+        "Creates scripts from usage scenes",
+        "Fits home, storage, and daily-use products",
+        "Supports reusable batch SKU templates"
+      ]
+    },
+    "categories-beauty-product-video": {
+      "question": "How does Haitu support beauty and personal care product videos?",
+      "answer": "Haitu organizes trusted claims, usage steps, texture, scenarios, and blocked wording into compliance-aware scripts, caption direction, and short-video assets for beauty and personal care products.",
+      "points": [
+        "Separates trusted claims and blocked wording",
+        "Organizes usage steps and texture shots",
+        "Creates scripts and caption direction",
+        "Keeps advertising compliance review"
+      ]
+    },
+    "categories-electronics-product-video": {
+      "question": "How does Haitu support electronics accessory product videos?",
+      "answer": "Haitu organizes electronics accessory specifications, compatibility, ports, materials, usage scenes, and safety notes into product video scripts, storyboards, and short-video assets.",
+      "points": [
+        "Organizes specs and compatibility",
+        "Highlights ports, materials, and usage scenes",
+        "Creates explanatory scripts and video assets",
+        "Keeps parameter and safety review"
+      ]
+    },
+    "categories-pet-supplies-product-video": {
+      "question": "How does Haitu support pet supplies product videos?",
+      "answer": "Haitu organizes pet supplies dimensions, materials, target pets, usage scenes, and safety notes into product video scripts, storyboards, and short-video assets.",
+      "points": [
+        "Organizes size and target pet facts",
+        "Explains materials and safety boundaries",
+        "Highlights usage scenes",
+        "Keeps human review for pet safety claims"
+      ]
+    },
+    "categories-kitchen-product-video": {
+      "question": "How does Haitu help kitchen product sellers create short videos?",
+      "answer": "Haitu organizes kitchen product dimensions, materials, capacity, usage steps, cleaning notes, and scene references into short-video scripts, storyboards, and product video assets.",
+      "points": [
+        "Organizes dimensions, materials, and capacity",
+        "Highlights usage and cleaning steps",
+        "Fits kitchen and dining products",
+        "Keeps safety and compliance review"
+      ]
+    },
+    "features-product-image-background-cleanup": {
+      "question": "When should ecommerce teams use Haitu product image background cleanup?",
+      "answer": "Haitu product image background cleanup starts by organizing original product photos, references, background requirements, and marketplace rules so teams can prepare cleaner and more consistent product image inputs for image optimization, scripts, storyboards, and future image creative workflows.",
+      "points": [
+        "Organizes source photos and background requirements",
+        "Keeps product appearance and material facts",
+        "Supports image optimization and video generation",
+        "Does not claim the full image studio is already shipped"
+      ]
+    },
+    "features-product-reference-image-management": {
+      "question": "How does Haitu manage product reference images?",
+      "answer": "Haitu keeps reference images, detail shots, scene examples, style constraints, and blocked visual directions in the same product packet so scripts, image optimization, and video generation stay anchored to trusted references.",
+      "points": [
+        "Captures product photos and detail shots",
+        "Manages scene references and style constraints",
+        "Reduces AI drift away from the real product",
+        "Site language switching does not rewrite uploaded images or product content"
+      ]
+    },
+    "features-product-video-storyboard-generator": {
+      "question": "What does the Haitu product video storyboard generator do?",
+      "answer": "The Haitu product video storyboard generator turns product facts, references, selling points, and marketplace creative needs into opening hooks, pain points, selling point order, shot structure, caption direction, and CTAs before product video generation.",
+      "points": [
+        "Creates hooks and shot order",
+        "Structures benefits from product facts",
+        "Connects product images to video generation",
+        "Keeps human review before publishing"
+      ]
+    },
+    "features-product-creative-workflow": {
+      "question": "What is the Haitu product creative workflow?",
+      "answer": "The Haitu product creative workflow keeps product facts, images, references, scripts, storyboards, model choices, and review steps in one process so cross-border ecommerce teams can move from product data to image optimization, scripts, and product video assets.",
+      "points": [
+        "Unifies product data and references",
+        "Connects images, scripts, storyboards, and video",
+        "Supports hosted and own models",
+        "Keeps wallet billing and human review boundaries"
+      ]
+    },
+    "features-product-creative-review-workflow": {
+      "question": "What problem does the Haitu product creative review workflow solve?",
+      "answer": "The Haitu product creative review workflow helps teams check product facts, marketplace rules, ad claims, images, and video assets before publishing so they reduce wrong-product, exaggerated-claim, restricted-word, and asset mismatch risks.",
+      "points": [
+        "Checks product facts before publishing",
+        "Reviews marketplace rules and ad claims",
+        "Connects image, script, and video review",
+        "Keeps final human judgment"
+      ]
+    },
+    "features-ecommerce-video-localization": {
+      "question": "How does Haitu localize ecommerce product videos?",
+      "answer": "Haitu organizes scripts, subtitles, selling points, and review notes around each target market so product videos can reuse the same product facts while adapting to different languages and platform habits.",
+      "points": [
+        "Organizes scripts and subtitle direction",
+        "Keeps original product data unchanged",
+        "Adapts market-specific phrasing",
+        "Keeps human review before publishing"
+      ]
+    },
+    "features-model-cost-control": {
+      "question": "How does Haitu help teams control model costs?",
+      "answer": "Haitu keeps hosted models and bring-your-own-model workflows in the same product creative process so teams can understand cost by asset task, model choice, and wallet consumption while reducing repeated calls across batch SKUs.",
+      "points": [
+        "Separates hosted and own models",
+        "Tracks cost by creative task",
+        "Reuses product data and script structures",
+        "Avoids unplanned batch reruns"
+      ]
+    },
+    "categories-jewelry-product-video": {
+      "question": "How does Haitu support jewelry product videos?",
+      "answer": "Haitu organizes jewelry materials, plating, dimensions, wearing scenes, close-up detail shots, packaging, and care notes into short-video scripts, storyboards, and product video assets.",
+      "points": [
+        "Organizes materials, plating, and dimensions",
+        "Highlights wearing scenes and close-ups",
+        "Fits jewelry, accessories, and gifts",
+        "Keeps material and claim review"
+      ]
+    },
+    "categories-baby-products-video": {
+      "question": "How does Haitu help baby product teams prepare short videos?",
+      "answer": "Haitu organizes baby product safety boundaries, age suitability, materials, usage scenes, warning notes, and blocked claims into compliance-first short-video scripts, storyboards, and assets.",
+      "points": [
+        "Organizes age suitability and materials",
+        "Emphasizes safety boundaries and usage scenes",
+        "Fits baby and child products",
+        "Keeps strict human review"
+      ]
+    },
+    "categories-sports-outdoor-product-video": {
+      "question": "How does Haitu support sports and outdoor product videos?",
+      "answer": "Haitu organizes sports and outdoor product activity scenes, materials, size, weather, storage, and safety notes into product video scripts, storyboards, and short-video assets.",
+      "points": [
+        "Organizes activity scenes and materials",
+        "Explains size, weather, and storage",
+        "Fits sports and outdoor products",
+        "Keeps safety statement review"
+      ]
+    },
+    "categories-car-accessories-product-video": {
+      "question": "How does Haitu help car accessory sellers create short videos?",
+      "answer": "Haitu organizes car accessory vehicle fitment, installation steps, materials, usage effects, specifications, and safety notes into short-video scripts, storyboards, and product video assets.",
+      "points": [
+        "Organizes fitment and installation steps",
+        "Highlights materials and usage effects",
+        "Fits car accessories and in-car products",
+        "Keeps compatibility and safety review"
+      ]
+    }
+  },
+  "commonGeoFaqs": [
+    {
+      "question": "What AI services does wallet balance pay for?",
+      "answer": "Wallet balance is used for product image optimization, product video generation, marketing script organization, model calls, and other digital SaaS services. Site language switching does not automatically translate uploaded product data or generation records."
+    }
+  ],
+  "pageGeoFaqs": {
+    "home": [
+      {
+        "question": "Who should use Haitu?",
+        "answer": "Haitu is for cross-border ecommerce sellers, brand operators, content creators, and agencies that need to manage product data, product images, scripts, and short-video assets in batches."
+      }
+    ],
+    "features-ai-product-video-generator": [
+      {
+        "question": "How is Haitu different from a general AI video generator?",
+        "answer": "Haitu starts from SKUs, product images, selling points, usage scenes, and marketplace creative needs before creating scripts, storyboards, and product videos. General entertainment video generators usually do not understand product data or ecommerce review workflows."
+      },
+      {
+        "question": "What inputs does AI product video generation need?",
+        "answer": "Useful inputs include product titles, photos, references, materials, dimensions, selling points, usage scenes, blocked claims, and target channels. Clearer product facts make scripts and shots more reliable."
+      },
+      {
+        "question": "Can generated videos be published directly?",
+        "answer": "They should be reviewed before publishing. Teams need to check product facts, marketplace rules, ad compliance, and intellectual property risks before using AI outputs publicly."
+      }
+    ],
+    "features-product-image-optimization": [
+      {
+        "question": "How is product image optimization different from product image generation?",
+        "answer": "Product image optimization focuses on organizing original photos, references, materials, dimensions, and trusted selling points before video generation and future image creation. Full product image generation is part of the later image studio roadmap."
+      },
+      {
+        "question": "Will Haitu automatically change the product in the image?",
+        "answer": "Haitu is designed to anchor creative work to real product facts and reduce wrong products or distortion. AI outputs still need human review for appearance, color, structure, and marketplace rules."
+      }
+    ],
+    "features-ai-product-image-generator": [
+      {
+        "question": "What product images will Haitu generate after the image studio ships?",
+        "answer": "The roadmap includes hero images, lifestyle scenes, ad images, and product image extensions constrained by real product photos, references, materials, dimensions, and trusted selling points."
+      },
+      {
+        "question": "How should teams prepare for product image generation now?",
+        "answer": "Teams can organize original photos, references, categories, materials, dimensions, selling points, and blocked claims in Haitu today. Those inputs support product video generation and future image creation."
+      }
+    ],
+    "features-image-to-product-video": [
+      {
+        "question": "Can Haitu turn product images into short videos?",
+        "answer": "Yes. Haitu turns product images, references, product facts, and selling points into short-video scripts, storyboards, and video generation inputs for ecommerce product display and ads."
+      },
+      {
+        "question": "Which channels fit product image-to-video workflows?",
+        "answer": "The workflow fits TikTok Shop, Amazon, Shopee, Shopify, and other channels that need product display videos, ad videos, or product page creative assets. Outputs still need marketplace review before publishing."
+      }
+    ],
+    "features-product-copy-generator": [
+      {
+        "question": "Will Haitu automatically translate uploaded product data?",
+        "answer": "No. Site language switching only changes the interface and marketing pages. Uploaded product data stays in the language users provide unless they explicitly generate or rewrite localized copy."
+      },
+      {
+        "question": "What can product copy generation create?",
+        "answer": "It can create titles, selling points, descriptions, ad scripts, short-video caption direction, and localized copy from product facts for cross-border ecommerce teams."
+      },
+      {
+        "question": "How does Haitu reduce exaggerated copy?",
+        "answer": "Haitu separates product facts, trusted selling points, and blocked claims, but teams should still review marketplace rules, advertising compliance, and real product information before publishing."
+      }
+    ],
+    "features-batch-product-creative-generation": [
+      {
+        "question": "How does Haitu process many SKUs in batches?",
+        "answer": "Haitu uses product packets, references, selling points, script storyboards, model configuration, and review workflows to organize image optimization, copy, and video generation for many SKUs."
+      },
+      {
+        "question": "Who needs batch product creative generation?",
+        "answer": "It fits teams with large catalogs, frequent launches, multi-channel operations, or agency delivery workflows that repeat product title, selling point, script, and video preparation."
+      },
+      {
+        "question": "Can teams review batch outputs manually?",
+        "answer": "Yes. Haitu does not skip review. It structures product facts and creative tasks first, then teams verify product accuracy, image consistency, and marketplace compliance."
+      }
+    ],
+    "features-hosted-ai-models": [
+      {
+        "question": "Are hosted models good for early testing?",
+        "answer": "Yes. Hosted models avoid the need to apply for several provider accounts or maintain API keys at the start, so teams can test product facts, scripts, storyboards, and video generation faster."
+      },
+      {
+        "question": "Do hosted models prevent using own models later?",
+        "answer": "No. Hosted models and own models can coexist. Teams can start with hosted models, then switch based on cost, quality, governance, or internal model strategy."
+      }
+    ],
+    "features-bring-your-own-model": [
+      {
+        "question": "Does Haitu support bring-your-own-model?",
+        "answer": "Yes. Teams with provider accounts or internal pipelines can connect their own text, image, or video model APIs to Haitu product creative workflows."
+      },
+      {
+        "question": "Who should use own models in Haitu?",
+        "answer": "Own models fit teams that already have model provider accounts, internal model strategy, cost control requirements, or stricter governance while still using Haitu product data and creative workflows."
+      },
+      {
+        "question": "Will Haitu change the language of uploaded product data?",
+        "answer": "No. Uploaded product data stays in the language users provide. Site localization only translates the interface and marketing pages, and localized outputs are generated only when users request them."
+      }
+    ],
+    "platforms-tiktok-shop": [
+      {
+        "question": "Is Haitu useful for TikTok Shop sellers?",
+        "answer": "Yes. Haitu organizes product data around TikTok Shop short videos, product image optimization, ad selling points, and localized copy so sellers can prepare social commerce assets faster."
+      },
+      {
+        "question": "What inputs help TikTok Shop creative generation?",
+        "answer": "Useful inputs include product photos, references, titles, selling points, usage scenes, target language, and blocked claims before generating scripts, storyboards, and product videos."
+      },
+      {
+        "question": "Does Haitu guarantee TikTok Shop approval?",
+        "answer": "No. Sellers must review product facts, ad claims, intellectual property risks, and local compliance against TikTok Shop rules before publishing AI outputs."
+      }
+    ],
+    "platforms-amazon": [
+      {
+        "question": "How does Haitu help Amazon listing creatives?",
+        "answer": "Haitu organizes product images, references, selling points, description direction, video scripts, and short-video assets for Amazon listings, A+ content, and external ads."
+      },
+      {
+        "question": "Can Amazon assets be published directly?",
+        "answer": "They should be reviewed first. Teams need to check Amazon image rules, copy limits, category restrictions, ad claims, and intellectual property risks."
+      },
+      {
+        "question": "Can Haitu support Amazon off-site ad creatives?",
+        "answer": "Yes. Haitu can prepare product video scripts, ad selling points, and image creative direction, while final assets still need review against ad platform and Amazon policies."
+      }
+    ],
+    "platforms-shopee": [
+      {
+        "question": "Is Haitu useful for Shopee cross-border sellers?",
+        "answer": "Yes. Haitu helps Shopee sellers organize product images, selling points, references, and short-video scripts for product pages and ad creative assets in Southeast Asian ecommerce."
+      },
+      {
+        "question": "How does Shopee multilingual content work?",
+        "answer": "Uploaded product data stays in the language users provide. Teams can generate localized titles, selling points, or scripts from product facts when they need target-market content."
+      },
+      {
+        "question": "Can Shopee creatives be generated in batches?",
+        "answer": "Yes. Large SKU sets can reuse product data organization, script templates, and review workflows while adjusting images, selling points, and video messages per product."
+      }
+    ],
+    "platforms-shopify": [
+      {
+        "question": "How does Haitu support Shopify stores?",
+        "answer": "Haitu starts from product facts and references to prepare consistent images, copy, and video assets for Shopify product pages, landing pages, and paid campaigns."
+      },
+      {
+        "question": "Will Shopify brand creatives become generic?",
+        "answer": "Haitu uses product facts, references, and brand requirements as inputs. Teams should still review tone, visual consistency, and ad promises so generated content stays on brand."
+      },
+      {
+        "question": "Can Haitu support Shopify multi-market content?",
+        "answer": "Yes. Teams can generate target-market titles, selling points, scripts, and video direction, while original uploaded product data is not automatically translated by site language switching."
+      }
+    ],
+    "tools-product-title-generator": [
+      {
+        "question": "What inputs does the product title generator need?",
+        "answer": "Useful inputs include product name, category, materials, dimensions, core selling points, target market language, and blocked terms so titles fit search intent and platform expression."
+      },
+      {
+        "question": "What can teams do after generating titles?",
+        "answer": "Generated titles can feed product copy, short-video scripts, and product video generation so one product packet keeps creative messaging consistent."
+      },
+      {
+        "question": "Will title generation automatically change product language?",
+        "answer": "No. Uploaded product data stays in the original language. Teams can choose target-market language when generating a new title output."
+      }
+    ],
+    "tools-product-video-script-generator": [
+      {
+        "question": "Can the script be used directly for product video generation?",
+        "answer": "Yes. Use the script with product photos, references, target ratios, and selling point order as inputs for product video generation, then review the generated shots and copy."
+      },
+      {
+        "question": "How is the script generator different from the video generator?",
+        "answer": "The script generator structures the opening, pain point, benefits, shots, and CTA first. The video generator then uses scripts, product images, and references to create video assets."
+      }
+    ],
+    "use-cases-cross-border-ecommerce": [
+      {
+        "question": "How can cross-border sellers optimize product images and generate short videos in batches?",
+        "answer": "They can first organize product photos, references, titles, materials, dimensions, selling points, and blocked claims into product packets, then use Haitu to create image optimization requests, script storyboards, and product video assets."
+      },
+      {
+        "question": "Is Haitu useful for sellers with Chinese supply chains?",
+        "answer": "Yes. Haitu is built for cross-border ecommerce teams, especially sellers with many SKUs who need product data turned into marketplace-ready images, copy, and short-video assets."
+      },
+      {
+        "question": "Will Haitu automatically translate uploaded product data?",
+        "answer": "No. Uploaded product data stays in the language users provide. Teams can generate localized titles, selling points, or scripts separately from product facts."
+      }
+    ],
+    "use-cases-tiktok-shop-product-video": [
+      {
+        "question": "Which inputs make TikTok Shop product videos better?",
+        "answer": "Helpful inputs include product photos, references, titles, core selling points, usage scenes, target language, and blocked claims before script, storyboard, and video generation."
+      },
+      {
+        "question": "Does Haitu guarantee TikTok Shop approval?",
+        "answer": "No. Haitu prepares creative assets, but sellers must review marketplace rules, ad claims, product facts, intellectual property, and local compliance before publishing."
+      },
+      {
+        "question": "Can Haitu create TikTok Shop videos in batches?",
+        "answer": "Yes. Similar SKUs can reuse script structures, creative templates, and review workflows while adjusting selling points and shots per product."
+      }
+    ],
+    "use-cases-amazon-product-image-optimization": [
+      {
+        "question": "What matters for Amazon product image optimization?",
+        "answer": "Teams should check hero image rules, product accuracy, category restrictions, ad claims, and intellectual property. Haitu organizes product facts and assets, but does not replace Amazon policy review."
+      },
+      {
+        "question": "Can Haitu support A+ content and off-site ads?",
+        "answer": "Yes. The same product packet can feed image optimization requests, copy direction, video scripts, and short-video assets."
+      },
+      {
+        "question": "Will Amazon product data be translated automatically?",
+        "answer": "No. Original product data stays in the language provided. Teams can generate English or other target-market listing copy separately when needed."
+      }
+    ],
+    "use-cases-fashion-product-video": [
+      {
+        "question": "What product information does a fashion video need?",
+        "answer": "Useful inputs include style, fit, material, color, size, detail images, outfit scenes, and blocked claims because they affect scripts and shots."
+      },
+      {
+        "question": "Can AI fashion videos show color or style mistakes?",
+        "answer": "AI outputs can drift, so teams should review color, pattern, style, material, and brand expression before publishing."
+      },
+      {
+        "question": "Can fashion product videos be generated in batches?",
+        "answer": "Yes. Similar styles can reuse script structures and review workflows while adjusting color, size, material, and selling points."
+      }
+    ],
+    "use-cases-home-goods-product-video": [
+      {
+        "question": "What should home goods videos highlight?",
+        "answer": "They often need to highlight size, capacity, materials, usage method, before-and-after storage, or scene effects so buyers understand the use case quickly."
+      },
+      {
+        "question": "Do home goods image-to-video workflows need references?",
+        "answer": "References and usage scenes are helpful because they guide scripts and shots, but final outputs still need product-fact review."
+      },
+      {
+        "question": "Can home goods SKUs reuse templates?",
+        "answer": "Yes. Similar products can share script templates and review workflows while changing dimensions, colors, materials, and use cases."
+      }
+    ],
+    "use-cases-beauty-product-short-video": [
+      {
+        "question": "Can beauty product videos make effect promises?",
+        "answer": "They should not make unverified effect promises. Haitu helps organize trusted claims and blocked wording, and teams must review advertising compliance before publishing."
+      },
+      {
+        "question": "What structure works for beauty short videos?",
+        "answer": "Common structures include pain-point opening, texture shot, usage steps, scenario note, caution or boundary, and CTA."
+      },
+      {
+        "question": "Does Haitu store full payment account details?",
+        "answer": "No. Haitu receives payment status, amount, currency, and order result, but does not store full card numbers, WeChat Pay accounts, or Alipay accounts."
+      }
+    ],
+    "platforms-lazada": [
+      {
+        "question": "What creatives can Lazada sellers create with Haitu?",
+        "answer": "Haitu helps Lazada sellers organize product photos, references, selling points, localized titles, video scripts, and short-video assets for Southeast Asian product pages, ads, and short-video content."
+      },
+      {
+        "question": "Does Haitu automatically translate Lazada product data?",
+        "answer": "No. Uploaded product data stays in the language users provide. Teams can generate localized titles, selling points, or scripts from product facts when they need target-market content."
+      },
+      {
+        "question": "Does Haitu guarantee Lazada approval?",
+        "answer": "No. Haitu prepares creative assets, but sellers must review product facts, marketplace rules, ad claims, intellectual property, and local compliance before publishing."
+      }
+    ],
+    "platforms-etsy": [
+      {
+        "question": "Is Haitu useful for Etsy sellers?",
+        "answer": "Yes. Haitu is useful for Etsy sellers who need to turn handmade, craft, vintage, or personalized product facts into image optimization requests, titles, selling points, scripts, and short-video assets."
+      },
+      {
+        "question": "What should Etsy product creatives highlight?",
+        "answer": "They should highlight materials, craft, dimensions, usage scenes, personalization options, and real product details so AI output does not drift away from the actual item."
+      },
+      {
+        "question": "Will Haitu change the original language of handmade product descriptions?",
+        "answer": "No. Product data stays in the language users provide. Teams can generate English or other localized outputs separately from product facts."
+      }
+    ],
+    "compare-ai-product-video-generator-vs-general-video-generator": [
+      {
+        "question": "When should teams choose Haitu instead of a general AI video generator?",
+        "answer": "Choose Haitu when the goal is ecommerce product videos built from SKUs, product photos, selling points, platform ratios, scripts, and review workflows. General video tools are often better for entertainment, concept, or broad creative videos."
+      },
+      {
+        "question": "Why are general AI video generators not always enough for product videos?",
+        "answer": "Product videos need product appearance, material, selling points, and compliance language to stay consistent. Without product fact constraints, a general tool may produce visuals or copy that drift from the real item."
+      },
+      {
+        "question": "Do Haitu-generated videos still need review?",
+        "answer": "Yes. Haitu structures product facts and creative inputs, but teams still need to review product accuracy, marketplace rules, advertising compliance, and intellectual property before publishing."
+      }
+    ],
+    "compare-haitu-vs-canva-for-product-video": [
+      {
+        "question": "Are Haitu and Canva replacements for each other?",
+        "answer": "Not necessarily. Canva is useful for general design, template layouts, and brand visuals. Haitu is built for ecommerce product facts, references, scripts, model workflows, and product video generation."
+      },
+      {
+        "question": "When is Haitu a better fit for product videos?",
+        "answer": "Haitu fits when teams need to prepare videos in batches from SKUs, product photos, selling points, marketplace ratios, scripts, and model configuration."
+      },
+      {
+        "question": "Can teams edit Haitu outputs in design tools later?",
+        "answer": "Yes. Teams can use Haitu to create product scripts, video assets, and creative direction, then use design tools for final brand layout or manual finishing."
+      }
+    ],
+    "compare-haitu-vs-manual-product-video-production": [
+      {
+        "question": "Does Haitu replace manual product video production?",
+        "answer": "Not completely. Haitu is best for batch SKU organization, script storyboards, and first-pass product video assets. Highly customized brand films, complex shoots, and final approval still need human work."
+      },
+      {
+        "question": "When should teams choose manual production?",
+        "answer": "Manual production fits projects with higher budgets, strict brand direction, real shooting needs, or complex post-production. Haitu fits frequent launches and large SKU catalogs."
+      },
+      {
+        "question": "How can Haitu work with a human creative team?",
+        "answer": "Haitu can structure product facts, selling points, scripts, and first-pass video direction. Human teams can then refine key products, review compliance, and finalize publishing."
+      }
+    ],
+    "categories-apparel-product-video": [
+      {
+        "question": "What product information does an apparel video need?",
+        "answer": "Useful inputs include style, fit, material, color, size, detail images, outfit scenes, and blocked claims because they affect scripts, shots, and captions."
+      },
+      {
+        "question": "Can AI apparel videos show color or style mistakes?",
+        "answer": "AI outputs can drift, so teams should review color, pattern, style, size, material, and brand expression before publishing."
+      },
+      {
+        "question": "Can apparel product videos be generated in batches?",
+        "answer": "Yes. Similar styles can reuse script structures and review workflows while adjusting color, size, material, and selling points."
+      }
+    ],
+    "categories-home-goods-product-video": [
+      {
+        "question": "What should home goods videos highlight?",
+        "answer": "They often need to highlight dimensions, capacity, materials, usage methods, storage before-and-after, or scene effects so buyers understand the use case quickly."
+      },
+      {
+        "question": "Do home goods image-to-video workflows need references?",
+        "answer": "References and usage scenes are helpful because they guide scripts and shots, but final outputs still need product-fact review."
+      },
+      {
+        "question": "Can home goods SKUs reuse templates?",
+        "answer": "Yes. Similar products can share script templates and review workflows while changing dimensions, colors, materials, and use cases."
+      }
+    ],
+    "categories-beauty-product-video": [
+      {
+        "question": "Can beauty product videos make effect promises?",
+        "answer": "They should not make unverified effect promises. Haitu helps organize trusted claims and blocked wording, and teams must review advertising compliance before publishing."
+      },
+      {
+        "question": "What structure works for beauty short videos?",
+        "answer": "Common structures include pain-point opening, texture shot, usage steps, scenario note, caution or boundary, and CTA."
+      },
+      {
+        "question": "Will beauty product language be translated automatically?",
+        "answer": "No. Product data stays in the language users upload. Teams can generate localized copy or captions separately from product facts."
+      }
+    ],
+    "categories-electronics-product-video": [
+      {
+        "question": "What information does an electronics accessory video need?",
+        "answer": "Useful inputs include specifications, compatibility, ports, materials, dimensions, usage methods, safety notes, and blocked claims."
+      },
+      {
+        "question": "Will electronics specs be automatically rewritten?",
+        "answer": "No. Site language switching does not automatically translate uploaded product specs or rewrite user product content. Teams still review specs, compatibility, ports, and safety statements before publishing."
+      },
+      {
+        "question": "Are electronics accessories good for explanatory short videos?",
+        "answer": "Yes. Haitu can structure scripts around setup steps, connection methods, comparison scenes, and common buyer questions."
+      }
+    ],
+    "categories-pet-supplies-product-video": [
+      {
+        "question": "What matters in pet supplies product videos?",
+        "answer": "Teams should review dimensions, materials, target pet type, age or size limits, usage method, and safety boundaries without overstating safety claims."
+      },
+      {
+        "question": "Can pet supplies videos be generated in batches?",
+        "answer": "Yes. Similar products can reuse script templates while adjusting pet type, size, materials, and use cases."
+      },
+      {
+        "question": "Can AI output replace pet safety review?",
+        "answer": "No. Teams still need to review product facts, intended use, safety wording, and marketplace rules before publishing."
+      }
+    ],
+    "categories-kitchen-product-video": [
+      {
+        "question": "What should kitchen product videos highlight?",
+        "answer": "Common points include size, capacity, materials, heat or safety boundaries, usage steps, cleaning method, and storage effect."
+      },
+      {
+        "question": "Can kitchen product videos be published directly?",
+        "answer": "Publishing without review is not recommended. Teams should check materials, safety statements, usage method, ad claims, and marketplace rules."
+      },
+      {
+        "question": "Do kitchen products fit image-to-video workflows?",
+        "answer": "Yes. Product photos, usage scenes, and step notes can become scripts, storyboards, and short-video assets."
+      }
+    ],
+    "features-product-image-background-cleanup": [
+      {
+        "question": "How is background cleanup different from full product image generation?",
+        "answer": "Background cleanup focuses on organizing source photos, background requirements, and marketplace rules so product image inputs are cleaner. Full product image generation belongs to the later image studio roadmap."
+      },
+      {
+        "question": "Will background cleanup change the product itself?",
+        "answer": "The goal is to keep product appearance, color, structure, and material facts intact. Teams still review edges, reflections, transparent materials, and details before publishing."
+      },
+      {
+        "question": "Which channels can use cleaner product image inputs?",
+        "answer": "Cleaner inputs can support TikTok Shop, Amazon, Shopee, Lazada, Shopify, ad creative requests, and downstream product video generation."
+      }
+    ],
+    "features-product-reference-image-management": [
+      {
+        "question": "Which images should teams keep as product references?",
+        "answer": "Useful references include original photos, detail shots, scene examples, style references, blocked visual directions, and final approved assets."
+      },
+      {
+        "question": "Will reference images be translated or rewritten automatically?",
+        "answer": "No. Site language switching only changes the interface and marketing pages. Uploaded references and product data stay as user content."
+      },
+      {
+        "question": "How does reference management reduce AI drift?",
+        "answer": "Clear references and blocked directions constrain product appearance, materials, colors, and usage scenes so generated content stays closer to the real product."
+      }
+    ],
+    "features-product-video-storyboard-generator": [
+      {
+        "question": "What inputs make product storyboards better?",
+        "answer": "Useful inputs include product photos, references, titles, materials, dimensions, selling points, pain points, usage scenes, target marketplace, and blocked claims."
+      },
+      {
+        "question": "How is a storyboard different from video generation?",
+        "answer": "Storyboards organize the hook, pain point, selling point order, shots, and captions first. Video generation then uses the storyboard, product photos, and references to create assets."
+      },
+      {
+        "question": "Can teams edit the storyboard before generation?",
+        "answer": "Yes. Teams can adjust benefit order, shot descriptions, caption direction, and CTA before generating video assets."
+      }
+    ],
+    "features-product-creative-workflow": [
+      {
+        "question": "Where does the product creative workflow start?",
+        "answer": "It usually starts from product data, product photos, references, materials, dimensions, selling points, and blocked claims before moving into titles, scripts, storyboards, image optimization, and product videos."
+      },
+      {
+        "question": "Does the workflow support batch SKUs?",
+        "answer": "Yes. Similar products can reuse data structure, script templates, model settings, and review workflows while adjusting product-specific details."
+      },
+      {
+        "question": "Can hosted models and own models share the same workflow?",
+        "answer": "Yes. Teams can start with Haitu hosted models or connect their own text, image, or video model APIs inside the same product workflow."
+      }
+    ],
+    "features-product-creative-review-workflow": [
+      {
+        "question": "Where does the product creative review workflow start?",
+        "answer": "It usually starts from product facts, references, scripts, storyboards, video assets, and target marketplace rules before checking whether claims and visuals match the real product."
+      },
+      {
+        "question": "Can AI output skip human review?",
+        "answer": "No. Haitu can organize review signals and risk points, but teams still need to check product facts, marketplace rules, ad compliance, and intellectual property risks before publishing."
+      },
+      {
+        "question": "Which teams need a creative review workflow?",
+        "answer": "It fits ecommerce sellers, brand operators, agencies, and content teams that work across batch SKUs, multiple collaborators, and multiple marketplaces."
+      }
+    ],
+    "features-ecommerce-video-localization": [
+      {
+        "question": "Does video localization automatically translate uploaded product data?",
+        "answer": "No. Site language switching does not automatically translate uploaded product data. Teams choose a target language and market when creating localized outputs, then review them before publishing."
+      },
+      {
+        "question": "What inputs help product video localization?",
+        "answer": "Useful inputs include product facts, the original script, target market, blocked claims, marketplace requirements, subtitle style, and localization notes."
+      },
+      {
+        "question": "Which marketplaces fit localization workflows?",
+        "answer": "It fits TikTok Shop, Amazon, Shopee, Lazada, Shopify, Etsy, and other cross-border scenarios where one product is promoted in multiple languages."
+      }
+    ],
+    "features-model-cost-control": [
+      {
+        "question": "How does model cost control relate to wallet billing?",
+        "answer": "Wallet balance is used for product image optimization, video generation, script organization, model calls, and other digital services. Cost control helps teams understand what may consume balance or own-model quota before batch tasks run."
+      },
+      {
+        "question": "Can bring-your-own-model reduce costs?",
+        "answer": "It can, depending on provider pricing, call volume, output quality, and maintenance cost. Haitu keeps hosted and own models inside the same product creative workflow."
+      },
+      {
+        "question": "How can teams reduce repeated model calls?",
+        "answer": "Teams can reuse product packets, script templates, references, and review decisions before generating SKU-specific assets, reducing unplanned reruns."
+      }
+    ],
+    "categories-jewelry-product-video": [
+      {
+        "question": "What should jewelry product videos highlight?",
+        "answer": "Common points include materials, plating, dimensions, wearing scenes, detail close-ups, packaging, and care notes."
+      },
+      {
+        "question": "Can jewelry videos overstate benefits?",
+        "answer": "No. Teams should review materials, plating, origin, effect claims, and marketplace rules before publishing."
+      },
+      {
+        "question": "Do jewelry products fit image-to-video workflows?",
+        "answer": "Yes. Hero photos, detail shots, wearing photos, and lifestyle references can become scripts, storyboards, and short-video assets."
+      }
+    ],
+    "categories-baby-products-video": [
+      {
+        "question": "What matters most in baby product videos?",
+        "answer": "Teams should check age suitability, materials, safety boundaries, usage method, warning notes, and blocked claims without overstating safety or benefits."
+      },
+      {
+        "question": "Can AI replace baby product safety review?",
+        "answer": "No. Baby product content must be reviewed by the team for product facts, safety statements, marketplace rules, and local regulatory requirements before publishing."
+      },
+      {
+        "question": "Can baby product videos be generated in batches?",
+        "answer": "Similar SKUs can share a workflow, but each product still needs review for age range, materials, size, and usage scenario."
+      }
+    ],
+    "categories-sports-outdoor-product-video": [
+      {
+        "question": "What should sports and outdoor product videos highlight?",
+        "answer": "Common points include use scenario, materials, dimensions, weight, weather conditions, storage method, installation steps, and safety notes."
+      },
+      {
+        "question": "Can outdoor product videos be published directly?",
+        "answer": "Publishing without review is not recommended. Teams should check specifications, intended scenarios, weather or safety claims, ad wording, and marketplace rules."
+      },
+      {
+        "question": "Which short-video structures fit sports and outdoor products?",
+        "answer": "Unboxing, setup, outdoor usage, before-and-after comparison, storage display, and multi-scene transitions often work well."
+      }
+    ],
+    "categories-car-accessories-product-video": [
+      {
+        "question": "What inputs do car accessory videos need?",
+        "answer": "Useful inputs include vehicle fitment, model years, installation location, materials, dimensions, usage effect, installation steps, and safety notes."
+      },
+      {
+        "question": "Can car accessory fitment be automatically rewritten?",
+        "answer": "No. Fitment and specifications are product facts and should not be changed by site language switching or AI output."
+      },
+      {
+        "question": "What should teams review before publishing car accessory videos?",
+        "answer": "Teams should check compatibility, installation steps, safety statements, ad claims, intellectual property, and marketplace rules."
+      }
+    ]
+  },
+  "pages": {
+    "home": {
+      "slug": "",
+      "title": "Haitu - AI Product Image Optimization and Video Generation Platform",
+      "description": "Haitu helps cross-border ecommerce teams optimize product images, organize marketing scripts, and create product videos with wallet-based digital SaaS billing.",
+      "h1": "AI product image optimization and video generation platform",
+      "eyebrow": "Upgrade product images · scale product videos",
+      "lead": "Upload product photos, references, and product facts to optimize product images, organize marketing scripts, and create product videos for {{marketplaces}} with hosted models or your own models. Users top up through Stripe Checkout with WeChat Pay, Alipay, or cards; wallet balance is used for product image optimization, video generation, and script organization as digital SaaS services.",
+      "primaryCta": "Optimize product images",
+      "secondaryCta": "Open app",
+      "heroTitleLines": [
+        "AI image optimization",
+        "product video generation"
+      ],
+      "sections": [
+        {
+          "heading": "Know how Haitu works before you create",
+          "body": "Haitu is built for cross-border ecommerce sellers, brand operators, and creators. Successful top-ups credit wallet balance for product image optimization, script organization, product videos, and other digital services.",
+          "bullets": [
+            "Ecommerce SaaS",
+            "Stripe Checkout",
+            "WeChat Pay / Alipay / cards",
+            "Balance for digital services"
+          ]
+        },
+        {
+          "heading": "Upload product data and create product assets",
+          "body": "Optimize product images, organize marketing scripts, create storyboards, and generate short videos from product photos, references, titles, materials, dimensions, and selling points.",
+          "bullets": [
+            "Product data management",
+            "Product image optimization",
+            "Marketing script organization",
+            "Product video generation"
+          ]
+        },
+        {
+          "heading": "Use Haitu models or bring your own",
+          "body": "Teams can start with Haitu hosted text and video models, keep future image models in the same configuration layer, then connect their own models and creative pipeline when needed.",
+          "bullets": [
+            "Image model roadmap",
+            "Hosted video models",
+            "Bring your own model",
+            "Team workflow extension"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What does Haitu provide?",
+          "answer": "Haitu provides product image optimization, marketing script organization, and short-video creation for cross-border ecommerce. Users upload or manage product data, then create and organize digital content assets with AI."
+        },
+        {
+          "question": "How does billing work?",
+          "answer": "Users choose a top-up amount in the billing center and pay through Stripe Checkout with WeChat Pay, Alipay, or cards. After payment succeeds, wallet balance is credited and used for product image optimization, video generation, script organization, and other digital SaaS services."
+        },
+        {
+          "question": "Does Haitu sell physical goods or restricted services?",
+          "answer": "No. Haitu does not sell physical goods and does not provide gambling, financial investment, cryptocurrency trading, loans, adult content, medicine, or other restricted services."
+        }
+      ]
+    },
+    "features-ai-product-video-generator": {
+      "slug": "features/ai-product-video-generator",
+      "title": "AI Product Video Generator for Ecommerce Sellers - Haitu",
+      "description": "Create product videos from product facts, reference images, and selling points.",
+      "h1": "AI product video generator for ecommerce sellers",
+      "eyebrow": "Turn SKUs into product videos",
+      "lead": "Create product videos from product facts, reference images, and selling points.",
+      "primaryCta": "Generate product videos",
+      "secondaryCta": "Explore image optimization"
+    },
+    "features-product-image-optimization": {
+      "slug": "features/product-image-optimization",
+      "title": "Product Image Optimization for Ecommerce - Haitu",
+      "description": "Organize product photos, references, materials, dimensions, and selling points before creating ecommerce videos and future image creatives.",
+      "h1": "Product image optimization for ecommerce",
+      "eyebrow": "Clean product assets before generation",
+      "lead": "For ecommerce teams, Haitu organizes product photos, references, materials, dimensions, blocked claims, and selling points before product video generation and future image creative workflows.",
+      "primaryCta": "Organize product images",
+      "secondaryCta": "Generate product videos",
+      "sections": [
+        {
+          "heading": "Start from real product photos and facts",
+          "body": "Keep hero images, detail shots, references, and product facts in one product asset packet to reduce wrong products, distortion, and exaggerated claims.",
+          "bullets": [
+            "Product photo library",
+            "Reference management",
+            "Material and size facts",
+            "Separated blocked claims"
+          ]
+        },
+        {
+          "heading": "Connect image assets to video workflows",
+          "body": "Haitu currently focuses on product-image-to-video workflows. More image generation and ad image expansion features will be added as the image studio ships.",
+          "bullets": [
+            "Image to video",
+            "Script generation",
+            "Ad image requirements",
+            "Future image studio"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Does this page mean image generation is fully available now?",
+          "answer": "Not yet. The image studio is planned for a later release. Today this workflow helps organize product images and facts, then feed product video generation."
+        },
+        {
+          "question": "Why structure product images before generation?",
+          "answer": "Ecommerce creative work needs product accuracy. Clear references, materials, dimensions, selling points, and blocked claims make later video and image generation more reliable."
+        }
+      ]
+    },
+    "features-ai-product-image-generator": {
+      "slug": "features/ai-product-image-generator",
+      "title": "AI Product Image Generator Roadmap - Haitu",
+      "description": "Haitu is building AI product image generation around real references and verified selling points. Current workflows support image organization and product video generation.",
+      "h1": "AI product image generator roadmap",
+      "eyebrow": "Image creative features are coming",
+      "lead": "The full image studio is not live yet. Today you can organize product references, materials, dimensions, and selling points in Haitu for product video generation; hero image, lifestyle scene, and ad image generation will be added later.",
+      "primaryCta": "Prepare product images",
+      "secondaryCta": "Explore video generation",
+      "sections": [
+        {
+          "heading": "Prepare the facts image generation will need",
+          "body": "Product image generation should be constrained by real product photos, references, materials, dimensions, usage scenes, and blocked claims.",
+          "bullets": [
+            "Reference capture",
+            "Product fact constraints",
+            "Scene requirements",
+            "Image studio readiness"
+          ]
+        },
+        {
+          "heading": "Clear boundary for the current release",
+          "body": "Haitu currently focuses on product image organization and video generation. This page will become the full image generator entry when the image studio ships.",
+          "bullets": [
+            "Current image organization",
+            "Current video generation",
+            "Future hero images",
+            "Future ad variants"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Can Haitu generate product images right now?",
+          "answer": "The full image studio is not live yet. Use the current workflow to organize product references and generate product videos."
+        },
+        {
+          "question": "Why keep this SEO page before launch?",
+          "answer": "Image creation is on the Haitu roadmap. The page sets the right expectation and routes users to image optimization and product video workflows today."
+        }
+      ]
+    },
+    "features-image-to-product-video": {
+      "slug": "features/image-to-product-video",
+      "title": "Turn Product Images into Videos - Haitu",
+      "description": "Upload product photos, references, and selling points to turn static ecommerce images into product video scripts, storyboards, and final assets.",
+      "h1": "Turn product images into videos",
+      "eyebrow": "Static product photos to video assets",
+      "lead": "Use product photos, references, and verified selling points as inputs to create product video assets for TikTok Shop, Amazon, Shopee, Shopify, and other ecommerce channels.",
+      "primaryCta": "Make videos from images",
+      "secondaryCta": "Explore batch workflows",
+      "sections": [
+        {
+          "heading": "Images become the input to video creation",
+          "body": "Haitu combines product photos, selling points, usage scenes, and marketplace ratios to create scripts and shot structures for ecommerce videos.",
+          "bullets": [
+            "Product photo input",
+            "Reference input",
+            "Selling point constraints",
+            "Short-video scripts"
+          ]
+        },
+        {
+          "heading": "Built for batch SKU workflows",
+          "body": "Teams with large product catalogs can use one workflow for images, facts, video requests, review, and publishing.",
+          "bullets": [
+            "Batch SKUs",
+            "Unified product packet",
+            "Marketplace ratios",
+            "Review workflow"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What information should I provide?",
+          "answer": "Product photos, references, titles, materials, dimensions, selling points, usage scenes, and blocked claims help the video output stay accurate."
+        },
+        {
+          "question": "Does this work for TikTok Shop?",
+          "answer": "Yes. Haitu organizes scripts, shots, and ratios around short-video commerce needs."
+        }
+      ]
+    },
+    "features-product-copy-generator": {
+      "slug": "features/product-copy-generator",
+      "title": "AI Product Copy Generator for Global Ecommerce - Haitu",
+      "description": "Generate multilingual product titles, descriptions, selling points, ad scripts, and captions.",
+      "h1": "AI product copy generator for global ecommerce",
+      "eyebrow": "Titles, selling points, and scripts",
+      "lead": "Turn raw product information into localized titles, descriptions, selling points, short-video scripts, and ad CTAs.",
+      "primaryCta": "Generate copy",
+      "secondaryCta": "Explore batch workflows"
+    },
+    "features-batch-product-creative-generation": {
+      "slug": "features/batch-product-creative-generation",
+      "title": "Batch Product Creative Generation - Haitu",
+      "description": "Import product photos, references, or product sheets to optimize ecommerce images and generate product video assets in batches.",
+      "h1": "Batch product image optimization and video generation",
+      "eyebrow": "From product libraries to video assets",
+      "lead": "For ecommerce teams with many SKUs that need one workflow for optimizing images, generating videos, reviewing, and publishing assets.",
+      "primaryCta": "Process in batch",
+      "secondaryCta": "Explore workflow"
+    },
+    "features-hosted-ai-models": {
+      "slug": "features/hosted-ai-models",
+      "title": "Hosted AI Models for Ecommerce Creatives - Haitu",
+      "description": "Use Haitu hosted text and video model configurations without setting up your own model API keys first, with one place reserved for future image model workflows.",
+      "h1": "Hosted AI models for ecommerce creatives",
+      "eyebrow": "Start without configuring API keys",
+      "lead": "For lean ecommerce teams and early tests, Haitu hosted models let you organize product facts, generate scripts, create product videos, and later use image creative features in one workflow.",
+      "primaryCta": "Use hosted models",
+      "secondaryCta": "Explore own models",
+      "sections": [
+        {
+          "heading": "Skip model account setup at the start",
+          "body": "Teams can test the product creative workflow with hosted model configurations before applying for multiple provider accounts.",
+          "bullets": [
+            "Hosted keys",
+            "Model bundle selection",
+            "Unified billing entry",
+            "Fast testing"
+          ]
+        },
+        {
+          "heading": "Covers text, video, and future image workflows",
+          "body": "Hosted models support product organization, scripts, and video generation today, with image studio capabilities added as they ship.",
+          "bullets": [
+            "Text models",
+            "Video models",
+            "Image model roadmap",
+            "Team workflow"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "How are hosted models different from own models?",
+          "answer": "Hosted models are easier to start with because Haitu manages provider access. Own models are better for teams that already have provider accounts or tighter cost controls."
+        },
+        {
+          "question": "Can I switch to my own models later?",
+          "answer": "Yes. Haitu supports both hosted model mode and bring-your-own-key model mode."
+        }
+      ]
+    },
+    "features-bring-your-own-model": {
+      "slug": "features/bring-your-own-model",
+      "title": "Bring Your Own AI Model API - Haitu",
+      "description": "Connect your own model APIs to Haitu for product fact organization, video generation, and future image creative workflows.",
+      "h1": "Bring your own AI model API",
+      "eyebrow": "BYOK and custom model workflows",
+      "lead": "Teams with existing model accounts or internal pipelines can connect their own text, image, and video model APIs to Haitu while keeping one product creative workflow.",
+      "primaryCta": "Connect own models",
+      "secondaryCta": "Explore hosted models",
+      "sections": [
+        {
+          "heading": "For teams with existing model resources",
+          "body": "If your team already uses OpenAI, Volcengine, or other image and video providers, Haitu can keep those model choices in one configuration layer.",
+          "bullets": [
+            "Own API keys",
+            "Model version control",
+            "Clear cost ownership",
+            "Team strategy control"
+          ]
+        },
+        {
+          "heading": "The creative workflow stays the same",
+          "body": "Whether you use hosted or own models, the app still centers on product facts, references, scripts, videos, and review workflows.",
+          "bullets": [
+            "Fact organization",
+            "Script generation",
+            "Video generation",
+            "Future image studio"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Do own models replace hosted models?",
+          "answer": "No. Both modes coexist so teams can choose based on cost, quality, governance, and convenience."
+        },
+        {
+          "question": "Will user product language be changed automatically?",
+          "answer": "No. User-uploaded product content stays in the language the user provides. Site localization only translates the product UI and marketing pages."
+        }
+      ]
+    },
+    "platforms-tiktok-shop": {
+      "slug": "platforms/tiktok-shop",
+      "title": "TikTok Shop Product Creative Automation - Haitu",
+      "description": "Haitu turns product data into short videos, image optimization requests, ad scripts, and multilingual copy for TikTok Shop sellers.",
+      "h1": "TikTok Shop product creative automation",
+      "eyebrow": "Creative assets for social commerce",
+      "lead": "Haitu turns product data into short videos, image optimization requests, ad scripts, and multilingual copy for TikTok Shop sellers.",
+      "primaryCta": "Create TikTok Shop creatives",
+      "secondaryCta": "Try title generator"
+    },
+    "platforms-amazon": {
+      "slug": "platforms/amazon",
+      "title": "Amazon Product Image Optimization and Video Generator - Haitu",
+      "description": "Optimize Amazon product images and generate video scripts, selling points, and listing copy from product data.",
+      "h1": "Amazon product image optimization and video generator",
+      "eyebrow": "Creative assets for listings and ads",
+      "lead": "Use product facts and reference images to prepare creatives for Amazon listings, A+ content, and external ads.",
+      "primaryCta": "Generate Amazon assets",
+      "secondaryCta": "Explore copy generation"
+    },
+    "platforms-shopee": {
+      "slug": "platforms/shopee",
+      "title": "Shopee Product Image and Video Creative Automation - Haitu",
+      "description": "Organize product images, selling points, and references for Shopee sellers, then generate ecommerce video assets for product pages and ads.",
+      "h1": "Shopee product image and video creative automation",
+      "eyebrow": "Creative assets for Southeast Asian ecommerce",
+      "lead": "For Shopee listings and ads, Haitu keeps product photos, selling points, usage scenes, and video scripts in one workflow for batch SKU operations.",
+      "primaryCta": "Create Shopee assets",
+      "secondaryCta": "Explore batch workflows"
+    },
+    "platforms-shopify": {
+      "slug": "platforms/shopify",
+      "title": "Shopify Product Image and Video Creative Automation - Haitu",
+      "description": "Prepare product images, selling points, video scripts, and multilingual creatives for Shopify product pages and campaigns.",
+      "h1": "Shopify product image and video creative automation",
+      "eyebrow": "Creative assets for independent stores",
+      "lead": "Use product facts and references to prepare consistent image, copy, and video assets for Shopify product pages, landing pages, and ad campaigns.",
+      "primaryCta": "Create Shopify assets",
+      "secondaryCta": "Try title generator"
+    },
+    "tools-product-title-generator": {
+      "slug": "tools/product-title-generator",
+      "title": "AI Product Title Generator - Haitu",
+      "description": "Generate multilingual ecommerce product titles from product facts, category, materials, and selling points.",
+      "h1": "AI product title generator",
+      "eyebrow": "Search-ready titles for global ecommerce",
+      "lead": "Turn product names, categories, materials, selling points, and target languages into ecommerce titles for search and conversion.",
+      "primaryCta": "Generate titles",
+      "secondaryCta": "Create video scripts"
+    },
+    "tools-product-video-script-generator": {
+      "slug": "tools/product-video-script-generator",
+      "title": "AI Product Video Script Generator - Haitu",
+      "description": "Turn product facts, selling points, and usage scenes into ecommerce video scripts, storyboards, and caption direction.",
+      "h1": "AI product video script generator",
+      "eyebrow": "Clarify the video before generation",
+      "lead": "Turn product titles, materials, dimensions, selling points, pain points, and usage scenes into short-video scripts and storyboard structures before generating product videos.",
+      "primaryCta": "Generate video scripts",
+      "secondaryCta": "Create product videos",
+      "sections": [
+        {
+          "heading": "Scripts constrain selling points and shots",
+          "body": "Product videos need a clear opening, pain point, benefit order, usage moment, and CTA instead of random motion.",
+          "bullets": [
+            "Opening hook",
+            "Benefit order",
+            "Shot structure",
+            "Caption direction"
+          ]
+        },
+        {
+          "heading": "Useful for batch product videos",
+          "body": "A consistent script structure makes large SKU workflows easier to review, reuse, and localize.",
+          "bullets": [
+            "Batch SKUs",
+            "Template reuse",
+            "Localization",
+            "Faster review"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Will the script change uploaded product language?",
+          "answer": "No. Haitu does not force-change the language of user-provided product content. Generate localized scripts separately for target markets."
+        },
+        {
+          "question": "Can the script be used directly for video generation?",
+          "answer": "Yes. Use the script together with product photos, references, and target ratios as inputs for product video generation."
+        }
+      ]
+    },
+    "terms": {
+      "slug": "terms",
+      "title": "Terms of Service - Haitu",
+      "description": "Read the basic terms for using Haitu product image optimization, product video generation, hosted models, and bring-your-own-model workflows.",
+      "h1": "Terms of Service",
+      "eyebrow": "Please read before using Haitu",
+      "lead": "This page explains what users should know about Haitu accounts, wallet balance, AI generation services, prohibited use, content review, and the scope of the service. Haitu is a digital SaaS tool and does not sell physical goods.",
+      "primaryCta": "Open app",
+      "secondaryCta": "View privacy policy",
+      "sections": [
+        {
+          "heading": "Accounts, balance, and AI generation services",
+          "body": "Users can upload and manage product data in the console, then use wallet balance for product image optimization, video generation, marketing script organization, and later AI image creative services. Balance is only used for digital SaaS services inside Haitu.",
+          "bullets": [
+            "Protect your account",
+            "Balance for digital services",
+            "Image optimization",
+            "Video and script generation"
+          ]
+        },
+        {
+          "heading": "Prohibited use",
+          "body": "Do not use Haitu to create, promote, or support gambling, financial investment, cryptocurrency trading, loans, adult content, medicine, illegal goods, infringing goods, or other restricted services.",
+          "bullets": [
+            "No gambling",
+            "No investment or loans",
+            "No adult or medicine content",
+            "No illegal or infringing goods"
+          ]
+        },
+        {
+          "heading": "AI output requires human review",
+          "body": "Haitu aims to generate assets from product facts and user input, but AI output may be inaccurate, exaggerated, or unsuitable for publishing. Users should review output and follow marketplace policies before use.",
+          "bullets": [
+            "Check product facts",
+            "Check marketplace policy",
+            "Check rights risks",
+            "Keep human approval"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What type of service is Haitu?",
+          "answer": "Haitu is an AI product image and video creation SaaS tool for cross-border ecommerce. It provides digital content generation and asset management, not physical goods."
+        },
+        {
+          "question": "Can AI-generated assets be published directly?",
+          "answer": "Publishing without review is not recommended. Users should check product accuracy, marketplace rules, advertising compliance, and intellectual property risks."
+        }
+      ]
+    },
+    "privacy": {
+      "slug": "privacy",
+      "title": "Privacy Policy - Haitu",
+      "description": "Learn how Haitu handles account information, product facts, reference images, generation tasks, model configuration, and payment-related data.",
+      "h1": "Privacy Policy",
+      "eyebrow": "Data handling and privacy",
+      "lead": "Haitu processes account data, login information, product data, reference images, generation records, model configuration, and payment status to provide product creative workflows, account management, billing, and security. Haitu does not store full card numbers, WeChat Pay accounts, or Alipay accounts.",
+      "primaryCta": "Open app",
+      "secondaryCta": "View terms",
+      "sections": [
+        {
+          "heading": "Data we may process",
+          "body": "This may include account email, login and session information, workspace information, product titles, materials, dimensions, selling points, reference images, generation records, model settings, wallet ledger records, payment status, and technical logs.",
+          "bullets": [
+            "Email and login data",
+            "Product data and references",
+            "Generation records",
+            "Payment status and wallet ledger"
+          ]
+        },
+        {
+          "heading": "Payment details are handled by payment providers",
+          "body": "Users complete WeChat Pay, Alipay, or card payments through Stripe Checkout and other payment pages. Haitu receives order ID, payment status, amount, currency, and settlement result, but does not store full card numbers, WeChat Pay accounts, or Alipay accounts.",
+          "bullets": [
+            "Stripe Checkout",
+            "No full card numbers",
+            "No WeChat Pay accounts",
+            "No Alipay accounts"
+          ]
+        },
+        {
+          "heading": "User content and third-party models",
+          "body": "When users choose hosted or own models, product facts, reference images, and prompts may be sent to the relevant model provider to complete generation tasks. Avoid uploading sensitive or unauthorized content.",
+          "bullets": [
+            "Hosted model calls",
+            "Own model calls",
+            "Minimum necessary transfer",
+            "Avoid sensitive content"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Will product content be translated automatically?",
+          "answer": "Site localization does not automatically change user-uploaded product content. Product facts stay in the language provided unless the user requests localized generation or rewriting."
+        },
+        {
+          "question": "Can users request deletion?",
+          "answer": "Users can contact support to request deletion or export. Handling may depend on account status, billing records, legal requirements, and backup cycles."
+        }
+      ]
+    },
+    "refund": {
+      "slug": "refund",
+      "title": "Refund Policy - Haitu",
+      "description": "Understand the basic rules for Haitu top-ups, wallet balance, model calls, failed generation tasks, and refund handling.",
+      "h1": "Refund Policy",
+      "eyebrow": "Top-ups and generation tasks",
+      "lead": "Haitu fees cover product image optimization, video generation, marketing script organization, model calls, and platform services. After users pay through Stripe Checkout with WeChat Pay, Alipay, or cards, wallet balance is credited and used for digital SaaS services.",
+      "primaryCta": "View billing",
+      "secondaryCta": "Contact us",
+      "sections": [
+        {
+          "heading": "Unused balance can be reviewed by support",
+          "body": "If a top-up has not been used, users may contact support for manual refund review. The actual refund path depends on Stripe or other payment channels, fees, account status, and risk-control requirements.",
+          "bullets": [
+            "Unused balance",
+            "Manual review",
+            "Payment channel limits",
+            "Account review"
+          ]
+        },
+        {
+          "heading": "Consumed AI generation services are generally non-refundable",
+          "body": "Once a task has called third-party models or consumed platform resources, image optimization, video generation, and script organization services generally cannot be refunded as unused balance. System errors or duplicate charges can be reviewed by support.",
+          "bullets": [
+            "Model call cost",
+            "Consumed services generally non-refundable",
+            "Failure review",
+            "Duplicate charge handling"
+          ]
+        },
+        {
+          "heading": "Contact support with records first",
+          "body": "For refunds or wallet adjustments, provide account email, payment record, task ID, and issue description so the team can check generation and billing records.",
+          "bullets": [
+            "Account email",
+            "Payment record",
+            "Task ID",
+            "Issue description"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Does unsatisfactory AI output always qualify for a refund?",
+          "answer": "Not always. AI generation is probabilistic, and tasks that incurred model costs need to be reviewed based on failure cause, billing record, and platform rules."
+        },
+        {
+          "question": "What if I was charged twice?",
+          "answer": "If duplicate charges or system errors occur, contact support with account, time, payment record, and task ID for review."
+        }
+      ]
+    },
+    "contact": {
+      "slug": "contact",
+      "title": "Contact - Haitu",
+      "description": "Contact the Haitu team for product image optimization, product video generation, model integration, billing, and account support.",
+      "h1": "Contact",
+      "eyebrow": "Product support and partnerships",
+      "lead": "For product creative workflows, video generation, model integration, billing, refunds, or account support, contact the Haitu team. Business name: Haitu. Website: https://haitu.online. Support email: support@haitu.online.",
+      "primaryCta": "Open app",
+      "secondaryCta": "View refund policy",
+      "sections": [
+        {
+          "heading": "Contact information",
+          "body": "Business name: Haitu. Website: https://haitu.online. Support email: support@haitu.online. Do not send passwords, verification codes, full API keys, or full payment account details by email.",
+          "bullets": [
+            "Haitu",
+            "https://haitu.online",
+            "support@haitu.online",
+            "Do not send sensitive credentials"
+          ]
+        },
+        {
+          "heading": "Include key details in support requests",
+          "body": "To help us locate the issue faster, provide account email, workspace, product SKU, task ID, payment record or screenshot, and the outcome you expect.",
+          "bullets": [
+            "Account email",
+            "Product SKU",
+            "Task ID",
+            "Issue screenshot"
+          ]
+        },
+        {
+          "heading": "When to contact us",
+          "body": "Common topics include account login, wallet balance, refund questions, failed generation tasks, model configuration, hosted models, own model integration, batch workflows, and partnerships.",
+          "bullets": [
+            "Account and billing",
+            "Refunds and invoices",
+            "Generation tasks",
+            "Model integration"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Should I send passwords or API keys to support?",
+          "answer": "No. Do not send passwords, verification codes, or full API keys through chat or email."
+        },
+        {
+          "question": "Can I ask about bringing my own model?",
+          "answer": "Yes. Include the model provider, model type, expected call pattern, and team workflow."
+        }
+      ]
+    },
+    "use-cases-cross-border-ecommerce": {
+      "slug": "use-cases/cross-border-ecommerce",
+      "title": "Cross-Border Ecommerce Product Creative Workflow - Haitu",
+      "description": "Use Haitu to manage product facts, optimize product images, organize marketing scripts, and generate product short videos for cross-border ecommerce teams.",
+      "h1": "Cross-border ecommerce product creative workflow",
+      "eyebrow": "From product data to image and video assets",
+      "lead": "Start from product facts, product images, selling points, and references, then move titles, image optimization, scripts, storyboards, and product videos into one AI workflow.",
+      "primaryCta": "Organize product assets",
+      "secondaryCta": "Explore TikTok Shop workflow",
+      "sections": [
+        {
+          "heading": "Unify product data and creative inputs",
+          "body": "Turn product photos, references, titles, categories, materials, dimensions, selling points, and blocked claims into reusable product packets.",
+          "bullets": [
+            "Product packets",
+            "Reference management",
+            "Selling point constraints",
+            "Blocked claims"
+          ]
+        },
+        {
+          "heading": "Create images, scripts, and videos from facts",
+          "body": "Haitu organizes product image optimization requests, title direction, script storyboards, and product video assets from the same verified product facts.",
+          "bullets": [
+            "Image optimization",
+            "Titles and selling points",
+            "Scripts and storyboards",
+            "Product videos"
+          ]
+        },
+        {
+          "heading": "Use hosted or own models",
+          "body": "Lean teams can start with hosted models; teams with model accounts or internal pipelines can connect their own models inside the same workflow.",
+          "bullets": [
+            "Hosted models",
+            "Own models",
+            "Wallet billing",
+            "Team review"
+          ]
+        }
+      ]
+    },
+    "use-cases-tiktok-shop-product-video": {
+      "slug": "use-cases/tiktok-shop-product-video",
+      "title": "TikTok Shop Product Video Workflow - Haitu",
+      "description": "Create short-video scripts, storyboards, localized selling points, and product video assets for TikTok Shop sellers from product images and references.",
+      "h1": "TikTok Shop product video workflow",
+      "eyebrow": "Product short videos for social commerce",
+      "lead": "Organize TikTok Shop product data, reference images, selling points, and target-market wording before creating short-video scripts, storyboards, localized selling points, and product video assets.",
+      "primaryCta": "Create TikTok Shop videos",
+      "secondaryCta": "Explore ecommerce workflow",
+      "sections": [
+        {
+          "heading": "Structure selling points for social commerce",
+          "body": "Organize the hook, pain point, selling point order, usage moment, and CTA before generating video assets.",
+          "bullets": [
+            "Opening hook",
+            "Pain point",
+            "Selling point order",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "Use product photos and references as inputs",
+          "body": "Product photos, detail images, and references help keep the product appearance, material, and usage scene consistent.",
+          "bullets": [
+            "Product photos",
+            "Detail images",
+            "References",
+            "Video ratios"
+          ]
+        },
+        {
+          "heading": "Review before publishing",
+          "body": "Sellers should still check product facts, marketplace rules, ad claims, intellectual property, and local compliance before publishing AI outputs.",
+          "bullets": [
+            "Fact review",
+            "Ad compliance",
+            "Marketplace rules",
+            "Localization"
+          ]
+        }
+      ]
+    },
+    "use-cases-amazon-product-image-optimization": {
+      "slug": "use-cases/amazon-product-image-optimization",
+      "title": "Amazon Product Image Optimization and Video Assets - Haitu",
+      "description": "Prepare product images, references, selling points, scripts, and short-video assets for Amazon listings, A+ content, and off-site ads.",
+      "h1": "Amazon product image optimization and video assets",
+      "eyebrow": "Trusted creative inputs for listings and ads",
+      "lead": "For Amazon listings, A+ content, and off-site ads, Haitu organizes product images, references, selling points, description direction, scripts, and video assets in a reviewable AI workflow.",
+      "primaryCta": "Prepare Amazon assets",
+      "secondaryCta": "Explore image optimization",
+      "sections": [
+        {
+          "heading": "Prepare listing facts first",
+          "body": "Store hero images, detail shots, materials, dimensions, selling points, and blocked claims before image optimization and script generation.",
+          "bullets": [
+            "Hero image facts",
+            "Detail shots",
+            "Materials and dimensions",
+            "Claim constraints"
+          ]
+        },
+        {
+          "heading": "Connect A+ content and off-site ads",
+          "body": "One product packet can feed image optimization requests, copy direction, video scripts, and short-video assets without repeating work.",
+          "bullets": [
+            "A+ content",
+            "Off-site ads",
+            "Video scripts",
+            "Short videos"
+          ]
+        },
+        {
+          "heading": "Keep Amazon policy review",
+          "body": "Haitu prepares assets but does not guarantee marketplace approval. Teams should review Amazon image, copy, category, and ad policies before publishing.",
+          "bullets": [
+            "Image rules",
+            "Category limits",
+            "Ad claims",
+            "Human review"
+          ]
+        }
+      ]
+    },
+    "use-cases-fashion-product-video": {
+      "slug": "use-cases/fashion-product-video",
+      "title": "Fashion Product Video Generation Workflow - Haitu",
+      "description": "Organize style, materials, sizes, outfit scenes, references, and selling points to create short-video scripts and product video assets for fashion products.",
+      "h1": "Fashion product video generation workflow",
+      "eyebrow": "Style, material, and outfit scenes",
+      "lead": "For apparel, accessories, bags, and shoes, Haitu turns style, material, size, detail images, outfit scenes, and selling points into short-video scripts and product video assets.",
+      "primaryCta": "Create fashion product videos",
+      "secondaryCta": "Explore image-to-video",
+      "sections": [
+        {
+          "heading": "Highlight style and details",
+          "body": "Capture cut, fit, material, color, size, and detail images so scripts can explain real product advantages.",
+          "bullets": [
+            "Cut and fit",
+            "Material and color",
+            "Size facts",
+            "Detail shots"
+          ]
+        },
+        {
+          "heading": "Generate scripts around outfit scenes",
+          "body": "Create hooks, outfit scenes, selling point order, caption direction, and shot structures for short-video commerce.",
+          "bullets": [
+            "Outfit scenes",
+            "Opening hooks",
+            "Captions",
+            "Shot structure"
+          ]
+        },
+        {
+          "heading": "Keep image and video consistent",
+          "body": "AI outputs still need review for style, color, pattern, material, and brand expression to avoid wrong products or exaggerated claims.",
+          "bullets": [
+            "Color review",
+            "Pattern consistency",
+            "Material review",
+            "Brand tone"
+          ]
+        }
+      ]
+    },
+    "use-cases-home-goods-product-video": {
+      "slug": "use-cases/home-goods-product-video",
+      "title": "Home Goods Product Image-to-Video Workflow - Haitu",
+      "description": "Turn home goods product photos, dimensions, materials, usage scenes, and references into short-video scripts, storyboards, and product video assets.",
+      "h1": "Home goods product image-to-video workflow",
+      "eyebrow": "Dimensions, materials, and usage scenes",
+      "lead": "For home goods, storage, kitchen, and daily-use products, Haitu organizes product photos, dimensions, materials, usage methods, and scene references into short-video scripts and product video assets.",
+      "primaryCta": "Create home goods videos",
+      "secondaryCta": "Explore batch workflows",
+      "sections": [
+        {
+          "heading": "Explain dimensions and materials clearly",
+          "body": "Home goods often depend on size, capacity, material, and usage. Haitu organizes those facts before scripts and videos are generated.",
+          "bullets": [
+            "Dimensions",
+            "Capacity",
+            "Materials",
+            "Usage methods"
+          ]
+        },
+        {
+          "heading": "Create videos from usage scenes",
+          "body": "Structure scenes around storage before-and-after, kitchen tasks, home setup, and problem-solving moments.",
+          "bullets": [
+            "Storage scenes",
+            "Kitchen tasks",
+            "Home setup",
+            "Problem solving"
+          ]
+        },
+        {
+          "heading": "Fit batch SKU workflows",
+          "body": "Similar home goods can reuse script templates and review workflows while changing dimensions, colors, materials, and use cases.",
+          "bullets": [
+            "Batch SKUs",
+            "Script templates",
+            "Different selling points",
+            "Reusable review"
+          ]
+        }
+      ]
+    },
+    "use-cases-beauty-product-short-video": {
+      "slug": "use-cases/beauty-product-short-video",
+      "title": "Beauty Product Short Video Workflow - Haitu",
+      "description": "Organize beauty and personal care selling points, usage steps, texture, scenes, and compliance boundaries before generating short-video scripts and product videos.",
+      "h1": "Beauty product short video workflow",
+      "eyebrow": "Steps, texture, and compliant claims",
+      "lead": "For beauty, skincare, and personal care products, Haitu organizes selling points, usage steps, texture, scenarios, and blocked claims into short-video scripts and product video assets.",
+      "primaryCta": "Create beauty product videos",
+      "secondaryCta": "Explore script generator",
+      "sections": [
+        {
+          "heading": "Separate trusted claims and blocked wording",
+          "body": "Beauty content needs careful claims. Haitu helps separate trusted selling points, usage steps, target scenes, and blocked expressions.",
+          "bullets": [
+            "Trusted claims",
+            "Blocked wording",
+            "Usage steps",
+            "Scenarios"
+          ]
+        },
+        {
+          "heading": "Build scripts around steps and experience",
+          "body": "Create hooks, texture shots, usage steps, scenario notes, caption direction, and CTAs without turning unverified effects into promises.",
+          "bullets": [
+            "Texture shots",
+            "Steps",
+            "Captions",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "Keep human compliance review",
+          "body": "AI output does not replace advertising compliance or marketplace review. Teams should check claims, sensitive wording, platform rules, and IP risk.",
+          "bullets": [
+            "Claim review",
+            "Sensitive words",
+            "Platform rules",
+            "IP risk"
+          ]
+        }
+      ]
+    },
+    "platforms-lazada": {
+      "slug": "platforms/lazada",
+      "title": "Lazada Product Image and Video Creative Workflow - Haitu",
+      "description": "Organize product photos, selling points, references, localized titles, and short-video scripts for Lazada product pages, ads, and Southeast Asian ecommerce content.",
+      "h1": "Lazada product image and video creative workflow",
+      "eyebrow": "Creative assets for Southeast Asian ecommerce",
+      "lead": "For Lazada product pages, ad campaigns, and short-video content, Haitu keeps product photos, references, selling points, target-market language, and video scripts in one AI product creative workflow.",
+      "primaryCta": "Create Lazada assets",
+      "secondaryCta": "Explore Shopee workflow",
+      "sections": [
+        {
+          "heading": "Prepare assets for Southeast Asian product pages",
+          "body": "Turn hero images, detail photos, scene references, titles, materials, dimensions, and selling points into a reusable product packet for Lazada listings and ads.",
+          "bullets": [
+            "Product photos",
+            "Localized selling points",
+            "Ad creative direction",
+            "Listing content"
+          ]
+        },
+        {
+          "heading": "Connect scripts and product video generation",
+          "body": "Haitu creates short-video scripts, storyboards, and product video assets from real product facts so teams spend less time reorganizing SKU information.",
+          "bullets": [
+            "Video scripts",
+            "Storyboards",
+            "Product videos",
+            "Batch SKUs"
+          ]
+        },
+        {
+          "heading": "Keep marketplace review before publishing",
+          "body": "AI output does not replace Lazada rules or local compliance review. Sellers should check product facts, ad claims, intellectual property, and target-market language before publishing.",
+          "bullets": [
+            "Product facts",
+            "Marketplace rules",
+            "Ad compliance",
+            "Local wording"
+          ]
+        }
+      ]
+    },
+    "platforms-etsy": {
+      "slug": "platforms/etsy",
+      "title": "Etsy Product Image and Video Creative Workflow - Haitu",
+      "description": "Organize product photos, materials, craft details, title ideas, selling points, scripts, and short-video assets for handmade, vintage, and personalized Etsy products.",
+      "h1": "Etsy product image and video creative workflow",
+      "eyebrow": "Handmade, vintage, and personalized product creatives",
+      "lead": "Start from product facts, references, materials, craft details, dimensions, and personalization options to prepare more trusted images, copy, and video assets for handmade, craft, vintage, and personalized product listings.",
+      "primaryCta": "Create Etsy assets",
+      "secondaryCta": "Try title generator",
+      "sections": [
+        {
+          "heading": "Highlight materials and craft details",
+          "body": "Etsy products often depend on materials, craft process, dimensions, usage scenes, and personalization notes. Haitu organizes those facts before image optimization and script generation.",
+          "bullets": [
+            "Materials",
+            "Craft details",
+            "Dimensions",
+            "Personalization"
+          ]
+        },
+        {
+          "heading": "Turn product stories into short-video scripts",
+          "body": "Organize product origin, making details, gifting moments, and buyer concerns into titles, selling points, video scripts, and short-video creative direction.",
+          "bullets": [
+            "Product story",
+            "Gift scenarios",
+            "Titles and selling points",
+            "Video scripts"
+          ]
+        },
+        {
+          "heading": "Keep output aligned with the real product",
+          "body": "Sellers should review appearance, color, materials, rights, and Etsy rules before publishing AI-generated creative assets.",
+          "bullets": [
+            "Appearance review",
+            "Color and materials",
+            "Rights risk",
+            "Marketplace rules"
+          ]
+        }
+      ]
+    },
+    "compare-ai-product-video-generator-vs-general-video-generator": {
+      "slug": "compare/ai-product-video-generator-vs-general-video-generator",
+      "title": "AI Product Video Generator vs General Video Generator - Haitu",
+      "description": "Compare ecommerce AI product video generators with general AI video generators across product facts, scripts, marketplace assets, and review workflows.",
+      "h1": "AI product video generator vs general video generator",
+      "eyebrow": "Product facts, not only moving images",
+      "lead": "General AI video generators are useful for broad creative and entertainment visuals. Haitu is built for ecommerce product creatives, organizing SKUs, product photos, references, selling points, scripts, and marketplace rules before video generation.",
+      "primaryCta": "Create product videos",
+      "secondaryCta": "Explore image-to-video",
+      "sections": [
+        {
+          "heading": "Inputs are different",
+          "body": "Product videos need accurate product photos, materials, dimensions, selling points, blocked claims, and target-channel requirements instead of only a short prompt.",
+          "bullets": [
+            "SKU data",
+            "Product photos",
+            "Selling point constraints",
+            "Marketplace ratios"
+          ]
+        },
+        {
+          "heading": "Outputs serve product pages and ads",
+          "body": "Haitu output centers on product image optimization, short-video scripts, storyboards, caption direction, and product video assets for ecommerce launches and campaigns.",
+          "bullets": [
+            "Image optimization",
+            "Scripts",
+            "Captions",
+            "Product videos"
+          ]
+        },
+        {
+          "heading": "Review stays in the workflow",
+          "body": "Haitu does not promise to skip review. Teams should check product accuracy, marketplace policy, advertising compliance, and intellectual property before publishing AI outputs.",
+          "bullets": [
+            "Fact review",
+            "Marketplace policy",
+            "Ad compliance",
+            "IP risk"
+          ]
+        }
+      ]
+    },
+    "compare-haitu-vs-canva-for-product-video": {
+      "slug": "compare/haitu-vs-canva-for-product-video",
+      "title": "Haitu vs Canva for Product Video Workflows - Haitu",
+      "description": "Compare Haitu and Canva for ecommerce product video workflows, from product facts and scripts to model-driven video generation and final design work.",
+      "h1": "Haitu vs Canva for product video workflows",
+      "eyebrow": "Product workflow vs general design workspace",
+      "lead": "Canva is useful for general design and layout work. Haitu focuses on product facts, reference images, scripts, model workflows, and ecommerce video generation for teams that need product creative assets from SKU data.",
+      "primaryCta": "Create product videos",
+      "secondaryCta": "Explore product scripts",
+      "sections": [
+        {
+          "heading": "Canva supports broad visual design",
+          "body": "Canva is often useful for templates, brand layouts, presentations, social posts, and manual visual arrangement across many content types.",
+          "bullets": [
+            "Templates",
+            "Brand layouts",
+            "Social graphics",
+            "Manual design editing"
+          ]
+        },
+        {
+          "heading": "Haitu starts from product facts",
+          "body": "Haitu organizes product images, references, materials, selling points, blocked claims, scripts, model settings, and ecommerce video generation in one product creative workflow.",
+          "bullets": [
+            "Product facts",
+            "Reference images",
+            "Video scripts",
+            "Model workflows"
+          ]
+        },
+        {
+          "heading": "Use the right tool for each stage",
+          "body": "Teams can use Haitu to create product scripts, image optimization requests, and video assets, then use design tools for final brand layout or manual finishing when needed.",
+          "bullets": [
+            "Generate from SKUs",
+            "Review AI output",
+            "Design finishing",
+            "Marketplace publishing"
+          ]
+        }
+      ]
+    },
+    "compare-haitu-vs-manual-product-video-production": {
+      "slug": "compare/haitu-vs-manual-product-video-production",
+      "title": "Haitu vs Manual Product Video Production - Haitu",
+      "description": "Compare Haitu with manual product video production for batch SKUs, script preparation, video assets, cost rhythm, and human review.",
+      "h1": "Haitu vs manual product video production",
+      "eyebrow": "Batch efficiency with human review",
+      "lead": "Manual production fits highly customized, higher-budget, real-shooting projects. Haitu helps cross-border teams structure product photos, selling points, scripts, and short-video assets for many SKUs before human review and refinement.",
+      "primaryCta": "Generate product videos in batch",
+      "secondaryCta": "Explore batch creative generation",
+      "sections": [
+        {
+          "heading": "Manual production fits flagship projects",
+          "body": "Real shoots, complex post-production, live talent, and highly customized brand films are still best led by professional human teams.",
+          "bullets": [
+            "Real shooting",
+            "Complex editing",
+            "Brand films",
+            "High customization"
+          ]
+        },
+        {
+          "heading": "Haitu fits daily SKU launches",
+          "body": "When teams need to process many SKUs, organize selling points, create scripts, and produce first-pass short-video assets, Haitu can structure the workflow faster.",
+          "bullets": [
+            "Batch SKUs",
+            "Storyboards",
+            "Product image inputs",
+            "First-pass videos"
+          ]
+        },
+        {
+          "heading": "Final quality still needs human review",
+          "body": "Haitu reduces repeated organization and first-draft production, while teams still check product facts, platform rules, visual quality, and advertising compliance before publishing.",
+          "bullets": [
+            "Human review",
+            "Fact checks",
+            "Marketplace rules",
+            "Visual refinement"
+          ]
+        }
+      ]
+    },
+    "categories-apparel-product-video": {
+      "slug": "categories/apparel-product-video",
+      "title": "Apparel Product Video Generation Workflow - Haitu",
+      "description": "Organize style, fit, materials, colors, sizes, detail images, and outfit scenes into product video scripts and short-video assets for apparel sellers.",
+      "h1": "Apparel product video generation workflow",
+      "eyebrow": "Style, sizing, and outfit scenes",
+      "lead": "For apparel, accessories, bags, and shoes, Haitu turns style, fit, material, color, size, detail images, and outfit scenes into product video scripts, storyboards, and short-video assets.",
+      "primaryCta": "Create apparel videos",
+      "secondaryCta": "Explore image-to-video",
+      "sections": [
+        {
+          "heading": "Organize style and size facts first",
+          "body": "Keep fit, material, color, size, detail photos, and blocked claims in the product packet so scripts and shots stay close to the real item.",
+          "bullets": [
+            "Style and fit",
+            "Material and color",
+            "Size facts",
+            "Detail shots"
+          ]
+        },
+        {
+          "heading": "Create scripts around outfit scenes",
+          "body": "Generate hooks, outfit scenes, selling point order, caption direction, and short-video shot structures.",
+          "bullets": [
+            "Outfit scenes",
+            "Opening hooks",
+            "Selling point order",
+            "Caption direction"
+          ]
+        },
+        {
+          "heading": "Keep human review for color and style",
+          "body": "AI outputs still need review for color, pattern, style, material, and brand expression before publishing.",
+          "bullets": [
+            "Color review",
+            "Pattern consistency",
+            "Material review",
+            "Brand tone"
+          ]
+        }
+      ]
+    },
+    "categories-home-goods-product-video": {
+      "slug": "categories/home-goods-product-video",
+      "title": "Home Goods Product Video Category Workflow - Haitu",
+      "description": "Turn home goods product photos, dimensions, capacity, materials, usage scenes, and references into short-video scripts and video assets.",
+      "h1": "Home goods product image-to-video workflow",
+      "eyebrow": "Dimensions, capacity, and usage scenes",
+      "lead": "For home goods, storage, and daily-use products, Haitu organizes product photos, dimensions, capacity, materials, usage methods, and scene references into short-video scripts and product video assets.",
+      "primaryCta": "Create home goods videos",
+      "secondaryCta": "Explore batch workflows",
+      "sections": [
+        {
+          "heading": "Explain dimensions and materials clearly",
+          "body": "Home goods often depend on size, capacity, material, and usage. Haitu organizes those facts before scripts and videos are generated.",
+          "bullets": [
+            "Dimensions",
+            "Capacity",
+            "Materials",
+            "Usage methods"
+          ]
+        },
+        {
+          "heading": "Create videos from usage scenes",
+          "body": "Structure scenes around storage before-and-after, home setup, and problem-solving moments.",
+          "bullets": [
+            "Storage scenes",
+            "Home setup",
+            "Problem solving",
+            "Storyboards"
+          ]
+        },
+        {
+          "heading": "Fit reusable batch templates",
+          "body": "Similar home goods can reuse script templates and review workflows while changing dimensions, colors, materials, and use cases.",
+          "bullets": [
+            "Batch SKUs",
+            "Script templates",
+            "Different selling points",
+            "Reusable review"
+          ]
+        }
+      ]
+    },
+    "categories-beauty-product-video": {
+      "slug": "categories/beauty-product-video",
+      "title": "Beauty and Personal Care Product Video Workflow - Haitu",
+      "description": "Organize trusted claims, usage steps, texture, scenarios, and compliance boundaries before generating beauty product video scripts and short-video assets.",
+      "h1": "Beauty product short video workflow",
+      "eyebrow": "Steps, texture, and compliant claims",
+      "lead": "For beauty, skincare, and personal care products, Haitu organizes trusted claims, usage steps, texture, scenarios, and blocked wording into short-video scripts, caption direction, and product video assets.",
+      "primaryCta": "Create beauty videos",
+      "secondaryCta": "Explore script generator",
+      "sections": [
+        {
+          "heading": "Separate trusted claims and blocked wording",
+          "body": "Beauty content needs careful claims. Haitu helps separate trusted selling points, usage steps, target scenes, and blocked expressions.",
+          "bullets": [
+            "Trusted claims",
+            "Blocked wording",
+            "Usage steps",
+            "Scenarios"
+          ]
+        },
+        {
+          "heading": "Build scripts around steps and experience",
+          "body": "Create hooks, texture shots, usage steps, scenario notes, caption direction, and CTAs without turning unverified effects into promises.",
+          "bullets": [
+            "Texture shots",
+            "Steps",
+            "Captions",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "Keep human compliance review",
+          "body": "AI output does not replace advertising compliance or marketplace review. Teams should check claims, sensitive wording, platform rules, and IP risk.",
+          "bullets": [
+            "Claim review",
+            "Sensitive words",
+            "Platform rules",
+            "IP risk"
+          ]
+        }
+      ]
+    },
+    "categories-electronics-product-video": {
+      "slug": "categories/electronics-product-video",
+      "title": "Electronics Accessory Product Video Workflow - Haitu",
+      "description": "Organize specifications, compatibility, ports, materials, usage scenes, and safety notes into product video scripts and short-video assets for electronics accessories.",
+      "h1": "Electronics accessory product video workflow",
+      "eyebrow": "Specs, compatibility, and setup steps",
+      "lead": "For phone accessories, digital accessories, and small electronics, Haitu organizes specifications, compatibility, ports, materials, usage scenes, and safety notes into product video scripts, storyboards, and short-video assets.",
+      "primaryCta": "Create electronics videos",
+      "secondaryCta": "Explore product scripts",
+      "sections": [
+        {
+          "heading": "Check specs and compatibility first",
+          "body": "Electronics accessory content needs accurate specs, ports, compatible devices, materials, and usage boundaries so video assets do not mislead buyers.",
+          "bullets": [
+            "Specifications",
+            "Compatibility",
+            "Ports",
+            "Safety notes"
+          ]
+        },
+        {
+          "heading": "Fit explanatory short videos",
+          "body": "Structure scripts around setup steps, connection methods, comparison scenes, and common buyer questions.",
+          "bullets": [
+            "Setup steps",
+            "Connection methods",
+            "Comparison scenes",
+            "Buyer questions"
+          ]
+        },
+        {
+          "heading": "Review parameters before publishing",
+          "body": "Teams should review specs, compatibility, safety statements, ad claims, and marketplace rules before publishing AI outputs.",
+          "bullets": [
+            "Spec review",
+            "Compatibility review",
+            "Safety statements",
+            "Marketplace rules"
+          ]
+        }
+      ]
+    },
+    "categories-pet-supplies-product-video": {
+      "slug": "categories/pet-supplies-product-video",
+      "title": "Pet Supplies Product Video Workflow - Haitu",
+      "description": "Organize pet supplies dimensions, materials, target pets, usage scenes, and safety notes into product video scripts and short-video assets.",
+      "h1": "Pet supplies product video workflow",
+      "eyebrow": "Size, materials, and pet safety wording",
+      "lead": "For pet toys, feeding, cleaning, and travel supplies, Haitu organizes dimensions, materials, target pets, usage scenes, and safety notes into product video scripts, storyboards, and short-video assets.",
+      "primaryCta": "Create pet supplies videos",
+      "secondaryCta": "Explore image-to-video",
+      "sections": [
+        {
+          "heading": "Organize target pets and dimensions",
+          "body": "Pet supplies need target pet type, size, age or body limits, dimensions, and materials so scripts match real usage scenes.",
+          "bullets": [
+            "Target pets",
+            "Size limits",
+            "Materials",
+            "Usage scenes"
+          ]
+        },
+        {
+          "heading": "Handle safety wording carefully",
+          "body": "Haitu can include safety notes and blocked claims as inputs so unverified safety effects are not written as promises.",
+          "bullets": [
+            "Safety boundaries",
+            "Blocked claims",
+            "Human review",
+            "Marketplace rules"
+          ]
+        },
+        {
+          "heading": "Fit frequent SKU launches",
+          "body": "Similar pet supplies can reuse script templates and review workflows while adjusting pet type, material, and use case.",
+          "bullets": [
+            "Batch SKUs",
+            "Template reuse",
+            "Pet types",
+            "Scenario differences"
+          ]
+        }
+      ]
+    },
+    "categories-kitchen-product-video": {
+      "slug": "categories/kitchen-product-video",
+      "title": "Kitchen Product Short Video Workflow - Haitu",
+      "description": "Organize kitchen product dimensions, materials, capacity, usage steps, cleaning notes, and references into short-video scripts and product video assets.",
+      "h1": "Kitchen product short video workflow",
+      "eyebrow": "Capacity, steps, and cleaning notes",
+      "lead": "For kitchen tools, dining products, and storage items, Haitu organizes dimensions, materials, capacity, usage steps, cleaning notes, and scene references into short-video scripts and product video assets.",
+      "primaryCta": "Create kitchen product videos",
+      "secondaryCta": "Explore home goods videos",
+      "sections": [
+        {
+          "heading": "Explain capacity and materials",
+          "body": "Kitchen products often depend on dimensions, capacity, materials, heat or safety boundaries. Haitu organizes those facts before scripts and videos are generated.",
+          "bullets": [
+            "Dimensions",
+            "Capacity",
+            "Materials",
+            "Usage steps"
+          ]
+        },
+        {
+          "heading": "Create videos from usage steps",
+          "body": "Turn unboxing, operation, cleaning, storage, and comparison scenes into short-video structures.",
+          "bullets": [
+            "Operation steps",
+            "Cleaning notes",
+            "Storage effect",
+            "Scene comparison"
+          ]
+        },
+        {
+          "heading": "Review safety and ad claims",
+          "body": "AI output does not replace safety statements or marketplace review. Teams should check material, heat, usage, and ad claims before publishing.",
+          "bullets": [
+            "Safety statements",
+            "Marketplace rules",
+            "Material review",
+            "Ad compliance"
+          ]
+        }
+      ]
+    },
+    "features-product-image-background-cleanup": {
+      "slug": "features/product-image-background-cleanup",
+      "title": "Product Image Background Cleanup Workflow - Haitu",
+      "description": "Organize source photos, references, background requirements, and marketplace rules before ecommerce image optimization, ad creative requests, and product video generation.",
+      "h1": "Product image background cleanup workflow",
+      "eyebrow": "Clean product image inputs before generation",
+      "lead": "Organize original product photos, references, background requirements, and marketplace rules before image optimization, ad creative requests, scripts, and future image creative workflows.",
+      "primaryCta": "Prepare background requirements",
+      "secondaryCta": "Explore reference management",
+      "sections": [
+        {
+          "heading": "Start from source photos and background needs",
+          "body": "Keep original product photos, detail shots, target backgrounds, marketplace rules, and blocked directions in one product packet.",
+          "bullets": [
+            "Source photos",
+            "Target backgrounds",
+            "Marketplace rules",
+            "Blocked directions"
+          ]
+        },
+        {
+          "heading": "Keep the product itself accurate",
+          "body": "Background cleanup is about clearer inputs, not changing product structure, color, material, or real selling points.",
+          "bullets": [
+            "Appearance consistency",
+            "Color review",
+            "Material facts",
+            "Detail checks"
+          ]
+        },
+        {
+          "heading": "Connect to video and future image workflows",
+          "body": "Cleaner image inputs can feed scripts, storyboards, product video generation, and future image creative modules.",
+          "bullets": [
+            "Storyboards",
+            "Product videos",
+            "Ad image requests",
+            "Image studio readiness"
+          ]
+        }
+      ]
+    },
+    "features-product-reference-image-management": {
+      "slug": "features/product-reference-image-management",
+      "title": "Product Reference Image Management for Ecommerce AI - Haitu",
+      "description": "Manage product photos, detail shots, scene references, and visual constraints so AI image optimization and video generation stay close to the real product.",
+      "h1": "Product reference image management for ecommerce AI",
+      "eyebrow": "Trusted references for AI creative work",
+      "lead": "Keep reference images, detail shots, scene examples, style constraints, and blocked visual directions in one product packet for image optimization, storyboards, and product video generation.",
+      "primaryCta": "Manage product references",
+      "secondaryCta": "Explore background cleanup",
+      "sections": [
+        {
+          "heading": "Capture source photos and detail shots",
+          "body": "Archive hero images, detail shots, packaging images, material closeups, and usage scenes so teams do not lose or misuse visual inputs.",
+          "bullets": [
+            "Hero images",
+            "Detail shots",
+            "Packaging",
+            "Material closeups"
+          ]
+        },
+        {
+          "heading": "Record style constraints and blocked directions",
+          "body": "References include not only images, but also which scenes fit, which styles to avoid, and which claims should not be exaggerated.",
+          "bullets": [
+            "Style constraints",
+            "Scene references",
+            "Blocked directions",
+            "Claim boundaries"
+          ]
+        },
+        {
+          "heading": "Reduce script and video drift",
+          "body": "Scripts, storyboards, and video generation can all reference the same product packet for consistent appearance, materials, and usage scenes.",
+          "bullets": [
+            "Script references",
+            "Storyboard constraints",
+            "Video consistency",
+            "Human review"
+          ]
+        }
+      ]
+    },
+    "features-product-video-storyboard-generator": {
+      "slug": "features/product-video-storyboard-generator",
+      "title": "Product Video Storyboard Generator - Haitu",
+      "description": "Create ecommerce product video hooks, pain points, selling point order, shot structures, caption direction, and CTAs from product facts and references.",
+      "h1": "Product video storyboard generator",
+      "eyebrow": "Clarify the video before generation",
+      "lead": "Turn product facts, references, selling points, and marketplace creative needs into opening hooks, pain points, selling point order, shot structure, caption direction, and CTAs before product video generation.",
+      "primaryCta": "Create product storyboards",
+      "secondaryCta": "Explore script generator",
+      "sections": [
+        {
+          "heading": "Structure hooks and benefit order first",
+          "body": "Organize target buyer pain points, product benefits, usage scenes, and platform rhythm into a short-video script structure.",
+          "bullets": [
+            "Opening hooks",
+            "Pain points",
+            "Benefit order",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "Connect product photos to shot structure",
+          "body": "Product photos, detail shots, and references become storyboard inputs so shot descriptions stay close to the real product.",
+          "bullets": [
+            "Product photos",
+            "Detail shots",
+            "Scene references",
+            "Ratio needs"
+          ]
+        },
+        {
+          "heading": "Keep human edits before generation",
+          "body": "Storyboards help teams review script logic, ad claims, and product facts before video generation instead of skipping review.",
+          "bullets": [
+            "Script review",
+            "Ad compliance",
+            "Product facts",
+            "Caption edits"
+          ]
+        }
+      ]
+    },
+    "features-product-creative-workflow": {
+      "slug": "features/product-creative-workflow",
+      "title": "Product Creative Workflow for Images, Scripts, and Videos - Haitu",
+      "description": "Move from product data, product images, and references to image optimization, titles, scripts, storyboards, model choices, review, and product video assets in one workflow.",
+      "h1": "Product creative workflow for images, scripts, and videos",
+      "eyebrow": "From product data to video-ready assets",
+      "lead": "Keep product facts, images, references, scripts, storyboards, model choices, and review steps in one workflow so cross-border ecommerce teams can prepare image, copy, and product video assets in batches.",
+      "primaryCta": "Start product creative workflow",
+      "secondaryCta": "Explore batch generation",
+      "sections": [
+        {
+          "heading": "Unify product data and references",
+          "body": "Start from titles, categories, materials, dimensions, selling points, blocked claims, product photos, and references in one reusable packet.",
+          "bullets": [
+            "Product packets",
+            "Reference management",
+            "Selling point constraints",
+            "Blocked claims"
+          ]
+        },
+        {
+          "heading": "Connect images, copy, storyboards, and video",
+          "body": "One product packet can feed image optimization, title and copy work, video scripts, storyboards, and product video generation.",
+          "bullets": [
+            "Image optimization",
+            "Titles and copy",
+            "Video scripts",
+            "Product videos"
+          ]
+        },
+        {
+          "heading": "Keep model choice and review clear",
+          "body": "Teams can use hosted models or their own models, while AI outputs still need product-fact, marketplace, and ad compliance review.",
+          "bullets": [
+            "Hosted models",
+            "Own models",
+            "Wallet billing",
+            "Human review"
+          ]
+        }
+      ]
+    },
+    "features-product-creative-review-workflow": {
+      "slug": "features/product-creative-review-workflow",
+      "title": "Product Creative Review Workflow - Haitu",
+      "description": "Review product facts, marketplace rules, ad claims, images, and video assets before publishing ecommerce product creatives.",
+      "h1": "Product creative review workflow",
+      "eyebrow": "Check product facts before publishing",
+      "lead": "Keep product facts, marketplace rules, ad claims, images, and video assets in one pre-publishing review workflow so ecommerce teams reduce wrong-product, exaggerated-claim, restricted-word, and asset mismatch risks.",
+      "primaryCta": "Review product creatives",
+      "secondaryCta": "Explore product workflow",
+      "sections": [
+        {
+          "heading": "Start by checking product facts",
+          "body": "Review titles, materials, dimensions, compatibility, references, scripts, and storyboards against the real product before publishing.",
+          "bullets": [
+            "Product facts",
+            "References",
+            "Scripts",
+            "Video assets"
+          ]
+        },
+        {
+          "heading": "Cover marketplace and ad rules",
+          "body": "Check blocked claims, exaggerated promises, intellectual property risks, marketplace creative rules, and ad compliance requirements.",
+          "bullets": [
+            "Blocked claims",
+            "Ad compliance",
+            "Marketplace rules",
+            "IP risks"
+          ]
+        },
+        {
+          "heading": "AI organizes signals, humans decide",
+          "body": "Haitu can organize review points and risk signals, but teams remain responsible for product facts and final publishing decisions.",
+          "bullets": [
+            "Risk signals",
+            "Human confirmation",
+            "Publishing notes",
+            "Team workflow"
+          ]
+        }
+      ]
+    },
+    "features-ecommerce-video-localization": {
+      "slug": "features/ecommerce-video-localization",
+      "title": "Ecommerce Video Localization Workflow - Haitu",
+      "description": "Organize product video scripts, subtitles, selling points, and review notes for cross-border ecommerce markets.",
+      "h1": "Ecommerce video localization workflow",
+      "eyebrow": "Adapt one product for multiple markets",
+      "lead": "Use product facts and source assets to organize scripts, subtitles, selling points, and review notes for different markets without automatically rewriting uploaded product data.",
+      "primaryCta": "Localize product videos",
+      "secondaryCta": "Explore script generator",
+      "sections": [
+        {
+          "heading": "Start from product facts and source scripts",
+          "body": "Uploaded product data keeps its original language. Localized scripts, subtitles, and selling points are created only when teams choose a target market.",
+          "bullets": [
+            "Product facts",
+            "Source script",
+            "Target market",
+            "Subtitle direction"
+          ]
+        },
+        {
+          "heading": "Adapt platform content habits",
+          "body": "Structure short-video phrasing for TikTok Shop, Amazon, Shopee, Lazada, Shopify, Etsy, and other ecommerce channels.",
+          "bullets": [
+            "Platform rhythm",
+            "Local selling points",
+            "Subtitle style",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "Review language and compliance before publishing",
+          "body": "Localized outputs need human checks for product facts, translation accuracy, blocked claims, ad compliance, and marketplace rules.",
+          "bullets": [
+            "Translation review",
+            "Blocked claims",
+            "Ad compliance",
+            "Marketplace rules"
+          ]
+        }
+      ]
+    },
+    "features-model-cost-control": {
+      "slug": "features/model-cost-control",
+      "title": "Model Cost and Wallet Consumption Control - Haitu",
+      "description": "Understand hosted models, own models, wallet consumption, and batch reuse across product image optimization, scripts, and product video generation.",
+      "h1": "Model cost and wallet consumption control",
+      "eyebrow": "Make batch creative generation more predictable",
+      "lead": "Keep hosted models and bring-your-own-model workflows in one product creative process so teams can understand wallet consumption around image optimization, script organization, video generation, and model calls while reducing repeated reruns across batch SKUs.",
+      "primaryCta": "Review model cost workflow",
+      "secondaryCta": "Explore bring-your-own-model",
+      "sections": [
+        {
+          "heading": "Separate hosted and own models",
+          "body": "Teams can start with Haitu hosted models or connect their own model/API, then understand cost sources at the task level.",
+          "bullets": [
+            "Hosted models",
+            "Own models",
+            "Model calls",
+            "Cost sources"
+          ]
+        },
+        {
+          "heading": "Understand wallet consumption by task",
+          "body": "Wallet balance pays for product image optimization, video generation, script organization, model calls, and other digital services.",
+          "bullets": [
+            "Wallet billing",
+            "Image optimization",
+            "Video generation",
+            "Script organization"
+          ]
+        },
+        {
+          "heading": "Reuse product work to reduce reruns",
+          "body": "Reusable product packets, references, script templates, and review decisions reduce unplanned repeated calls for the same or similar SKUs.",
+          "bullets": [
+            "Data reuse",
+            "Script templates",
+            "Review decisions",
+            "Batch SKUs"
+          ]
+        }
+      ]
+    },
+    "categories-jewelry-product-video": {
+      "slug": "categories/jewelry-product-video",
+      "title": "Jewelry Product Video Workflow - Haitu",
+      "description": "Organize jewelry materials, plating, dimensions, wearing scenes, close-up detail shots, packaging, and care notes into short-video scripts and product video assets.",
+      "h1": "Jewelry product video workflow",
+      "eyebrow": "Materials, detail shots, and wearing scenes",
+      "lead": "For jewelry, accessories, and gift products, Haitu organizes materials, plating, dimensions, wearing scenes, close-up detail shots, packaging, and care notes into scripts, storyboards, and product video assets.",
+      "primaryCta": "Create jewelry product videos",
+      "secondaryCta": "Explore apparel videos",
+      "sections": [
+        {
+          "heading": "Highlight materials and close-up details",
+          "body": "Jewelry videos need accurate material, plating, dimension, shine, detail, and packaging context so creative assets stay close to the real product.",
+          "bullets": [
+            "Materials",
+            "Plating",
+            "Detail shots",
+            "Care notes"
+          ]
+        },
+        {
+          "heading": "Build scripts around wearing scenes",
+          "body": "Turn commute, date, holiday, gift, and styling scenarios into short-video structures.",
+          "bullets": [
+            "Wearing scenes",
+            "Styling ideas",
+            "Gift moments",
+            "Short scripts"
+          ]
+        },
+        {
+          "heading": "Review claim boundaries before publishing",
+          "body": "Teams should check materials, origin, effect claims, price promises, and marketplace rules before publishing.",
+          "bullets": [
+            "Material review",
+            "Claim boundaries",
+            "Marketplace rules",
+            "Human review"
+          ]
+        }
+      ]
+    },
+    "categories-baby-products-video": {
+      "slug": "categories/baby-products-video",
+      "title": "Baby Product Short Video Workflow - Haitu",
+      "description": "Organize baby product safety boundaries, age suitability, materials, usage scenes, warning notes, and blocked claims into compliance-first short-video assets.",
+      "h1": "Baby product short video workflow",
+      "eyebrow": "Safety boundaries, age suitability, and materials",
+      "lead": "For baby and child products, Haitu organizes safety boundaries, age suitability, materials, usage scenes, warning notes, and blocked claims into compliance-first scripts, storyboards, and product video assets.",
+      "primaryCta": "Create baby product videos",
+      "secondaryCta": "Explore home goods videos",
+      "sections": [
+        {
+          "heading": "Clarify age and material boundaries first",
+          "body": "Baby product videos must check age suitability, materials, size, usage method, warning notes, and safety boundaries before creative work.",
+          "bullets": [
+            "Age suitability",
+            "Materials",
+            "Safety boundaries",
+            "Warning notes"
+          ]
+        },
+        {
+          "heading": "Describe real usage scenarios",
+          "body": "Nursing, travel, care, feeding, storage, and parent-child scenes can become short-video structures.",
+          "bullets": [
+            "Care scenes",
+            "Travel scenes",
+            "Storage display",
+            "Parent-child usage"
+          ]
+        },
+        {
+          "heading": "Human review comes before speed",
+          "body": "AI output does not replace baby product safety review. Teams must check product facts, marketplace rules, and local regulatory requirements.",
+          "bullets": [
+            "Safety review",
+            "Marketplace rules",
+            "Regulatory needs",
+            "Human confirmation"
+          ]
+        }
+      ]
+    },
+    "categories-sports-outdoor-product-video": {
+      "slug": "categories/sports-outdoor-product-video",
+      "title": "Sports and Outdoor Product Video Workflow - Haitu",
+      "description": "Organize activity scenes, materials, size, weather, storage, and safety notes for sports and outdoor product short-video assets.",
+      "h1": "Sports and outdoor product video workflow",
+      "eyebrow": "Activity scenes, materials, and safety notes",
+      "lead": "For sports gear, outdoor products, and camping accessories, Haitu organizes activity scenes, materials, size, weather, storage, setup steps, and safety notes into scripts, storyboards, and product video assets.",
+      "primaryCta": "Create sports and outdoor videos",
+      "secondaryCta": "Explore image-to-video",
+      "sections": [
+        {
+          "heading": "Make usage scenarios specific",
+          "body": "Sports and outdoor products need clear activity scenes, weather conditions, dimensions, weight, storage method, and setup steps.",
+          "bullets": [
+            "Activity scenes",
+            "Weather",
+            "Size and weight",
+            "Storage"
+          ]
+        },
+        {
+          "heading": "Use multi-shot video structures",
+          "body": "Unboxing, setup, outdoor use, before-and-after comparison, and storage display can all become storyboards.",
+          "bullets": [
+            "Unboxing",
+            "Setup",
+            "Outdoor use",
+            "Storage display"
+          ]
+        },
+        {
+          "heading": "Review safety statements before publishing",
+          "body": "Teams should check intended use, safety statements, load or protection claims, ad compliance, and marketplace rules before publishing AI output.",
+          "bullets": [
+            "Safety statements",
+            "Intended use",
+            "Ad compliance",
+            "Marketplace rules"
+          ]
+        }
+      ]
+    },
+    "categories-car-accessories-product-video": {
+      "slug": "categories/car-accessories-product-video",
+      "title": "Car Accessories Product Video Workflow - Haitu",
+      "description": "Organize vehicle fitment, installation steps, materials, usage effects, specifications, and safety notes into car accessory short-video assets.",
+      "h1": "Car accessories product video workflow",
+      "eyebrow": "Fitment, installation, and usage effects",
+      "lead": "For car accessories, in-car products, and modification-related items, Haitu organizes vehicle fitment, installation steps, materials, usage effects, specifications, and safety notes into scripts, storyboards, and product video assets.",
+      "primaryCta": "Create car accessory videos",
+      "secondaryCta": "Explore electronics accessory videos",
+      "sections": [
+        {
+          "heading": "Check fitment and specifications first",
+          "body": "Car accessory videos need accurate vehicle fitment, model years, installation location, dimensions, materials, and compatibility boundaries.",
+          "bullets": [
+            "Vehicle fitment",
+            "Model years",
+            "Install location",
+            "Specifications"
+          ]
+        },
+        {
+          "heading": "Build videos from installation steps",
+          "body": "Unboxing, installation, before-and-after comparison, usage effect, and safety notes can become short-video structures.",
+          "bullets": [
+            "Unboxing",
+            "Installation steps",
+            "Usage effects",
+            "Safety notes"
+          ]
+        },
+        {
+          "heading": "Review compatibility and safety",
+          "body": "AI output must not rewrite fitment facts. Teams should check compatibility, safety statements, ad claims, and marketplace rules before publishing.",
+          "bullets": [
+            "Compatibility",
+            "Safety statements",
+            "Ad compliance",
+            "Human review"
+          ]
+        }
+      ]
+    }
+  }
+}

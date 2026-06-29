@@ -37,8 +37,18 @@ describe("auth and admin routes source boundaries", () => {
     expect(routesSource).toContain('url.pathname === "/api/auth/reset-password"');
     expect(routesSource).toContain('url.pathname === "/api/auth/logout"');
     expect(routesSource).toContain('url.pathname === "/api/admin/overview"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/wallet-transactions"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/recharge-orders"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/content/summary"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/content/products"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/content/video-jobs"');
+    expect(routesSource).toContain('url.pathname === "/api/admin/site-settings"');
     expect(routesSource).toContain("adminUserMatch");
     expect(routesSource).toContain("buildAdminOverview");
     expect(routesSource).toContain("buildAdminUserDetail");
+    expect(routesSource).toContain("listAdminWalletTransactions");
+    expect(routesSource).toContain("listAdminRechargeOrders");
+    expect(routesSource).toContain("buildAdminContentSummary");
+    expect(routesSource).toContain("getAdminSiteSettings");
   });
 });

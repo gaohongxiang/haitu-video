@@ -6,7 +6,7 @@ import type { ConsoleAuthStore } from "./consoleAuth.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
 import {
-  buildPlatformModelAdminConfig,
+  buildModelServiceAdminConfig,
   buildProviderConfig
 } from "./modelConfigPresentation.js";
 import {
@@ -42,15 +42,22 @@ export async function handleModelConfigRoutes(input: {
       platformModelConfigStore: requestContext.platformModelConfigStore
     }));
   }
-  if (request.method === "GET" && url.pathname === "/api/platform/model-configs") {
+  if (
+    request.method === "GET"
+    && (url.pathname === "/api/admin/platform-model-configs" || url.pathname === "/api/platform/model-configs")
+  ) {
     const adminResponse = await authStore.requireAdmin(request);
     if (adminResponse) {
       return adminResponse;
     }
-    return jsonResponse(await buildPlatformModelAdminConfig(requestContext.platformModelConfigStore));
+    return jsonResponse(await buildModelServiceAdminConfig(requestContext.platformModelConfigStore));
   }
-  const platformModelConfigMatch = url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)$/);
-  const platformModelConfigKeyMatch = url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)\/key$/);
+  const platformModelConfigMatch =
+    url.pathname.match(/^\/api\/admin\/platform-model-configs\/([^/]+)$/)
+    ?? url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)$/);
+  const platformModelConfigKeyMatch =
+    url.pathname.match(/^\/api\/admin\/platform-model-configs\/([^/]+)\/key$/)
+    ?? url.pathname.match(/^\/api\/platform\/model-configs\/([^/]+)\/key$/);
   if (platformModelConfigKeyMatch && request.method === "GET") {
     const adminResponse = await authStore.requireAdmin(request);
     if (adminResponse) {

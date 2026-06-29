@@ -1,7 +1,8 @@
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import type { FinalVideoLanguage } from "../core/videoLanguage.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
-import type { VideoResolution } from "../providers/types.js";
+import type { VideoAspectRatio, VideoResolution } from "../providers/types.js";
+import type { ModelPricingSnapshot } from "./modelPricing.js";
 
 export interface VideoJobRequest {
   productPath: string;
@@ -11,6 +12,7 @@ export interface VideoJobRequest {
   providerModel?: string;
   duration?: number;
   resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
   cta?: string;
@@ -21,6 +23,8 @@ export interface VideoJobRequest {
   platformFeeCny?: number;
   upstreamEstimatedCostCny?: number;
   walletReservationId?: string;
+  billingCatalogVersion?: string;
+  billingPriceSnapshot?: ModelPricingSnapshot;
   reuseManifest?: string;
 }
 
@@ -35,6 +39,7 @@ export interface VideoJobRecord {
   providerModel?: string;
   durationSeconds?: number;
   resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
   cta?: string;
@@ -45,6 +50,8 @@ export interface VideoJobRecord {
   platformFeeCny?: number;
   upstreamEstimatedCostCny?: number;
   walletReservationId?: string;
+  billingCatalogVersion?: string;
+  billingPriceSnapshot?: ModelPricingSnapshot;
   reuseManifest?: string;
   outDir: string;
   reportPath?: string;

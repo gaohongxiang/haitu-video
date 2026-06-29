@@ -64,6 +64,8 @@ describe("SQLite database infrastructure", () => {
       expect(rows.map((row) => row.name)).toEqual(expect.arrayContaining([
         "audit_logs",
         "model_credentials",
+        "model_pricing_catalog_drafts",
+        "model_pricing_catalog_versions",
         "model_service_preferences",
         "model_variants",
         "payment_webhook_events",

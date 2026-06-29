@@ -38,6 +38,18 @@ describe("console refresh source", () => {
     expect(renderSource).toContain('case "settings":');
   });
 
+  it("does not leave the console locked on the loading screen after an initial refresh error", async () => {
+    const source = await readFile(appPath, "utf8");
+    const refreshSource = source.slice(source.indexOf("async function refreshConsole"), source.indexOf("function applySettings"));
+
+    expect(refreshSource).toContain("setConsoleReady(true);");
+    expect(refreshSource).toContain("showError(error);");
+    expect(refreshSource).toContain("setConsoleLoadError(message);");
+    expect(refreshSource).toContain('message !== "Authentication required"');
+    expect(source).toContain("function ConsoleSectionErrorState");
+    expect(source).toContain("consoleLoadError");
+  });
+
   it("keeps JSON fetch helpers outside the App component file", async () => {
     const source = await readFile(appPath, "utf8");
     const apiClientSource = await readFile(apiClientPath, "utf8");
@@ -49,7 +61,17 @@ describe("console refresh source", () => {
     expect(apiClientSource).toContain("export async function getJson");
     expect(apiClientSource).toContain("export async function postJsonWithSignal");
     expect(apiClientSource).toContain("export async function readJsonResponse");
-    expect(apiClientSource).toContain('getJson<T["productsResponse"]>("/api/products")');
-    expect(apiClientSource).toContain('getJson<T["videoJobsResponse"]>("/api/video-jobs")');
+    expect(apiClientSource).toContain('getJsonWithSignal<T["productsResponse"]>("/api/products", signal)');
+    expect(apiClientSource).toContain('getJsonWithSignal<T["videoJobsResponse"]>("/api/video-jobs", signal)');
+  });
+
+  it("adds request timeouts to console snapshot fetches so a hung endpoint cannot freeze the page", async () => {
+    const apiClientSource = await readFile(apiClientPath, "utf8");
+
+    expect(apiClientSource).toContain("const consoleSnapshotRequestTimeoutMs");
+    expect(apiClientSource).toContain("AbortSignal.timeout(consoleSnapshotRequestTimeoutMs)");
+    expect(apiClientSource).toContain("控制台初始化接口失败 ${path}");
+    expect(apiClientSource).toContain("getJsonWithSignal<T[\"providerConfigResponse\"]>(\"/api/provider-config\", signal)");
+    expect(apiClientSource).toContain("getJsonWithSignal<T[\"modelBundlesResponse\"]>(\"/api/model-bundles\", signal)");
   });
 });

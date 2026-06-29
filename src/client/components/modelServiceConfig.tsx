@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Plus, RefreshCcw } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   catalogEntriesForProvider,
@@ -10,10 +10,13 @@ import {
   type ModelCatalogEntry,
   type ModelProviderId
 } from "../../providers/modelCatalog.js";
+import { i18n } from "../../i18n/client.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Field, Input, Select } from "./ui/field.js";
+
+const tSettings = (key: string, options?: Record<string, unknown>) => i18n.t(`app:settings.${key}`, options);
 
 export type ModelConfigProviderId = ModelProviderId;
 export type ApiOwner = "platform" | "byok";
@@ -89,12 +92,13 @@ export const modelConfigPresets: Record<ModelConfigProviderId, ModelConfigDraft[
 };
 
 export function modelConfigDraftFromCatalogEntry(entry: ModelCatalogEntry, name = entry.vendor): ModelConfigDraft {
+  const vendorModels = catalogEntriesForVendor(entry.providerId, entry.vendor);
   return {
     name,
     vendor: entry.vendor,
     apiKey: "",
     baseUrl: entry.baseUrl,
-    models: [entry.modelId],
+    models: vendorModels.length > 0 ? vendorModels.map((item) => item.modelId) : [entry.modelId],
     apiMode: entry.apiMode,
     enabled: true
   };
@@ -161,7 +165,6 @@ export function syncModelConfigDraftsFromLedger(
       name: model.label || next[model.id].name,
       vendor: model.providerLabel || next[model.id].vendor,
       baseUrl: model.baseUrl || next[model.id].baseUrl,
-      models: model.model ? [model.model] : next[model.id].models,
       apiMode: model.apiMode ?? next[model.id].apiMode,
       enabled: model.enabled ?? next[model.id].enabled ?? true
     };
@@ -249,8 +252,32 @@ function catalogModelsForDraft(providerId: ModelConfigProviderId, draft: ModelCo
   return entries;
 }
 
+function catalogModelIdsForDraft(providerId: ModelConfigProviderId, draft: ModelConfigDraft): string[] {
+  return catalogModelsForDraft(providerId, draft).map((entry) => entry.modelId);
+}
+
 function normalizeCatalogModelSelection(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function modelSelectionSignature(models: string[]): string {
+  return models.map(normalizeCatalogModelSelection).join("\u0000");
+}
+
+function sameModelSelection(left: string[], right: string[]): boolean {
+  return modelSelectionSignature(left) === modelSelectionSignature(right);
+}
+
+export function selectedModelIdsForModelConfigDialog(
+  providerId: ModelConfigProviderId,
+  draft: ModelConfigDraft,
+  isEditingExisting: boolean
+): string[] {
+  if (isEditingExisting) {
+    return draft.models;
+  }
+  const catalogModelIds = catalogModelIdsForDraft(providerId, draft);
+  return catalogModelIds.length > 0 ? catalogModelIds : draft.models;
 }
 
 function firstDraftModel(draft: ModelConfigDraft): string {
@@ -304,7 +331,7 @@ export function SharedModelServiceGroup({
           <div className="flex flex-wrap items-center gap-1.5">
             <h3 className="m-0 text-[15px] font-black leading-5 text-[var(--text)]">{title}</h3>
             <Badge className="min-h-5 px-1.5 text-[10px]">{badge}</Badge>
-            <Badge className="min-h-5 px-1.5 text-[10px]" tone={configuredCount > 0 ? "ok" : "danger"}>{configuredCount > 0 ? `${configuredCount} 条可用` : "未配置"}</Badge>
+            <Badge className="min-h-5 px-1.5 text-[10px]" tone={configuredCount > 0 ? "ok" : "danger"}>{configuredCount > 0 ? tSettings("available", { count: configuredCount }) : tSettings("notConfigured")}</Badge>
           </div>
           <div className="mt-0.5 text-[12px] font-medium leading-5 text-[var(--muted)]">{description}</div>
         </div>
@@ -312,7 +339,7 @@ export function SharedModelServiceGroup({
           <div className="flex flex-wrap gap-1.5">
             <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="primary" type="button" disabled={isBusy} onClick={onAdd}>
               <Plus size={12} />
-              {addButtonLabel ? addButtonLabel(badge) : `添加${badge}服务`}
+              {addButtonLabel ? addButtonLabel(badge) : tSettings("actions.addService", { badge })}
             </Button>
           </div>
         ) : null}
@@ -320,14 +347,14 @@ export function SharedModelServiceGroup({
       <div className="grid gap-1.5">
         {configuredServices.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-3 text-[12px] font-semibold leading-5 text-[var(--muted)]">
-            {emptyText ?? "还没有配置可用服务，添加 API Key 后这里会显示已启用的模型服务。"}
+            {emptyText ?? tSettings("emptyServices")}
           </div>
         ) : null}
         {configuredServices.map((service, index) => (
           <div key={service.configId ?? `${service.id}-${index}`} className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 min-[980px]:grid-cols-[minmax(220px,1.1fr)_minmax(220px,1fr)_auto] min-[980px]:items-center">
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-1.5">
-                {index === 0 && service.configured ? <Badge className="min-h-5 px-1.5 text-[10px]" tone="ok">默认</Badge> : null}
+                {index === 0 && service.configured ? <Badge className="min-h-5 px-1.5 text-[10px]" tone="ok">{tSettings("default")}</Badge> : null}
                 <Badge className="min-h-5 px-1.5 text-[10px]" tone={apiOwner === "platform" ? "ok" : "neutral"}>{keyBadgeLabel}</Badge>
                 <strong className="truncate text-[13px] font-black text-[var(--text)]">{service.serviceLabel}</strong>
               </div>
@@ -347,19 +374,19 @@ export function SharedModelServiceGroup({
                 {onToggleEnabled ? (
                   <EnabledSwitchButton
                     enabled={service.enabled !== false}
-                    label={service.enabled === false ? "停用" : "启用"}
+                    label={service.enabled === false ? tSettings("disabled") : tSettings("enabled")}
                     disabled={isBusy || !service.configured}
                     onClick={() => void onToggleEnabled(providerId, service, service.enabled === false)}
                   />
                 ) : null}
                 {onEdit ? (
                   <Button className="min-h-7 px-2 text-[12px]" size="sm" type="button" disabled={isBusy} onClick={() => onEdit(service)}>
-                    编辑
+                    {tSettings("actions.edit")}
                   </Button>
                 ) : null}
                 {onClear ? (
                   <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="danger" type="button" disabled={isBusy || !service.configured} onClick={() => void onClear(providerId, service.configId)}>
-                    删除
+                    {tSettings("actions.delete")}
                   </Button>
                 ) : null}
               </div>
@@ -413,6 +440,7 @@ export function EnabledSwitchButton({
 
 export function SharedModelConfigDialog({
   title,
+  editTitle,
   badge,
   providerId,
   draft,
@@ -429,6 +457,7 @@ export function SharedModelConfigDialog({
   isBusy
 }: {
   title: string;
+  editTitle?: string;
   badge: string;
   providerId: ModelConfigProviderId;
   draft: ModelConfigDraft;
@@ -448,18 +477,30 @@ export function SharedModelConfigDialog({
   const [isEditingApiKey, setIsEditingApiKey] = useState(false);
   const [isRevealingApiKey, setIsRevealingApiKey] = useState(false);
   const [revealedApiKey, setRevealedApiKey] = useState("");
+  const defaultModelSelectionAppliedRef = useRef<string | undefined>(undefined);
   const endpointPrefix = endpointPrefixPreview(draft.baseUrl, providerId, firstDraftModel(draft));
   const isEditingExisting = Boolean(draft.configId);
   const hasStoredApiKey = isEditingExisting && Boolean(draft.keyPreview);
   const storedApiKeyMask = "••••••••••••••••";
-  const apiKeyInputPlaceholder = isEditingExisting ? "输入新 Key 可替换，留空则保留原 Key" : "sk-...";
+  const apiKeyInputPlaceholder = isEditingExisting ? tSettings("serviceDialog.apiKeyKeepPlaceholder") : "sk-...";
   const isShowingStoredApiKey = hasStoredApiKey && !isEditingApiKey && !draft.apiKey;
   const apiKeyFieldValue = isShowingStoredApiKey
     ? showApiKey && revealedApiKey ? revealedApiKey : storedApiKeyMask
     : draft.apiKey;
-  const isTesting = testStatus?.message === "测试配置中...";
+  const isTesting = testStatus?.tone === "neutral" && [
+    tSettings("serviceDialog.testingMessage"),
+    i18n.t("app:status.testing", { lng: "zh" }),
+    i18n.t("app:status.testing", { lng: "en" })
+  ].includes(testStatus.message);
   const catalogModels = catalogModelsForDraft(providerId, draft);
-  const selectedModelIds = draft.models;
+  const catalogModelIds = catalogModels.map((entry) => entry.modelId);
+  const defaultModelSelectionKey = `${providerId}\u0000${draft.vendor}\u0000${modelSelectionSignature(catalogModelIds)}`;
+  const shouldUseInitialDefaultModels = !isEditingExisting
+    && defaultModelSelectionAppliedRef.current !== defaultModelSelectionKey
+    && !sameModelSelection(draft.models, catalogModelIds);
+  const selectedModelIds = shouldUseInitialDefaultModels
+    ? selectedModelIdsForModelConfigDialog(providerId, draft, isEditingExisting)
+    : draft.models;
   const selectedModelSet = new Set(selectedModelIds.map(normalizeCatalogModelSelection));
   const applyVendor = (vendor: string) => {
     const preset = modelConfigDraftFromVendor(providerId, vendor);
@@ -479,6 +520,26 @@ export function SharedModelConfigDialog({
       apiMode: entry.apiMode ?? draft.apiMode
     });
   };
+  useLayoutEffect(() => {
+    if (isEditingExisting) {
+      defaultModelSelectionAppliedRef.current = undefined;
+      return;
+    }
+    if (defaultModelSelectionAppliedRef.current === defaultModelSelectionKey) {
+      return;
+    }
+    defaultModelSelectionAppliedRef.current = defaultModelSelectionKey;
+    if (!sameModelSelection(draft.models, catalogModelIds)) {
+      onDraftChange(providerId, { models: catalogModelIds });
+    }
+  }, [
+    catalogModelIds,
+    defaultModelSelectionKey,
+    draft.models,
+    isEditingExisting,
+    onDraftChange,
+    providerId
+  ]);
   useEffect(() => {
     setShowApiKey(false);
     setIsEditingApiKey(false);
@@ -519,10 +580,10 @@ export function SharedModelConfigDialog({
       <section className="max-h-[min(860px,calc(100vh-32px))] w-full max-w-[860px] overflow-auto rounded-[18px] border border-[var(--border-strong)] bg-[var(--panel)] p-6 shadow-[0_24px_72px_rgba(96,64,43,.20)]">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[.16em] text-[var(--muted)]">{isEditingExisting ? "EDIT CONFIG" : "NEW CONFIG"}</div>
-            <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[var(--text)]">{isEditingExisting ? title.replace("添加", "编辑") : title}</h3>
+            <div className="text-[11px] font-black uppercase tracking-[.16em] text-[var(--muted)]">{isEditingExisting ? tSettings("serviceDialog.editMode") : tSettings("serviceDialog.newMode")}</div>
+            <h3 className="m-0 mt-1.5 text-[24px] font-black leading-tight text-[var(--text)]">{isEditingExisting ? editTitle ?? title : title}</h3>
             <div className="mt-2 text-[13px] font-semibold leading-5 text-[var(--muted)]">
-              {isEditingExisting ? "不填写 API Key 时会保留原 Key。" : "推荐先选择模板，系统会自动填入更合理的 Base URL 与默认模型。"}
+              {isEditingExisting ? tSettings("serviceDialog.editHint") : tSettings("serviceDialog.addHint")}
             </div>
           </div>
           <Badge>{badge}</Badge>
@@ -540,10 +601,10 @@ export function SharedModelConfigDialog({
               </Button>
             ))}
           </div>
-          <Field label="配置名称">
+          <Field label={tSettings("serviceDialog.nameLabel")}>
             <Input value={draft.name} onChange={(event) => onDraftChange(providerId, { name: event.target.value })} />
           </Field>
-          <Field label="模型商">
+          <Field label={tSettings("serviceDialog.vendorLabel")}>
             <Select value={draft.vendor} onChange={(event) => applyVendor(event.target.value)}>
               {vendorOptions(providerId).map((vendor) => (
                 <option key={vendor.value} value={vendor.value}>{vendor.label}</option>
@@ -569,7 +630,7 @@ export function SharedModelConfigDialog({
                 variant="ghost"
                 className="absolute right-1.5 top-1/2 -translate-y-1/2"
                 disabled={isBusy || isRevealingApiKey}
-                aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
+                aria-label={showApiKey ? tSettings("serviceDialog.hideApiKey") : tSettings("serviceDialog.showApiKey")}
                 onClick={() => void toggleApiKeyVisibility()}
               >
                 {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -580,7 +641,7 @@ export function SharedModelConfigDialog({
             <Input value={draft.baseUrl} onChange={(event) => onDraftChange(providerId, { baseUrl: event.target.value })} />
           </Field>
           <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] font-semibold text-[var(--muted)]">
-            实际端点前缀: <span className="font-mono text-[var(--text)]">{endpointPrefix}</span>
+            {tSettings("serviceDialog.endpointPrefix")} <span className="font-mono text-[var(--text)]">{endpointPrefix}</span>
           </div>
           <Field label={<ModelVersionFieldLabel testStatus={testStatus} isTesting={isTesting} />}>
             <div className="grid gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-2">
@@ -607,7 +668,7 @@ export function SharedModelConfigDialog({
                         <Badge key={tag} className="min-h-5 px-1.5 text-[10px]">{tag}</Badge>
                       ))}
                     </span>
-                    <span className="text-[11px] font-semibold text-[var(--muted)]" title={entry.modelId}>官方模型 ID 已内置</span>
+                    <span className="text-[11px] font-semibold text-[var(--muted)]" title={entry.modelId}>{tSettings("serviceDialog.officialModelId")}</span>
                   </label>
                 );
               })}
@@ -617,20 +678,20 @@ export function SharedModelConfigDialog({
             {onRefreshModels ? (
               <Button type="button" variant="ghost" disabled={isBusy} onClick={() => void onRefreshModels(providerId)}>
                 <RefreshCcw size={14} />
-                刷新可用模型
+                {tSettings("actions.refreshModels")}
               </Button>
             ) : null}
             {onTest ? (
               <Button type="button" variant="ghost" disabled={isBusy} onClick={() => void onTest(providerId)}>
                 {isTesting ? <RefreshCcw className="h-4 w-4 animate-spin" /> : null}
-                {isTesting ? "测试中" : "测试配置"}
+                {isTesting ? tSettings("actions.testing") : tSettings("actions.test")}
               </Button>
             ) : null}
             <Button type="button" disabled={isBusy} onClick={onClose}>
-              取消
+              {tSettings("actions.cancel")}
             </Button>
             <Button variant="primary" type="submit" disabled={isBusy}>
-              保存
+              {tSettings("actions.save")}
             </Button>
           </div>
         </form>
@@ -647,11 +708,11 @@ function ModelVersionFieldLabel({
   isTesting: boolean;
 }) {
   const inlineStatus = isTesting
-    ? { message: "测试配置中...", tone: "neutral" as const }
+    ? { message: tSettings("serviceDialog.testingMessage"), tone: "neutral" as const }
     : testStatus;
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <span>模型版本</span>
+      <span>{tSettings("serviceDialog.modelVersions")}</span>
       {inlineStatus ? (
         <span
           className={cn(

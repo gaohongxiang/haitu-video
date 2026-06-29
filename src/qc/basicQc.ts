@@ -1,6 +1,7 @@
 import type { ProductFacts } from "../core/productFacts.js";
 import type { GeneratedScript } from "../core/scriptGenerator.js";
-import type { VideoOutput } from "../providers/types.js";
+import type { VideoAspectRatio, VideoOutput, VideoResolution } from "../providers/types.js";
+import { defaultVideoAspectRatio, normalizeVideoAspectRatio, videoDimensionsFor } from "../providers/videoGeometry.js";
 
 export interface BasicQcReport {
   result: "pass" | "warning" | "fail";
@@ -16,13 +17,20 @@ export function runBasicQc(input: {
   script: GeneratedScript;
   output: VideoOutput;
   targetDurationSeconds?: number;
+  targetAspectRatio?: VideoAspectRatio;
+  targetResolution?: VideoResolution;
 }): BasicQcReport {
   const targetDurationSeconds = input.targetDurationSeconds ?? 15;
+  const targetAspectRatio = normalizeVideoAspectRatio(input.targetAspectRatio ?? defaultVideoAspectRatio);
   const checks = [
     {
-      name: "aspect_ratio_9_16",
-      passed: input.output.width * 16 === input.output.height * 9,
-      message: "Output metadata should be 9:16."
+      name: `aspect_ratio_${targetAspectRatio.replace(":", "_")}`,
+      passed: matchesAspectRatio({
+        output: input.output,
+        aspectRatio: targetAspectRatio,
+        resolution: input.targetResolution
+      }),
+      message: `Output metadata should be ${targetAspectRatio}.`
     },
     {
       name: "duration_matches_target",
@@ -55,4 +63,22 @@ function normalizeForbiddenClaim(claim: string): string {
     .replace(/[はがをにのも]?未確認/g, "")
     .replace(/未確認/g, "")
     .trim();
+}
+
+function matchesAspectRatio(input: {
+  output: VideoOutput;
+  aspectRatio: VideoAspectRatio;
+  resolution?: VideoResolution;
+}): boolean {
+  if (input.resolution) {
+    const expected = videoDimensionsFor({
+      resolution: input.resolution,
+      aspectRatio: input.aspectRatio
+    });
+    return input.output.width === expected.width && input.output.height === expected.height;
+  }
+  const { output, aspectRatio } = input;
+  return aspectRatio === "16:9"
+    ? output.width * 9 === output.height * 16
+    : output.width * 16 === output.height * 9;
 }

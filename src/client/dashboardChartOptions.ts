@@ -6,12 +6,27 @@ const chartPalette = ["#6f442c", "#0aa394", "#c65a36", "#b7791f", "#d87955", "#7
 const chartAxisColor = "#8a7665";
 const chartGridLineColor = "#ead7c4";
 
-export function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsOption {
+export interface DashboardChartLabels {
+  cost: string;
+  jobs: string;
+  occurrenceUnit: string;
+  providerSeries: string;
+}
+
+const defaultDashboardChartLabels: DashboardChartLabels = {
+  cost: "成本",
+  jobs: "任务",
+  occurrenceUnit: "次",
+  providerSeries: "模型分布"
+};
+
+export function buildProviderChartOption(rows: DashboardProviderRow[], labels: Partial<DashboardChartLabels> = {}): EChartsOption {
+  const chartLabels = { ...defaultDashboardChartLabels, ...labels };
   return {
     color: chartPalette,
     tooltip: {
       trigger: "item",
-      formatter: "{b}: {c} 次 ({d}%)"
+      formatter: `{b}: {c} ${chartLabels.occurrenceUnit} ({d}%)`
     },
     legend: {
       bottom: 0,
@@ -22,7 +37,7 @@ export function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsO
     },
     series: [
       {
-        name: "模型分布",
+        name: chartLabels.providerSeries,
         type: "pie",
         radius: ["58%", "76%"],
         center: ["50%", "44%"],
@@ -40,7 +55,8 @@ export function buildProviderChartOption(rows: DashboardProviderRow[]): EChartsO
   };
 }
 
-export function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOption {
+export function buildTrendChartOption(points: DashboardTrendPoint[], labels: Partial<DashboardChartLabels> = {}): EChartsOption {
+  const chartLabels = { ...defaultDashboardChartLabels, ...labels };
   return {
     color: ["#6f442c", "#0aa394", "#c65a36"],
     tooltip: { trigger: "axis" },
@@ -81,14 +97,14 @@ export function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOpt
         data: points.map((point) => point.totalTokens)
       },
       {
-        name: "任务",
+        name: chartLabels.jobs,
         type: "bar",
         barWidth: 12,
         yAxisIndex: 1,
         data: points.map((point) => point.jobs)
       },
       {
-        name: "成本",
+        name: chartLabels.cost,
         type: "line",
         yAxisIndex: 1,
         smooth: true,
@@ -99,7 +115,8 @@ export function buildTrendChartOption(points: DashboardTrendPoint[]): EChartsOpt
   };
 }
 
-export function buildRecentChartOption(rows: DashboardRecentRow[]): EChartsOption {
+export function buildRecentChartOption(rows: DashboardRecentRow[], labels: Partial<DashboardChartLabels> = {}): EChartsOption {
+  const chartLabels = { ...defaultDashboardChartLabels, ...labels };
   const ordered = [...rows].reverse();
   return {
     color: ["#6f442c", "#c65a36"],
@@ -138,7 +155,7 @@ export function buildRecentChartOption(rows: DashboardRecentRow[]): EChartsOptio
         data: ordered.map((row) => row.totalTokens)
       },
       {
-        name: "成本",
+        name: chartLabels.cost,
         type: "line",
         yAxisIndex: 1,
         smooth: true,

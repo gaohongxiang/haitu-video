@@ -7,17 +7,24 @@ import { generateVideoPrompt } from "../core/promptGenerator.js";
 import { generateJapaneseAdScript } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage } from "../core/videoLanguage.js";
 import { maxSeedanceReferenceImages } from "../core/videoProviderErrors.js";
-import { estimateCny, type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import { type MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import type { ProductJobManifest } from "../pipeline/runProductJob.js";
 import type { MoneyAmount, VideoOutput, VideoProviderResult } from "../providers/types.js";
+import { defaultVideoResolution, normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
 import { runBasicQc } from "../qc/basicQc.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { VideoJobErrorDetails, VideoJobRecord } from "./consoleVideoJobTypes.js";
+import {
+  estimateVideoUpstreamCostCny,
+  videoTokenPriceCnyPerMillion
+} from "./modelPricing.js";
 
 export async function persistRecoverableDownloadFailure(input: {
   record: VideoJobRecord;
   error: unknown;
   errorDetails: VideoJobErrorDetails;
   reportUrlForPath: (path: string) => string;
+  billingPolicyStore?: BillingPolicyStore;
 }): Promise<Partial<VideoJobRecord>> {
   const partial = extractRecoverableDownloadFailure(input.error);
   if (!partial || input.errorDetails.providerPhase !== "download-output") {
@@ -26,14 +33,19 @@ export async function persistRecoverableDownloadFailure(input: {
   const product = parseProductFacts(JSON.parse(await readFile(input.record.productPath, "utf8")) as unknown);
   const rawManifestPath = join(input.record.outDir, "raw", product.sku, "v1", "manifest.json");
   const providerTaskId = partial.providerTaskId;
-  const tokenPriceCnyPerMillion = Number(process.env.SEEDANCE_TOKEN_PRICE_CNY_PER_MILLION ?? 37);
+  const tokenPriceCnyPerMillion = videoTokenPriceCnyPerMillion(input.record.providerModel, input.record.resolution);
   const totalTokens = partial.usage?.totalTokens ?? partial.usage?.completionTokens;
   const billing = totalTokens === undefined
     ? undefined
     : {
         tokenPriceCnyPerMillion,
         totalTokens,
-        estimatedCostCny: estimateCny(totalTokens, tokenPriceCnyPerMillion)
+        estimatedCostCny: estimateVideoUpstreamCostCny({
+          model: input.record.providerModel,
+          resolution: input.record.resolution,
+          aspectRatio: input.record.aspectRatio,
+          totalTokens
+        })
       };
   const rawManifest = await buildRecoverableRawManifest({
     record: input.record,
@@ -118,6 +130,7 @@ async function buildRecoverableRawManifest(input: {
   manifestPath: string;
 }): Promise<ProductJobManifest> {
   const durationSeconds = input.record.durationSeconds ?? input.partial.output.durationSeconds;
+  const aspectRatio = normalizeVideoAspectRatio(input.record.aspectRatio);
   const template = input.record.template ?? "scene";
   const finalLanguage = normalizeFinalVideoLanguage(input.record.finalLanguage);
   const generationProduct = {
@@ -132,7 +145,7 @@ async function buildRecoverableRawManifest(input: {
   });
   const prompt = generateVideoPrompt(generationProduct, {
     durationSeconds,
-    aspectRatio: "9:16",
+    aspectRatio,
     template,
     storyboardLines: input.record.storyboardLines,
     finalLanguage
@@ -142,7 +155,9 @@ async function buildRecoverableRawManifest(input: {
     product: input.product,
     script,
     output: input.partial.output,
-    targetDurationSeconds: durationSeconds
+    targetDurationSeconds: durationSeconds,
+    targetAspectRatio: aspectRatio,
+    targetResolution: input.record.resolution ?? defaultVideoResolution
   });
   const hashtags = generateJapaneseHashtags({
     product: input.product,

@@ -1,5 +1,7 @@
 import type { ProviderConfigItem } from "./components/modelServiceConfig.js";
 import { modelLabelForId } from "../providers/modelCatalog.js";
+import type { AppLocale } from "../i18n/config.js";
+import { appText } from "../i18n/appText.js";
 
 export const platformQualityBundleId = "platform-quality-bundle";
 export const platformLowCostBundleId = "platform-low-cost-bundle";
@@ -43,18 +45,18 @@ export function configuredModelOptions(models: ProviderConfigItem[]): ModelConfi
   return ["auto", ...models.map((model) => model.configId).filter((configId): configId is string => Boolean(configId))];
 }
 
-export function bundleModelLabel(models: ProviderConfigItem[], configId?: string): string {
+export function bundleModelLabel(models: ProviderConfigItem[], configId?: string, locale?: AppLocale): string {
   const model = models.find((item) => item.configId === configId);
-  return model ? modelLabelForId(model.id, model.model) : "自动";
+  return model ? modelLabelForId(model.id, model.model) : appText("settings.bundles.autoModel", locale);
 }
 
-export function modelConfigChoiceLabel(value: ModelConfigChoice, models: ProviderConfigItem[]): string {
+export function modelConfigChoiceLabel(value: ModelConfigChoice, models: ProviderConfigItem[], locale?: AppLocale): string {
   if (value === "auto") {
-    return "自动推荐";
+    return appText("videoStudio.models.auto", locale);
   }
   const model = models.find((item) => item.configId === value);
   if (!model) {
-    return "已删除模型";
+    return appText("videoStudio.models.deleted", locale);
   }
   return modelLabelForId(model.id, model.model);
 }
@@ -116,13 +118,17 @@ export function sortSelectableModelBundles(bundles: ModelBundleItem[]): ModelBun
   return [...platformBundles, ...byokBundles];
 }
 
-export function modelSchemeBundleLabel(bundle: ModelBundleItem): string {
+export function modelSchemeBundleLabel(bundle: ModelBundleItem, locale?: AppLocale): string {
+  return localizedModelSchemeBundleLabel(bundle, locale);
+}
+
+export function localizedModelSchemeBundleLabel(bundle: ModelBundleItem, locale?: AppLocale): string {
   if (bundle.apiOwner === "platform") {
-    if (bundle.bundleId === platformQualityBundleId) return "平台 · 高质量";
-    if (bundle.bundleId === platformLowCostBundleId) return "平台 · 低成本";
-    return `平台 · ${bundle.label}`;
+    if (bundle.bundleId === platformQualityBundleId) return appText("videoStudio.models.platformQuality", locale);
+    if (bundle.bundleId === platformLowCostBundleId) return appText("videoStudio.models.platformLowCost", locale);
+    return appText("videoStudio.models.platformCustom", locale, { label: bundle.label });
   }
-  return `自带 · ${bundle.label}`;
+  return appText("videoStudio.models.byokCustom", locale, { label: bundle.label });
 }
 
 export function modelSchemeIdForBundle(bundleId: string): ModelSchemeChoice {
@@ -133,8 +139,8 @@ export function bundleIdFromModelSchemeId(value: ModelSchemeChoice): string | un
   return value.startsWith("bundle:") ? value.slice("bundle:".length) : undefined;
 }
 
-export function modelSchemeChoiceLabel(value: ModelSchemeChoice, options: ModelSchemeOption[]): string {
-  return options.find((option) => option.id === value)?.label ?? options[0]?.label ?? "未选择";
+export function modelSchemeChoiceLabel(value: ModelSchemeChoice, options: ModelSchemeOption[], locale?: AppLocale): string {
+  return options.find((option) => option.id === value)?.label ?? options[0]?.label ?? appText("videoStudio.models.unselected", locale);
 }
 
 export function modelSchemeOwner(value: ModelSchemeChoice, options: ModelSchemeOption[]): ModelServicePreference["serviceMode"] | undefined {
@@ -154,24 +160,25 @@ export function modelSchemeSummary(input: {
   selectedTextModelConfigId: ModelConfigChoice;
   selectedImageModelConfigId: ModelConfigChoice;
   selectedVideoModelConfigId: ModelConfigChoice;
+  locale?: AppLocale;
 }): string {
-  const label = modelSchemeChoiceLabel(input.schemeId, input.options);
+  const label = modelSchemeChoiceLabel(input.schemeId, input.options, input.locale);
   return [
-    `当前：${label}`,
+    appText("videoStudio.models.current", input.locale, { label }),
     [
-      `文本 ${modelConfigChoiceLabel(input.selectedTextModelConfigId, input.textModels)}`,
-      `图片 ${modelConfigChoiceLabel(input.selectedImageModelConfigId, input.imageModels)}`,
-      `视频 ${modelConfigChoiceLabel(input.selectedVideoModelConfigId, input.videoModels)}`
+      appText("videoStudio.models.textModel", input.locale, { model: modelConfigChoiceLabel(input.selectedTextModelConfigId, input.textModels, input.locale) }),
+      appText("videoStudio.models.imageModel", input.locale, { model: modelConfigChoiceLabel(input.selectedImageModelConfigId, input.imageModels, input.locale) }),
+      appText("videoStudio.models.videoModel", input.locale, { model: modelConfigChoiceLabel(input.selectedVideoModelConfigId, input.videoModels, input.locale) })
     ].join(" · ")
-  ].join("｜");
+  ].join(" | ");
 }
 
-export function bundleModelConfigIds(bundle: ModelBundleItem): Required<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">> {
+export function bundleModelConfigIds(bundle: ModelBundleItem, locale?: AppLocale): Required<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">> {
   const textModelConfigId = normalizeBundleConfigId(bundle.textModelConfigId);
   const imageModelConfigId = normalizeBundleConfigId(bundle.imageModelConfigId);
   const videoModelConfigId = normalizeBundleConfigId(bundle.videoModelConfigId);
   if (!textModelConfigId || !imageModelConfigId || !videoModelConfigId) {
-    throw new Error("模型组合未配置完整。");
+    throw new Error(appText("status.bundleIncomplete", locale));
   }
   return {
     textModelConfigId,
@@ -191,22 +198,26 @@ export function bundleIdForPreference(bundles: ModelBundleItem[], preferredBundl
   return bundles.find(isSelectableModelBundle)?.bundleId;
 }
 
-export function nextModelBundleLabel(bundles: ModelBundleItem[]): string {
+export function nextModelBundleLabel(bundles: ModelBundleItem[], locale?: AppLocale): string {
   const usedIndexes = new Set(
     bundles
-      .map((bundle) => bundle.label.match(/^新增组合(\d+)$/)?.[1])
-      .filter((value): value is string => Boolean(value))
-      .map((value) => Number(value))
-      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((bundle) => numberedModelBundleLabelIndex(bundle.label))
+      .filter((value) => Number.isFinite(value) && value > 0 && value < Number.MAX_SAFE_INTEGER)
   );
-  if (usedIndexes.size === 0) {
-    return "新增组合1";
-  }
   let index = 1;
   while (usedIndexes.has(index)) {
     index += 1;
   }
-  return `新增组合${index}`;
+  return appText("settings.bundles.newIndexed", locale, { index });
+}
+
+function extractNumberedModelBundleLabelIndex(label: string): string | undefined {
+  return [
+    label.match(/^新增组合(\d+)$/)?.[1],
+    label.match(/^New Bundle\s*(\d+)$/i)?.[1]
+  ]
+      .filter((value): value is string => Boolean(value))
+      [0];
 }
 
 export function compareCustomModelBundles(left: ModelBundleItem, right: ModelBundleItem): number {
@@ -262,7 +273,7 @@ function normalizeBundleConfigId(value: unknown): string | undefined {
 }
 
 function numberedModelBundleLabelIndex(label: string): number {
-  const parsed = Number(label.match(/^新增组合(\d+)$/)?.[1]);
+  const parsed = Number(extractNumberedModelBundleLabelIndex(label));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.MAX_SAFE_INTEGER;
 }
 

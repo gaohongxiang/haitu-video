@@ -1,4 +1,4 @@
-import type { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import {
   listUserPaymentMethods
@@ -12,7 +12,7 @@ import {
 export async function handleSettingsTemplateRoutes(input: {
   request: Request;
   url: URL;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
 }): Promise<Response | undefined> {
   const { request, url, settingsStore } = input;
 

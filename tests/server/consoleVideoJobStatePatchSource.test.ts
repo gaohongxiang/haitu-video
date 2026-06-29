@@ -54,6 +54,7 @@ describe("console video job state patch source boundaries", () => {
     expect(statePatchSource).toContain("providerVideoUrl: undefined");
     expect(statePatchSource).toContain("errorDetails: undefined");
     expect(statePatchSource).toContain("productSku: input.report.productSku");
-    expect(statePatchSource).toContain("upstreamEstimatedCostCny: input.record.apiBillingMode");
+    expect(statePatchSource).toContain("upstreamActualCostCny");
+    expect(statePatchSource).toContain("upstreamEstimatedCostCny: upstreamActualCostCny");
   });
 });

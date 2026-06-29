@@ -1,5 +1,7 @@
 import type { MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { VideoJobRecord, VideoJobRequest } from "./consoleVideoJobTypes.js";
+import { estimateVideoUpstreamCostCny } from "./modelPricing.js";
 
 export function completedVideoJobPatch(input: {
   record: VideoJobRecord;
@@ -7,7 +9,11 @@ export function completedVideoJobPatch(input: {
   hashtags?: string[];
   completedAt: string;
   mediaUrlForPath: (path: string) => string;
+  billingPolicyStore?: BillingPolicyStore;
 }): Partial<VideoJobRecord> {
+  const upstreamActualCostCny = input.record.apiBillingMode === "platform"
+    ? videoUpstreamCostFromReport(input.record, input.report) ?? input.record.upstreamEstimatedCostCny
+    : 0;
   return {
     status: "completed",
     productSku: input.report.productSku,
@@ -24,9 +30,7 @@ export function completedVideoJobPatch(input: {
     hashtags: input.hashtags,
     totalTokens: input.report.billing?.totalTokens ?? input.report.usage?.totalTokens,
     estimatedCostCny: input.report.billing?.estimatedCostCny,
-    upstreamEstimatedCostCny: input.record.apiBillingMode === "platform"
-      ? input.report.billing?.estimatedCostCny ?? input.record.upstreamEstimatedCostCny
-      : 0,
+    upstreamEstimatedCostCny: upstreamActualCostCny,
     providerTaskId: input.report.raw.taskId,
     recoverableRawManifestPath: input.report.raw.manifestPath,
     providerVideoUrl: undefined,
@@ -35,6 +39,19 @@ export function completedVideoJobPatch(input: {
     errorDetails: undefined,
     completedAt: input.completedAt
   };
+}
+
+function videoUpstreamCostFromReport(record: VideoJobRecord, report: MakeVideoReport): number | undefined {
+  const totalTokens = report.billing?.totalTokens ?? report.usage?.totalTokens;
+  if (totalTokens === undefined) {
+    return report.billing?.estimatedCostCny;
+  }
+  return estimateVideoUpstreamCostCny({
+    model: record.providerModel,
+    resolution: record.resolution,
+    aspectRatio: record.aspectRatio,
+    totalTokens
+  });
 }
 
 export function queuedRetryVideoJobPatch(input: {

@@ -32,7 +32,7 @@ describe("SqliteModelConfigStore", () => {
         name: "OpenAI",
         vendor: "openai",
         baseUrl: "https://api.openai.com",
-        model: ["gpt-5.5", "gpt-5.4-mini"],
+        model: ["gpt-5.5"],
         apiMode: "responses_stream",
         priority: 9
       });
@@ -54,8 +54,7 @@ describe("SqliteModelConfigStore", () => {
       });
 
       expect((await store.listConfigs("openai-compatible-text")).map((config) => config.model)).toEqual([
-        "gpt-5.5",
-        "gpt-5.4-mini"
+        "gpt-5.5"
       ]);
       expect((await store.listConfigs("openai-compatible-image")).map((config) => config.model)).toEqual(["gpt-image-2"]);
       expect((await store.listConfigs("volcengine-seedance")).map((config) => config.model)).toEqual([
@@ -104,9 +103,9 @@ describe("SqliteModelConfigStore", () => {
       await store.set("openai-compatible-text", {
         apiKey: "older-text-secret",
         name: "旧文本服务",
-        vendor: "openai",
-        baseUrl: "https://old.example.test",
-        model: "old-text-model",
+        vendor: "deepseek",
+        baseUrl: "https://api.deepseek.com",
+        model: "deepseek-v4-flash",
         priority: 100
       });
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -114,8 +113,8 @@ describe("SqliteModelConfigStore", () => {
         apiKey: "newer-text-secret",
         name: "新文本服务",
         vendor: "openai",
-        baseUrl: "https://new.example.test",
-        model: "new-text-model",
+        baseUrl: "https://api.openai.com",
+        model: "gpt-5.5",
         priority: 1
       });
 
@@ -126,7 +125,7 @@ describe("SqliteModelConfigStore", () => {
       await expect(store.getConfig("openai-compatible-text")).resolves.toEqual(expect.objectContaining({
         label: "新文本服务",
         apiKey: "newer-text-secret",
-        model: "new-text-model"
+        model: "gpt-5.5"
       }));
     } finally {
       closeDatabase(handle);
@@ -165,6 +164,39 @@ describe("SqliteModelConfigStore", () => {
       expect((await store.listConfigs("volcengine-seedance")).map((config) => config.model)).toEqual([
         "doubao-seedance-2-0-fast-260128",
         "doubao-seedance-2-0-260128"
+      ]);
+    } finally {
+      closeDatabase(handle);
+    }
+  });
+
+  it("rejects model versions that are not in the unified priced catalog", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-config-priced-catalog-"));
+    tempDirs.push(root);
+    const handle = openDatabase({ dataDir: join(root, "data"), env: process.env });
+    runMigrations(handle);
+    ensureDefaultWorkspace(handle);
+    try {
+      const store = new SqliteModelConfigStore({
+        handle,
+        secretKey: "test-secret-key-with-more-than-32-bytes",
+        workspaceId: "default"
+      });
+
+      await expect(store.set("openai-compatible-text", {
+        apiKey: "text-secret-123456",
+        vendor: "openai",
+        model: "gpt-unknown"
+      })).rejects.toThrow("模型版本不在统一模型目录中");
+
+      await store.set("openai-compatible-image", {
+        apiKey: "image-secret-123456",
+        vendor: "gemini",
+        model: "gemini-2.5-flash-image"
+      });
+
+      expect((await store.listConfigs("openai-compatible-image")).map((config) => config.model)).toEqual([
+        "gemini-2.5-flash-image"
       ]);
     } finally {
       closeDatabase(handle);

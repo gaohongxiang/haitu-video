@@ -3,8 +3,11 @@ import { isAbsolute, relative, resolve } from "node:path";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import { normalizeFinalVideoLanguage, type FinalVideoLanguage } from "../core/videoLanguage.js";
 import type { VideoProviderName } from "../providers/providerFactory.js";
-import type { VideoResolution } from "../providers/types.js";
-import { FileConsoleSettingsStore } from "./consoleSettings.js";
+import type { VideoAspectRatio, VideoResolution } from "../providers/types.js";
+import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
+import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
+import type { ConsoleSettingsStore } from "./consoleSettings.js";
+import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { LocalVideoJobQueue } from "./consoleVideoJobQueue.js";
 import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
@@ -24,6 +27,7 @@ export interface MakeVideoRequest {
   providerModel?: string;
   duration?: number;
   resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
   template?: ScriptTemplate;
   finalLanguage?: FinalVideoLanguage;
   cta?: string;
@@ -41,13 +45,16 @@ export type ProductVideoJobRequest = Omit<BatchVideoJobRequest, "productPath">;
 
 interface EnqueueVideoJobOptions {
   rootDir: string;
-  settingsStore: FileConsoleSettingsStore;
+  settingsStore: ConsoleSettingsStore;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore: ModelConfigStore;
   modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
   walletStore: WalletStore;
   videoJobQueue: LocalVideoJobQueue;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
 }
 
 interface EnqueueBatchVideoJobsOptions extends EnqueueVideoJobOptions {
@@ -101,7 +108,12 @@ export async function enqueueVideoJob(
     walletStore: options.walletStore,
     provider: providerName,
     modelConfig: videoModel.config,
-    durationSeconds: body.duration ?? settings.defaultDurationSeconds
+    durationSeconds: body.duration ?? settings.defaultDurationSeconds,
+    resolution: normalizeVideoResolution(body.resolution),
+    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio),
+    billingPolicyStore: options.billingPolicyStore,
+    modelPricingCatalog: options.modelPricingCatalog,
+    modelPricingCatalogVersion: options.modelPricingCatalogVersion
   });
   return options.videoJobQueue.enqueue({
     productPath,
@@ -111,6 +123,7 @@ export async function enqueueVideoJob(
     providerModel: videoModel.providerModel,
     duration: body.duration,
     resolution: normalizeVideoResolution(body.resolution),
+    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio),
     template: body.template,
     finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
     cta: body.cta,

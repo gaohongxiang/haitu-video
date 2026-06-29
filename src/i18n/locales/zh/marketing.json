@@ -1,0 +1,3183 @@
+{
+  "marketplaces": "TikTok Shop、Amazon、Shopee、Lazada、Shopify",
+  "pageOrder": [
+    "",
+    "features/ai-product-video-generator",
+    "features/product-image-optimization",
+    "features/ai-product-image-generator",
+    "features/image-to-product-video",
+    "features/product-copy-generator",
+    "features/batch-product-creative-generation",
+    "features/hosted-ai-models",
+    "features/bring-your-own-model",
+    "features/product-image-background-cleanup",
+    "features/product-reference-image-management",
+    "features/product-video-storyboard-generator",
+    "features/product-creative-workflow",
+    "features/product-creative-review-workflow",
+    "features/ecommerce-video-localization",
+    "features/model-cost-control",
+    "platforms/tiktok-shop",
+    "platforms/amazon",
+    "platforms/shopee",
+    "platforms/shopify",
+    "platforms/lazada",
+    "platforms/etsy",
+    "tools/product-title-generator",
+    "tools/product-video-script-generator",
+    "use-cases/cross-border-ecommerce",
+    "use-cases/tiktok-shop-product-video",
+    "use-cases/amazon-product-image-optimization",
+    "use-cases/fashion-product-video",
+    "use-cases/home-goods-product-video",
+    "use-cases/beauty-product-short-video",
+    "categories/apparel-product-video",
+    "categories/home-goods-product-video",
+    "categories/beauty-product-video",
+    "categories/electronics-product-video",
+    "categories/pet-supplies-product-video",
+    "categories/kitchen-product-video",
+    "categories/jewelry-product-video",
+    "categories/baby-products-video",
+    "categories/sports-outdoor-product-video",
+    "categories/car-accessories-product-video",
+    "compare/ai-product-video-generator-vs-general-video-generator",
+    "compare/haitu-vs-canva-for-product-video",
+    "compare/haitu-vs-manual-product-video-production",
+    "terms",
+    "privacy",
+    "refund",
+    "contact"
+  ],
+  "pageMeta": {
+    "": {
+      "priority": "1.0",
+      "changefreq": "weekly"
+    },
+    "features/ai-product-video-generator": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/product-image-optimization": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/ai-product-image-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/image-to-product-video": {
+      "priority": "0.9",
+      "changefreq": "monthly"
+    },
+    "features/product-copy-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/batch-product-creative-generation": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/hosted-ai-models": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/bring-your-own-model": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/tiktok-shop": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/amazon": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "platforms/shopee": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/shopify": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/lazada": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "platforms/etsy": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "tools/product-title-generator": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "tools/product-video-script-generator": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "terms": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "privacy": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "refund": {
+      "priority": "0.3",
+      "changefreq": "yearly"
+    },
+    "contact": {
+      "priority": "0.4",
+      "changefreq": "yearly"
+    },
+    "use-cases/cross-border-ecommerce": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "use-cases/tiktok-shop-product-video": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "use-cases/amazon-product-image-optimization": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/fashion-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/home-goods-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "use-cases/beauty-product-short-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "compare/ai-product-video-generator-vs-general-video-generator": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "compare/haitu-vs-canva-for-product-video": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "compare/haitu-vs-manual-product-video-production": {
+      "priority": "0.6",
+      "changefreq": "monthly"
+    },
+    "categories/apparel-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/home-goods-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/beauty-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/electronics-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/pet-supplies-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/kitchen-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "features/product-image-background-cleanup": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-reference-image-management": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-video-storyboard-generator": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-creative-workflow": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/product-creative-review-workflow": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/ecommerce-video-localization": {
+      "priority": "0.8",
+      "changefreq": "monthly"
+    },
+    "features/model-cost-control": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/jewelry-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/baby-products-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/sports-outdoor-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    },
+    "categories/car-accessories-product-video": {
+      "priority": "0.7",
+      "changefreq": "monthly"
+    }
+  },
+  "preview": {
+    "ariaLabel": "商品创意工作台预览",
+    "source": "商品原图",
+    "sourceMeta": "主图 / 场景图 / 参考图",
+    "engine": "AI 图片优化",
+    "engineMeta": "抠图 · 布光 · 场景 · 质感",
+    "output": "商品视频",
+    "outputMeta": "分镜 · 脚本 · 成片",
+    "metricOne": "批量 SKU",
+    "metricTwo": "图片优化",
+    "metricThree": "视频生成",
+    "workspace": "图片与视频创作台",
+    "board": "商品素材总览",
+    "batch": "图片优化队列",
+    "market": "视频规格",
+    "review": "审核发布",
+    "script": "视频分镜",
+    "image": "优化主图",
+    "title": "广告图扩展",
+    "model": "模型模式",
+    "hostedModel": "平台模型",
+    "customModel": "自有模型",
+    "status": "生成中"
+  },
+  "homepage": {
+    "capability": {
+      "eyebrow": "能力生态",
+      "title": "围绕商品图片和短视频的工作流",
+      "body": "Haitu 先把商品资料、参考图、卖点和模型配置组织清楚，再进入脚本、图片优化、视频生成和审核发布。图片创作功能后续接入，当前页面会保持真实边界。",
+      "items": [
+        {
+          "heading": "商品资料和参考图管理",
+          "body": "上传商品原图、参考图、标题、材质、尺寸和禁用表达，形成可复用的商品资料包。",
+          "bullets": [
+            "商品图归档",
+            "参考图沉淀",
+            "卖点约束"
+          ]
+        },
+        {
+          "heading": "营销脚本和短视频生成",
+          "body": "从商品事实生成短视频脚本、分镜、字幕方向和商品视频素材，适合跨境团队批量处理 SKU。",
+          "bullets": [
+            "脚本整理",
+            "分镜生成",
+            "视频生成"
+          ]
+        },
+        {
+          "heading": "平台模型和自有模型",
+          "body": "轻量团队可以直接使用平台模型；有模型资源的团队可以接入自有模型，继续沿用同一套商品工作流。",
+          "bullets": [
+            "平台模型",
+            "自有模型",
+            "统一配置"
+          ]
+        }
+      ]
+    },
+    "payment": {
+      "eyebrow": "付费方式",
+      "title": "充值余额，按实际 AI 服务消耗",
+      "body": "用户在充值中心选择金额，通过 Stripe Checkout 使用微信支付、支付宝或银行卡付款。付款成功后余额入账，余额用于商品图优化、视频生成、脚本整理等数字化 SaaS 服务。",
+      "note": "Haitu 是数字服务，不销售实物商品。",
+      "steps": [
+        {
+          "label": "01",
+          "title": "选择充值金额",
+          "body": "在控制台充值中心选择金额，创建 Stripe Checkout 订单。"
+        },
+        {
+          "label": "02",
+          "title": "完成在线支付",
+          "body": "根据 Stripe 可用方式使用微信支付、支付宝或银行卡付款。"
+        },
+        {
+          "label": "03",
+          "title": "余额入账并消耗",
+          "body": "支付成功后余额进入账户，用于商品图优化、视频和脚本等数字服务。"
+        }
+      ]
+    },
+    "trust": {
+      "eyebrow": "信任与合规",
+      "title": "安心创作，费用和规则都说清楚",
+      "items": [
+        {
+          "heading": "专注数字内容创作",
+          "body": "Haitu 面向跨境电商卖家、品牌运营人员和内容创作者，帮助你优化商品图、整理脚本并制作商品短视频。"
+        },
+        {
+          "heading": "余额和消耗透明",
+          "body": "充值后的余额用于商品图优化、视频生成和脚本整理等数字服务，消耗记录可以在账户中查看。"
+        },
+        {
+          "heading": "未使用余额可处理",
+          "body": "如果充值后还没使用，可以联系客服人工处理退款；已经消耗的 AI 服务一般不可退。"
+        },
+        {
+          "heading": "发布前自己把关",
+          "body": "AI 结果上线前，建议你检查商品事实、平台规则、广告合规和知识产权风险。"
+        }
+      ]
+    },
+    "finalCta": {
+      "title": "准备好把商品素材跑起来了吗",
+      "body": "先把商品资料、参考图和模型模式放进 Haitu，再逐步生成脚本、优化图片素材并制作商品短视频。",
+      "primaryCta": "进入控制台",
+      "secondaryCta": "联系 Haitu"
+    }
+  },
+  "defaultSections": [
+    {
+      "heading": "围绕真实商品图片和商品事实生成",
+      "body": "先沉淀商品图、参考图、类目、材质、尺寸和可用卖点，再优化图片并生成视频素材，减少失真和违规表达。",
+      "bullets": [
+        "商品图结构化",
+        "参考图参与创作",
+        "卖点和禁用词分离",
+        "图片视频一致性"
+      ]
+    },
+    {
+      "heading": "为获客和转化设计",
+      "body": "每个页面和工具都服务于跨境卖家的搜索意图，从商品图优化、广告图扩展到短视频生成逐步引导转化。",
+      "bullets": [
+        "覆盖图片视频关键词",
+        "沉淀模板和案例",
+        "支持批量 SKU",
+        "连接创作台"
+      ]
+    }
+  ],
+  "defaultFaqs": [
+    {
+      "question": "这些素材能直接用于海外平台吗？",
+      "answer": "Haitu 会按商品事实优化图片并生成视频素材，最终发布前仍建议结合平台规则和店铺审核流程确认。"
+    },
+    {
+      "question": "可以批量处理商品吗？",
+      "answer": "可以。Haitu 的方向是从商品图库、ERP 和商品资料库批量整理多平台商品图片素材，并生成商品视频素材。"
+    }
+  ],
+  "geoAnswers": {
+    "default": {
+      "question": "Haitu 适合谁使用？",
+      "answer": "Haitu 嗨兔适合跨境电商卖家、品牌运营人员、内容创作者和代运营团队，用来整理商品资料、优化商品图、生成营销脚本和制作商品短视频。",
+      "points": [
+        "面向跨境电商商品素材工作流",
+        "支持平台模型和自有模型",
+        "商品资料保持用户输入语言",
+        "余额用于数字化 SaaS 服务"
+      ]
+    },
+    "home": {
+      "question": "Haitu 是什么？",
+      "answer": "Haitu 嗨兔是面向跨境电商卖家的 AI 商品图片优化与商品视频创作平台，帮助用户管理商品资料和参考图，生成营销脚本、视频分镜和商品短视频。Haitu 不是实物商品商城，也不是泛泛的娱乐视频生成器。",
+      "points": [
+        "上传和管理商品资料、SKU、卖点和参考图",
+        "优化商品图并整理营销脚本和视频分镜",
+        "使用平台模型，也可以接入自有模型",
+        "充值余额用于商品图优化、视频生成和脚本整理"
+      ]
+    },
+    "features-ai-product-image-generator": {
+      "question": "Haitu 的 AI 商品图生成器当前是什么状态？",
+      "answer": "当前完整图片创作功能还没有上线。Haitu 先支持商品图资料整理、参考图管理和商品视频生成，后续再把主图、场景图和广告图生成接入同一套商品素材工作流。",
+      "points": [
+        "当前支持商品图资料整理",
+        "当前支持参考图管理和视频生成",
+        "不会把未上线能力包装成已完成",
+        "图片创作上线后再升级为完整生成器入口"
+      ]
+    },
+    "features-image-to-product-video": {
+      "question": "Haitu 的商品图片转视频功能是什么？",
+      "answer": "Haitu 的商品图片转视频工作流会基于商品资料、卖点和参考图生成适合电商展示的短视频脚本、分镜和成片素材。它不是普通娱乐视频生成器，而是围绕 SKU、商品图、卖点脚本、分镜和电商平台素材需求设计。",
+      "points": [
+        "以商品原图、参考图和商品事实为输入",
+        "生成短视频脚本、分镜和商品视频素材",
+        "适合 TikTok Shop、Amazon、Shopee、Shopify 等平台",
+        "适合批量 SKU 商品素材工作流"
+      ]
+    },
+    "features-ai-product-video-generator": {
+      "question": "Haitu 的 AI 商品视频生成器解决什么问题？",
+      "answer": "Haitu 的 AI 商品视频生成器把商品标题、卖点、使用场景和参考图组织成短视频脚本、分镜和成片任务，帮助跨境电商团队更快为多个 SKU 制作商品短视频。",
+      "points": [
+        "从商品事实和参考图生成视频素材",
+        "适合海外货架、广告和短视频内容",
+        "支持平台模型和自有视频模型",
+        "生成前后都保留人工审核空间"
+      ]
+    },
+    "features-product-image-optimization": {
+      "question": "Haitu 的商品图优化工具做什么？",
+      "answer": "Haitu 的商品图优化工具先整理商品原图、参考图、材质、尺寸、卖点和禁用表达，让后续图片优化、视频生成和广告素材扩展都基于更可靠的商品事实。",
+      "points": [
+        "沉淀商品原图和参考图",
+        "整理材质、尺寸和可信卖点",
+        "减少后续生成中的错品和夸大",
+        "连接视频生成和后续图片创作"
+      ]
+    },
+    "features-product-copy-generator": {
+      "question": "Haitu 的商品文案生成器适合哪些内容？",
+      "answer": "Haitu 的商品文案生成器把原始商品资料整理成标题、卖点、描述、广告脚本、短视频字幕方向和多语言文案，适合跨境电商团队批量处理商品内容。",
+      "points": [
+        "基于商品事实生成文案",
+        "支持标题、卖点、描述和脚本",
+        "可按目标市场生成多语言内容",
+        "不自动改变用户上传的商品资料语言"
+      ]
+    },
+    "features-batch-product-creative-generation": {
+      "question": "Haitu 如何支持批量商品素材生成？",
+      "answer": "Haitu 通过商品资料包、参考图、脚本分镜、模型配置和审核流程，把多个 SKU 的商品图优化、视频生成和文案整理放进同一套批量工作流。",
+      "points": [
+        "适合大量 SKU 商品素材处理",
+        "统一管理商品图、参考图和卖点",
+        "批量生成脚本和商品视频",
+        "方便团队审核和复用模板"
+      ]
+    },
+    "features-hosted-ai-models": {
+      "question": "Haitu 的平台 AI 模型托管适合什么团队？",
+      "answer": "Haitu 的平台 AI 模型托管适合想快速测试商品素材工作流的轻量团队，不用先申请多个模型服务商账号或维护 API Key，就可以开始商品资料整理、脚本分镜和视频生成。",
+      "points": [
+        "不用先申请多个模型服务商账号",
+        "适合刚开始测试的跨境卖家",
+        "平台统一维护模型配置和默认组合",
+        "后续仍可切换到自有模型"
+      ]
+    },
+    "features-bring-your-own-model": {
+      "question": "Haitu 的自有模型接入是什么意思？",
+      "answer": "Haitu 的自有模型接入让已有模型账号或内部管线的团队，把自己的文本、图片或视频模型 API 接入同一套商品素材工作流，继续控制成本、模型版本和生成策略。",
+      "points": [
+        "支持自带 API Key 和模型配置",
+        "适合已有模型资源的团队",
+        "商品资料和创作流程保持一致",
+        "平台模型和自有模型可以并存"
+      ]
+    },
+    "platforms-tiktok-shop": {
+      "question": "Haitu 如何帮助 TikTok Shop 卖家？",
+      "answer": "Haitu 围绕 TikTok Shop 的短视频、商品图优化需求、广告卖点和本地化文案组织商品资料，帮助卖家把 SKU 更快转成适合内容电商展示的素材。",
+      "points": [
+        "整理 TikTok Shop 商品卖点和参考图",
+        "生成短视频脚本和商品视频素材",
+        "辅助本地化标题、卖点和广告脚本",
+        "适合批量处理内容电商 SKU"
+      ]
+    },
+    "platforms-amazon": {
+      "question": "Haitu 如何服务 Amazon 卖家？",
+      "answer": "Haitu 帮助 Amazon 卖家围绕 Listing、A+ 内容和站外广告整理商品图、参考图、卖点、脚本和视频素材，让商品事实和创意表达保持一致。",
+      "points": [
+        "适合 Amazon Listing 和广告素材准备",
+        "整理商品图、卖点和描述方向",
+        "生成视频脚本和短视频素材",
+        "发布前仍需按 Amazon 规则审核"
+      ]
+    },
+    "platforms-shopee": {
+      "question": "Haitu 如何服务 Shopee 跨境卖家？",
+      "answer": "Haitu 帮助 Shopee 跨境卖家整理商品图、卖点、参考图和短视频脚本，适合东南亚电商团队批量准备商品详情和广告素材。",
+      "points": [
+        "适合 Shopee 商品图和短视频素材",
+        "围绕东南亚电商使用场景组织内容",
+        "支持批量 SKU 素材整理",
+        "可与多语言文案流程配合"
+      ]
+    },
+    "platforms-shopify": {
+      "question": "Haitu 如何服务 Shopify 独立站？",
+      "answer": "Haitu 帮助 Shopify 团队从商品事实和参考图出发，为商品页、广告落地页和短视频投放准备更一致的图片、文案和视频素材。",
+      "points": [
+        "适合独立站商品页素材",
+        "支持广告图需求和短视频脚本",
+        "围绕品牌商品事实减少失真",
+        "可配合多语言市场内容"
+      ]
+    },
+    "platforms-lazada": {
+      "question": "Haitu 如何帮助 Lazada 卖家准备商品素材？",
+      "answer": "Haitu 帮助 Lazada 卖家围绕商品图、参考图、卖点、目标市场语言和短视频脚本准备东南亚电商商品页、广告素材和短视频内容。",
+      "points": [
+        "适合 Lazada 商品详情和广告素材",
+        "围绕东南亚市场整理卖点",
+        "支持商品图优化和短视频脚本",
+        "用户商品资料不因界面语言切换而自动翻译"
+      ]
+    },
+    "platforms-etsy": {
+      "question": "Haitu 如何帮助 Etsy 卖家准备商品素材？",
+      "answer": "Haitu 帮助 Etsy 卖家从商品事实、参考图、手工细节、材质和个性化说明出发，整理商品图优化需求、标题卖点、脚本和短视频素材。",
+      "points": [
+        "适合手工、复古和个性化商品",
+        "围绕材质、工艺和使用场景组织内容",
+        "支持商品图优化和短视频素材",
+        "发布前仍需卖家审核商品事实和平台规则"
+      ]
+    },
+    "compare-ai-product-video-generator-vs-general-video-generator": {
+      "question": "Haitu 和普通 AI 视频生成器有什么区别？",
+      "answer": "Haitu 面向电商商品素材工作流，会先组织 SKU、商品图、参考图、卖点、脚本和平台要求，再生成商品视频；普通 AI 视频生成器通常更偏通用创意或娱乐视频。",
+      "points": [
+        "Haitu 从商品事实和 SKU 出发",
+        "连接图片优化、脚本和视频生成",
+        "保留平台规则和人工审核",
+        "普通视频工具更适合泛创意内容"
+      ]
+    },
+    "compare-haitu-vs-canva-for-product-video": {
+      "question": "Haitu 和 Canva 做商品视频工作流有什么不同？",
+      "answer": "Canva 适合通用设计、排版和模板制作；Haitu 更关注商品事实、参考图片、脚本、模型工作流和电商商品视频生成，适合把商品资料转成可审核的图片、文案和短视频素材。",
+      "points": [
+        "Canva 适合通用设计和模板排版",
+        "Haitu 围绕商品资料和参考图工作",
+        "Haitu 连接脚本、模型和视频生成",
+        "两者适用场景不同，可以按团队流程选择"
+      ]
+    },
+    "compare-haitu-vs-manual-product-video-production": {
+      "question": "Haitu 和人工商品视频制作流程有什么不同？",
+      "answer": "人工制作适合高预算、强定制的品牌大片；Haitu 更适合跨境团队把大量 SKU 的商品图、卖点、脚本和短视频素材先批量结构化，再进行人工审核和微调。",
+      "points": [
+        "Haitu 适合批量 SKU 素材准备",
+        "人工制作适合重定制项目",
+        "AI 输出仍需要团队审核",
+        "可把人工精力留给关键商品和最终把关"
+      ]
+    },
+    "tools-product-title-generator": {
+      "question": "Haitu 的商品标题生成器做什么？",
+      "answer": "Haitu 的商品标题生成器会基于商品名称、类目、材质、卖点和目标市场生成更适合跨境电商搜索和转化的标题，并可继续进入脚本和视频流程。",
+      "points": [
+        "基于商品事实生成标题",
+        "适配目标市场语言和表达",
+        "服务搜索流量和转化",
+        "可衔接商品文案和视频脚本"
+      ]
+    },
+    "tools-product-video-script-generator": {
+      "question": "Haitu 的商品视频脚本生成器做什么？",
+      "answer": "Haitu 的商品视频脚本生成器把商品标题、材质尺寸、卖点、痛点和使用场景整理成短视频脚本、分镜结构和字幕方向，再作为商品视频生成的重要输入。",
+      "points": [
+        "生成开场、卖点、镜头和 CTA 结构",
+        "让视频生成更受商品事实约束",
+        "适合批量 SKU 视频脚本整理",
+        "可继续进入商品视频生成流程"
+      ]
+    },
+    "use-cases-cross-border-ecommerce": {
+      "question": "Haitu 如何帮助跨境电商团队批量做商品素材？",
+      "answer": "Haitu 从商品资料、商品图、卖点和参考图出发，帮助跨境电商团队整理商品事实、优化商品图、生成营销脚本、视频分镜和商品短视频，适合多平台、多 SKU 的素材工作流。",
+      "points": [
+        "统一商品资料包",
+        "连接商品图优化和视频生成",
+        "支持平台模型和自有模型",
+        "余额用于数字 SaaS 服务"
+      ]
+    },
+    "use-cases-tiktok-shop-product-video": {
+      "question": "Haitu 如何帮助 TikTok Shop 卖家制作商品视频？",
+      "answer": "Haitu 会把 TikTok Shop 商品图、参考图、卖点、使用场景和目标市场表达整理成短视频脚本、分镜、本地化卖点和商品视频素材。",
+      "points": [
+        "商品图参与视频创作",
+        "生成短视频脚本和分镜",
+        "适合内容电商卖点表达",
+        "发布前保留平台规则审核"
+      ]
+    },
+    "use-cases-amazon-product-image-optimization": {
+      "question": "Haitu 如何帮助 Amazon 卖家优化商品图和视频素材？",
+      "answer": "Haitu 帮助 Amazon 卖家围绕 Listing、A+ 内容和站外广告整理商品图、参考图、卖点、描述方向、脚本和短视频素材。",
+      "points": [
+        "适合 Listing 素材准备",
+        "整理商品图和卖点",
+        "连接视频脚本和短视频素材",
+        "发布前仍需按 Amazon 规则审核"
+      ]
+    },
+    "use-cases-fashion-product-video": {
+      "question": "Haitu 如何生成服饰商品短视频？",
+      "answer": "Haitu 会把服饰商品的款式、材质、颜色、尺码、细节图、穿搭场景和卖点整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理款式和材质",
+        "突出穿搭场景",
+        "生成脚本和视频素材",
+        "人工检查颜色和款式一致性"
+      ]
+    },
+    "use-cases-home-goods-product-video": {
+      "question": "Haitu 如何把家居商品图片转成短视频？",
+      "answer": "Haitu 会把家居商品的图片、尺寸、容量、材质、使用方法和场景参考整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理尺寸和材质",
+        "围绕使用场景生成脚本",
+        "适合家居和生活用品",
+        "支持批量 SKU 工作流"
+      ]
+    },
+    "use-cases-beauty-product-short-video": {
+      "question": "Haitu 如何支持美妆个护商品短视频？",
+      "answer": "Haitu 会把美妆个护商品的卖点、使用步骤、质地、适用场景和禁用表达整理成短视频脚本、字幕方向和商品视频素材。",
+      "points": [
+        "整理可信卖点和禁用表达",
+        "生成步骤型短视频脚本",
+        "适合美妆个护素材",
+        "保留广告合规审核"
+      ]
+    },
+    "categories-apparel-product-video": {
+      "question": "Haitu 如何帮助服饰卖家生成商品短视频？",
+      "answer": "Haitu 会把服饰商品的款式、版型、材质、颜色、尺码、细节图和穿搭场景整理成商品视频脚本、分镜和短视频素材，适合跨境服饰卖家批量处理上新内容。",
+      "points": [
+        "整理款式和尺码事实",
+        "突出材质、细节和穿搭场景",
+        "生成脚本、分镜和视频素材",
+        "发布前人工核对颜色和款式"
+      ]
+    },
+    "categories-home-goods-product-video": {
+      "question": "Haitu 如何帮助家居卖家把商品图片转成视频？",
+      "answer": "Haitu 会把家居商品的尺寸、容量、材质、收纳前后、使用方法和场景参考整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理尺寸、容量和材质",
+        "围绕使用场景生成脚本",
+        "适合家居、收纳和生活用品",
+        "支持批量 SKU 模板复用"
+      ]
+    },
+    "categories-beauty-product-video": {
+      "question": "Haitu 如何支持美妆个护商品短视频？",
+      "answer": "Haitu 会把美妆个护商品的可信卖点、使用步骤、质地、适用场景和禁用表达整理成合规优先的脚本、字幕方向和短视频素材。",
+      "points": [
+        "区分可信卖点和禁用表达",
+        "整理使用步骤和质地展示",
+        "生成脚本和字幕方向",
+        "保留广告合规审核"
+      ]
+    },
+    "categories-electronics-product-video": {
+      "question": "Haitu 如何支持电子配件商品视频？",
+      "answer": "Haitu 会把电子配件的规格、兼容性、接口、材质、使用场景和安全注意事项整理成商品视频脚本、分镜和短视频素材。",
+      "points": [
+        "整理规格和兼容性",
+        "突出接口、材质和使用场景",
+        "生成解释型脚本和视频素材",
+        "发布前核对参数和安全声明"
+      ]
+    },
+    "categories-pet-supplies-product-video": {
+      "question": "Haitu 如何帮助宠物用品卖家准备商品视频？",
+      "answer": "Haitu 会把宠物用品的尺寸、材质、适用宠物、使用场景和安全注意事项整理成商品视频脚本、分镜和短视频素材。",
+      "points": [
+        "整理尺寸和适用宠物",
+        "说明材质和安全边界",
+        "突出使用场景",
+        "发布前人工审核宠物安全表述"
+      ]
+    },
+    "categories-kitchen-product-video": {
+      "question": "Haitu 如何帮助厨房用品卖家生成短视频？",
+      "answer": "Haitu 会把厨房用品的尺寸、材质、容量、使用步骤、清洁方式和场景参考整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理尺寸、材质和容量",
+        "突出使用步骤和清洁方式",
+        "适合厨房和餐厨用品",
+        "保留安全与合规审核"
+      ]
+    },
+    "features-product-image-background-cleanup": {
+      "question": "Haitu 的商品图背景清洁化适合什么场景？",
+      "answer": "Haitu 的商品图背景清洁化工作流会先整理商品原图、参考图、背景需求和平台规则，帮助跨境团队准备更干净、更一致的商品图输入，并衔接视频脚本、分镜和后续图片创作能力。",
+      "points": [
+        "整理原图和背景需求",
+        "保留商品外观和材质事实",
+        "服务商品图优化和视频生成",
+        "不把未上线图片创作包装成已完成"
+      ]
+    },
+    "features-product-reference-image-management": {
+      "question": "Haitu 如何管理商品参考图？",
+      "answer": "Haitu 会把商品原图、细节图、场景参考、风格约束和禁用视觉方向放进同一套商品资料包，让脚本、图片优化和视频生成都能围绕可信参考展开。",
+      "points": [
+        "沉淀商品原图和细节图",
+        "管理场景参考和风格约束",
+        "减少 AI 输出偏离商品",
+        "用户上传图片语言和内容不被自动改写"
+      ]
+    },
+    "features-product-video-storyboard-generator": {
+      "question": "Haitu 的商品视频分镜生成器做什么？",
+      "answer": "Haitu 的商品视频分镜生成器会把商品事实、参考图、卖点和平台素材需求整理成开场钩子、痛点、卖点顺序、镜头结构、字幕方向和 CTA，再进入商品视频生成流程。",
+      "points": [
+        "生成开场和镜头顺序",
+        "围绕商品事实组织卖点",
+        "衔接商品图和视频生成",
+        "发布前保留人工审核"
+      ]
+    },
+    "features-product-creative-workflow": {
+      "question": "Haitu 的商品素材工作流是什么？",
+      "answer": "Haitu 的商品素材工作流把商品事实、商品图、参考图、脚本、分镜、模型选择和审核步骤放在同一套流程里，帮助跨境团队从资料整理走到图片优化、脚本和商品视频素材。",
+      "points": [
+        "统一商品资料和参考图",
+        "连接图片、脚本、分镜和视频",
+        "支持平台模型和自有模型",
+        "保留余额扣费和人工审核边界"
+      ]
+    },
+    "features-product-creative-review-workflow": {
+      "question": "Haitu 的商品素材审核工作流解决什么问题？",
+      "answer": "Haitu 的商品素材审核工作流帮助团队在发布前检查商品事实、平台规则、广告表达、图片和视频素材，减少错品、夸大卖点、违规词和素材不一致带来的风险。",
+      "points": [
+        "发布前检查商品事实",
+        "核对平台规则和广告表达",
+        "连接图片、脚本和视频审核",
+        "保留人工最终判断"
+      ]
+    },
+    "features-ecommerce-video-localization": {
+      "question": "Haitu 如何做电商商品视频本地化？",
+      "answer": "Haitu 会围绕目标市场整理脚本、字幕、卖点、本地表达和审核备注，让商品短视频从同一套商品资料出发，适配不同语言和平台内容习惯。",
+      "points": [
+        "整理脚本和字幕方向",
+        "保留商品资料原始语言",
+        "适配不同市场表达",
+        "发布前人工审核本地化内容"
+      ]
+    },
+    "features-model-cost-control": {
+      "question": "Haitu 如何帮助团队控制模型成本？",
+      "answer": "Haitu 把平台模型和自有模型放在同一套商品创作流程里，帮助团队按素材任务、模型选择和余额消耗理解成本，并在批量 SKU 创作中减少重复调用。",
+      "points": [
+        "区分平台模型和自有模型",
+        "围绕任务理解余额消耗",
+        "复用商品资料和脚本结构",
+        "避免无计划批量重跑"
+      ]
+    },
+    "categories-jewelry-product-video": {
+      "question": "Haitu 如何帮助饰品和珠宝卖家生成商品视频？",
+      "answer": "Haitu 会把饰品和珠宝商品的材质、镀层、尺寸、佩戴场景、细节特写和保养注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理材质、镀层和尺寸",
+        "突出佩戴场景和细节特写",
+        "适合饰品、珠宝和配饰",
+        "发布前核对材质和功效表述"
+      ]
+    },
+    "categories-baby-products-video": {
+      "question": "Haitu 如何帮助母婴商品准备短视频？",
+      "answer": "Haitu 会把母婴商品的安全边界、适用年龄、材质和使用场景，以及禁用表达整理成合规优先的短视频脚本、分镜和素材。",
+      "points": [
+        "整理适用年龄和材质",
+        "强调安全边界和使用场景",
+        "适合母婴用品和儿童用品",
+        "保留严格人工审核"
+      ]
+    },
+    "categories-sports-outdoor-product-video": {
+      "question": "Haitu 如何支持运动户外商品视频？",
+      "answer": "Haitu 会把运动户外商品的活动场景、材质、尺寸、天气条件、收纳方式和安全注意事项整理成商品视频脚本、分镜和短视频素材。",
+      "points": [
+        "整理活动场景和材质",
+        "说明尺寸、天气和收纳方式",
+        "适合运动和户外用品",
+        "发布前核对安全声明"
+      ]
+    },
+    "categories-car-accessories-product-video": {
+      "question": "Haitu 如何帮助汽车配件卖家生成短视频？",
+      "answer": "Haitu 会把汽车配件的适配车型、安装步骤、材质和使用效果，以及安全注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "points": [
+        "整理适配车型和安装步骤",
+        "突出材质和使用效果",
+        "适合汽车配件和车载用品",
+        "发布前核对兼容性和安全表述"
+      ]
+    }
+  },
+  "commonGeoFaqs": [
+    {
+      "question": "余额会用于哪些 AI 服务？",
+      "answer": "余额用于商品图优化、商品视频生成、营销脚本整理、模型调用和其他数字化 SaaS 服务。用户商品资料、上传内容和生成记录不会因为切换网站语言而自动翻译。"
+    }
+  ],
+  "pageGeoFaqs": {
+    "home": [
+      {
+        "question": "Haitu 适合哪些团队？",
+        "answer": "Haitu 适合跨境电商卖家、品牌运营人员、内容创作者和代运营团队，尤其适合需要批量整理商品资料、商品图、脚本和短视频素材的小团队。"
+      }
+    ],
+    "features-ai-product-video-generator": [
+      {
+        "question": "Haitu 和普通 AI 视频生成器有什么区别？",
+        "answer": "Haitu 先围绕 SKU、商品图、卖点、使用场景和平台素材需求组织输入，再生成脚本、分镜和商品视频。普通娱乐视频生成器通常不理解商品资料和电商审核流程。"
+      },
+      {
+        "question": "AI 商品视频生成需要哪些素材？",
+        "answer": "建议提供商品标题、原图、参考图、材质尺寸、核心卖点、使用场景、禁用表达和目标平台。资料越清楚，视频脚本和镜头越容易贴合真实商品。"
+      },
+      {
+        "question": "生成的视频可以直接发布吗？",
+        "answer": "不建议无审核直接发布。发布前应检查商品事实、平台规则、广告合规和知识产权风险，确认没有夸大、错品或违规表达。"
+      }
+    ],
+    "features-product-image-optimization": [
+      {
+        "question": "商品图优化和 AI 商品图生成有什么区别？",
+        "answer": "商品图优化更强调整理原图、参考图、材质、尺寸和可信卖点，为视频生成和后续图片创作准备准确输入；AI 商品图生成是后续完整图片创作能力的一部分。"
+      },
+      {
+        "question": "Haitu 会自动改变商品图片里的产品吗？",
+        "answer": "Haitu 的目标是围绕真实商品事实组织素材，减少错品和失真。AI 结果仍需要人工审核，尤其要检查产品外观、颜色、结构和平台要求。"
+      }
+    ],
+    "features-ai-product-image-generator": [
+      {
+        "question": "AI 商品图生成上线后会做哪些图片？",
+        "answer": "规划方向包括主图、场景图、广告图和商品图扩展，但必须基于真实商品图片、参考图、材质尺寸和可信卖点来约束生成。"
+      },
+      {
+        "question": "当前应该如何准备商品图生成资料？",
+        "answer": "当前可以先在 Haitu 整理商品原图、参考图、类目、材质、尺寸、卖点和禁用表达，这些资料会服务于商品视频生成和后续图片创作。"
+      }
+    ],
+    "features-image-to-product-video": [
+      {
+        "question": "Haitu 可以用商品图片生成短视频吗？",
+        "answer": "可以。Haitu 会把商品图片、参考图、商品事实和卖点转成短视频脚本、分镜和视频生成输入，适合电商商品展示和广告素材准备。"
+      },
+      {
+        "question": "商品图片转视频适合哪些平台？",
+        "answer": "适合 TikTok Shop、Amazon、Shopee、Shopify 等需要商品展示视频、广告短视频或商品页素材的平台。最终发布前仍需按平台规则审核。"
+      }
+    ],
+    "features-product-copy-generator": [
+      {
+        "question": "Haitu 会自动翻译用户上传的商品资料吗？",
+        "answer": "不会。网站语言切换只影响界面和官网内容，用户上传的商品资料保持原语言；如果需要目标市场文案，应单独生成或改写。"
+      },
+      {
+        "question": "商品文案生成可以产出哪些内容？",
+        "answer": "可以围绕商品事实生成标题、卖点、描述、广告脚本、短视频字幕方向和本地化文案，适合跨境团队批量整理商品内容。"
+      },
+      {
+        "question": "生成文案会如何避免夸大宣传？",
+        "answer": "Haitu 会把商品事实、可信卖点和禁用表达分开整理，但发布前仍应由团队检查平台规则、广告合规和真实商品信息。"
+      }
+    ],
+    "features-batch-product-creative-generation": [
+      {
+        "question": "Haitu 如何批量处理多个 SKU？",
+        "answer": "Haitu 通过商品资料包、参考图、卖点、脚本分镜、模型配置和审核流程，把多个 SKU 的商品图优化、文案整理和视频生成放进同一套工作流。"
+      },
+      {
+        "question": "批量生成适合什么团队？",
+        "answer": "适合有大量商品、频繁上新、多平台运营或需要代运营交付素材的团队，可以减少重复整理标题、卖点、脚本和视频需求的工作。"
+      },
+      {
+        "question": "批量生成后还能人工审核吗？",
+        "answer": "可以。Haitu 的定位不是跳过审核，而是先把商品资料和创意任务结构化，再让团队检查商品事实、图片一致性和平台合规。"
+      }
+    ],
+    "features-hosted-ai-models": [
+      {
+        "question": "平台模型适合刚开始测试的卖家吗？",
+        "answer": "适合。平台模型省掉申请多个模型账号和维护 API Key 的步骤，可以先跑通商品资料整理、脚本分镜和视频生成流程。"
+      },
+      {
+        "question": "平台模型会影响以后接入自有模型吗？",
+        "answer": "不会。平台模型和自有模型可以并存，团队可以先用平台模型测试流程，后续再按成本、质量和管理要求切换。"
+      }
+    ],
+    "features-bring-your-own-model": [
+      {
+        "question": "Haitu 支持自带模型吗？",
+        "answer": "支持。已有模型账号或内部管线的团队，可以把自己的文本、图片或视频模型 API 接入 Haitu 的商品素材工作流。"
+      },
+      {
+        "question": "自有模型适合哪些团队？",
+        "answer": "适合已经有模型供应商账号、内部模型策略、成本控制要求或更强治理需求的团队，同时仍能使用 Haitu 的商品资料和创作流程。"
+      }
+    ],
+    "platforms-tiktok-shop": [
+      {
+        "question": "Haitu 适合 TikTok Shop 卖家吗？",
+        "answer": "适合。Haitu 围绕 TikTok Shop 的短视频、商品图优化、广告卖点和本地化文案组织商品资料，帮助卖家更快准备内容电商素材。"
+      },
+      {
+        "question": "TikTok Shop 素材需要哪些输入？",
+        "answer": "建议准备商品图、参考图、标题、核心卖点、使用场景、目标市场语言和禁用表达，再生成短视频脚本、分镜和商品视频素材。"
+      },
+      {
+        "question": "Haitu 会替我保证 TikTok Shop 审核通过吗？",
+        "answer": "不会承诺平台审核结果。AI 输出上线前仍需要卖家按 TikTok Shop 规则检查商品事实、广告表达、知识产权和本地合规。"
+      }
+    ],
+    "platforms-amazon": [
+      {
+        "question": "Haitu 如何帮助 Amazon Listing 素材？",
+        "answer": "Haitu 可以整理商品图、参考图、卖点、描述方向、视频脚本和短视频素材，帮助 Amazon 卖家为 Listing、A+ 内容和站外广告准备内容。"
+      },
+      {
+        "question": "Amazon 素材可以直接发布吗？",
+        "answer": "不建议直接发布。发布前应按 Amazon 平台规则检查主图、文案、类目限制、广告声明和知识产权风险。"
+      },
+      {
+        "question": "Haitu 适合 Amazon 站外广告素材吗？",
+        "answer": "适合准备商品短视频脚本、广告卖点和图片素材方向，但最终投放素材仍需要结合广告平台和 Amazon 政策审核。"
+      }
+    ],
+    "platforms-shopee": [
+      {
+        "question": "Haitu 适合 Shopee 跨境卖家吗？",
+        "answer": "适合。Haitu 可以帮助 Shopee 卖家整理商品图、卖点、参考图和短视频脚本，适合东南亚电商团队批量准备商品详情和广告素材。"
+      },
+      {
+        "question": "Shopee 多语言商品内容怎么处理？",
+        "answer": "用户上传的商品资料保持原语言。需要目标市场标题、卖点或脚本时，可以基于商品事实单独生成本地化内容。"
+      },
+      {
+        "question": "Shopee 素材适合批量生成吗？",
+        "answer": "适合。大量 SKU 可以共用资料整理、脚本模板和审核流程，再根据商品差异调整图片、卖点和视频表达。"
+      }
+    ],
+    "platforms-shopify": [
+      {
+        "question": "Haitu 如何服务 Shopify 独立站？",
+        "answer": "Haitu 可以从商品事实和参考图出发，为 Shopify 商品页、广告落地页和短视频投放准备更一致的图片、文案和视频素材。"
+      },
+      {
+        "question": "Shopify 品牌素材会不会变得很通用？",
+        "answer": "Haitu 会以商品事实、参考图和品牌需求作为输入。团队仍应检查语气、视觉一致性和广告承诺，避免生成内容脱离品牌。"
+      },
+      {
+        "question": "Shopify 多市场内容可以用 Haitu 做吗？",
+        "answer": "可以围绕目标市场生成标题、卖点、脚本和视频方向，但用户原始商品资料不会因为切换网站语言而被自动翻译。"
+      }
+    ],
+    "tools-product-title-generator": [
+      {
+        "question": "商品标题生成器需要哪些输入？",
+        "answer": "建议提供商品名称、类目、材质、尺寸、核心卖点、目标市场语言和禁用词，标题会更贴近搜索意图和平台表达习惯。"
+      },
+      {
+        "question": "标题生成后还能继续做什么？",
+        "answer": "标题可以继续进入商品文案、短视频脚本和视频生成流程，让同一个商品资料包里的素材表达保持一致。"
+      },
+      {
+        "question": "标题会自动改掉商品语言吗？",
+        "answer": "不会。用户上传的商品资料保持原语言；生成标题时可以选择目标市场语言，作为新的输出内容。"
+      }
+    ],
+    "tools-product-video-script-generator": [
+      {
+        "question": "商品视频脚本能直接用于视频生成吗？",
+        "answer": "可以。脚本可以和商品图、参考图、目标比例、卖点顺序一起作为商品视频生成输入。生成后仍建议人工审核镜头和文案。"
+      },
+      {
+        "question": "脚本生成器和视频生成器有什么区别？",
+        "answer": "脚本生成器先整理开场、卖点、痛点、镜头和 CTA，视频生成器再基于脚本、商品图和参考图生成视频素材。"
+      }
+    ],
+    "use-cases-cross-border-ecommerce": [
+      {
+        "question": "跨境电商卖家如何批量优化商品图和生成短视频？",
+        "answer": "可以先把商品图、参考图、标题、材质、尺寸、卖点和禁用表达整理成资料包，再用 Haitu 生成商品图优化需求、脚本分镜和商品视频素材。"
+      },
+      {
+        "question": "Haitu 适合中国供应链卖家吗？",
+        "answer": "适合。Haitu 面向跨境电商团队，尤其适合有大量 SKU、需要把商品资料转成多平台图片、文案和短视频素材的卖家。"
+      },
+      {
+        "question": "会自动翻译用户上传的商品资料吗？",
+        "answer": "不会。用户上传的商品资料保持原语言；需要目标市场标题、卖点或脚本时，可以基于商品事实单独生成本地化内容。"
+      }
+    ],
+    "use-cases-tiktok-shop-product-video": [
+      {
+        "question": "TikTok Shop 商品视频需要哪些输入？",
+        "answer": "建议准备商品图、参考图、标题、核心卖点、使用场景、目标语言和禁用表达，再进入脚本、分镜和视频生成。"
+      },
+      {
+        "question": "Haitu 生成的视频能保证 TikTok Shop 审核通过吗？",
+        "answer": "不能保证。Haitu 帮助准备素材，发布前仍需卖家检查平台规则、广告表达、商品事实和知识产权风险。"
+      },
+      {
+        "question": "可以批量做 TikTok Shop 商品视频吗？",
+        "answer": "可以。相似 SKU 可以共用脚本结构、素材模板和审核流程，再按商品差异调整卖点和镜头。"
+      }
+    ],
+    "use-cases-amazon-product-image-optimization": [
+      {
+        "question": "Amazon 商品图优化需要注意什么？",
+        "answer": "需要注意主图规则、商品真实性、类目限制、广告声明和知识产权。Haitu 会帮助整理事实和素材，但不替代平台审核。"
+      },
+      {
+        "question": "Haitu 可以服务 A+ 内容和站外广告吗？",
+        "answer": "可以。Haitu 可以基于同一套商品资料整理图片优化需求、文案方向、视频脚本和短视频素材。"
+      },
+      {
+        "question": "Amazon 商品资料会被自动翻译吗？",
+        "answer": "不会。原始商品资料保持用户输入语言；如果需要英文或其他语言 Listing 文案，可以单独生成目标市场内容。"
+      }
+    ],
+    "use-cases-fashion-product-video": [
+      {
+        "question": "服饰视频需要哪些商品信息？",
+        "answer": "建议提供款式、版型、材质、颜色、尺码、细节图、穿搭场景和禁用表达，这些会影响脚本和镜头。"
+      },
+      {
+        "question": "AI 生成服饰视频会不会出现颜色或款式偏差？",
+        "answer": "AI 输出可能出现偏差，因此发布前需要人工核对颜色、花纹、款式、材质和品牌表达。"
+      },
+      {
+        "question": "服饰商品适合批量生成短视频吗？",
+        "answer": "适合。相似款式可以复用脚本结构和审核流程，再按颜色、尺码、材质和卖点差异调整。"
+      }
+    ],
+    "use-cases-home-goods-product-video": [
+      {
+        "question": "家居商品视频应该突出什么？",
+        "answer": "通常需要突出尺寸、容量、材质、使用方法、收纳前后或场景效果，帮助用户快速理解商品用途。"
+      },
+      {
+        "question": "家居商品图片转视频需要参考图吗？",
+        "answer": "建议提供参考图和使用场景图。它们可以帮助 Haitu 组织脚本和镜头，但最终输出仍要检查商品事实。"
+      },
+      {
+        "question": "家居类多 SKU 可以共用模板吗？",
+        "answer": "可以。相似商品可以共用脚本模板和审核流程，再根据尺寸、颜色、材质和用途调整。"
+      }
+    ],
+    "use-cases-beauty-product-short-video": [
+      {
+        "question": "美妆个护视频能写功效承诺吗？",
+        "answer": "不应写未经验证的功效承诺。Haitu 会帮助整理可信卖点和禁用表达，发布前仍需人工审核广告合规。"
+      },
+      {
+        "question": "美妆短视频适合哪些内容结构？",
+        "answer": "常见结构包括痛点开场、质地展示、使用步骤、适用场景、注意事项和 CTA。"
+      },
+      {
+        "question": "Haitu 会保存完整支付账号吗？",
+        "answer": "不会。Haitu 只接收支付状态、金额、币种和订单结果，不保存完整银行卡号、微信支付账号或支付宝账号。"
+      }
+    ],
+    "platforms-lazada": [
+      {
+        "question": "Lazada 卖家可以用 Haitu 做哪些素材？",
+        "answer": "Haitu 可以帮助 Lazada 卖家整理商品图、参考图、卖点、本地化标题、视频脚本和短视频素材，适合东南亚电商商品页、广告素材和短视频内容。"
+      },
+      {
+        "question": "Lazada 多语言商品内容会自动翻译吗？",
+        "answer": "不会。用户上传的商品资料保持原语言；需要目标市场标题、卖点或脚本时，可以基于商品事实单独生成本地化内容。"
+      },
+      {
+        "question": "Haitu 能保证 Lazada 发布审核通过吗？",
+        "answer": "不能保证平台审核结果。Haitu 帮助准备素材，发布前仍需卖家检查商品事实、平台规则、广告表达和本地合规。"
+      }
+    ],
+    "platforms-etsy": [
+      {
+        "question": "Haitu 适合 Etsy 卖家吗？",
+        "answer": "适合需要把手工、复古、个性化商品资料整理成商品图优化需求、标题卖点、脚本和短视频素材的 Etsy 卖家。"
+      },
+      {
+        "question": "Etsy 商品素材应该突出什么？",
+        "answer": "通常需要突出材质、工艺、尺寸、使用场景、个性化选项和真实商品细节，避免把 AI 输出做成和实物不一致的展示。"
+      },
+      {
+        "question": "Haitu 会改变手工商品的原始描述语言吗？",
+        "answer": "不会。商品资料保持用户输入语言；如需英文或其他目标市场文案，可以单独从商品事实生成本地化输出。"
+      }
+    ],
+    "compare-ai-product-video-generator-vs-general-video-generator": [
+      {
+        "question": "Haitu 和普通 AI 视频生成器怎么选？",
+        "answer": "如果目标是娱乐视频、概念片或泛创意画面，普通 AI 视频生成器更直接；如果目标是围绕 SKU、商品图、卖点和平台素材要求生成商品视频，Haitu 更贴近电商工作流。"
+      },
+      {
+        "question": "普通 AI 视频生成器为什么不一定适合商品视频？",
+        "answer": "商品视频需要保持产品外观、材质、卖点和合规表达一致。通用工具如果缺少商品资料约束，可能更容易生成偏离真实商品的画面或文案。"
+      },
+      {
+        "question": "Haitu 生成的视频还需要人工审核吗？",
+        "answer": "需要。Haitu 会组织商品事实和创作输入，但 AI 输出发布前仍要检查商品真实性、平台规则、广告合规和知识产权。"
+      }
+    ],
+    "compare-haitu-vs-canva-for-product-video": [
+      {
+        "question": "Haitu 和 Canva 是替代关系吗？",
+        "answer": "不一定。Canva 适合通用设计、模板排版和品牌视觉整理；Haitu 适合从商品资料、参考图、脚本和模型工作流生成电商图片、文案和短视频素材。"
+      },
+      {
+        "question": "什么时候更适合用 Haitu 做商品视频？",
+        "answer": "当团队需要围绕 SKU、商品图、卖点、平台比例、脚本和模型配置批量准备商品视频时，Haitu 的商品事实驱动流程更适合。"
+      },
+      {
+        "question": "Haitu 输出后还能进设计工具继续编辑吗？",
+        "answer": "可以。团队可以用 Haitu 先生成商品脚本、视频和素材方向，再根据品牌规范进入设计工具做最后排版或视觉微调。"
+      }
+    ],
+    "compare-haitu-vs-manual-product-video-production": [
+      {
+        "question": "Haitu 会取代人工商品视频制作吗？",
+        "answer": "不会完全取代。Haitu 更适合批量 SKU 的资料整理、脚本分镜和初版短视频素材；高定制品牌片、复杂拍摄和最终审核仍需要人工参与。"
+      },
+      {
+        "question": "什么时候应该选择人工制作？",
+        "answer": "预算较高、品牌调性要求极强、需要真实拍摄或复杂后期的项目更适合人工制作。Haitu 更适合上新频率高、SKU 多的日常素材流程。"
+      },
+      {
+        "question": "Haitu 如何和人工团队配合？",
+        "answer": "Haitu 可以先把商品资料、卖点、脚本和初版视频结构整理出来，人工团队再做重点商品的审美微调、合规确认和最终发布。"
+      }
+    ],
+    "categories-apparel-product-video": [
+      {
+        "question": "服饰视频需要哪些商品信息？",
+        "answer": "建议提供款式、版型、材质、颜色、尺码、细节图、穿搭场景和禁用表达，这些会影响脚本、镜头和字幕方向。"
+      },
+      {
+        "question": "AI 服饰视频会不会出现颜色或款式偏差？",
+        "answer": "AI 输出可能出现偏差，因此发布前需要人工核对颜色、花纹、款式、尺码、材质和品牌表达。"
+      },
+      {
+        "question": "服饰商品适合批量生成短视频吗？",
+        "answer": "适合。相似款式可以复用脚本结构和审核流程，再按颜色、尺码、材质和卖点差异调整。"
+      }
+    ],
+    "categories-home-goods-product-video": [
+      {
+        "question": "家居商品视频应该突出什么？",
+        "answer": "通常需要突出尺寸、容量、材质、使用方法、收纳前后或场景效果，帮助用户快速理解商品用途。"
+      },
+      {
+        "question": "家居商品图片转视频需要参考图吗？",
+        "answer": "建议提供参考图和使用场景图。它们可以帮助 Haitu 组织脚本和镜头，但最终输出仍要检查商品事实。"
+      },
+      {
+        "question": "家居类多 SKU 可以共用模板吗？",
+        "answer": "可以。相似商品可以共用脚本模板和审核流程，再根据尺寸、颜色、材质和用途调整。"
+      }
+    ],
+    "categories-beauty-product-video": [
+      {
+        "question": "美妆个护视频能写功效承诺吗？",
+        "answer": "不应写未经验证的功效承诺。Haitu 会帮助整理可信卖点和禁用表达，发布前仍需人工审核广告合规。"
+      },
+      {
+        "question": "美妆短视频适合哪些内容结构？",
+        "answer": "常见结构包括痛点开场、质地展示、使用步骤、适用场景、注意事项和 CTA。"
+      },
+      {
+        "question": "美妆商品语言会被自动翻译吗？",
+        "answer": "不会。商品资料保持用户上传语言；需要目标市场文案或字幕时，可以基于商品事实单独生成本地化输出。"
+      }
+    ],
+    "categories-electronics-product-video": [
+      {
+        "question": "电子配件视频需要哪些商品信息？",
+        "answer": "建议提供规格参数、兼容机型、接口、材质、尺寸、使用方法、安全注意事项和禁用表达。"
+      },
+      {
+        "question": "电子配件参数会被自动改写吗？",
+        "answer": "不会自动改写用户上传的商品参数。AI 输出发布前仍要人工核对规格、兼容性、接口和安全声明。"
+      },
+      {
+        "question": "电子配件适合做解释型短视频吗？",
+        "answer": "适合。Haitu 可以围绕使用步骤、连接方式、对比场景和常见问题整理视频脚本。"
+      }
+    ],
+    "categories-pet-supplies-product-video": [
+      {
+        "question": "宠物用品视频需要注意什么？",
+        "answer": "需要注意尺寸、材质、适用宠物、年龄或体型限制、使用方式和安全边界，避免夸大安全承诺。"
+      },
+      {
+        "question": "宠物用品可以批量生成视频吗？",
+        "answer": "可以。相似用品可以复用脚本模板，再按宠物类型、尺寸、材质和使用场景调整。"
+      },
+      {
+        "question": "AI 输出能替代宠物安全审核吗？",
+        "answer": "不能。发布前仍需人工检查商品事实、适用范围、安全表述和平台规则。"
+      }
+    ],
+    "categories-kitchen-product-video": [
+      {
+        "question": "厨房用品视频应该突出哪些点？",
+        "answer": "常见重点包括尺寸、容量、材质、耐热或安全边界、使用步骤、清洁方式和收纳效果。"
+      },
+      {
+        "question": "厨房用品视频能直接发布吗？",
+        "answer": "不建议无审核直接发布。需要检查材质、安全声明、使用方式、广告表达和平台规则。"
+      },
+      {
+        "question": "厨房用品适合图片转视频吗？",
+        "answer": "适合。商品图、使用场景图和步骤说明可以转成脚本、分镜和短视频素材。"
+      }
+    ],
+    "features-product-image-background-cleanup": [
+      {
+        "question": "商品图背景清洁化和完整商品图生成有什么区别？",
+        "answer": "背景清洁化更强调整理原图、背景需求和平台规则，让商品图输入更干净；完整商品图生成属于后续图片创作能力，当前页面不会把它包装成已完整上线。"
+      },
+      {
+        "question": "背景清洁化会改变商品本身吗？",
+        "answer": "目标是不改变商品外观、颜色、结构和材质事实。AI 结果仍需人工检查，尤其是商品边缘、反光、透明材质和细节。"
+      },
+      {
+        "question": "背景清洁化适合哪些平台素材？",
+        "answer": "适合为 TikTok Shop、Amazon、Shopee、Lazada、Shopify 等平台准备主图、广告图需求和后续视频素材输入。"
+      }
+    ],
+    "features-product-reference-image-management": [
+      {
+        "question": "商品参考图管理需要保存哪些图片？",
+        "answer": "建议保存商品原图、细节图、场景参考、风格参考、禁用方向和最终可用素材，方便后续脚本、图片优化和视频生成复用。"
+      },
+      {
+        "question": "参考图会被自动翻译或改写吗？",
+        "answer": "不会。网站语言切换只影响界面和营销页，用户上传的参考图和商品资料保持原始内容。"
+      },
+      {
+        "question": "参考图管理如何减少 AI 失真？",
+        "answer": "清楚的参考图和禁用方向能约束商品外观、材质、颜色和使用场景，减少生成内容脱离真实商品。"
+      }
+    ],
+    "features-product-video-storyboard-generator": [
+      {
+        "question": "商品视频分镜需要哪些输入？",
+        "answer": "建议提供商品图、参考图、标题、材质尺寸、卖点、痛点、使用场景、目标平台和禁用表达。"
+      },
+      {
+        "question": "分镜和视频生成有什么区别？",
+        "answer": "分镜先整理开场、痛点、卖点顺序、镜头和字幕方向；视频生成再基于分镜、商品图和参考图生成视频素材。"
+      },
+      {
+        "question": "分镜生成后可以人工修改吗？",
+        "answer": "可以。团队可以在进入视频生成前调整卖点顺序、镜头描述、字幕方向和 CTA。"
+      }
+    ],
+    "features-product-creative-workflow": [
+      {
+        "question": "商品素材工作流从哪里开始？",
+        "answer": "通常从商品资料、商品图、参考图、材质尺寸、卖点和禁用表达开始，再进入标题、脚本、分镜、图片优化和商品视频生成。"
+      },
+      {
+        "question": "这个工作流适合批量 SKU 吗？",
+        "answer": "适合。相似商品可以复用资料结构、脚本模板、模型配置和审核流程，再按商品差异调整。"
+      },
+      {
+        "question": "平台模型和自有模型能在同一工作流里使用吗？",
+        "answer": "可以。团队可以先用平台模型快速开始，也可以接入自己的文本、图片或视频模型 API。"
+      }
+    ],
+    "features-product-creative-review-workflow": [
+      {
+        "question": "商品素材审核工作流从哪里开始？",
+        "answer": "通常从商品事实、参考图、脚本、分镜、视频素材和目标平台规则开始，先确认素材是否和真实商品一致，再检查广告表达和禁用内容。"
+      },
+      {
+        "question": "AI 输出可以跳过人工审核吗？",
+        "answer": "不可以。Haitu 可以整理审核线索和风险点，但发布前仍需要人工确认商品事实、平台规则、广告合规和知识产权风险。"
+      },
+      {
+        "question": "审核工作流适合哪些团队？",
+        "answer": "适合跨境电商卖家、品牌运营、代运营和内容团队，尤其适合多人协作、批量 SKU 和多平台发布场景。"
+      }
+    ],
+    "features-ecommerce-video-localization": [
+      {
+        "question": "视频本地化会自动翻译用户商品资料吗？",
+        "answer": "不会。网站语言切换不会自动翻译用户上传的商品资料。本地化输出应由团队明确选择目标语言和市场，并在发布前人工审核。"
+      },
+      {
+        "question": "本地化商品视频需要哪些输入？",
+        "answer": "建议提供商品事实、原始脚本、目标市场、禁用表达、平台要求、字幕风格和本地化备注。"
+      },
+      {
+        "question": "本地化适合哪些平台？",
+        "answer": "适合 TikTok Shop、Amazon、Shopee、Lazada、Shopify、Etsy 等跨境场景，尤其适合同一商品面向不同语言市场投放。"
+      }
+    ],
+    "features-model-cost-control": [
+      {
+        "question": "模型成本控制和余额扣费有什么关系？",
+        "answer": "余额用于商品图优化、视频生成、脚本整理、模型调用等数字服务。成本控制帮助团队在批量任务前理解哪些步骤会消耗余额或自有模型额度。"
+      },
+      {
+        "question": "使用自有模型能降低成本吗？",
+        "answer": "可能可以，但取决于自有模型供应商价格、调用量、质量和团队维护成本。Haitu 的价值是把平台模型和自有模型纳入同一商品素材流程。"
+      },
+      {
+        "question": "如何减少重复模型调用？",
+        "answer": "先复用商品资料、脚本模板、参考图和审核结论，再按 SKU 差异生成素材，可以减少无计划重复重跑。"
+      }
+    ],
+    "categories-jewelry-product-video": [
+      {
+        "question": "饰品视频应该突出哪些素材？",
+        "answer": "常见重点包括材质、镀层、尺寸、佩戴场景、细节特写、包装和保养注意事项。"
+      },
+      {
+        "question": "饰品和珠宝视频能夸大功效吗？",
+        "answer": "不建议。发布前应核对材质、镀层、产地、功效类表达和平台规则，避免误导性承诺。"
+      },
+      {
+        "question": "饰品适合图片转视频吗？",
+        "answer": "适合。主图、细节图、佩戴图和场景图可以转成脚本、分镜和短视频素材。"
+      }
+    ],
+    "categories-baby-products-video": [
+      {
+        "question": "母婴商品视频最需要注意什么？",
+        "answer": "需要注意适用年龄、材质、安全边界、使用方式、警示语和禁用表达，避免夸大安全或效果承诺。"
+      },
+      {
+        "question": "AI 输出能替代母婴安全审核吗？",
+        "answer": "不能。母婴商品发布前必须由团队人工核对商品事实、安全声明、平台规则和当地监管要求。"
+      },
+      {
+        "question": "母婴商品适合批量做视频吗？",
+        "answer": "适合相似 SKU 的基础素材流程，但每个商品仍要按年龄段、材质、尺寸和使用场景单独审核。"
+      }
+    ],
+    "categories-sports-outdoor-product-video": [
+      {
+        "question": "运动户外商品视频应该突出什么？",
+        "answer": "常见重点包括使用场景、材质、尺寸、重量、天气条件、收纳方式、安装步骤和安全注意事项。"
+      },
+      {
+        "question": "户外商品视频可以直接发布吗？",
+        "answer": "不建议无审核直接发布。需要检查规格、适用场景、天气或安全声明、广告表达和平台规则。"
+      },
+      {
+        "question": "运动户外商品适合哪些短视频结构？",
+        "answer": "适合开箱、安装、户外使用、前后对比、收纳展示和多场景切换等结构。"
+      }
+    ],
+    "categories-car-accessories-product-video": [
+      {
+        "question": "汽车配件视频需要哪些输入？",
+        "answer": "建议提供适配车型、年份、安装位置、材质、尺寸、使用效果、安装步骤和安全注意事项。"
+      },
+      {
+        "question": "汽车配件能自动改写适配车型吗？",
+        "answer": "不能。用户上传的适配车型和规格属于商品事实，不能因为站点语言切换或 AI 输出而自动改写。"
+      },
+      {
+        "question": "汽车配件视频发布前要检查什么？",
+        "answer": "需要检查兼容性、安装步骤、安全声明、广告表达、知识产权和目标平台规则。"
+      }
+    ]
+  },
+  "pages": {
+    "home": {
+      "slug": "",
+      "title": "Haitu 嗨兔 - 跨境电商 AI 商品视频与图片创作平台",
+      "description": "Haitu 嗨兔是跨境电商 AI 商品图片和视频创作平台，帮助卖家上传和管理商品资料，优化商品图、营销脚本和短视频创作，并通过余额支付数字化 SaaS 服务。",
+      "h1": "跨境电商商品图片优化与 AI 视频生成平台",
+      "eyebrow": "商品图升级 · 短视频规模化",
+      "lead": "上传商品原图、参考图和商品资料，用平台模型或接入自有模型批量优化商品图、整理营销脚本并生成适配 {{marketplaces}} 的商品短视频。用户在充值中心通过 Stripe Checkout 使用微信支付、支付宝或银行卡付款，余额用于商品图优化、视频生成和脚本整理等数字化 SaaS 服务。",
+      "primaryCta": "开始优化商品图",
+      "secondaryCta": "进入创作台",
+      "heroTitleLines": [
+        "商品图优化与视频生成",
+        "AI 创作平台"
+      ],
+      "sections": [
+        {
+          "heading": "先看清楚怎么用、怎么扣费",
+          "body": "Haitu 面向跨境电商卖家、品牌运营人员和内容创作者。充值成功后余额入账，用于商品图优化、营销脚本整理和短视频生成等数字服务。",
+          "bullets": [
+            "跨境电商 SaaS",
+            "Stripe Checkout",
+            "微信/支付宝/银行卡",
+            "余额用于数字服务"
+          ]
+        },
+        {
+          "heading": "上传商品资料，组织商品素材",
+          "body": "围绕商品原图、参考图、标题、材质、尺寸和卖点优化商品图、整理营销脚本、生成分镜和短视频，方便团队批量处理 SKU。",
+          "bullets": [
+            "商品资料管理",
+            "商品图优化",
+            "营销脚本整理",
+            "商品短视频生成"
+          ]
+        },
+        {
+          "heading": "平台模型开箱即用，也支持自有模型",
+          "body": "轻量团队可以直接使用 Haitu 提供的文本和视频模型，并接入后续图片创作模型；有自研能力的团队，也可以接入自己的模型和素材管线。",
+          "bullets": [
+            "图片模型路线",
+            "平台视频模型",
+            "自有模型接入",
+            "团队工作流扩展"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Haitu 提供什么服务？",
+          "answer": "Haitu 提供跨境电商商品图片优化、营销脚本整理和短视频创作服务，用户上传或管理商品资料后，用 AI 生成和整理数字内容素材。"
+        },
+        {
+          "question": "Haitu 如何收费？",
+          "answer": "用户在充值中心选择金额，通过 Stripe Checkout 使用微信支付、支付宝或银行卡付款。付款成功后余额入账，余额用于商品图优化、视频生成、脚本整理等数字化 SaaS 服务。"
+        },
+        {
+          "question": "Haitu 是否销售实物商品或受限服务？",
+          "answer": "不销售实物商品，也不提供赌博、金融投资、加密货币交易、贷款、成人内容、药品等受限服务。Haitu 的服务对象是跨境电商卖家、品牌运营人员和内容创作者。"
+        }
+      ]
+    },
+    "features-ai-product-video-generator": {
+      "slug": "features/ai-product-video-generator",
+      "title": "AI 商品视频生成器 - Haitu",
+      "description": "用商品资料、卖点和参考图批量生成跨境电商短视频，适配 TikTok Shop、Amazon、Shopee 等平台。",
+      "h1": "AI 商品视频生成器",
+      "eyebrow": "把 SKU 变成短视频",
+      "lead": "从商品标题、卖点、使用场景和参考图出发，生成适合海外货架和短视频广告的商品视频脚本与成片版本。",
+      "primaryCta": "生成商品视频",
+      "secondaryCta": "查看商品图优化"
+    },
+    "features-product-image-optimization": {
+      "slug": "features/product-image-optimization",
+      "title": "商品图优化工具 - Haitu",
+      "description": "整理商品原图、参考图、材质、尺寸和卖点，为跨境电商主图、场景图、广告图和商品视频生成准备可信素材。",
+      "h1": "商品图优化工具",
+      "eyebrow": "先把图片资产整理干净",
+      "lead": "面向跨境电商团队，把商品原图、参考图、材质、尺寸、禁用词和卖点放进统一流程，先完成图片素材结构化，再进入视频和后续图片创作。",
+      "primaryCta": "整理商品图片",
+      "secondaryCta": "生成商品视频",
+      "sections": [
+        {
+          "heading": "围绕真实商品图做优化准备",
+          "body": "把主图、细节图、场景参考图和商品事实放在同一个资料包里，减少后续生成视频或图片素材时的错品、失真和夸大表达。",
+          "bullets": [
+            "商品原图归档",
+            "参考图管理",
+            "材质尺寸沉淀",
+            "卖点与禁用词分离"
+          ]
+        },
+        {
+          "heading": "连接视频生成和图片创作路线",
+          "body": "当前重点支持商品图片到视频的创作流程；图片生成和更多广告图扩展能力会在图片创作模块上线后逐步接入。",
+          "bullets": [
+            "图片转视频",
+            "脚本分镜生成",
+            "广告图需求沉淀",
+            "后续图片创作接入"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "这个页面是不是已经完整支持图片生成？",
+          "answer": "图片创作功能还在后续规划中。当前更适合用来整理商品图、参考图和商品事实，并承接商品视频生成。"
+        },
+        {
+          "question": "为什么商品图优化要先做资料结构化？",
+          "answer": "跨境商品素材最怕错品和夸大。先把图片、材质、尺寸、卖点和禁用词整理清楚，后续生成视频或图片时更稳定。"
+        }
+      ]
+    },
+    "features-ai-product-image-generator": {
+      "slug": "features/ai-product-image-generator",
+      "title": "AI 商品图生成器规划 - Haitu",
+      "description": "Haitu 将围绕商品参考图、材质、尺寸和可信卖点建设 AI 商品图生成能力，当前先支持商品图资料整理和视频生成工作流。",
+      "h1": "AI 商品图生成器规划",
+      "eyebrow": "图片创作能力逐步接入",
+      "lead": "图片创作功能还没完整上线。当前可以先把商品参考图、材质、尺寸和卖点整理进 Haitu，用于商品视频生成；后续会继续接入主图、场景图和广告图生成。",
+      "primaryCta": "先整理商品图",
+      "secondaryCta": "查看视频生成",
+      "sections": [
+        {
+          "heading": "先把图片生成需要的资料准备好",
+          "body": "商品图生成不是单纯画一张图，而是要依赖商品原图、参考图、材质、尺寸、使用场景和禁用表达。",
+          "bullets": [
+            "参考图沉淀",
+            "商品事实约束",
+            "场景需求整理",
+            "图片创作准备"
+          ]
+        },
+        {
+          "heading": "不把未上线能力包装成已完成",
+          "body": "Haitu 当前重点是图片素材整理和商品视频生成；等图片创作功能上线后，这个页面会升级为完整生成器入口。",
+          "bullets": [
+            "当前支持资料整理",
+            "当前支持视频生成",
+            "后续主图生成",
+            "后续广告图扩展"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "现在能直接生成商品图吗？",
+          "answer": "完整图片创作功能还没上线。当前建议先使用商品资料和参考图整理能力，并进入商品视频生成流程。"
+        },
+        {
+          "question": "为什么还保留这个 SEO 页面？",
+          "answer": "因为图片创作是 Haitu 的明确路线。页面会提前解释能力边界，并承接对商品图优化和后续图片生成有需求的用户。"
+        }
+      ]
+    },
+    "features-image-to-product-video": {
+      "slug": "features/image-to-product-video",
+      "title": "商品图片转视频 - Haitu",
+      "description": "上传商品图、参考图和卖点，把静态商品图片延展为跨境电商短视频脚本、分镜和成片素材。",
+      "h1": "商品图片转视频",
+      "eyebrow": "从静态商品图到短视频素材",
+      "lead": "把商品原图、参考图和可信卖点作为输入，生成适合 TikTok Shop、Amazon、Shopee、Shopify 等平台的商品短视频素材。",
+      "primaryCta": "用商品图做视频",
+      "secondaryCta": "查看批量生成",
+      "sections": [
+        {
+          "heading": "图片不是孤立素材，而是视频创作输入",
+          "body": "Haitu 会结合商品图、卖点、使用场景和平台比例，生成更适合短视频货架和广告投放的脚本与镜头结构。",
+          "bullets": [
+            "商品图输入",
+            "参考图输入",
+            "卖点约束",
+            "短视频脚本"
+          ]
+        },
+        {
+          "heading": "适合跨境团队批量处理 SKU",
+          "body": "当商品库里有大量相似 SKU 时，可以用统一工作流沉淀图片、事实和视频需求，减少重复整理。",
+          "bullets": [
+            "批量 SKU",
+            "统一资料包",
+            "多平台比例",
+            "审核发布流程"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "图片转视频需要提供哪些信息？",
+          "answer": "建议提供商品原图、参考图、标题、材质尺寸、卖点、使用场景和禁用表达。信息越清楚，视频越稳定。"
+        },
+        {
+          "question": "适合 TikTok Shop 吗？",
+          "answer": "适合。Haitu 的视频流程会围绕短视频平台的脚本、镜头和比例需求组织商品素材。"
+        }
+      ]
+    },
+    "features-product-copy-generator": {
+      "slug": "features/product-copy-generator",
+      "title": "AI 商品文案生成器 - Haitu",
+      "description": "为跨境电商商品批量生成多语言标题、卖点、描述、广告脚本和短视频字幕。",
+      "h1": "AI 商品文案生成器",
+      "eyebrow": "多语言标题、卖点和脚本",
+      "lead": "把原始商品资料整理成不同市场可用的标题、描述、卖点、短视频脚本和广告 CTA。",
+      "primaryCta": "生成商品文案",
+      "secondaryCta": "查看批量生成"
+    },
+    "features-batch-product-creative-generation": {
+      "slug": "features/batch-product-creative-generation",
+      "title": "批量商品素材生成 - Haitu",
+      "description": "导入商品图、参考图或商品资料，批量优化跨境电商商品图并生成商品视频素材。",
+      "h1": "批量商品图片优化与视频生成",
+      "eyebrow": "从商品图库到整批视频素材",
+      "lead": "适合有大量 SKU 的跨境团队，把商品图、参考图和资料导入后统一优化图片、生成视频、审核和发布。",
+      "primaryCta": "批量处理素材",
+      "secondaryCta": "了解工作流"
+    },
+    "features-hosted-ai-models": {
+      "slug": "features/hosted-ai-models",
+      "title": "平台 AI 模型托管 - Haitu",
+      "description": "无需自己申请和维护模型 API，直接使用 Haitu 提供的平台文本和视频模型组合完成商品素材创作，并为后续图片创作模型预留统一配置。",
+      "h1": "平台 AI 模型托管",
+      "eyebrow": "不用先配置 API Key",
+      "lead": "适合轻量团队和刚开始测试的跨境卖家，直接选择 Haitu 已接入的平台模型，用于商品资料整理、视频脚本、商品视频和后续图片创作能力。",
+      "primaryCta": "使用平台模型",
+      "secondaryCta": "查看自有模型",
+      "sections": [
+        {
+          "heading": "省掉模型账号和 Key 维护",
+          "body": "团队可以先用平台模型跑通商品素材工作流，不必一开始就申请多个模型服务商账号。",
+          "bullets": [
+            "平台托管 Key",
+            "模型组合选择",
+            "统一计费入口",
+            "快速开始测试"
+          ]
+        },
+        {
+          "heading": "覆盖文本、图片和视频工作流",
+          "body": "从商品整理、脚本分镜到视频生成，平台模型提供默认能力；图片创作模块上线后也会继续纳入同一套配置。",
+          "bullets": [
+            "文本模型",
+            "视频模型",
+            "图片模型路线",
+            "团队工作流"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "平台模型和自有模型有什么区别？",
+          "answer": "平台模型更省心，不需要自己配置 Key；自有模型适合已有 API 账号、成本控制或私有工作流要求更高的团队。"
+        },
+        {
+          "question": "以后可以切换到自有模型吗？",
+          "answer": "可以。Haitu 的模型服务配置会同时支持平台托管和自带 API 两种模式。"
+        }
+      ]
+    },
+    "features-bring-your-own-model": {
+      "slug": "features/bring-your-own-model",
+      "title": "自有 AI 模型接入 - Haitu",
+      "description": "跨境电商团队可以在 Haitu 接入自己的模型 API，把商品资料整理、视频生成和后续图片创作纳入统一工作流。",
+      "h1": "自有 AI 模型接入",
+      "eyebrow": "BYOK 和自有模型工作流",
+      "lead": "已有模型账号或内部管线的团队，可以把自己的文本、图片、视频模型接入 Haitu，在同一套商品素材流程里控制成本、模型版本和生成策略。",
+      "primaryCta": "接入自有模型",
+      "secondaryCta": "查看平台模型",
+      "sections": [
+        {
+          "heading": "适合已有技术和模型资源的团队",
+          "body": "如果团队已经在使用 OpenAI、火山、其他图片或视频模型，可以把 Key 和模型组合放进统一配置。",
+          "bullets": [
+            "自带 API Key",
+            "模型版本管理",
+            "成本归属清晰",
+            "团队策略可控"
+          ]
+        },
+        {
+          "heading": "不改变商品素材工作流",
+          "body": "无论使用平台模型还是自有模型，前台仍然围绕商品资料、参考图、脚本、视频和审核发布组织流程。",
+          "bullets": [
+            "资料整理",
+            "脚本生成",
+            "视频生成",
+            "后续图片创作"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "自有模型会替代平台模型吗？",
+          "answer": "不会。两种模式并存，团队可以按成本、质量和管理要求选择。"
+        },
+        {
+          "question": "用户上传的商品语言会被自动改掉吗？",
+          "answer": "不会。商品资料和用户输入内容保持原语言，网站界面多语言只翻译产品 UI 和营销页面。"
+        }
+      ]
+    },
+    "platforms-tiktok-shop": {
+      "slug": "platforms/tiktok-shop",
+      "title": "TikTok Shop 商品素材生成 - Haitu",
+      "description": "为 TikTok Shop 卖家整理商品图、生成商品短视频、标题、卖点、描述和多语言广告脚本。",
+      "h1": "TikTok Shop 商品素材生成",
+      "eyebrow": "适配内容电商的商品创意",
+      "lead": "Haitu 把商品资料转成 TikTok Shop 可用的短视频脚本、商品图优化需求、广告卖点和本地化文案。",
+      "primaryCta": "生成 TikTok Shop 素材",
+      "secondaryCta": "查看标题工具"
+    },
+    "platforms-amazon": {
+      "slug": "platforms/amazon",
+      "title": "Amazon 商品图与视频生成 - Haitu",
+      "description": "为亚马逊卖家优化商品图，并生成视频脚本、卖点描述和多语言 Listing 创意素材。",
+      "h1": "Amazon 商品图优化与视频生成",
+      "eyebrow": "为 Listing 和广告准备商品素材",
+      "lead": "从商品事实和参考图出发，准备适合 Amazon Listing、A+ 内容和站外广告的图文视频素材。",
+      "primaryCta": "生成 Amazon 素材",
+      "secondaryCta": "查看商品文案"
+    },
+    "platforms-shopee": {
+      "slug": "platforms/shopee",
+      "title": "Shopee 商品图片与视频素材生成 - Haitu",
+      "description": "为 Shopee 跨境卖家整理商品图、卖点和参考图，并生成适合商品详情和广告投放的短视频素材。",
+      "h1": "Shopee 商品图片与视频素材生成",
+      "eyebrow": "适配东南亚电商素材需求",
+      "lead": "围绕 Shopee 商品上架和广告素材，把商品图、卖点、使用场景和视频脚本放进一个工作流，帮助团队批量处理 SKU。",
+      "primaryCta": "生成 Shopee 素材",
+      "secondaryCta": "查看批量生成"
+    },
+    "platforms-shopify": {
+      "slug": "platforms/shopify",
+      "title": "Shopify 商品图片与视频素材生成 - Haitu",
+      "description": "为 Shopify 独立站商品页和广告投放整理商品图、卖点、视频脚本和多语言素材。",
+      "h1": "Shopify 商品图片与视频素材生成",
+      "eyebrow": "为独立站商品页准备素材",
+      "lead": "从商品事实和参考图出发，为 Shopify 商品页、广告落地页和短视频投放准备更一致的图片、文案和视频素材。",
+      "primaryCta": "生成 Shopify 素材",
+      "secondaryCta": "查看商品标题工具"
+    },
+    "tools-product-title-generator": {
+      "slug": "tools/product-title-generator",
+      "title": "AI 商品标题生成器 - Haitu",
+      "description": "输入商品资料和目标市场，生成适合跨境电商平台的多语言商品标题。",
+      "h1": "AI 商品标题生成器",
+      "eyebrow": "先从标题拿到精准流量",
+      "lead": "把商品名称、类目、材质、卖点和目标语言整理成更适合搜索和转化的商品标题。",
+      "primaryCta": "生成商品标题",
+      "secondaryCta": "继续生成视频脚本"
+    },
+    "tools-product-video-script-generator": {
+      "slug": "tools/product-video-script-generator",
+      "title": "AI 商品视频脚本生成器 - Haitu",
+      "description": "输入商品资料、卖点和使用场景，为跨境电商短视频生成脚本、分镜和字幕方向。",
+      "h1": "AI 商品视频脚本生成器",
+      "eyebrow": "先把视频逻辑写清楚",
+      "lead": "把商品标题、材质尺寸、卖点、痛点和使用场景整理成短视频脚本和分镜结构，再进入商品视频生成流程。",
+      "primaryCta": "生成视频脚本",
+      "secondaryCta": "继续生成视频",
+      "sections": [
+        {
+          "heading": "脚本先约束卖点和镜头",
+          "body": "商品视频不是随机动效，而是先明确开场、痛点、卖点、使用过程和收尾 CTA。",
+          "bullets": [
+            "开场钩子",
+            "卖点顺序",
+            "镜头分镜",
+            "字幕方向"
+          ]
+        },
+        {
+          "heading": "更适合批量商品视频",
+          "body": "有了统一脚本结构，跨境团队处理大量 SKU 时更容易审核、复用和微调。",
+          "bullets": [
+            "批量 SKU",
+            "模板复用",
+            "多语言改写",
+            "审核更快"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "视频脚本会改掉商品原语言吗？",
+          "answer": "不会强行改掉用户上传的商品资料语言。需要多语言脚本时，应按目标市场单独生成。"
+        },
+        {
+          "question": "脚本可以直接用于生成视频吗？",
+          "answer": "可以作为视频生成的重要输入，并建议结合商品图、参考图和平台比例一起使用。"
+        }
+      ]
+    },
+    "terms": {
+      "slug": "terms",
+      "title": "服务条款 - Haitu",
+      "description": "了解使用 Haitu 商品图片优化、商品视频生成、平台模型和自有模型接入服务时的基本条款。",
+      "h1": "服务条款",
+      "eyebrow": "使用 Haitu 前请阅读",
+      "lead": "本页面说明使用 Haitu 时需要了解的账号责任、余额和 AI 生成服务、禁止用途、内容审核和服务范围。Haitu 是数字化 SaaS 工具，不销售实物商品。",
+      "primaryCta": "进入创作台",
+      "secondaryCta": "查看隐私政策",
+      "sections": [
+        {
+          "heading": "账号、余额和 AI 生成服务",
+          "body": "用户可以在控制台上传和管理商品资料，使用余额调用商品图优化、视频生成、营销脚本整理以及后续 AI 图片创作等数字服务。余额仅用于 Haitu 平台内的数字化 SaaS 服务。",
+          "bullets": [
+            "账号自行保管",
+            "余额用于数字服务",
+            "商品图优化",
+            "视频与脚本生成"
+          ]
+        },
+        {
+          "heading": "禁止用途",
+          "body": "不得使用 Haitu 创建、推广或协助赌博、金融投资、加密货币交易、贷款、成人内容、药品、违法商品、侵权商品或其他受限服务相关内容。",
+          "bullets": [
+            "禁止赌博",
+            "禁止金融投资和贷款",
+            "禁止成人和药品内容",
+            "禁止侵权或违法商品"
+          ]
+        },
+        {
+          "heading": "AI 生成内容需要人工审核",
+          "body": "Haitu 会尽力基于商品事实和用户输入生成素材，但 AI 输出可能存在不准确、夸大或不适合发布的内容，用户发布前应自行审核并遵守目标平台政策。",
+          "bullets": [
+            "检查商品事实",
+            "检查平台政策",
+            "检查版权风险",
+            "保留人工确认"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Haitu 是什么类型的服务？",
+          "answer": "Haitu 是跨境电商 AI 商品图片和视频创作 SaaS 工具，提供数字内容生成和素材管理，不销售实物商品。"
+        },
+        {
+          "question": "AI 生成素材可以直接发布吗？",
+          "answer": "不建议无审核直接发布。用户应结合商品事实、平台规则、广告合规和知识产权风险自行确认。"
+        }
+      ]
+    },
+    "privacy": {
+      "slug": "privacy",
+      "title": "隐私政策 - Haitu",
+      "description": "了解 Haitu 如何处理账号信息、商品资料、参考图片、生成任务、模型配置和支付相关数据。",
+      "h1": "隐私政策",
+      "eyebrow": "数据处理和隐私说明",
+      "lead": "Haitu 会处理用户账号、登录信息、商品资料、参考图片、生成记录、模型配置和支付状态，用于提供商品素材创作、账号管理、计费和安全维护。Haitu 不保存完整银行卡号、微信支付账号或支付宝账号。",
+      "primaryCta": "进入创作台",
+      "secondaryCta": "查看服务条款",
+      "sections": [
+        {
+          "heading": "我们可能处理的数据",
+          "body": "包括账号邮箱、登录和会话信息、工作区信息、商品标题、材质尺寸、卖点、参考图片、生成记录、模型配置、余额流水、支付状态和必要的技术日志。",
+          "bullets": [
+            "邮箱和登录信息",
+            "商品资料和参考图",
+            "生成记录",
+            "支付状态和余额流水"
+          ]
+        },
+        {
+          "heading": "支付信息由支付机构处理",
+          "body": "用户通过 Stripe Checkout 等支付页面完成微信支付、支付宝或银行卡付款。Haitu 只接收订单号、支付状态、金额、币种和入账结果，不保存完整银行卡号、微信支付账号或支付宝账号。",
+          "bullets": [
+            "Stripe Checkout",
+            "不保存完整银行卡号",
+            "不保存微信支付账号",
+            "不保存支付宝账号"
+          ]
+        },
+        {
+          "heading": "用户内容和第三方模型",
+          "body": "当用户选择平台模型或自有模型时，商品资料、参考图片和提示词可能会被发送给相应模型服务商以完成生成任务；用户应避免上传敏感或无权使用的内容。",
+          "bullets": [
+            "平台模型调用",
+            "自有模型调用",
+            "最小必要传输",
+            "避免敏感内容"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "商品图片和资料会被翻译成别的语言吗？",
+          "answer": "网站界面多语言不会自动改变用户上传的商品内容。商品资料保持用户输入的语言，除非用户主动要求生成或改写目标语言内容。"
+        },
+        {
+          "question": "可以要求删除数据吗？",
+          "answer": "用户可以通过联系方式提出数据删除或导出请求。实际处理方式会结合账号状态、账务记录、法律要求和备份周期。"
+        }
+      ]
+    },
+    "refund": {
+      "slug": "refund",
+      "title": "退款说明 - Haitu",
+      "description": "了解 Haitu 充值、余额、模型调用、生成任务失败和退款处理的基础规则。",
+      "h1": "退款说明",
+      "eyebrow": "充值与生成任务处理",
+      "lead": "Haitu 的费用用于商品图优化、视频生成、营销脚本整理、模型调用和平台服务。用户通过 Stripe Checkout 使用微信支付、支付宝或银行卡付款后，余额入账并用于数字化 SaaS 服务。",
+      "primaryCta": "查看充值中心",
+      "secondaryCta": "联系我们",
+      "sections": [
+        {
+          "heading": "未使用余额可联系客服处理退款",
+          "body": "如果充值后余额尚未使用，用户可以通过客服邮箱申请人工退款审核。实际退款路径取决于 Stripe 等支付渠道、手续费、账户状态和风控要求。",
+          "bullets": [
+            "未使用余额",
+            "人工审核",
+            "支付渠道限制",
+            "账户状态核验"
+          ]
+        },
+        {
+          "heading": "已消耗的 AI 生成服务一般不可退",
+          "body": "一旦任务已经调用第三方模型或消耗平台资源，相关图片优化、视频生成和脚本整理服务通常不可按未使用余额退款；系统异常或重复扣费可联系客服核查。",
+          "bullets": [
+            "模型调用成本",
+            "已消耗服务一般不可退",
+            "任务失败核查",
+            "重复扣费处理"
+          ]
+        },
+        {
+          "heading": "先联系客服核对记录",
+          "body": "退款或余额调整前，请提供账号邮箱、支付记录、任务编号和问题描述，方便核对生成记录与账务流水。",
+          "bullets": [
+            "账号邮箱",
+            "支付记录",
+            "任务编号",
+            "问题描述"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "生成效果不满意一定能退款吗？",
+          "answer": "不一定。AI 生成存在不确定性，已产生模型调用成本的任务需要根据失败原因、扣费记录和平台规则单独判断。"
+        },
+        {
+          "question": "重复扣费怎么办？",
+          "answer": "如果出现重复扣费或系统异常，请联系客服并提供账号、时间、支付记录和任务编号，团队会核对后处理。"
+        }
+      ]
+    },
+    "contact": {
+      "slug": "contact",
+      "title": "联系方式 - Haitu",
+      "description": "联系 Haitu 团队，反馈商品图片优化、商品视频生成、模型接入、充值和账号相关问题。",
+      "h1": "联系方式",
+      "eyebrow": "产品支持与商务合作",
+      "lead": "如需咨询商品素材创作、视频生成、模型接入、充值账单、退款或账号使用问题，请联系 Haitu 团队。业务名称：Haitu；网站地址：https://haitu.online；客服邮箱：support@haitu.online。",
+      "primaryCta": "进入创作台",
+      "secondaryCta": "查看退款说明",
+      "sections": [
+        {
+          "heading": "联系方式",
+          "body": "业务名称：Haitu。网站地址：https://haitu.online。客服邮箱：support@haitu.online。请不要通过邮件发送密码、验证码、完整 API Key 或完整支付账号。",
+          "bullets": [
+            "Haitu",
+            "https://haitu.online",
+            "support@haitu.online",
+            "不要发送敏感凭证"
+          ]
+        },
+        {
+          "heading": "支持请求请带上关键信息",
+          "body": "为了更快定位问题，建议提供账号邮箱、工作区、商品 SKU、任务编号、支付记录或截图，以及你期望解决的问题。",
+          "bullets": [
+            "账号邮箱",
+            "商品 SKU",
+            "任务编号",
+            "问题截图"
+          ]
+        },
+        {
+          "heading": "适合联系的场景",
+          "body": "包括账号登录、充值余额、退款咨询、生成失败、模型配置、平台模型、自有模型接入、批量素材流程和商务合作。",
+          "bullets": [
+            "账号和充值",
+            "退款和账单",
+            "生成任务",
+            "模型接入"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "联系客服需要提供密码或 API Key 吗？",
+          "answer": "不需要。请不要通过聊天或邮件发送密码、验证码、完整 API Key 等敏感信息。"
+        },
+        {
+          "question": "可以咨询自有模型接入吗？",
+          "answer": "可以。请说明你使用的模型服务商、模型类型、预期调用方式和团队工作流。"
+        }
+      ]
+    },
+    "use-cases-cross-border-ecommerce": {
+      "slug": "use-cases/cross-border-ecommerce",
+      "title": "跨境电商 AI 商品素材工作流 - Haitu",
+      "description": "面向跨境电商团队，用 Haitu 管理商品资料、优化商品图、整理营销脚本并批量生成商品短视频。",
+      "h1": "跨境电商 AI 商品素材工作流",
+      "eyebrow": "从商品资料到图文视频素材",
+      "lead": "从商品资料、商品图、卖点和参考图出发，把跨境电商团队常见的标题、图片优化、脚本分镜和短视频素材放进同一套 AI 工作流。",
+      "primaryCta": "开始整理商品素材",
+      "secondaryCta": "查看 TikTok Shop 场景",
+      "sections": [
+        {
+          "heading": "先统一商品资料和素材输入",
+          "body": "把商品原图、参考图、标题、类目、材质、尺寸、卖点和禁用表达沉淀成资料包，减少多人协作时的信息断层。",
+          "bullets": [
+            "商品资料包",
+            "参考图管理",
+            "卖点约束",
+            "禁用表达"
+          ]
+        },
+        {
+          "heading": "再进入图片、脚本和视频产出",
+          "body": "Haitu 会围绕商品事实生成标题方向、商品图优化需求、短视频脚本、分镜和商品视频素材，适合多平台上新节奏。",
+          "bullets": [
+            "商品图优化",
+            "标题和卖点",
+            "脚本分镜",
+            "商品视频"
+          ]
+        },
+        {
+          "heading": "适配平台模型和自有模型",
+          "body": "轻量团队可以使用平台模型快速开始；已有模型账号或内部管线的团队，也可以接入自有模型继续使用同一套工作流。",
+          "bullets": [
+            "平台模型",
+            "自有模型",
+            "余额扣费",
+            "团队审核"
+          ]
+        }
+      ]
+    },
+    "use-cases-tiktok-shop-product-video": {
+      "slug": "use-cases/tiktok-shop-product-video",
+      "title": "TikTok Shop 商品视频制作工作流 - Haitu",
+      "description": "用商品图、卖点和参考图为 TikTok Shop 卖家生成短视频脚本、分镜、本地化卖点和商品视频素材。",
+      "h1": "TikTok Shop 商品视频制作工作流",
+      "eyebrow": "适合内容电商的商品短视频",
+      "lead": "把 TikTok Shop 商品资料、参考图、核心卖点和目标市场表达整理清楚，再生成短视频脚本、分镜、本地化卖点和商品视频素材。",
+      "primaryCta": "生成 TikTok Shop 视频",
+      "secondaryCta": "查看跨境电商场景",
+      "sections": [
+        {
+          "heading": "围绕内容电商组织卖点",
+          "body": "把商品痛点、使用场景、开场钩子、卖点顺序和 CTA 先整理成脚本结构，让视频不只是随机画面运动。",
+          "bullets": [
+            "开场钩子",
+            "痛点场景",
+            "卖点顺序",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "商品图和参考图参与视频创作",
+          "body": "商品原图、细节图和参考图会作为视频创作输入，帮助保持产品外观、材质和使用场景的一致性。",
+          "bullets": [
+            "商品原图",
+            "细节图",
+            "参考图",
+            "视频比例"
+          ]
+        },
+        {
+          "heading": "发布前按平台规则复核",
+          "body": "AI 结果上线前，仍需要卖家检查商品事实、平台规则、广告表达、知识产权和本地合规要求。",
+          "bullets": [
+            "事实审核",
+            "广告合规",
+            "平台规则",
+            "本地表达"
+          ]
+        }
+      ]
+    },
+    "use-cases-amazon-product-image-optimization": {
+      "slug": "use-cases/amazon-product-image-optimization",
+      "title": "Amazon 商品图优化与视频素材 - Haitu",
+      "description": "为 Amazon Listing、A+ 内容和站外广告整理商品图、参考图、卖点、脚本和短视频素材。",
+      "h1": "Amazon 商品图优化与视频素材",
+      "eyebrow": "为 Listing 和广告准备可信素材",
+      "lead": "围绕 Amazon Listing、A+ 内容和站外广告，把商品图、参考图、卖点、描述方向和短视频素材放进可审核的 AI 工作流。",
+      "primaryCta": "准备 Amazon 素材",
+      "secondaryCta": "查看商品图优化",
+      "sections": [
+        {
+          "heading": "先把 Listing 素材事实整理好",
+          "body": "沉淀商品主图、细节图、材质、尺寸、卖点和禁用表达，让后续图片优化和视频脚本更贴近真实商品。",
+          "bullets": [
+            "主图事实",
+            "细节图",
+            "材质尺寸",
+            "卖点约束"
+          ]
+        },
+        {
+          "heading": "连接 A+ 内容和站外广告",
+          "body": "同一套商品资料可以继续用于图片优化需求、文案方向、视频脚本和短视频素材，减少重复整理。",
+          "bullets": [
+            "A+ 内容",
+            "站外广告",
+            "视频脚本",
+            "短视频素材"
+          ]
+        },
+        {
+          "heading": "不替代 Amazon 规则审核",
+          "body": "Haitu 帮助准备素材，不承诺平台审核结果。发布前仍应按 Amazon 图片、文案、类目和广告政策检查。",
+          "bullets": [
+            "图片规则",
+            "类目限制",
+            "广告声明",
+            "人工审核"
+          ]
+        }
+      ]
+    },
+    "use-cases-fashion-product-video": {
+      "slug": "use-cases/fashion-product-video",
+      "title": "服饰商品短视频生成场景 - Haitu",
+      "description": "为服饰类商品整理款式、材质、尺码、穿搭场景和参考图，生成商品短视频脚本和视频素材。",
+      "h1": "服饰商品短视频生成场景",
+      "eyebrow": "款式、材质和穿搭场景",
+      "lead": "面向服饰、配饰和鞋包等商品，把款式、材质、尺码、细节图、穿搭场景和卖点整理成短视频脚本与商品视频素材。",
+      "primaryCta": "生成服饰商品视频",
+      "secondaryCta": "查看图片转视频",
+      "sections": [
+        {
+          "heading": "突出款式和细节",
+          "body": "先记录款式、版型、材质、颜色、尺码和细节图，帮助视频脚本围绕真实商品卖点展开。",
+          "bullets": [
+            "款式版型",
+            "材质颜色",
+            "尺码信息",
+            "细节图"
+          ]
+        },
+        {
+          "heading": "围绕穿搭和使用场景生成脚本",
+          "body": "适合生成开场钩子、穿搭场景、卖点顺序、字幕方向和短视频镜头结构。",
+          "bullets": [
+            "穿搭场景",
+            "开场钩子",
+            "字幕方向",
+            "镜头结构"
+          ]
+        },
+        {
+          "heading": "保持图片和视频一致",
+          "body": "AI 视频输出仍需人工检查款式、颜色、花纹、材质和品牌表达，避免错品或夸大。",
+          "bullets": [
+            "颜色核对",
+            "花纹一致",
+            "材质审核",
+            "品牌表达"
+          ]
+        }
+      ]
+    },
+    "use-cases-home-goods-product-video": {
+      "slug": "use-cases/home-goods-product-video",
+      "title": "家居商品图片转视频场景 - Haitu",
+      "description": "为家居、收纳、厨房和生活用品整理商品图、尺寸、材质、使用场景并生成短视频脚本和视频素材。",
+      "h1": "家居商品图片转视频场景",
+      "eyebrow": "尺寸、材质和使用场景",
+      "lead": "面向家居、收纳、厨房和生活用品，把商品图、尺寸、材质、使用方法和场景参考整理成短视频脚本、分镜和视频素材。",
+      "primaryCta": "生成家居商品视频",
+      "secondaryCta": "查看批量素材生成",
+      "sections": [
+        {
+          "heading": "把尺寸和材质讲清楚",
+          "body": "家居类商品常依赖尺寸、容量、材质和使用方式。Haitu 会先整理这些事实，再进入脚本和视频生成。",
+          "bullets": [
+            "尺寸容量",
+            "材质说明",
+            "使用方式",
+            "场景参考"
+          ]
+        },
+        {
+          "heading": "从使用场景出发做视频",
+          "body": "围绕收纳前后、厨房操作、居家布置和问题解决场景，生成更容易理解的短视频结构。",
+          "bullets": [
+            "收纳前后",
+            "厨房操作",
+            "居家布置",
+            "问题解决"
+          ]
+        },
+        {
+          "heading": "适合批量 SKU 工作流",
+          "body": "同一类家居商品可以共用脚本模板和审核流程，再根据尺寸、颜色、材质和用途差异调整。",
+          "bullets": [
+            "批量 SKU",
+            "脚本模板",
+            "差异卖点",
+            "审核复用"
+          ]
+        }
+      ]
+    },
+    "use-cases-beauty-product-short-video": {
+      "slug": "use-cases/beauty-product-short-video",
+      "title": "美妆个护商品短视频场景 - Haitu",
+      "description": "为美妆个护商品整理卖点、使用步骤、质地、适用场景和合规表达，生成短视频脚本和商品视频素材。",
+      "h1": "美妆个护商品短视频场景",
+      "eyebrow": "步骤、质地和合规表达",
+      "lead": "面向美妆、护肤和个护商品，把产品卖点、使用步骤、质地、适用场景和禁用表达整理成短视频脚本和商品视频素材。",
+      "primaryCta": "生成美妆商品视频",
+      "secondaryCta": "查看视频脚本工具",
+      "sections": [
+        {
+          "heading": "先整理卖点和禁用表达",
+          "body": "美妆个护内容需要谨慎表达功效、适用人群和使用方式。Haitu 会把可信卖点和禁用表达分开管理。",
+          "bullets": [
+            "可信卖点",
+            "禁用表达",
+            "使用步骤",
+            "适用场景"
+          ]
+        },
+        {
+          "heading": "脚本围绕步骤和体验展开",
+          "body": "适合生成开场、质地展示、使用步骤、场景说明、字幕方向和 CTA，不把未经验证的功效写成承诺。",
+          "bullets": [
+            "质地展示",
+            "步骤说明",
+            "字幕方向",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "发布前保留人工审核",
+          "body": "AI 输出不能替代广告合规和平台审核。发布前应检查功效表述、敏感词、平台规则和知识产权。",
+          "bullets": [
+            "功效审核",
+            "敏感词",
+            "平台规则",
+            "知识产权"
+          ]
+        }
+      ]
+    },
+    "platforms-lazada": {
+      "slug": "platforms/lazada",
+      "title": "Lazada 商品图片与视频素材生成 - Haitu",
+      "description": "为 Lazada 卖家整理商品图、卖点、参考图、本地化标题和短视频脚本，准备东南亚电商商品页、广告素材和短视频内容。",
+      "h1": "Lazada 商品图片与视频素材生成",
+      "eyebrow": "适配东南亚电商素材需求",
+      "lead": "围绕 Lazada 商品详情、广告投放和短视频内容，把商品图、参考图、卖点、目标市场语言和视频脚本放进同一套 AI 商品素材工作流。",
+      "primaryCta": "生成 Lazada 素材",
+      "secondaryCta": "查看 Shopee 素材",
+      "sections": [
+        {
+          "heading": "为东南亚电商商品页准备素材",
+          "body": "把商品主图、细节图、场景参考、标题、材质、尺寸和卖点整理成资料包，服务 Lazada 商品详情页和广告素材制作。",
+          "bullets": [
+            "商品图整理",
+            "本地化卖点",
+            "广告素材方向",
+            "详情页内容"
+          ]
+        },
+        {
+          "heading": "连接脚本和短视频生成",
+          "body": "Haitu 会围绕真实商品事实生成短视频脚本、分镜和商品视频素材，减少团队重复整理 SKU 信息的时间。",
+          "bullets": [
+            "视频脚本",
+            "分镜结构",
+            "商品短视频",
+            "批量 SKU"
+          ]
+        },
+        {
+          "heading": "发布前保留平台审核",
+          "body": "AI 输出不能替代 Lazada 平台规则和本地合规审核，发布前仍需检查商品事实、广告表达、知识产权和目标市场语言。",
+          "bullets": [
+            "商品事实",
+            "平台规则",
+            "广告合规",
+            "本地语言"
+          ]
+        }
+      ]
+    },
+    "platforms-etsy": {
+      "slug": "platforms/etsy",
+      "title": "Etsy 商品图片与视频素材工作流 - Haitu",
+      "description": "为 Etsy 手工、复古和个性化商品整理商品图、材质、工艺、标题卖点、脚本和短视频素材。",
+      "h1": "Etsy 商品图片与视频素材工作流",
+      "eyebrow": "手工、复古和个性化商品素材",
+      "lead": "从商品事实、参考图、材质、工艺、尺寸和个性化选项出发，为 Etsy 商品页、社媒内容和短视频展示准备更可信的图片、文案和视频素材。",
+      "primaryCta": "生成 Etsy 素材",
+      "secondaryCta": "查看商品标题工具",
+      "sections": [
+        {
+          "heading": "突出真实材质和工艺细节",
+          "body": "Etsy 商品通常依赖材质、制作工艺、尺寸、使用场景和个性化说明。Haitu 会先整理这些事实，再进入图片优化和脚本生成。",
+          "bullets": [
+            "材质工艺",
+            "尺寸细节",
+            "个性化选项",
+            "使用场景"
+          ]
+        },
+        {
+          "heading": "从商品故事到短视频脚本",
+          "body": "将商品来源、制作细节、礼物场景和买家关注点整理成标题、卖点、视频脚本和短视频素材方向。",
+          "bullets": [
+            "商品故事",
+            "礼物场景",
+            "标题卖点",
+            "短视频脚本"
+          ]
+        },
+        {
+          "heading": "避免生成内容偏离实物",
+          "body": "AI 素材发布前仍需卖家核对外观、颜色、材质、版权和 Etsy 平台规则，确保展示与真实商品一致。",
+          "bullets": [
+            "外观核对",
+            "颜色材质",
+            "版权风险",
+            "平台规则"
+          ]
+        }
+      ]
+    },
+    "compare-ai-product-video-generator-vs-general-video-generator": {
+      "slug": "compare/ai-product-video-generator-vs-general-video-generator",
+      "title": "AI 商品视频生成器和普通视频生成器对比 - Haitu",
+      "description": "了解 Haitu 这类 AI 商品视频生成器与普通 AI 视频生成器在商品资料、脚本、平台素材和审核流程上的差异。",
+      "h1": "AI 商品视频生成器和普通视频生成器对比",
+      "eyebrow": "商品事实驱动，不只是生成画面",
+      "lead": "普通 AI 视频生成器适合泛创意和娱乐画面；Haitu 面向跨境电商商品素材，会围绕 SKU、商品图、参考图、卖点、脚本和平台规则组织视频生成流程。",
+      "primaryCta": "生成商品视频",
+      "secondaryCta": "查看图片转视频",
+      "sections": [
+        {
+          "heading": "输入不同：商品资料比提示词更重要",
+          "body": "商品视频需要准确的商品图、材质、尺寸、卖点、禁用表达和目标平台信息，而不只是几句通用提示词。",
+          "bullets": [
+            "SKU 信息",
+            "商品图和参考图",
+            "卖点约束",
+            "平台比例"
+          ]
+        },
+        {
+          "heading": "输出不同：服务商品页和广告转化",
+          "body": "Haitu 的输出围绕商品图优化、短视频脚本、分镜、字幕方向和商品视频素材，适合电商上新和广告素材准备。",
+          "bullets": [
+            "图片优化",
+            "脚本分镜",
+            "字幕方向",
+            "商品短视频"
+          ]
+        },
+        {
+          "heading": "审核不同：保留商品事实和平台规则",
+          "body": "Haitu 不承诺跳过审核。AI 输出发布前仍要检查商品真实性、平台政策、广告合规和知识产权。",
+          "bullets": [
+            "事实检查",
+            "平台政策",
+            "广告合规",
+            "知识产权"
+          ]
+        }
+      ]
+    },
+    "compare-haitu-vs-canva-for-product-video": {
+      "slug": "compare/haitu-vs-canva-for-product-video",
+      "title": "Haitu 和 Canva 商品视频工作流对比 - Haitu",
+      "description": "对比 Haitu 和 Canva 在电商商品视频工作流中的差异，从商品事实、参考图、脚本、模型工作流到最终设计编辑。",
+      "h1": "Haitu 和 Canva 商品视频工作流对比",
+      "eyebrow": "商品素材工作流和通用设计空间",
+      "lead": "Canva 适合通用设计、模板排版和品牌视觉整理；Haitu 更关注商品事实、参考图片、脚本、模型工作流和电商商品视频生成，适合需要从 SKU 资料生成商品创意素材的团队。",
+      "primaryCta": "生成商品视频",
+      "secondaryCta": "查看视频脚本工具",
+      "sections": [
+        {
+          "heading": "Canva 适合广泛的视觉设计",
+          "body": "Canva 常用于模板、品牌排版、演示文稿、社媒图片和多类型内容的人工视觉编排。",
+          "bullets": [
+            "模板设计",
+            "品牌排版",
+            "社媒图片",
+            "人工设计编辑"
+          ]
+        },
+        {
+          "heading": "Haitu 从商品事实开始",
+          "body": "Haitu 把商品图、参考图、材质、卖点、禁用表达、脚本、模型配置和电商视频生成放进同一套商品素材工作流。",
+          "bullets": [
+            "商品事实",
+            "参考图片",
+            "视频脚本",
+            "模型工作流"
+          ]
+        },
+        {
+          "heading": "按阶段选择合适工具",
+          "body": "团队可以用 Haitu 先生成商品脚本、图片优化需求和视频素材，再按品牌规范进入设计工具做最后排版或人工微调。",
+          "bullets": [
+            "从 SKU 生成",
+            "审核 AI 输出",
+            "设计收尾",
+            "平台发布"
+          ]
+        }
+      ]
+    },
+    "compare-haitu-vs-manual-product-video-production": {
+      "slug": "compare/haitu-vs-manual-product-video-production",
+      "title": "Haitu 和人工商品视频制作流程对比 - Haitu",
+      "description": "了解 Haitu 与人工商品视频制作在批量 SKU、脚本整理、视频素材、成本节奏和人工审核上的分工。",
+      "h1": "Haitu 和人工商品视频制作流程对比",
+      "eyebrow": "批量效率和人工把关结合",
+      "lead": "人工制作适合强定制、高预算和真实拍摄项目；Haitu 更适合跨境团队先把大量 SKU 的商品图、卖点、脚本和短视频素材批量结构化，再由团队审核和精修。",
+      "primaryCta": "批量生成商品视频",
+      "secondaryCta": "查看批量素材生成",
+      "sections": [
+        {
+          "heading": "人工制作适合重点项目",
+          "body": "高预算品牌片、复杂场景拍摄、真人出镜和重后期项目，仍然更适合专业人工团队主导。",
+          "bullets": [
+            "真实拍摄",
+            "复杂后期",
+            "品牌大片",
+            "高定制项目"
+          ]
+        },
+        {
+          "heading": "Haitu 适合日常批量上新",
+          "body": "当团队需要处理大量 SKU、快速整理卖点、脚本和短视频素材时，Haitu 可以先完成资料结构化和初版生成。",
+          "bullets": [
+            "批量 SKU",
+            "脚本分镜",
+            "商品图输入",
+            "初版视频"
+          ]
+        },
+        {
+          "heading": "最终质量仍靠人工审核",
+          "body": "Haitu 的价值是减少重复整理和初稿制作，发布前仍应由团队检查商品事实、平台规则、视觉质量和广告合规。",
+          "bullets": [
+            "人工审核",
+            "事实核对",
+            "平台规则",
+            "视觉精修"
+          ]
+        }
+      ]
+    },
+    "categories-apparel-product-video": {
+      "slug": "categories/apparel-product-video",
+      "title": "服饰商品短视频生成 - Haitu",
+      "description": "为服饰、配饰和鞋包商品整理款式、版型、材质、颜色、尺码、细节图和穿搭场景，生成商品短视频脚本和视频素材。",
+      "h1": "服饰商品短视频生成",
+      "eyebrow": "款式、尺码和穿搭场景",
+      "lead": "面向服饰、配饰和鞋包卖家，把款式、版型、材质、颜色、尺码、细节图和穿搭场景整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成服饰商品视频",
+      "secondaryCta": "查看图片转视频",
+      "sections": [
+        {
+          "heading": "先整理款式和尺码事实",
+          "body": "把版型、材质、颜色、尺码、细节图和禁用表达放进商品资料包，减少视频脚本和画面偏离真实商品。",
+          "bullets": [
+            "款式版型",
+            "材质颜色",
+            "尺码信息",
+            "细节图"
+          ]
+        },
+        {
+          "heading": "围绕穿搭和场景生成脚本",
+          "body": "适合生成开场钩子、穿搭场景、卖点顺序、字幕方向和短视频镜头结构。",
+          "bullets": [
+            "穿搭场景",
+            "开场钩子",
+            "卖点顺序",
+            "字幕方向"
+          ]
+        },
+        {
+          "heading": "保留颜色和款式人工审核",
+          "body": "AI 输出仍需人工检查颜色、花纹、款式、材质和品牌表达，避免错品或夸大。",
+          "bullets": [
+            "颜色核对",
+            "花纹一致",
+            "材质审核",
+            "品牌表达"
+          ]
+        }
+      ]
+    },
+    "categories-home-goods-product-video": {
+      "slug": "categories/home-goods-product-video",
+      "title": "家居商品图片转视频 - Haitu",
+      "description": "为家居、收纳和生活用品整理商品图、尺寸、容量、材质、使用场景并生成短视频脚本和视频素材。",
+      "h1": "家居商品图片转视频",
+      "eyebrow": "尺寸、容量和使用场景",
+      "lead": "面向家居、收纳和生活用品，把商品图、尺寸、容量、材质、使用方法和场景参考整理成短视频脚本、分镜和视频素材。",
+      "primaryCta": "生成家居商品视频",
+      "secondaryCta": "查看批量素材生成",
+      "sections": [
+        {
+          "heading": "把尺寸和材质讲清楚",
+          "body": "家居商品常依赖尺寸、容量、材质和使用方式。Haitu 会先整理这些事实，再进入脚本和视频生成。",
+          "bullets": [
+            "尺寸容量",
+            "材质说明",
+            "使用方式",
+            "场景参考"
+          ]
+        },
+        {
+          "heading": "从使用场景出发做视频",
+          "body": "围绕收纳前后、居家布置和问题解决场景，生成更容易理解的短视频结构。",
+          "bullets": [
+            "收纳前后",
+            "居家布置",
+            "问题解决",
+            "视频分镜"
+          ]
+        },
+        {
+          "heading": "适合批量 SKU 模板复用",
+          "body": "同一类家居商品可以共用脚本模板和审核流程，再根据尺寸、颜色、材质和用途差异调整。",
+          "bullets": [
+            "批量 SKU",
+            "脚本模板",
+            "差异卖点",
+            "审核复用"
+          ]
+        }
+      ]
+    },
+    "categories-beauty-product-video": {
+      "slug": "categories/beauty-product-video",
+      "title": "美妆个护商品短视频生成 - Haitu",
+      "description": "为美妆个护商品整理可信卖点、使用步骤、质地、适用场景和禁用表达，生成短视频脚本和商品视频素材。",
+      "h1": "美妆个护商品短视频生成",
+      "eyebrow": "步骤、质地和合规表达",
+      "lead": "面向美妆、护肤和个护商品，把可信卖点、使用步骤、质地、适用场景和禁用表达整理成短视频脚本、字幕方向和商品视频素材。",
+      "primaryCta": "生成美妆商品视频",
+      "secondaryCta": "查看视频脚本工具",
+      "sections": [
+        {
+          "heading": "先整理可信卖点和禁用表达",
+          "body": "美妆个护内容需要谨慎表达功效、适用人群和使用方式。Haitu 会把可信卖点和禁用表达分开管理。",
+          "bullets": [
+            "可信卖点",
+            "禁用表达",
+            "使用步骤",
+            "适用场景"
+          ]
+        },
+        {
+          "heading": "脚本围绕步骤和体验展开",
+          "body": "适合生成开场、质地展示、使用步骤、场景说明、字幕方向和 CTA，不把未经验证的功效写成承诺。",
+          "bullets": [
+            "质地展示",
+            "步骤说明",
+            "字幕方向",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "发布前保留人工审核",
+          "body": "AI 输出不能替代广告合规和平台审核。发布前应检查功效表述、敏感词、平台规则和知识产权。",
+          "bullets": [
+            "功效审核",
+            "敏感词",
+            "平台规则",
+            "知识产权"
+          ]
+        }
+      ]
+    },
+    "categories-electronics-product-video": {
+      "slug": "categories/electronics-product-video",
+      "title": "电子配件商品短视频生成 - Haitu",
+      "description": "为电子配件整理规格、兼容性、接口、材质、使用场景和安全注意事项，生成解释型商品短视频脚本和素材。",
+      "h1": "电子配件商品短视频生成",
+      "eyebrow": "规格、兼容性和使用步骤",
+      "lead": "面向手机配件、数码配件和小型电子用品，把规格参数、兼容性、接口、材质、使用场景和安全注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成电子配件视频",
+      "secondaryCta": "查看商品视频脚本",
+      "sections": [
+        {
+          "heading": "先核对规格和兼容性",
+          "body": "电子配件内容需要准确表达规格、接口、兼容机型、材质和使用边界，避免视频素材误导用户。",
+          "bullets": [
+            "规格参数",
+            "兼容机型",
+            "接口说明",
+            "安全注意"
+          ]
+        },
+        {
+          "heading": "适合解释型短视频",
+          "body": "围绕连接方式、使用步骤、对比场景和常见问题整理脚本，让用户快速理解商品用途。",
+          "bullets": [
+            "连接方式",
+            "使用步骤",
+            "对比场景",
+            "常见问题"
+          ]
+        },
+        {
+          "heading": "发布前人工复核参数",
+          "body": "AI 输出发布前仍需团队核对参数、兼容性、安全声明、广告表达和平台规则。",
+          "bullets": [
+            "参数核对",
+            "兼容性审核",
+            "安全声明",
+            "平台规则"
+          ]
+        }
+      ]
+    },
+    "categories-pet-supplies-product-video": {
+      "slug": "categories/pet-supplies-product-video",
+      "title": "宠物用品商品短视频生成 - Haitu",
+      "description": "为宠物用品整理尺寸、材质、适用宠物、使用场景和安全注意事项，生成商品短视频脚本和视频素材。",
+      "h1": "宠物用品商品短视频生成",
+      "eyebrow": "尺寸、材质和宠物安全表达",
+      "lead": "面向宠物玩具、喂养、清洁和出行用品，把尺寸、材质、适用宠物、使用场景和安全注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成宠物用品视频",
+      "secondaryCta": "查看图片转视频",
+      "sections": [
+        {
+          "heading": "先整理适用宠物和尺寸",
+          "body": "宠物用品需要说明适用宠物、体型、年龄、尺寸和材质，帮助视频脚本围绕真实使用场景展开。",
+          "bullets": [
+            "适用宠物",
+            "尺寸体型",
+            "材质说明",
+            "使用场景"
+          ]
+        },
+        {
+          "heading": "谨慎处理安全表述",
+          "body": "Haitu 会把安全注意事项和禁用表达作为输入，避免把未经验证的安全效果写成承诺。",
+          "bullets": [
+            "安全边界",
+            "禁用表达",
+            "人工审核",
+            "平台规则"
+          ]
+        },
+        {
+          "heading": "适合批量上新素材",
+          "body": "相似宠物用品可以复用脚本模板和审核流程，再按宠物类型、材质和使用场景调整。",
+          "bullets": [
+            "批量 SKU",
+            "模板复用",
+            "宠物类型",
+            "场景差异"
+          ]
+        }
+      ]
+    },
+    "categories-kitchen-product-video": {
+      "slug": "categories/kitchen-product-video",
+      "title": "厨房用品商品短视频生成 - Haitu",
+      "description": "为厨房和餐厨用品整理尺寸、材质、容量、使用步骤、清洁方式和场景参考，生成短视频脚本和商品视频素材。",
+      "h1": "厨房用品商品短视频生成",
+      "eyebrow": "容量、步骤和清洁方式",
+      "lead": "面向厨房工具、餐厨用品和收纳用品，把尺寸、材质、容量、使用步骤、清洁方式和场景参考整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成厨房用品视频",
+      "secondaryCta": "查看家居商品视频",
+      "sections": [
+        {
+          "heading": "把容量和材质讲清楚",
+          "body": "厨房用品常依赖尺寸、容量、材质、耐热或安全边界。Haitu 会先整理这些事实，再进入脚本和视频生成。",
+          "bullets": [
+            "尺寸容量",
+            "材质说明",
+            "安全边界",
+            "使用步骤"
+          ]
+        },
+        {
+          "heading": "围绕使用步骤生成视频",
+          "body": "适合把开箱、操作、清洁、收纳和对比场景整理成短视频结构。",
+          "bullets": [
+            "操作步骤",
+            "清洁方式",
+            "收纳效果",
+            "场景对比"
+          ]
+        },
+        {
+          "heading": "发布前核对安全和广告表达",
+          "body": "AI 输出不能替代安全声明和平台规则审核。发布前应检查材质、耐热、使用方式和广告表达。",
+          "bullets": [
+            "安全声明",
+            "平台规则",
+            "材质核对",
+            "广告合规"
+          ]
+        }
+      ]
+    },
+    "features-product-image-background-cleanup": {
+      "slug": "features/product-image-background-cleanup",
+      "title": "商品图背景清洁化工作流 - Haitu",
+      "description": "整理商品原图、参考图、背景需求和平台规则，为跨境电商商品图优化、广告图需求和商品视频生成准备干净输入。",
+      "h1": "商品图背景清洁化工作流",
+      "eyebrow": "先把商品图输入整理干净",
+      "lead": "先整理商品原图、参考图、背景需求和平台规则，为商品图优化、广告图需求、视频脚本和后续图片创作准备更稳定的输入。",
+      "primaryCta": "整理商品图背景需求",
+      "secondaryCta": "查看参考图管理",
+      "sections": [
+        {
+          "heading": "从原图和背景需求开始",
+          "body": "把商品原图、细节图、目标背景、平台规则和禁用方向放进资料包，避免后续素材生成时信息分散。",
+          "bullets": [
+            "商品原图",
+            "目标背景",
+            "平台规则",
+            "禁用方向"
+          ]
+        },
+        {
+          "heading": "保持商品本身不失真",
+          "body": "背景清洁化的重点是让输入更清楚，而不是改变商品结构、颜色、材质和真实卖点。",
+          "bullets": [
+            "外观一致",
+            "颜色核对",
+            "材质保留",
+            "细节审核"
+          ]
+        },
+        {
+          "heading": "衔接视频和后续图片创作",
+          "body": "清楚的商品图输入可以继续进入脚本分镜、商品视频生成和后续图片创作模块。",
+          "bullets": [
+            "脚本分镜",
+            "商品视频",
+            "广告图需求",
+            "图片创作准备"
+          ]
+        }
+      ]
+    },
+    "features-product-reference-image-management": {
+      "slug": "features/product-reference-image-management",
+      "title": "商品参考图管理 - Haitu",
+      "description": "集中管理商品原图、细节图、场景参考、风格约束和禁用视觉方向，让 AI 商品图优化和视频生成更贴近真实商品。",
+      "h1": "商品参考图管理",
+      "eyebrow": "让 AI 创作有可信参考",
+      "lead": "把商品原图、细节图、场景参考、风格约束和禁用视觉方向放进同一套商品资料包，服务图片优化、脚本分镜和商品视频生成。",
+      "primaryCta": "管理商品参考图",
+      "secondaryCta": "查看背景清洁化",
+      "sections": [
+        {
+          "heading": "沉淀商品原图和细节图",
+          "body": "把主图、细节图、包装图、材质图和使用场景图统一归档，减少团队反复找图和误用素材。",
+          "bullets": [
+            "主图归档",
+            "细节图",
+            "包装图",
+            "材质图"
+          ]
+        },
+        {
+          "heading": "记录风格约束和禁用方向",
+          "body": "参考图不只是图片库，也包括哪些场景可用、哪些风格不能用、哪些卖点不能夸大。",
+          "bullets": [
+            "风格约束",
+            "场景参考",
+            "禁用方向",
+            "卖点边界"
+          ]
+        },
+        {
+          "heading": "减少脚本和视频生成偏差",
+          "body": "脚本、分镜和视频生成都可以引用同一套参考图，让商品外观、材质和使用场景更一致。",
+          "bullets": [
+            "脚本参考",
+            "分镜约束",
+            "视频一致性",
+            "人工审核"
+          ]
+        }
+      ]
+    },
+    "features-product-video-storyboard-generator": {
+      "slug": "features/product-video-storyboard-generator",
+      "title": "商品视频分镜生成器 - Haitu",
+      "description": "基于商品事实、参考图和卖点生成商品短视频开场、痛点、卖点顺序、镜头结构、字幕方向和 CTA。",
+      "h1": "商品视频分镜生成器",
+      "eyebrow": "先把视频结构讲清楚",
+      "lead": "把商品事实、参考图、卖点和平台素材需求整理成开场钩子、痛点、卖点顺序、镜头结构、字幕方向和 CTA，再进入商品视频生成流程。",
+      "primaryCta": "生成商品视频分镜",
+      "secondaryCta": "查看视频脚本工具",
+      "sections": [
+        {
+          "heading": "先组织开场和卖点顺序",
+          "body": "围绕目标用户痛点、商品卖点、使用场景和平台节奏，生成更适合短视频的脚本结构。",
+          "bullets": [
+            "开场钩子",
+            "痛点场景",
+            "卖点顺序",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "把商品图接入镜头结构",
+          "body": "商品原图、细节图和参考图会作为分镜输入，帮助镜头描述围绕真实商品展开。",
+          "bullets": [
+            "商品原图",
+            "细节镜头",
+            "参考场景",
+            "比例需求"
+          ]
+        },
+        {
+          "heading": "发布前保留人工调整",
+          "body": "分镜不是跳过审核，而是让团队在生成视频前先检查脚本逻辑、广告表达和商品事实。",
+          "bullets": [
+            "脚本审核",
+            "广告合规",
+            "商品事实",
+            "字幕调整"
+          ]
+        }
+      ]
+    },
+    "features-product-creative-workflow": {
+      "slug": "features/product-creative-workflow",
+      "title": "商品图片、脚本与视频一体化工作流 - Haitu",
+      "description": "从商品资料、商品图和参考图出发，把图片优化、标题文案、视频脚本、分镜、模型选择和审核发布放进同一套流程。",
+      "h1": "商品图片、脚本与视频一体化工作流",
+      "eyebrow": "从资料整理到商品视频素材",
+      "lead": "把商品事实、商品图、参考图、标题文案、脚本、分镜、模型选择和审核步骤放进同一套流程，帮助跨境团队批量准备图片、脚本和商品短视频素材。",
+      "primaryCta": "启动商品素材工作流",
+      "secondaryCta": "查看批量素材生成",
+      "sections": [
+        {
+          "heading": "统一商品资料和参考图",
+          "body": "先把标题、类目、材质、尺寸、卖点、禁用表达、商品图和参考图沉淀成可复用资料包。",
+          "bullets": [
+            "商品资料包",
+            "参考图管理",
+            "卖点约束",
+            "禁用表达"
+          ]
+        },
+        {
+          "heading": "连接图片、脚本、分镜和视频",
+          "body": "同一套资料可以进入商品图优化、标题文案、视频脚本、分镜和商品视频生成，减少重复整理。",
+          "bullets": [
+            "图片优化",
+            "标题文案",
+            "视频脚本",
+            "商品视频"
+          ]
+        },
+        {
+          "heading": "模型选择和审核边界清楚",
+          "body": "团队可以使用平台模型或自有模型；AI 输出发布前仍需检查商品事实、平台规则和广告合规。",
+          "bullets": [
+            "平台模型",
+            "自有模型",
+            "余额扣费",
+            "人工审核"
+          ]
+        }
+      ]
+    },
+    "features-product-creative-review-workflow": {
+      "slug": "features/product-creative-review-workflow",
+      "title": "商品素材审核工作流 - Haitu",
+      "description": "在发布前检查商品事实、平台规则、广告表达、图片和视频素材，减少错品、夸大卖点和违规内容风险。",
+      "h1": "商品素材审核工作流",
+      "eyebrow": "发布前把商品事实核清楚",
+      "lead": "把商品事实、平台规则、广告表达、图片和视频素材放进同一套发布前审核流程，帮助跨境团队减少错品、夸大卖点、违规词和素材不一致。",
+      "primaryCta": "开始审核商品素材",
+      "secondaryCta": "查看一体化工作流",
+      "sections": [
+        {
+          "heading": "从商品事实开始检查",
+          "body": "先核对标题、材质、尺寸、适配范围、参考图、脚本和分镜是否和真实商品一致。",
+          "bullets": [
+            "商品事实",
+            "参考图",
+            "脚本分镜",
+            "视频素材"
+          ]
+        },
+        {
+          "heading": "覆盖平台和广告规则",
+          "body": "发布前检查禁用表达、夸大承诺、知识产权风险、平台素材规则和广告合规要求。",
+          "bullets": [
+            "禁用表达",
+            "广告合规",
+            "平台规则",
+            "知识产权"
+          ]
+        },
+        {
+          "heading": "AI 整理线索，人工做最终判断",
+          "body": "Haitu 可以帮助整理审核点和风险提示，但不替代团队对商品事实和发布结果的人工负责。",
+          "bullets": [
+            "风险提示",
+            "人工确认",
+            "发布记录",
+            "团队协作"
+          ]
+        }
+      ]
+    },
+    "features-ecommerce-video-localization": {
+      "slug": "features/ecommerce-video-localization",
+      "title": "电商商品视频本地化工作流 - Haitu",
+      "description": "围绕目标市场整理商品视频脚本、字幕、卖点、本地表达和审核备注，让跨境电商短视频适配不同语言和平台。",
+      "h1": "电商商品视频本地化工作流",
+      "eyebrow": "同一商品，适配不同市场表达",
+      "lead": "基于商品事实和原始素材，为不同市场整理视频脚本、字幕方向、卖点表达、本地化备注和发布前审核点，帮助跨境团队复用商品素材而不自动改写用户原始资料。",
+      "primaryCta": "整理视频本地化素材",
+      "secondaryCta": "查看视频脚本工具",
+      "sections": [
+        {
+          "heading": "从商品事实和原始脚本出发",
+          "body": "保留用户上传的商品资料语言，只在团队选择目标市场后生成本地化脚本、字幕和卖点表达。",
+          "bullets": [
+            "商品事实",
+            "原始脚本",
+            "目标市场",
+            "字幕方向"
+          ]
+        },
+        {
+          "heading": "适配平台内容习惯",
+          "body": "围绕 TikTok Shop、Amazon、Shopee、Lazada、Shopify 和 Etsy 的内容节奏整理短视频表达。",
+          "bullets": [
+            "平台节奏",
+            "本地卖点",
+            "字幕风格",
+            "CTA"
+          ]
+        },
+        {
+          "heading": "发布前检查语言和合规",
+          "body": "本地化输出需要人工检查商品事实、翻译准确性、禁用表达、广告合规和平台规则。",
+          "bullets": [
+            "翻译审核",
+            "禁用表达",
+            "广告合规",
+            "平台规则"
+          ]
+        }
+      ]
+    },
+    "features-model-cost-control": {
+      "slug": "features/model-cost-control",
+      "title": "模型成本和余额消耗控制 - Haitu",
+      "description": "在商品图优化、脚本整理和商品视频生成流程中区分平台模型、自有模型、余额消耗和批量任务复用，减少无计划重复调用。",
+      "h1": "模型成本和余额消耗控制",
+      "eyebrow": "让批量素材生成更可控",
+      "lead": "把平台模型和自有模型放进同一套商品素材流程，围绕商品图优化、脚本整理、视频生成和模型调用理解余额消耗，帮助团队在批量 SKU 创作时减少重复重跑。",
+      "primaryCta": "查看模型成本流程",
+      "secondaryCta": "查看自带模型",
+      "sections": [
+        {
+          "heading": "区分平台模型和自有模型",
+          "body": "团队可以用 Haitu 平台模型快速开始，也可以接入自有模型/API，并在任务层面理解不同模型的成本来源。",
+          "bullets": [
+            "平台模型",
+            "自有模型",
+            "模型调用",
+            "成本来源"
+          ]
+        },
+        {
+          "heading": "按任务理解余额消耗",
+          "body": "余额用于商品图优化、视频生成、脚本整理和模型调用等数字服务，批量任务前应先明确素材目标。",
+          "bullets": [
+            "余额扣费",
+            "图片优化",
+            "视频生成",
+            "脚本整理"
+          ]
+        },
+        {
+          "heading": "复用资料减少重复重跑",
+          "body": "通过商品资料包、参考图、脚本模板和审核结论复用，减少同一 SKU 或相似 SKU 的无计划重复调用。",
+          "bullets": [
+            "资料复用",
+            "脚本模板",
+            "审核结论",
+            "批量 SKU"
+          ]
+        }
+      ]
+    },
+    "categories-jewelry-product-video": {
+      "slug": "categories/jewelry-product-video",
+      "title": "饰品珠宝商品短视频生成 - Haitu",
+      "description": "为饰品、珠宝和配饰整理材质、镀层、尺寸、佩戴场景、细节特写和保养注意事项，生成短视频脚本和商品视频素材。",
+      "h1": "饰品珠宝商品短视频生成",
+      "eyebrow": "材质、细节和佩戴场景",
+      "lead": "面向饰品、珠宝和配饰卖家，把材质、镀层、尺寸、佩戴场景、细节特写、包装和保养注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成饰品商品视频",
+      "secondaryCta": "查看服饰商品视频",
+      "sections": [
+        {
+          "heading": "突出材质和细节特写",
+          "body": "饰品视频需要讲清材质、镀层、尺寸、光泽、细节和包装，避免素材脱离真实商品。",
+          "bullets": [
+            "材质镀层",
+            "尺寸细节",
+            "包装展示",
+            "保养提示"
+          ]
+        },
+        {
+          "heading": "围绕佩戴场景组织脚本",
+          "body": "把通勤、约会、节日、礼物和搭配场景整理成短视频结构。",
+          "bullets": [
+            "佩戴场景",
+            "搭配建议",
+            "礼物场景",
+            "短视频脚本"
+          ]
+        },
+        {
+          "heading": "发布前核对声明边界",
+          "body": "发布前检查材质、产地、功效表达、价格承诺和平台规则，避免误导性说法。",
+          "bullets": [
+            "材质核对",
+            "功效边界",
+            "平台规则",
+            "人工审核"
+          ]
+        }
+      ]
+    },
+    "categories-baby-products-video": {
+      "slug": "categories/baby-products-video",
+      "title": "母婴商品短视频生成 - Haitu",
+      "description": "为母婴和儿童用品整理安全边界、适用年龄、材质、使用场景和禁用表达，生成合规优先的短视频脚本和商品视频素材。",
+      "h1": "母婴商品短视频生成",
+      "eyebrow": "安全边界、适用年龄和材质",
+      "lead": "面向母婴和儿童用品，把安全边界、适用年龄、材质、使用场景、警示语和禁用表达整理成合规优先的短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成母婴商品视频",
+      "secondaryCta": "查看家居商品视频",
+      "sections": [
+        {
+          "heading": "先整理年龄和材质边界",
+          "body": "母婴商品视频必须先核对适用年龄、材质、尺寸、使用方式、警示语和安全边界。",
+          "bullets": [
+            "适用年龄",
+            "材质说明",
+            "安全边界",
+            "警示语"
+          ]
+        },
+        {
+          "heading": "围绕真实使用场景表达",
+          "body": "适合把收纳、出行、护理、喂养和亲子使用场景整理成短视频结构。",
+          "bullets": [
+            "护理场景",
+            "出行场景",
+            "收纳展示",
+            "亲子使用"
+          ]
+        },
+        {
+          "heading": "人工审核优先于发布速度",
+          "body": "AI 输出不能替代母婴安全审核，发布前必须检查商品事实、平台规则和当地监管要求。",
+          "bullets": [
+            "安全审核",
+            "平台规则",
+            "监管要求",
+            "人工确认"
+          ]
+        }
+      ]
+    },
+    "categories-sports-outdoor-product-video": {
+      "slug": "categories/sports-outdoor-product-video",
+      "title": "运动户外商品短视频生成 - Haitu",
+      "description": "为运动户外用品整理活动场景、材质、尺寸、天气条件、收纳方式和安全注意事项，生成短视频脚本和商品视频素材。",
+      "h1": "运动户外商品短视频生成",
+      "eyebrow": "活动场景、材质和安全说明",
+      "lead": "面向运动装备、户外用品和露营配件，把活动场景、材质、尺寸、天气条件、收纳方式和安全注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成运动户外视频",
+      "secondaryCta": "查看商品图片转视频",
+      "sections": [
+        {
+          "heading": "把使用场景讲具体",
+          "body": "运动户外用品需要说明活动场景、天气条件、尺寸重量、收纳方式和安装步骤。",
+          "bullets": [
+            "活动场景",
+            "天气条件",
+            "尺寸重量",
+            "收纳方式"
+          ]
+        },
+        {
+          "heading": "适合多镜头短视频结构",
+          "body": "开箱、安装、户外使用、前后对比和收纳展示都可以整理成分镜。",
+          "bullets": [
+            "开箱安装",
+            "户外使用",
+            "前后对比",
+            "收纳展示"
+          ]
+        },
+        {
+          "heading": "发布前核对安全声明",
+          "body": "AI 输出发布前要检查适用范围、安全声明、承重或防护表达、广告合规和平台规则。",
+          "bullets": [
+            "安全声明",
+            "适用范围",
+            "广告合规",
+            "平台规则"
+          ]
+        }
+      ]
+    },
+    "categories-car-accessories-product-video": {
+      "slug": "categories/car-accessories-product-video",
+      "title": "汽车配件商品短视频生成 - Haitu",
+      "description": "为汽车配件和车载用品整理适配车型、安装步骤、材质、使用效果和安全注意事项，生成短视频脚本和商品视频素材。",
+      "h1": "汽车配件商品短视频生成",
+      "eyebrow": "适配车型、安装步骤和使用效果",
+      "lead": "面向汽车配件、车载用品和改装周边，把适配车型、安装步骤、材质和使用效果、规格参数以及安全注意事项整理成短视频脚本、分镜和商品视频素材。",
+      "primaryCta": "生成汽车配件视频",
+      "secondaryCta": "查看电子配件视频",
+      "sections": [
+        {
+          "heading": "先核对适配和规格",
+          "body": "汽车配件视频必须明确适配车型、年份、安装位置、尺寸、材质和兼容性边界。",
+          "bullets": [
+            "适配车型",
+            "年份范围",
+            "安装位置",
+            "规格参数"
+          ]
+        },
+        {
+          "heading": "用安装步骤组织视频",
+          "body": "适合把开箱、安装、前后对比、使用效果和注意事项整理成短视频结构。",
+          "bullets": [
+            "开箱展示",
+            "安装步骤",
+            "使用效果",
+            "注意事项"
+          ]
+        },
+        {
+          "heading": "发布前检查兼容性和安全",
+          "body": "AI 输出不能自动改写适配事实，发布前要核对兼容性、安全声明、广告表达和平台规则。",
+          "bullets": [
+            "兼容性",
+            "安全声明",
+            "广告合规",
+            "人工审核"
+          ]
+        }
+      ]
+    }
+  }
+}

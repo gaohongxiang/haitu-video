@@ -35,6 +35,9 @@ export async function handleProductImportRoutes(input: {
   if (request.method === "POST" && url.pathname === "/api/products/import-ai-preview") {
     return jsonResponse(await buildAiImportedProductPreview({
       walletStore: requestContext.walletStore,
+      billingPolicyStore: requestContext.billingPolicyStore,
+      modelPricingCatalog: requestContext.modelPricingCatalog,
+      modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion,
       createTextModelProvider: ({ textModelConfigId }) => createTextModelProvider({
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,

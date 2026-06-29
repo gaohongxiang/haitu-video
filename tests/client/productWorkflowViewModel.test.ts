@@ -131,7 +131,9 @@ describe("product workflow view-model helpers", () => {
     expect(fileImportSourceRowsLabel(selectable)).toBe("4-6 (3 行)");
     expect(fileImportProductIdLabel(selectable)).toBe("GP-100");
     expect(fileImportRowLabel("ready")).toBe("未导入");
+    expect(fileImportRowLabel("ready", "en")).toBe("Not imported");
     expect(fileImportRowLabel("duplicate")).toBe("已导入");
+    expect(fileImportSourceRowsLabel(selectable, "en")).toBe("4-6 (3 rows)");
     expect(fileImportRowTone("ready")).toBe("ok");
     expect(fileImportRowTone("needs-ai")).toBe("warn");
     expect(fileImportRowTone("failed")).toBe("danger");
@@ -144,15 +146,22 @@ describe("product workflow view-model helpers", () => {
       ready: false,
       label: "请先填写商品资料。"
     });
+    expect(productGenerationReadiness({ selectedProduct: undefined, importText: "", locale: "en" })).toEqual({
+      ready: false,
+      label: "Fill in product facts first."
+    });
     expect(productGenerationReadiness({ selectedProduct: productDetail(), importText: "" })).toEqual({
       ready: true,
       label: "资料已保存，可生成视频。"
     });
     expect(productFactsStatusLabel({ selectedProduct: undefined, importText: "商品资料" })).toBe("原始资料");
+    expect(productFactsStatusLabel({ selectedProduct: undefined, importText: "商品资料", locale: "en" })).toBe("Raw facts");
     expect(productFactsStatusLabel({ selectedProduct: productDetail(), importText: "" })).toBe("已整理资料包");
     expect(productAutoSaveStatusLabel("saving")).toBe("保存中");
+    expect(productAutoSaveStatusLabel("saving", "en")).toBe("Saving");
     expect(productAutoSaveStatusLabel("idle")).toBe("");
     expect(storyboardStatusLabel("ai")).toBe("AI 生成分镜");
+    expect(storyboardStatusLabel("ai", "en")).toBe("AI storyboard");
     expect(storyboardStatusLabel("manual")).toBe("手动分镜");
   });
 

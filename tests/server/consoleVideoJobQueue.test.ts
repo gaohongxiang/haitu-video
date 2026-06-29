@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { FileConsoleSettingsStore } from "../../src/server/consoleSettings.js";
+import { MemoryConsoleSettingsStore } from "../../src/server/consoleSettings.js";
 import { LocalVideoJobQueue } from "../../src/server/consoleVideoJobQueue.js";
 
 let tempDirs: string[] = [];
@@ -27,7 +27,7 @@ describe("LocalVideoJobQueue", () => {
       rootDir: dataDir,
       outputsDir: jobsDir,
       workspaceId: "default",
-      settingsStore: new FileConsoleSettingsStore(join(dataDir, "system", "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         const report = makeReport(input);
@@ -85,7 +85,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         const report = makeReport(input);
@@ -144,7 +144,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       referenceImageUrlResolver,
       runMakeVideoPipeline: async (input) => {
@@ -177,7 +177,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         resolutions.push(input.resolution);
@@ -214,7 +214,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async () => {
         const cause = Object.assign(new Error("Headers Timeout Error"), {
@@ -267,7 +267,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-18T09:00:00.000Z"),
       runMakeVideoPipeline: async () => {
         throw Object.assign(new Error(providerError), {
@@ -312,7 +312,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-18T09:00:00.000Z"),
       runMakeVideoPipeline: async () => {
         throw Object.assign(new Error(providerError), {
@@ -357,7 +357,7 @@ describe("LocalVideoJobQueue", () => {
       const queue = new LocalVideoJobQueue({
         rootDir: root,
         outputsDir,
-        settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+        settingsStore: new MemoryConsoleSettingsStore(),
         now: () => new Date("2026-06-07T09:00:00.000Z"),
         runMakeVideoPipeline: async (input) => makeReport(input)
       });
@@ -402,7 +402,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
@@ -461,7 +461,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => makeReport(input)
     });
@@ -495,7 +495,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         attempts.push(input.outDir);
@@ -560,7 +560,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         calls.push({
@@ -672,7 +672,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:00:00.000Z")
     });
 
@@ -691,7 +691,7 @@ describe("LocalVideoJobQueue", () => {
     const outputsDir = join(root, "outputs");
     const productPath = join(fixturesDir, "box.json");
     await writeProduct(productPath);
-    const settingsStore = new FileConsoleSettingsStore(join(outputsDir, "console-settings.json"));
+    const settingsStore = new MemoryConsoleSettingsStore();
     let releaseFirstJob!: () => void;
     const firstJobGate = new Promise<void>((resolve) => {
       releaseFirstJob = resolve;
@@ -781,7 +781,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:02:00.000Z")
     });
 
@@ -830,7 +830,7 @@ describe("LocalVideoJobQueue", () => {
     const queue = new LocalVideoJobQueue({
       rootDir: root,
       outputsDir,
-      settingsStore: new FileConsoleSettingsStore(join(outputsDir, "console-settings.json")),
+      settingsStore: new MemoryConsoleSettingsStore(),
       now: () => new Date("2026-06-07T09:02:00.000Z"),
       runMakeVideoPipeline: async (input) => {
         calls.push(input.outDir);
