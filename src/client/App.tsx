@@ -5867,8 +5867,8 @@ function ProductModeActionBar({
 }) {
   if (mode === "video") {
     return (
-      <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-        <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
+      <div className="video-generate-bar product-creative-action-panel grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+        <div className="video-generate-summary product-creative-action-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
           {generateVideoSummary}
         </div>
         <div className={generationReadinessMessageClass}>
@@ -5893,8 +5893,8 @@ function ProductModeActionBar({
   }
 
   return (
-    <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-      <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
+    <div className="video-generate-bar product-creative-action-panel grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+      <div className="video-generate-summary product-creative-action-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
         {imageGenerateSummary}
       </div>
       <div className={cn(generationReadinessMessageClass, workspace.primaryAction.disabled && "text-[var(--danger)]")}>

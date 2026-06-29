@@ -95,6 +95,7 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("ProductModeAssetPanel");
     expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
     expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
+    expect(workbenchSource.indexOf("product-creative-output-column")).toBeLessThan(workbenchSource.indexOf("<ProductModeActionBar"));
   });
 
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
@@ -115,6 +116,9 @@ describe("video creation layout source", () => {
     expect(actionBarSource).toContain("imageGenerateSummary");
     expect(actionBarSource).toContain("onGenerateVideo");
     expect(actionBarSource).toContain("onGenerateProductImages");
+    expect(actionBarSource).toContain("product-creative-action-panel");
+    expect(actionBarSource).toContain("product-creative-action-summary");
+    expect(actionBarSource).not.toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
 
     expect(assetPanelSource).toContain('mode === "video"');
     expect(assetPanelSource).toContain("<VideoHistoryPanel");
