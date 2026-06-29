@@ -27,19 +27,14 @@ describe("video creation layout source", () => {
     expect(imageCase).not.toContain('tApp("image.empty")');
     expect(workspaceSource).toContain("mode: ProductCreativeWorkspaceMode;");
     expect(composerSource).toContain("buildProductCreativeWorkspace");
-    expect(composerSource).toContain("ProductCreativeWorkspacePanel");
-    expect(composerSource).toContain("ProductAssetLedgerPanel");
-    expect(composerSource).toContain("ProductPromptPipelinePanel");
+    expect(composerSource).toContain("ProductCreativeCommandCenter");
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
     expect(composerSource).toContain("workspace.modeSwitch.map");
     expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(composerSource).toContain("workspace.architectureLanes.map");
     expect(composerSource).toContain("workspace.assetLedger.map");
     expect(composerSource).toContain("workspace.modeSummary");
-    expect(composerSource).toContain("product-creative-architecture-lane");
     expect(composerSource).toContain("workspace.promptPipeline");
-    expect(composerSource).toContain("ProductPromptPipelinePanel");
     expect(composerSource).toContain("ProductModeOutputPanel");
     expect(composerSource).toContain("mode === \"video\"");
     expect(composerSource).toContain("mode === \"image\"");
@@ -49,22 +44,42 @@ describe("video creation layout source", () => {
     const source = await readFile(appPath, "utf8");
     const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductCreationProductLibrary"));
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
-    const creativePanelSource = source.slice(source.indexOf("function ProductCreativeWorkspacePanel"), source.indexOf("function ProductAssetLedgerPanel"));
+    const commandCenterSource = sourceBetween(source, "function ProductCreativeCommandCenter", "function ProductModeActionBar");
 
     expect(workspaceSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
     expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(creativePanelSource).toContain("onModeChange");
-    expect(creativePanelSource).toContain('type="button"');
-    expect(creativePanelSource).toContain("onClick={() => onModeChange(item.mode)}");
-    expect(creativePanelSource).toContain("disabled={item.active}");
-    expect(creativePanelSource).not.toContain("<span");
+    expect(commandCenterSource).toContain("onModeChange");
+    expect(commandCenterSource).toContain('type="button"');
+    expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(commandCenterSource).toContain("disabled={item.active}");
+  });
+
+  it("uses a single command center to connect product memory, prompt compilation, and shared assets", async () => {
+    const source = await readFile(appPath, "utf8");
+    const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
+    const commandCenterSource = sourceBetween(source, "function ProductCreativeCommandCenter", "function ProductModeActionBar");
+
+    expect(composerSource).toContain("<ProductCreativeCommandCenter");
+    expect(composerSource).not.toContain("<ProductCreativeWorkspacePanel");
+    expect(composerSource).not.toContain("<ProductAssetLedgerPanel");
+    expect(composerSource).not.toContain("<ProductPromptPipelinePanel");
+    expect(commandCenterSource).toContain("product-creative-command-center");
+    expect(commandCenterSource).toContain("product-creative-memory-column");
+    expect(commandCenterSource).toContain("product-creative-compiler-column");
+    expect(commandCenterSource).toContain("product-creative-assets-column");
+    expect(commandCenterSource).toContain("workspace.modeSwitch.map");
+    expect(commandCenterSource).toContain("workspace.memoryChips.map");
+    expect(commandCenterSource).toContain("workspace.promptPipeline");
+    expect(commandCenterSource).toContain("workspace.promptCompilerSteps.map");
+    expect(commandCenterSource).toContain("workspace.assetLedger.map");
+    expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
   });
 
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
     const source = await readFile(appPath, "utf8");
     const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
     const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
-    const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductCreativeWorkspacePanel");
+    const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
 
     expect(composerBodySource).toContain("<ProductModeActionBar");
     expect(composerBodySource).toContain("<ProductModeAssetPanel");

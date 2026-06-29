@@ -5185,9 +5185,7 @@ function ProductCreationComposer({
           </div>
         ) : null}
 
-        <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} onModeChange={onModeChange} />
-        <ProductAssetLedgerPanel workspace={creativeWorkspace} />
-        <ProductPromptPipelinePanel workspace={creativeWorkspace} />
+        <ProductCreativeCommandCenter workspace={creativeWorkspace} modeLabel={modeLabel} onModeChange={onModeChange} />
 
         <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
           <div className="model-scheme-control grid min-w-0 gap-1">
@@ -5448,6 +5446,130 @@ function ProductCreationComposer({
   );
 }
 
+function ProductCreativeCommandCenter({
+  workspace,
+  modeLabel,
+  onModeChange
+}: {
+  workspace: ProductCreativeWorkspace;
+  modeLabel: string;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
+}) {
+  const pipelineStages = [
+    { label: "输入源", detail: workspace.promptPipeline.inputSource },
+    { label: workspace.promptPipeline.optimizer.label, detail: workspace.promptPipeline.optimizer.detail },
+    { label: workspace.promptPipeline.output.label, detail: workspace.promptPipeline.output.detail }
+  ];
+
+  return (
+    <section className="product-creative-command-center grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_5%,var(--panel)),var(--panel))] p-3 min-[1180px]:grid-cols-[minmax(230px,.78fr)_minmax(360px,1.25fr)_minmax(280px,.9fr)]">
+      <div className="product-creative-memory-column grid content-start gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
+          <div className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</div>
+        </div>
+        <div className="min-w-0">
+          <h3 className="m-0 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
+          {workspace.selectedProductSku ? (
+            <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {workspace.memoryChips.map((chip) => (
+            <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
+              <div className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</div>
+              <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
+            </div>
+          ))}
+        </div>
+        <p className="m-0 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
+          {workspace.modeSummary}
+        </p>
+      </div>
+
+      <div className="product-creative-compiler-column grid content-start gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-black text-[var(--text)]">{workspace.promptPipeline.title}</div>
+            <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">提示词是编译结果，不是商品事实源头</div>
+          </div>
+          <Badge>{workspace.mode === "image" ? "Image Prompt" : "Video Prompt"}</Badge>
+        </div>
+        <div className="grid gap-2 min-[900px]:grid-cols-3 min-[1180px]:grid-cols-1 min-[1480px]:grid-cols-3">
+          {pipelineStages.map((stage, index) => (
+            <article key={stage.label} className="grid min-h-[82px] content-start gap-1 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate text-xs font-black text-[var(--text)]">{stage.label}</div>
+                <Badge tone={index === pipelineStages.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
+              </div>
+              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{stage.detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {workspace.promptCompilerSteps.map((step, index) => (
+            <article key={step.id} className="grid content-start gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate text-xs font-black text-[var(--text)]">{step.label}</div>
+                <div className="text-[10px] font-black text-[var(--muted)]">{index + 1}</div>
+              </div>
+              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="product-creative-assets-column grid content-start gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-black text-[var(--text)]">商品资产账本</div>
+          <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
+            {workspace.modeSwitch.map((item) => (
+              <button
+                type="button"
+                key={item.mode}
+                className={cn(
+                  "inline-flex min-h-8 cursor-pointer items-center rounded-[8px] border px-2.5 text-xs font-black transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_32%,transparent)] disabled:cursor-default disabled:opacity-100",
+                  item.active
+                    ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
+                    : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
+                )}
+                disabled={item.active}
+                onClick={() => onModeChange(item.mode)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-2">
+          {workspace.assetLedger.map((asset) => (
+            <article key={asset.id} className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-black text-[var(--text)]">{asset.label}</div>
+                  <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">{asset.role}</div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <strong className="text-xl font-black leading-none text-[var(--text)]">{asset.count}</strong>
+                  <span className="ml-0.5 text-[10px] font-black text-[var(--muted)]">{asset.unit}</span>
+                </div>
+              </div>
+              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{asset.detail}</p>
+              <div className="flex flex-wrap gap-1">
+                {asset.reusableBy.map((mode) => (
+                  <span key={mode} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
+                    {productCreativeWorkspaceModeLabel(mode)}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ProductModeActionBar({
   mode,
   tVideo,
@@ -5596,163 +5718,6 @@ function ProductModeAssetPanel({
       images={images}
       onPreviewReferenceImage={onPreviewReferenceImage}
     />
-  );
-}
-
-function ProductCreativeWorkspacePanel({
-  workspace,
-  modeLabel,
-  onModeChange
-}: {
-  workspace: ProductCreativeWorkspace;
-  modeLabel: string;
-  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
-}) {
-  return (
-    <section className="grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_6%,var(--panel)),var(--panel))] p-3">
-      <div className="grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.8fr)_minmax(0,1.5fr)_auto] min-[1180px]:items-start">
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
-            <div className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</div>
-          </div>
-          <h3 className="m-0 mt-2 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
-          {workspace.selectedProductSku ? (
-            <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
-          ) : null}
-        </div>
-
-        <p className="m-0 text-xs font-bold leading-5 text-[var(--muted)]">{workspace.modeSummary}</p>
-
-        <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
-          {workspace.modeSwitch.map((item) => (
-            <button
-              type="button"
-              key={item.mode}
-              className={cn(
-                "inline-flex min-h-8 cursor-pointer items-center rounded-[8px] border px-2.5 text-xs font-black transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_32%,transparent)] disabled:cursor-default disabled:opacity-100",
-                item.active
-                  ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
-                  : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
-              )}
-              disabled={item.active}
-              onClick={() => onModeChange(item.mode)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-4">
-        {workspace.memoryChips.map((chip) => (
-          <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
-            <div className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</div>
-            <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-2 min-[1180px]:grid-cols-4">
-        {workspace.architectureLanes.map((lane, index) => (
-          <article
-            key={lane.id}
-            className="product-creative-architecture-lane grid min-h-[148px] content-start gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 truncate text-sm font-black text-[var(--text)]">{lane.title}</div>
-              <Badge tone={index === workspace.architectureLanes.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
-            </div>
-            <p className="m-0 text-xs font-semibold leading-5 text-[var(--muted)]">{lane.detail}</p>
-            <div className="flex flex-wrap gap-1">
-              {lane.items.map((item) => (
-                <div key={item} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <div className="rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
-        商品事实是源头，提示词只是编译结果；图片资产和视频版本都会沉淀回同一个商品。
-      </div>
-    </section>
-  );
-}
-
-function ProductAssetLedgerPanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
-  return (
-    <section className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-black text-[var(--text)]">商品资产账本</div>
-        <Badge>{workspace.mode === "image" ? "写入图片资产" : "读取视觉资产"}</Badge>
-      </div>
-      <div className="grid gap-2 min-[900px]:grid-cols-3">
-        {workspace.assetLedger.map((asset) => (
-          <article key={asset.id} className="grid min-h-[104px] gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="truncate text-xs font-black text-[var(--text)]">{asset.label}</div>
-                <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">{asset.role}</div>
-              </div>
-              <div className="shrink-0 text-right">
-                <strong className="text-xl font-black leading-none text-[var(--text)]">{asset.count}</strong>
-                <span className="ml-0.5 text-[10px] font-black text-[var(--muted)]">{asset.unit}</span>
-              </div>
-            </div>
-            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{asset.detail}</p>
-            <div className="flex flex-wrap gap-1">
-              {asset.reusableBy.map((mode) => (
-                <span key={mode} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
-                  {productCreativeWorkspaceModeLabel(mode)}
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ProductPromptPipelinePanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
-  const pipelineStages = [
-    { label: "输入源", detail: workspace.promptPipeline.inputSource },
-    { label: workspace.promptPipeline.optimizer.label, detail: workspace.promptPipeline.optimizer.detail },
-    { label: workspace.promptPipeline.output.label, detail: workspace.promptPipeline.output.detail }
-  ];
-
-  return (
-    <section className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-black text-[var(--text)]">{workspace.promptPipeline.title}</div>
-        <Badge>{workspace.mode === "image" ? "Image Prompt" : "Video Prompt"}</Badge>
-      </div>
-      <div className="grid gap-2 min-[900px]:grid-cols-3">
-        {pipelineStages.map((stage, index) => (
-          <article key={stage.label} className="grid min-h-[88px] content-start gap-1 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-black text-[var(--text)]">{stage.label}</span>
-              <Badge tone={index === pipelineStages.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
-            </div>
-            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{stage.detail}</p>
-          </article>
-        ))}
-      </div>
-      <div className="grid gap-2 min-[1180px]:grid-cols-4">
-        {workspace.promptCompilerSteps.map((step, index) => (
-          <article key={step.id} className="grid content-start gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-xs font-black text-[var(--text)]">{step.label}</span>
-              <span className="text-[10px] font-black text-[var(--muted)]">{index + 1}</span>
-            </div>
-            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
-          </article>
-        ))}
-      </div>
-    </section>
   );
 }
 
