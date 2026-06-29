@@ -75,14 +75,38 @@ describe("video creation layout source", () => {
     expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
   });
 
+  it("uses an operational workbench for source data, creative intent, and reusable outputs", async () => {
+    const source = await readFile(appPath, "utf8");
+    const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
+
+    expect(composerSource).toContain("<ProductCreativeWorkbench");
+    expect(composerSource).not.toContain("video-generation-controls compact-generation-controls");
+    expect(composerSource).not.toContain("min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]");
+    expect(composerSource).not.toContain("<ProductModeActionBar");
+    expect(composerSource).not.toContain("<ProductModeAssetPanel");
+    expect(workbenchSource).toContain("product-creative-workbench");
+    expect(workbenchSource).toContain("product-creative-source-column");
+    expect(workbenchSource).toContain("product-creative-intent-column");
+    expect(workbenchSource).toContain("product-creative-output-column");
+    expect(workbenchSource).toContain("ProductComposerReferenceTray");
+    expect(workbenchSource).toContain("ProductModeOutputPanel");
+    expect(workbenchSource).toContain("ProductModeActionBar");
+    expect(workbenchSource).toContain("ProductModeAssetPanel");
+    expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
+    expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
+  });
+
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
     const source = await readFile(appPath, "utf8");
-    const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
+    const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
     const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
     const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
 
-    expect(composerBodySource).toContain("<ProductModeActionBar");
-    expect(composerBodySource).toContain("<ProductModeAssetPanel");
+    expect(composerBodySource).toContain("<ProductCreativeWorkbench");
+    expect(workbenchSource).toContain("<ProductModeActionBar");
+    expect(workbenchSource).toContain("<ProductModeAssetPanel");
     expect(composerBodySource).not.toContain("<VideoHistoryPanel");
     expect(composerBodySource).not.toContain("<ProductImageAssetPanel");
 
@@ -138,11 +162,12 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("video-operation-column");
     expect(composerSource).toContain("grid content-start gap-3");
     expect(composerSource).not.toContain("grid min-h-full content-start gap-3");
-    expect(composerSource).toContain("video-generation-controls compact-generation-controls");
+    expect(composerSource).toContain("ProductCreativeWorkbench");
+    expect(composerSource).toContain("product-creative-workbench");
+    expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("py-2");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain("model-scheme-chip-row");
-    expect(composerSource).toContain("min-[1180px]:col-span-7");
     expect(composerSource).toContain("overflow-visible");
     expect(composerSource).toContain("ModelSchemeChip");
     expect(composerSource).toContain("{schemeSummary}");
@@ -172,7 +197,6 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("gap-x-2 gap-y-1");
     expect(composerSource).toContain("video-generate-status-center");
     expect(composerSource).toContain("justify-center text-center");
-    expect(composerSource).toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
     expect(composerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 truncate");
@@ -305,8 +329,8 @@ describe("video creation layout source", () => {
     expect(appSource).toContain("videoAspectRatio: selectedVideoAspectRatio");
     expect(workspaceSource).toContain("billingEstimates={billingEstimates}");
     expect(composerSource).toContain("billingEstimates?: BillingEstimatesResponse");
-    expect(composerSource).toContain('estimate={billingEstimates?.estimates.organizeProduct}');
-    expect(composerSource).toContain('estimate={billingEstimates?.estimates.referenceImages}');
+    expect(composerSource).toContain('organizeProductEstimate={billingEstimates?.estimates.organizeProduct}');
+    expect(composerSource).toContain('referenceImagesEstimate={billingEstimates?.estimates.referenceImages}');
     expect(composerSource).toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
     expect(composerSource).toContain("estimate={storyboardEstimate}");
     expect(composerSource).toContain('videoEstimate={billingEstimates?.estimates.video}');

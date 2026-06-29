@@ -1025,12 +1025,12 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("<ProductCreationProductPicker");
     expect(creationComposerSource).toContain("grid content-start gap-3");
     expect(creationComposerSource).not.toContain("grid min-h-full content-start gap-3");
-    expect(creationComposerSource).toContain("video-generation-controls compact-generation-controls");
+    expect(creationComposerSource).toContain("ProductCreativeWorkbench");
+    expect(creationComposerSource).toContain("product-creative-workbench");
+    expect(creationComposerSource).toContain("product-creative-controls");
     expect(creationComposerSource).toContain("px-3 py-2");
-    expect(creationComposerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))]");
     expect(creationComposerSource).toContain("model-scheme-control");
     expect(creationComposerSource).toContain("model-scheme-chip-row");
-    expect(creationComposerSource).toContain("min-[1180px]:col-span-7");
     expect(creationComposerSource).toContain("overflow-visible");
     expect(creationComposerSource).toContain("ModelSchemeChip");
     expect(creationComposerSource).toContain("{schemeSummary}");
@@ -1060,7 +1060,6 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("gap-x-2 gap-y-1");
     expect(creationComposerSource).toContain("video-generate-status-center");
     expect(creationComposerSource).toContain("justify-center text-center");
-    expect(creationComposerSource).toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
     expect(creationComposerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(creationComposerSource).toContain("video-generate-bar");
     expect(creationComposerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
@@ -1206,7 +1205,7 @@ describe("console API", () => {
     expect(referenceMediaFilesSource).toContain("export async function mediaReferenceToFile");
     expect(appSource).not.toContain("function isSameOriginMediaReference(");
     expect(appSource).not.toContain("async function mediaReferenceToFile(");
-    expect(creationComposerSource).toContain("onPaste={handleProductFactsPaste}");
+    expect(creationComposerSource).toContain("onProductFactsPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("productReady: boolean");
@@ -1238,7 +1237,9 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("min-h-[350px] resize-y border-0");
     expect(creationComposerSource).not.toContain("max-h-[340px]");
     expect(creationComposerSource).not.toContain("grid min-h-[430px]");
-    expect(creationComposerSource).toContain("grid items-stretch gap-0");
+    expect(creationComposerSource).toContain("product-creative-source-column");
+    expect(creationComposerSource).toContain("product-creative-intent-column");
+    expect(creationComposerSource).toContain("product-creative-output-column");
     expect(appSource).toContain("const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);");
     expect(creationComposerSource).toContain("pendingImageFiles: File[];");
     expect(creationComposerSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
@@ -5587,12 +5588,12 @@ describe("console API", () => {
     expect(composerSource).not.toContain("<ProductCreationProductPicker");
     expect(composerSource).toContain("grid content-start gap-3");
     expect(composerSource).not.toContain("grid min-h-full content-start gap-3");
-    expect(composerSource).toContain("video-generation-controls compact-generation-controls");
+    expect(composerSource).toContain("ProductCreativeWorkbench");
+    expect(composerSource).toContain("product-creative-workbench");
+    expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("px-3 py-2");
-    expect(composerSource).toContain("min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))]");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain("model-scheme-chip-row");
-    expect(composerSource).toContain("min-[1180px]:col-span-7");
     expect(composerSource).toContain("overflow-visible");
     expect(composerSource).toContain("ModelSchemeChip");
     expect(composerSource).toContain("{schemeSummary}");
@@ -5621,7 +5622,6 @@ describe("console API", () => {
     expect(composerSource).not.toContain("gap-x-2 gap-y-1");
     expect(composerSource).toContain("video-generate-status-center");
     expect(composerSource).toContain("justify-center text-center");
-    expect(composerSource).toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
     expect(composerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(composerSource).toContain("video-generate-bar");
     expect(composerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
@@ -5687,7 +5687,9 @@ describe("console API", () => {
     expect(composerSource).not.toContain("min-h-[350px] resize-y border-0");
     expect(composerSource).not.toContain("max-h-[340px]");
     expect(composerSource).not.toContain("grid min-h-[430px]");
-    expect(composerSource).toContain("grid items-stretch gap-0");
+    expect(composerSource).toContain("product-creative-source-column");
+    expect(composerSource).toContain("product-creative-intent-column");
+    expect(composerSource).toContain("product-creative-output-column");
     expect(appSource).toContain("const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);");
     expect(videoCase).toContain("pendingImageFiles={pendingImageFiles}");
     expect(videoCase).toContain("setPendingImageFiles={setPendingImageFiles}");

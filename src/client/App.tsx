@@ -5187,178 +5187,55 @@ function ProductCreationComposer({
 
         <ProductCreativeCommandCenter workspace={creativeWorkspace} modeLabel={modeLabel} onModeChange={onModeChange} />
 
-        <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
-          <div className="model-scheme-control grid min-w-0 gap-1">
-            <CompactChoiceDropdown
-              label={tVideo("controls.modelScheme")}
-              value={activeModelSchemeId}
-              options={modelSchemeOptions.map((option) => option.id)}
-              formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
-              onChange={onModelSchemeChange}
-              density="compact"
-            />
-          </div>
-          {mode === "video" ? (
-            <>
-              <CompactChoiceDropdown
-                label={tVideo("controls.template")}
-                value={template}
-                options={templateOptions}
-                formatOption={(option) => localizedTemplateLabel(option, tVideo)}
-                onChange={onTemplateChange}
-                density="compact"
-              />
-              <CompactChoiceDropdown
-                label={tVideo("controls.duration")}
-                value={String(duration)}
-                options={durationOptions}
-                formatOption={(option) => `${option}s`}
-                onChange={(option) => onDurationChange(Number(option))}
-                density="compact"
-              />
-              <CompactChoiceDropdown
-                label={tVideo("controls.resolution")}
-                value={selectedVideoResolution}
-                options={videoResolutionOptions}
-                formatOption={videoResolutionLabel}
-                onChange={onVideoResolutionChange}
-                density="compact"
-              />
-              <CompactChoiceDropdown
-                label={tVideo("controls.aspectRatio")}
-                value={selectedVideoAspectRatio}
-                options={videoAspectRatioOptions}
-                formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
-                onChange={onVideoAspectRatioChange}
-                density="compact"
-              />
-              <CompactChoiceDropdown
-                label={tVideo("controls.finalLanguage")}
-                value={finalLanguage}
-                options={languageOptions}
-                formatOption={(option) => finalLanguageLabel(option, tVideo)}
-                onChange={onFinalLanguageChange}
-                density="compact"
-              />
-              <CompactChoiceDropdown
-                label={tVideo("controls.versionCount")}
-                value={String(versionCount)}
-                options={versionCountOptions}
-                formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
-                onChange={(option) => onVersionCountChange(Number(option))}
-                density="compact"
-              />
-            </>
-          ) : (
-            <>
-              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
-                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片目标</span>
-                <span className="truncate text-xs font-black text-[var(--text)]">主图 / 场景图 / 细节图</span>
-              </div>
-              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
-                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片模型</span>
-                <span className="truncate text-xs font-black text-[var(--text)]">{imageModelLabel}</span>
-              </div>
-              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
-                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">参考约束</span>
-                <span className="truncate text-xs font-black text-[var(--text)]">{tVideo("summary.referenceImages", { count: previewableReferenceImages.length })}</span>
-              </div>
-            </>
-          )}
-          <div
-            className={cn("model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5", mode === "video" ? "min-[1180px]:col-span-7" : "min-[1180px]:col-span-4")}
-            title={schemeSummary}
-            aria-label={schemeSummary}
-          >
-            {schemeModelChips.map((item) => (
-              <ModelSchemeChip key={item.label} label={item.label} value={item.value} />
-            ))}
-          </div>
-        </section>
-
-        <div className="grid items-stretch gap-0 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--panel)] min-[1180px]:grid-cols-[250px_minmax(360px,1fr)_350px]">
-          <div className="border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <ProductComposerReferenceTray
-              tVideo={tVideo}
-              className="h-full"
-              estimate={billingEstimates?.estimates.referenceImages}
-              product={selectedProduct}
-              pendingFiles={pendingImageFiles}
-              draftImages={draftReferenceImages}
-              pendingImages={pendingReferenceImageStatuses}
-              onImportAssets={onImportAssets}
-              onGenerateReferenceImages={onGenerateReferenceImages}
-              onToast={onToast}
-              onPreviewReferenceImage={setPreviewReferenceIndex}
-              onPendingPreview={(index) => setPreviewReferenceIndex(index)}
-              onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
-              onReorderReferenceImage={(fromIndex, toIndex) => void handleReorderReferenceImage(fromIndex, toIndex)}
-              onFilesChange={handleReferenceFiles}
-              onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
-            />
-          </div>
-
-          <div className="grid min-w-0 border-b border-[var(--border)] p-4 min-[1180px]:border-b-0 min-[1180px]:border-r">
-            <div className="product-facts-editor grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-              <div className="product-facts-actions flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm font-black text-[var(--text)]">{tVideo("facts.title")}</div>
-                <div className="flex items-center gap-2">
-                  {productAutoSaveLabel ? (
-                    <span className="text-[11px] font-black text-[var(--muted)]">{productAutoSaveLabel}</span>
-                  ) : null}
-                  <Button className="min-h-9 min-w-[220px] justify-center rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={() => void handleOrganizeProductPackage()}>
-                    {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
-                    {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
-                    <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.organizeProduct} />
-                  </Button>
-                </div>
-              </div>
-              <Textarea
-                ref={productFactsBodyRef}
-                className="product-facts-body h-full min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
-                rows={productFactsRows}
-                value={importText}
-                onChange={(event) => setImportText(event.target.value)}
-                onPaste={handleProductFactsPaste}
-                placeholder={tVideo("facts.placeholder")}
-              />
-            </div>
-
-            {importNotes.length > 0 ? (
-              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
-                {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="min-w-0 p-4">
-            <ProductModeOutputPanel
-              mode={mode}
-              appLocale={appLocale}
-              tVideo={tVideo}
-              workspace={creativeWorkspace}
-              imageModelLabel={imageModelLabel}
-              referenceImageCount={previewableReferenceImages.length}
-              template={template}
-              duration={duration}
-              storyboardDraft={storyboardDraft}
-              storyboardDraftIsGuidance={storyboardDraftIsGuidance}
-              storyboardHistory={storyboardHistory}
-              onStoryboardDraftChange={onStoryboardDraftChange}
-              onApplyStoryboardHistory={onApplyStoryboardHistory}
-              onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-              onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
-              isGeneratingStoryboard={isGeneratingStoryboard}
-              productReady={storyboardProductReady}
-              storyboardEstimate={billingEstimates?.estimates.storyboard}
-            />
-          </div>
-        </div>
-
-        <ProductModeActionBar
+        <ProductCreativeWorkbench
           mode={mode}
+          appLocale={appLocale}
           tVideo={tVideo}
           workspace={creativeWorkspace}
+          selectedProduct={selectedProduct}
+          pendingImageFiles={pendingImageFiles}
+          draftReferenceImages={draftReferenceImages}
+          pendingReferenceImageStatuses={pendingReferenceImageStatuses}
+          previewableReferenceImages={previewableReferenceImages}
+          importText={importText}
+          setImportText={setImportText}
+          draft={draft}
+          importNotes={importNotes}
+          productAutoSaveLabel={productAutoSaveLabel}
+          isPacking={isPacking}
+          packingDisabled={packingDisabled}
+          productFactsBodyRef={productFactsBodyRef}
+          productFactsRows={productFactsRows}
+          activeModelSchemeId={activeModelSchemeId}
+          modelSchemeOptions={modelSchemeOptions}
+          onModelSchemeChange={onModelSchemeChange}
+          template={template}
+          templateOptions={templateOptions}
+          onTemplateChange={onTemplateChange}
+          duration={duration}
+          durationOptions={durationOptions}
+          onDurationChange={onDurationChange}
+          selectedVideoResolution={selectedVideoResolution}
+          onVideoResolutionChange={onVideoResolutionChange}
+          selectedVideoAspectRatio={selectedVideoAspectRatio}
+          onVideoAspectRatioChange={onVideoAspectRatioChange}
+          finalLanguage={finalLanguage}
+          languageOptions={languageOptions}
+          onFinalLanguageChange={onFinalLanguageChange}
+          versionCount={versionCount}
+          versionCountOptions={versionCountOptions}
+          onVersionCountChange={onVersionCountChange}
+          imageModelLabel={imageModelLabel}
+          schemeSummary={schemeSummary}
+          schemeModelChips={schemeModelChips}
+          storyboardDraft={storyboardDraft}
+          storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+          storyboardHistory={storyboardHistory}
+          onStoryboardDraftChange={onStoryboardDraftChange}
+          onApplyStoryboardHistory={onApplyStoryboardHistory}
+          onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+          isGeneratingStoryboard={isGeneratingStoryboard}
+          storyboardProductReady={storyboardProductReady}
           generateVideoSummary={generateVideoSummary}
           imageGenerateSummary={imageGenerateSummary}
           generationReadiness={generationReadiness}
@@ -5372,25 +5249,28 @@ function ProductCreationComposer({
           isSubmittingImage={isSubmittingImage}
           videoEstimate={billingEstimates?.estimates.video}
           imageEstimate={billingEstimates?.estimates.referenceImages}
+          referenceImagesEstimate={billingEstimates?.estimates.referenceImages}
+          organizeProductEstimate={billingEstimates?.estimates.organizeProduct}
+          storyboardEstimate={billingEstimates?.estimates.storyboard}
+          onImportAssets={onImportAssets}
+          onGenerateReferenceImages={onGenerateReferenceImages}
+          onPreviewReferenceImage={setPreviewReferenceIndex}
+          onPendingPreview={(index) => setPreviewReferenceIndex(index)}
+          onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
+          onReorderReferenceImage={(fromIndex, toIndex) => void handleReorderReferenceImage(fromIndex, toIndex)}
+          onFilesChange={handleReferenceFiles}
+          onClearPendingFile={(index) => setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+          onOrganizeProductPackage={() => void handleOrganizeProductPackage()}
+          onProductFactsPaste={handleProductFactsPaste}
+          onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
           onGenerateVideo={handleGenerateVideo}
           onGenerateProductImages={handleGenerateProductImages}
-        />
-
-        <ProductModeAssetPanel
-          mode={mode}
-          appLocale={appLocale}
-          tVideo={tVideo}
           jobs={latestCreativeJobs}
-          product={selectedProduct}
-          draft={draft}
-          importText={importText}
-          images={previewableReferenceImages}
           onPreviewVideo={setPreviewJob}
           onDeleteVideo={setDeleteTarget}
           onRetryVideoJob={onRetryVideoJob}
           onRecoverVideoJobDownload={onRecoverVideoJobDownload}
           onToast={onToast}
-          onPreviewReferenceImage={setPreviewReferenceIndex}
         />
       </ProductCreationOperationWorkspace>
 
@@ -5442,6 +5322,382 @@ function ProductCreationComposer({
         }}
         onToast={onToast}
       />
+    </section>
+  );
+}
+
+function ProductCreativeWorkbench({
+  mode,
+  appLocale,
+  tVideo,
+  workspace,
+  selectedProduct,
+  pendingImageFiles,
+  draftReferenceImages,
+  pendingReferenceImageStatuses,
+  previewableReferenceImages,
+  importText,
+  setImportText,
+  draft,
+  importNotes,
+  productAutoSaveLabel,
+  isPacking,
+  packingDisabled,
+  productFactsBodyRef,
+  productFactsRows,
+  activeModelSchemeId,
+  modelSchemeOptions,
+  onModelSchemeChange,
+  template,
+  templateOptions,
+  onTemplateChange,
+  duration,
+  durationOptions,
+  onDurationChange,
+  selectedVideoResolution,
+  onVideoResolutionChange,
+  selectedVideoAspectRatio,
+  onVideoAspectRatioChange,
+  finalLanguage,
+  languageOptions,
+  onFinalLanguageChange,
+  versionCount,
+  versionCountOptions,
+  onVersionCountChange,
+  imageModelLabel,
+  schemeSummary,
+  schemeModelChips,
+  storyboardDraft,
+  storyboardDraftIsGuidance,
+  storyboardHistory,
+  onStoryboardDraftChange,
+  onApplyStoryboardHistory,
+  onDeleteStoryboardHistory,
+  isGeneratingStoryboard,
+  storyboardProductReady,
+  generateVideoSummary,
+  imageGenerateSummary,
+  generationReadiness,
+  generationReadinessMessageClass,
+  actionButtonClass,
+  actionDisabledClass,
+  generateVideoDisabled,
+  imageGenerateDisabled,
+  generateVideoButtonLabel,
+  isSubmittingVideo,
+  isSubmittingImage,
+  videoEstimate,
+  imageEstimate,
+  referenceImagesEstimate,
+  organizeProductEstimate,
+  storyboardEstimate,
+  onImportAssets,
+  onGenerateReferenceImages,
+  onPreviewReferenceImage,
+  onPendingPreview,
+  onDeleteReferenceImage,
+  onReorderReferenceImage,
+  onFilesChange,
+  onClearPendingFile,
+  onOrganizeProductPackage,
+  onProductFactsPaste,
+  onGenerateStoryboardDraft,
+  onGenerateVideo,
+  onGenerateProductImages,
+  jobs,
+  onPreviewVideo,
+  onDeleteVideo,
+  onRetryVideoJob,
+  onRecoverVideoJobDownload,
+  onToast
+}: {
+  mode: ProductCreativeWorkspaceMode;
+  appLocale: AppLocale;
+  tVideo: VideoStudioTranslator;
+  workspace: ProductCreativeWorkspace;
+  selectedProduct?: ProductDetail;
+  pendingImageFiles: File[];
+  draftReferenceImages: ReferenceImageStatus[];
+  pendingReferenceImageStatuses: ReferenceImageStatus[];
+  previewableReferenceImages: ReferenceImageStatus[];
+  importText: string;
+  setImportText: (text: string, draftOverride?: ProductDraft) => void;
+  draft: ProductDraft;
+  importNotes: string[];
+  productAutoSaveLabel: string;
+  isPacking: boolean;
+  packingDisabled: boolean;
+  productFactsBodyRef: React.RefObject<HTMLTextAreaElement | null>;
+  productFactsRows: number;
+  activeModelSchemeId: ModelSchemeChoice;
+  modelSchemeOptions: ModelSchemeOption[];
+  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
+  template: TemplateName;
+  templateOptions: TemplateName[];
+  onTemplateChange: (template: TemplateName) => void;
+  duration: number;
+  durationOptions: string[];
+  onDurationChange: (duration: number) => void;
+  selectedVideoResolution: VideoResolution;
+  onVideoResolutionChange: (resolution: VideoResolution) => void;
+  selectedVideoAspectRatio: VideoAspectRatio;
+  onVideoAspectRatioChange: (aspectRatio: VideoAspectRatio) => void;
+  finalLanguage: FinalVideoLanguage;
+  languageOptions: FinalVideoLanguage[];
+  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
+  versionCount: number;
+  versionCountOptions: string[];
+  onVersionCountChange: (versionCount: number) => void;
+  imageModelLabel: string;
+  schemeSummary: string;
+  schemeModelChips: Array<{ label: string; value: string }>;
+  storyboardDraft: string;
+  storyboardDraftIsGuidance: boolean;
+  storyboardHistory: StoryboardHistoryRecord[];
+  onStoryboardDraftChange: (draft: string) => void;
+  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  isGeneratingStoryboard: boolean;
+  storyboardProductReady: boolean;
+  generateVideoSummary: string;
+  imageGenerateSummary: string;
+  generationReadiness: { ready: boolean; label: string };
+  generationReadinessMessageClass: string;
+  actionButtonClass: string;
+  actionDisabledClass: string;
+  generateVideoDisabled: boolean;
+  imageGenerateDisabled: boolean;
+  generateVideoButtonLabel: string;
+  isSubmittingVideo: boolean;
+  isSubmittingImage: boolean;
+  videoEstimate?: BillingActionEstimate;
+  imageEstimate?: BillingActionEstimate;
+  referenceImagesEstimate?: BillingActionEstimate;
+  organizeProductEstimate?: BillingActionEstimate;
+  storyboardEstimate?: BillingActionEstimate;
+  onImportAssets: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onPreviewReferenceImage: (index: number) => void;
+  onPendingPreview: (index: number) => void;
+  onDeleteReferenceImage: (index: number) => void;
+  onReorderReferenceImage: (fromIndex: number, toIndex: number) => void;
+  onFilesChange: (files: FileList | File[] | null) => void;
+  onClearPendingFile: (index: number) => void;
+  onOrganizeProductPackage: () => void;
+  onProductFactsPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
+  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateVideo: () => Promise<void>;
+  onGenerateProductImages: () => Promise<void>;
+  jobs: CreativeVersionItem[];
+  onPreviewVideo: (job: CreativeVersionItem) => void;
+  onDeleteVideo: (job: CreativeVersionItem) => void;
+  onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
+  onToast: ConsoleToastFn;
+}) {
+  return (
+    <section className="product-creative-workbench grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.78fr)_minmax(360px,1.12fr)_minmax(320px,.95fr)]">
+      <div className="product-creative-source-column grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+        <ProductComposerReferenceTray
+          tVideo={tVideo}
+          className="h-full"
+          estimate={referenceImagesEstimate}
+          product={selectedProduct}
+          pendingFiles={pendingImageFiles}
+          draftImages={draftReferenceImages}
+          pendingImages={pendingReferenceImageStatuses}
+          onImportAssets={onImportAssets}
+          onGenerateReferenceImages={onGenerateReferenceImages}
+          onToast={onToast}
+          onPreviewReferenceImage={onPreviewReferenceImage}
+          onPendingPreview={onPendingPreview}
+          onDeleteReferenceImage={onDeleteReferenceImage}
+          onReorderReferenceImage={onReorderReferenceImage}
+          onFilesChange={onFilesChange}
+          onClearPendingFile={onClearPendingFile}
+        />
+
+        <div className="product-facts-editor grid min-h-[320px] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
+          <div className="product-facts-actions grid gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-black text-[var(--text)]">{tVideo("facts.title")}</div>
+              {productAutoSaveLabel ? (
+                <span className="text-[11px] font-black text-[var(--muted)]">{productAutoSaveLabel}</span>
+              ) : null}
+            </div>
+            <Button className="min-h-9 w-full justify-center rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
+              {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
+              {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
+              <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
+            </Button>
+          </div>
+          <Textarea
+            ref={productFactsBodyRef}
+            className="product-facts-body h-full min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
+            rows={productFactsRows}
+            value={importText}
+            onChange={(event) => setImportText(event.target.value)}
+            onPaste={onProductFactsPaste}
+            placeholder={tVideo("facts.placeholder")}
+          />
+          {importNotes.length > 0 ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
+              {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="product-creative-intent-column grid min-w-0 content-start gap-3">
+        <section className="product-creative-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+          <div className="model-scheme-control grid min-w-0 gap-1">
+            <CompactChoiceDropdown
+              label={tVideo("controls.modelScheme")}
+              value={activeModelSchemeId}
+              options={modelSchemeOptions.map((option) => option.id)}
+              formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
+              onChange={onModelSchemeChange}
+              density="compact"
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {mode === "video" ? (
+              <>
+                <CompactChoiceDropdown
+                  label={tVideo("controls.template")}
+                  value={template}
+                  options={templateOptions}
+                  formatOption={(option) => localizedTemplateLabel(option, tVideo)}
+                  onChange={onTemplateChange}
+                  density="compact"
+                />
+                <CompactChoiceDropdown
+                  label={tVideo("controls.duration")}
+                  value={String(duration)}
+                  options={durationOptions}
+                  formatOption={(option) => `${option}s`}
+                  onChange={(option) => onDurationChange(Number(option))}
+                  density="compact"
+                />
+                <CompactChoiceDropdown
+                  label={tVideo("controls.resolution")}
+                  value={selectedVideoResolution}
+                  options={videoResolutionOptions}
+                  formatOption={videoResolutionLabel}
+                  onChange={onVideoResolutionChange}
+                  density="compact"
+                />
+                <CompactChoiceDropdown
+                  label={tVideo("controls.aspectRatio")}
+                  value={selectedVideoAspectRatio}
+                  options={videoAspectRatioOptions}
+                  formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
+                  onChange={onVideoAspectRatioChange}
+                  density="compact"
+                />
+                <CompactChoiceDropdown
+                  label={tVideo("controls.finalLanguage")}
+                  value={finalLanguage}
+                  options={languageOptions}
+                  formatOption={(option) => finalLanguageLabel(option, tVideo)}
+                  onChange={onFinalLanguageChange}
+                  density="compact"
+                />
+                <CompactChoiceDropdown
+                  label={tVideo("controls.versionCount")}
+                  value={String(versionCount)}
+                  options={versionCountOptions}
+                  formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
+                  onChange={(option) => onVersionCountChange(Number(option))}
+                  density="compact"
+                />
+              </>
+            ) : (
+              <>
+                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片目标</span>
+                  <span className="truncate text-xs font-black text-[var(--text)]">主图 / 场景图 / 细节图</span>
+                </div>
+                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片模型</span>
+                  <span className="truncate text-xs font-black text-[var(--text)]">{imageModelLabel}</span>
+                </div>
+                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5 sm:col-span-2">
+                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">参考约束</span>
+                  <span className="truncate text-xs font-black text-[var(--text)]">{tVideo("summary.referenceImages", { count: previewableReferenceImages.length })}</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5" title={schemeSummary} aria-label={schemeSummary}>
+            {schemeModelChips.map((item) => (
+              <ModelSchemeChip key={item.label} label={item.label} value={item.value} />
+            ))}
+          </div>
+        </section>
+
+        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+          <ProductModeOutputPanel
+            mode={mode}
+            appLocale={appLocale}
+            tVideo={tVideo}
+            workspace={workspace}
+            imageModelLabel={imageModelLabel}
+            referenceImageCount={previewableReferenceImages.length}
+            template={template}
+            duration={duration}
+            storyboardDraft={storyboardDraft}
+            storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+            storyboardHistory={storyboardHistory}
+            onStoryboardDraftChange={onStoryboardDraftChange}
+            onApplyStoryboardHistory={onApplyStoryboardHistory}
+            onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+            onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+            isGeneratingStoryboard={isGeneratingStoryboard}
+            productReady={storyboardProductReady}
+            storyboardEstimate={storyboardEstimate}
+          />
+        </div>
+      </div>
+
+      <div className="product-creative-output-column grid min-w-0 content-start gap-3">
+        <ProductModeActionBar
+          mode={mode}
+          tVideo={tVideo}
+          workspace={workspace}
+          generateVideoSummary={generateVideoSummary}
+          imageGenerateSummary={imageGenerateSummary}
+          generationReadiness={generationReadiness}
+          generationReadinessMessageClass={generationReadinessMessageClass}
+          actionButtonClass={actionButtonClass}
+          actionDisabledClass={actionDisabledClass}
+          generateVideoDisabled={generateVideoDisabled}
+          imageGenerateDisabled={imageGenerateDisabled}
+          generateVideoButtonLabel={generateVideoButtonLabel}
+          isSubmittingVideo={isSubmittingVideo}
+          isSubmittingImage={isSubmittingImage}
+          videoEstimate={videoEstimate}
+          imageEstimate={imageEstimate}
+          onGenerateVideo={onGenerateVideo}
+          onGenerateProductImages={onGenerateProductImages}
+        />
+        <ProductModeAssetPanel
+          mode={mode}
+          appLocale={appLocale}
+          tVideo={tVideo}
+          jobs={jobs}
+          product={selectedProduct}
+          draft={draft}
+          importText={importText}
+          images={previewableReferenceImages}
+          onPreviewVideo={onPreviewVideo}
+          onDeleteVideo={onDeleteVideo}
+          onRetryVideoJob={onRetryVideoJob}
+          onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+          onToast={onToast}
+          onPreviewReferenceImage={onPreviewReferenceImage}
+        />
+      </div>
     </section>
   );
 }
