@@ -282,7 +282,7 @@ function promptPipelineForMode(mode: ProductCreativeWorkspaceMode): ProductCreat
   if (mode === "image") {
     return {
       title: "图片提示词编译契约",
-      inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+      inputSource: "商品记忆 + 视觉资产池 + 创作意图",
       optimizer: {
         label: "AI 可选优化层",
         detail: "只优化画面表达、构图和模型格式，不改写商品事实或禁用宣称"
@@ -296,7 +296,7 @@ function promptPipelineForMode(mode: ProductCreativeWorkspaceMode): ProductCreat
 
   return {
     title: "视频提示词编译契约",
-    inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+    inputSource: "商品记忆 + 视觉资产池 + 创作意图",
     optimizer: {
       label: "AI 可选优化层",
       detail: "只优化表达、镜头和模型格式，不改写商品事实或禁用宣称"

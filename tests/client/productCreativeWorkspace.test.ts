@@ -107,6 +107,7 @@ describe("buildProductCreativeWorkspace", () => {
       label: "优化商品图片",
       disabled: false
     });
+    expect(workspace.promptPipeline.inputSource).toBe("商品记忆 + 视觉资产池 + 创作意图");
     expect(workspace.promptCompilerSteps.at(-1)?.label).toBe("图片提示词");
     expect(workspace.promptCompilerSteps.at(-1)?.detail).toContain("主图");
   });
@@ -213,7 +214,7 @@ describe("buildProductCreativeWorkspace", () => {
 
     expect(workspace.promptPipeline).toEqual({
       title: "视频提示词编译契约",
-      inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+      inputSource: "商品记忆 + 视觉资产池 + 创作意图",
       optimizer: {
         label: "AI 可选优化层",
         detail: "只优化表达、镜头和模型格式，不改写商品事实或禁用宣称"
