@@ -4905,13 +4905,14 @@ function ProductCreationComposer({
     finalLanguageLabel(finalLanguage, tVideo),
     localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
   ].join(" · ");
+  const productImageAssetCount = 0;
   const creativeWorkspace = buildProductCreativeWorkspace({
     mode,
     products,
     selectedProduct,
     draftTitle: draft.title_ja,
     generatedVideoCount: latestCreativeJobs.length,
-    imageAssetCount: previewableReferenceImages.length
+    imageAssetCount: productImageAssetCount
   });
   const modeLabel = productCreativeWorkspaceModeLabel(mode);
   const imageModelLabel = localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo);
@@ -6118,8 +6119,8 @@ function ProductImageAssetPanel({
     )}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-base font-black text-[var(--text)]">商品图片资产</div>
-          <div className="mt-1 text-xs font-bold text-[var(--muted)]">图片模块产物会继续沉淀到同一个商品，供视频模块复用</div>
+          <div className="text-base font-black text-[var(--text)]">商品视觉资产池</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">这些图片当前保存在商品参考图列表中，会作为图片优化和视频生成的共同视觉约束</div>
         </div>
         <Badge>{tVideo("counts.image", { count: images.length })}</Badge>
       </div>
@@ -6160,7 +6161,7 @@ function ProductImageAssetPanel({
         )}>
           <div className="max-w-[340px]">
             <ImageIcon className="mx-auto text-[var(--accent)]" size={26} />
-            <div className="mt-2 text-sm font-black text-[var(--text)]">还没有图片资产</div>
+            <div className="mt-2 text-sm font-black text-[var(--text)]">还没有视觉资产</div>
             <p className="m-0 mt-1 text-xs font-bold leading-5 text-[var(--muted)]">先保存商品并添加参考图，再用图片优化动作生成可复用素材。</p>
           </div>
         </div>

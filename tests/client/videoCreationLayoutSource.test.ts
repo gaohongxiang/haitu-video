@@ -147,6 +147,20 @@ describe("video creation layout source", () => {
     expect(videoHistorySource).not.toContain('className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5"');
   });
 
+  it("does not double count reference images as image output assets in the creative workspace", async () => {
+    const source = await readFile(appPath, "utf8");
+    const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
+    const imageAssetSource = sourceBetween(source, "function ProductImageAssetPanel", "function ProductCreationProductLibrary");
+
+    expect(composerSource).toContain("const productImageAssetCount = 0");
+    expect(composerSource).toContain("imageAssetCount: productImageAssetCount");
+    expect(composerSource).not.toContain("imageAssetCount: previewableReferenceImages.length");
+    expect(imageAssetSource).toContain("商品视觉资产池");
+    expect(imageAssetSource).toContain("这些图片当前保存在商品参考图列表中，会作为图片优化和视频生成的共同视觉约束");
+    expect(imageAssetSource).not.toContain("商品图片资产");
+    expect(imageAssetSource).not.toContain("图片模块产物会继续沉淀到同一个商品，供视频模块复用");
+  });
+
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));

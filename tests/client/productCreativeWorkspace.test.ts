@@ -185,6 +185,22 @@ describe("buildProductCreativeWorkspace", () => {
     ]);
   });
 
+  it("keeps reference image inputs separate from image output asset counts", () => {
+    const workspace = buildProductCreativeWorkspace({
+      mode: "image",
+      products,
+      selectedProduct: product,
+      draftTitle: "",
+      generatedVideoCount: 0,
+      imageAssetCount: 0
+    });
+
+    expect(workspace.assetSummary.referenceImages).toBe(3);
+    expect(workspace.assetSummary.imageAssets).toBe(0);
+    expect(workspace.assetLedger.find((asset) => asset.id === "reference-images")?.count).toBe(3);
+    expect(workspace.assetLedger.find((asset) => asset.id === "image-assets")?.count).toBe(0);
+  });
+
   it("describes prompt optimization as a compiler contract instead of product memory", () => {
     const workspace = buildProductCreativeWorkspace({
       mode: "video",
