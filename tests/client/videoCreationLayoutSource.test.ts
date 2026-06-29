@@ -33,6 +33,7 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
     expect(composerSource).toContain("workspace.modeSwitch.map");
+    expect(composerSource).toContain("onModeChange={onModeChange}");
     expect(composerSource).toContain("workspace.architectureLanes.map");
     expect(composerSource).toContain("workspace.assetLedger.map");
     expect(composerSource).toContain("workspace.modeSummary");
@@ -42,6 +43,21 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("ProductModeOutputPanel");
     expect(composerSource).toContain("mode === \"video\"");
     expect(composerSource).toContain("mode === \"image\"");
+  });
+
+  it("renders the creative mode switch as navigation buttons that keep the product context", async () => {
+    const source = await readFile(appPath, "utf8");
+    const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductCreationProductLibrary"));
+    const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
+    const creativePanelSource = source.slice(source.indexOf("function ProductCreativeWorkspacePanel"), source.indexOf("function ProductAssetLedgerPanel"));
+
+    expect(workspaceSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
+    expect(composerSource).toContain("onModeChange={onModeChange}");
+    expect(creativePanelSource).toContain("onModeChange");
+    expect(creativePanelSource).toContain('type="button"');
+    expect(creativePanelSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(creativePanelSource).toContain("disabled={item.active}");
+    expect(creativePanelSource).not.toContain("<span");
   });
 
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {

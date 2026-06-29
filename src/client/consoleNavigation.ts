@@ -25,6 +25,8 @@ export function consoleSectionUrl(currentUrl: string, section: ConsoleSection): 
   url.searchParams.set("section", section);
   if (section !== "video") {
     url.searchParams.delete("step");
+  }
+  if (section !== "video" && section !== "image") {
     url.searchParams.delete("productSku");
   }
   return url.toString();

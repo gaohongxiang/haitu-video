@@ -3247,6 +3247,7 @@ export function App() {
               importNotes={importNotes}
               productAutoSaveStatus={productAutoSaveStatus}
               billingEstimates={billingEstimates}
+              onModeChange={(nextMode) => setActiveSection(nextMode)}
               onOrganizeProductPackage={organizeProductPackage}
               onFlushProductFactsAutoSave={flushProductFactsAutoSave}
               onSelectProduct={openProductStudio}
@@ -3345,6 +3346,7 @@ export function App() {
               importNotes={importNotes}
               productAutoSaveStatus={productAutoSaveStatus}
               billingEstimates={billingEstimates}
+              onModeChange={(nextMode) => setActiveSection(nextMode)}
               onOrganizeProductPackage={organizeProductPackage}
               onFlushProductFactsAutoSave={flushProductFactsAutoSave}
               onSelectProduct={openProductStudio}
@@ -4465,6 +4467,7 @@ function ProductCreationWorkspace({
   importNotes,
   productAutoSaveStatus,
   billingEstimates,
+  onModeChange,
   onOrganizeProductPackage,
   onFlushProductFactsAutoSave,
   onSelectProduct,
@@ -4534,6 +4537,7 @@ function ProductCreationWorkspace({
   importNotes: string[];
   productAutoSaveStatus: ProductAutoSaveStatus;
   billingEstimates?: BillingEstimatesResponse;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -4627,6 +4631,7 @@ function ProductCreationWorkspace({
       importNotes={importNotes}
       productAutoSaveStatus={productAutoSaveStatus}
       billingEstimates={billingEstimates}
+      onModeChange={onModeChange}
       onOrganizeProductPackage={onOrganizeProductPackage}
       onFlushProductFactsAutoSave={onFlushProductFactsAutoSave}
       onSelectProduct={onSelectProduct}
@@ -4698,6 +4703,7 @@ function ProductCreationComposer({
   importNotes,
   productAutoSaveStatus,
   billingEstimates,
+  onModeChange,
   onOrganizeProductPackage,
   onFlushProductFactsAutoSave,
   onSelectProduct,
@@ -4765,6 +4771,7 @@ function ProductCreationComposer({
   importNotes: string[];
   productAutoSaveStatus: ProductAutoSaveStatus;
   billingEstimates?: BillingEstimatesResponse;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -5178,7 +5185,7 @@ function ProductCreationComposer({
           </div>
         ) : null}
 
-        <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} />
+        <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} onModeChange={onModeChange} />
         <ProductAssetLedgerPanel workspace={creativeWorkspace} />
         <ProductPromptPipelinePanel workspace={creativeWorkspace} />
 
@@ -5594,10 +5601,12 @@ function ProductModeAssetPanel({
 
 function ProductCreativeWorkspacePanel({
   workspace,
-  modeLabel
+  modeLabel,
+  onModeChange
 }: {
   workspace: ProductCreativeWorkspace;
   modeLabel: string;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
 }) {
   return (
     <section className="grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_6%,var(--panel)),var(--panel))] p-3">
@@ -5605,7 +5614,7 @@ function ProductCreativeWorkspacePanel({
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
-            <span className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</span>
+            <div className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</div>
           </div>
           <h3 className="m-0 mt-2 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
           {workspace.selectedProductSku ? (
@@ -5617,17 +5626,20 @@ function ProductCreativeWorkspacePanel({
 
         <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
           {workspace.modeSwitch.map((item) => (
-            <span
+            <button
+              type="button"
               key={item.mode}
               className={cn(
-                "inline-flex min-h-8 items-center rounded-[8px] border px-2.5 text-xs font-black",
+                "inline-flex min-h-8 cursor-pointer items-center rounded-[8px] border px-2.5 text-xs font-black transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_32%,transparent)] disabled:cursor-default disabled:opacity-100",
                 item.active
                   ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
                   : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
               )}
+              disabled={item.active}
+              onClick={() => onModeChange(item.mode)}
             >
               {item.label}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -5635,7 +5647,7 @@ function ProductCreativeWorkspacePanel({
       <div className="grid gap-2 sm:grid-cols-4">
         {workspace.memoryChips.map((chip) => (
           <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
-            <span className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</span>
+            <div className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</div>
             <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
           </div>
         ))}
@@ -5654,9 +5666,9 @@ function ProductCreativeWorkspacePanel({
             <p className="m-0 text-xs font-semibold leading-5 text-[var(--muted)]">{lane.detail}</p>
             <div className="flex flex-wrap gap-1">
               {lane.items.map((item) => (
-                <span key={item} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
+                <div key={item} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
                   {item}
-                </span>
+                </div>
               ))}
             </div>
           </article>

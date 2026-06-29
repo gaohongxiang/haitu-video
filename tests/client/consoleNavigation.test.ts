@@ -36,7 +36,12 @@ describe("console navigation", () => {
     expect(url).toBe("http://127.0.0.1:4173/?provider=mock&section=ledger");
   });
 
-  it("drops product studio state when leaving video creation", () => {
+  it("keeps the selected product when switching between creative workspaces", () => {
+    expect(consoleSectionUrl("http://127.0.0.1:4173/?section=video&step=storyboard&productSku=TK-001", "image")).toBe("http://127.0.0.1:4173/?section=image&productSku=TK-001");
+    expect(consoleSectionUrl("http://127.0.0.1:4173/?section=image&productSku=TK-001", "video")).toBe("http://127.0.0.1:4173/?section=video&productSku=TK-001");
+  });
+
+  it("drops product studio state when leaving creative workspaces", () => {
     const url = consoleSectionUrl("http://127.0.0.1:4173/?section=video&step=storyboard&productSku=TK-001", "ledger");
 
     expect(url).toBe("http://127.0.0.1:4173/?section=ledger");
