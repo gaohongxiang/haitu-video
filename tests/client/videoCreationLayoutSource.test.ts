@@ -58,6 +58,7 @@ describe("video creation layout source", () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
     const commandCenterSource = sourceBetween(source, "function ProductCreativeCommandCenter", "function ProductModeActionBar");
+    const workspaceModelSource = await readFile("src/client/productCreativeWorkspace.ts", "utf8");
 
     expect(composerSource).toContain("<ProductCreativeCommandCenter");
     expect(composerSource).not.toContain("<ProductCreativeWorkspacePanel");
@@ -73,6 +74,10 @@ describe("video creation layout source", () => {
     expect(commandCenterSource).toContain("workspace.promptCompilerSteps.map");
     expect(commandCenterSource).toContain("workspace.assetLedger.map");
     expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(workspaceModelSource).toContain('"visual-asset-pool"');
+    expect(workspaceModelSource).toContain('"image-output-records"');
+    expect(workspaceModelSource).not.toContain('"reference-images"');
+    expect(workspaceModelSource).not.toContain('"image-assets"');
   });
 
   it("uses an operational workbench for source data, creative intent, and reusable outputs", async () => {

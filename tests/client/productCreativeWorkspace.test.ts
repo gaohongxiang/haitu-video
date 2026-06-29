@@ -133,7 +133,7 @@ describe("buildProductCreativeWorkspace", () => {
     ]);
     expect(workspace.architectureLanes[0].title).toBe("商品源数据");
     expect(workspace.architectureLanes[0].items).toContain("3 条可用事实");
-    expect(workspace.architectureLanes[1].items).toContain("3 张参考图");
+    expect(workspace.architectureLanes[1].items).toContain("3 个视觉资产");
     expect(workspace.architectureLanes[3].title).toBe("图片输出");
     expect(workspace.modeSummary).toContain("图片");
     expect(workspace.modeSummary).toContain("商品记忆");
@@ -150,28 +150,28 @@ describe("buildProductCreativeWorkspace", () => {
     });
 
     expect(workspace.assetLedger.map((asset) => asset.id)).toEqual([
-      "reference-images",
-      "image-assets",
+      "visual-asset-pool",
+      "image-output-records",
       "video-versions"
     ]);
     expect(workspace.assetLedger).toEqual([
       {
-        id: "reference-images",
-        label: "参考图",
+        id: "visual-asset-pool",
+        label: "视觉资产池",
         count: 3,
         unit: "张",
-        role: "输入约束",
-        detail: "锁定商品外观、材质和关键细节",
+        role: "商品级共享资产",
+        detail: "当前存储于参考图列表，作为图片优化和视频生成的共同视觉约束",
         reusableBy: ["image", "video"]
       },
       {
-        id: "image-assets",
-        label: "图片资产",
+        id: "image-output-records",
+        label: "图片输出记录",
         count: 4,
         unit: "个",
-        role: "图片模块输出",
-        detail: "主图、场景图、细节图会继续供视频模块复用",
-        reusableBy: ["image", "video"]
+        role: "独立图片账本预留",
+        detail: "后续独立记录主图、场景图、细节图版本；当前不与参考图重复计数",
+        reusableBy: ["image"]
       },
       {
         id: "video-versions",
@@ -197,8 +197,8 @@ describe("buildProductCreativeWorkspace", () => {
 
     expect(workspace.assetSummary.referenceImages).toBe(3);
     expect(workspace.assetSummary.imageAssets).toBe(0);
-    expect(workspace.assetLedger.find((asset) => asset.id === "reference-images")?.count).toBe(3);
-    expect(workspace.assetLedger.find((asset) => asset.id === "image-assets")?.count).toBe(0);
+    expect(workspace.assetLedger.find((asset) => asset.id === "visual-asset-pool")?.count).toBe(3);
+    expect(workspace.assetLedger.find((asset) => asset.id === "image-output-records")?.count).toBe(0);
   });
 
   it("describes prompt optimization as a compiler contract instead of product memory", () => {

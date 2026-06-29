@@ -16,7 +16,7 @@ export interface ProductCreativeAssetSummary {
   videoVersions: number;
 }
 
-export type ProductCreativeAssetLedgerItemId = "reference-images" | "image-assets" | "video-versions";
+export type ProductCreativeAssetLedgerItemId = "visual-asset-pool" | "image-output-records" | "video-versions";
 
 export interface ProductCreativeAssetLedgerItem {
   id: ProductCreativeAssetLedgerItemId;
@@ -144,22 +144,22 @@ function assetLedgerForSummary(summary: {
 }): ProductCreativeAssetLedgerItem[] {
   return [
     {
-      id: "reference-images",
-      label: "参考图",
+      id: "visual-asset-pool",
+      label: "视觉资产池",
       count: summary.referenceImages,
       unit: "张",
-      role: "输入约束",
-      detail: "锁定商品外观、材质和关键细节",
+      role: "商品级共享资产",
+      detail: "当前存储于参考图列表，作为图片优化和视频生成的共同视觉约束",
       reusableBy: ["image", "video"]
     },
     {
-      id: "image-assets",
-      label: "图片资产",
+      id: "image-output-records",
+      label: "图片输出记录",
       count: summary.imageAssetCount,
       unit: "个",
-      role: "图片模块输出",
-      detail: "主图、场景图、细节图会继续供视频模块复用",
-      reusableBy: ["image", "video"]
+      role: "独立图片账本预留",
+      detail: "后续独立记录主图、场景图、细节图版本；当前不与参考图重复计数",
+      reusableBy: ["image"]
     },
     {
       id: "video-versions",
@@ -192,7 +192,7 @@ function primaryActionForMode(mode: ProductCreativeWorkspaceMode, enabled: boole
 
 function modeSummaryForMode(mode: ProductCreativeWorkspaceMode): string {
   return mode === "image"
-    ? "图片模块读取同一份商品记忆和参考图，产出可复用的主图、场景图、细节图资产。"
+    ? "图片模块读取同一份商品记忆和视觉资产池，生成可回写商品的主图、场景图、细节图。"
     : "视频模块读取同一份商品记忆和视觉资产，产出分镜、节奏和模型视频输入。";
 }
 
@@ -228,8 +228,8 @@ function architectureLanesForMode(
     {
       id: "visual-assets",
       title: "视觉资产",
-      detail: "参考图和生成图约束商品外观，图片和视频共同复用。",
-      items: [`${summary.referenceImages} 张参考图`, `${summary.imageAssetCount} 个图片资产`, `${summary.generatedVideoCount} 个视频版本`]
+      detail: "当前商品图片统一在视觉资产池中约束商品外观，图片和视频共同复用。",
+      items: [`${summary.referenceImages} 个视觉资产`, `${summary.imageAssetCount} 个图片输出记录`, `${summary.generatedVideoCount} 个视频版本`]
     },
     {
       id: "creative-intent",
