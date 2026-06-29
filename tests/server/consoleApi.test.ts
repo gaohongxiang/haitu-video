@@ -691,7 +691,7 @@ describe("console API", () => {
     expect(appShell).not.toContain(">刷新<");
     expect(appShell).toContain("app-sidebar-account");
     expect(appShell).toContain("grid-rows-[auto_minmax(0,1fr)_auto]");
-    expect(appShell).toContain('activeSection === "video"');
+    expect(appShell).toContain("activeSectionIsCreativeWorkspace");
     expect(appShell).toContain("overflow-hidden p-0");
     expect(appShell).not.toContain("sticky top-0");
     expect(appShell).not.toContain("activeSectionSubtitle");
@@ -5444,7 +5444,9 @@ describe("console API", () => {
 
     const imageCase = appSource.slice(appSource.indexOf('case "image"'), appSource.indexOf('case "ledger"'));
     expect(imageCase).toContain('aria-label={tApp("image.ariaLabel")}');
-    expect(imageCase).toContain('tApp("image.empty")');
+    expect(imageCase).toContain("<ProductCreationWorkspace");
+    expect(imageCase).toContain('mode="image"');
+    expect(imageCase).not.toContain('tApp("image.empty")');
 
     const productCreationWorkspace = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     expect(productCreationWorkspace).toContain("<ProductCreationComposer");
@@ -5456,7 +5458,7 @@ describe("console API", () => {
     expect(productCreationWorkspace).not.toContain("ensureVideoProductSelection");
 
     const loadProductIntoDraftSource = appSource.slice(appSource.indexOf("async function loadProductIntoDraft"), appSource.indexOf("async function openProductStudio"));
-    expect(loadProductIntoDraftSource).toContain('if (activeSection === "video")');
+    expect(loadProductIntoDraftSource).toContain("if (activeSectionIsCreativeWorkspace)");
     expect(loadProductIntoDraftSource).toContain("applyProductToCreationComposerWithStoryboards(response.product)");
     expect(loadProductIntoDraftSource).toContain("persistProductStudioSku(response.product.sku)");
 

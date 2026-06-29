@@ -163,6 +163,12 @@ import {
   splitLines
 } from "./productDraftFacts.js";
 import {
+  buildProductCreativeWorkspace,
+  productCreativeWorkspaceModeLabel,
+  type ProductCreativeWorkspace,
+  type ProductCreativeWorkspaceMode
+} from "./productCreativeWorkspace.js";
+import {
   apiModeForProviderDraft,
   defaultModelConfigPreset,
   syncModelConfigDraftsFromLedger,
@@ -826,6 +832,10 @@ const navGroups = [
   { labelKey: "management", items: managementNavItems }
 ];
 
+function isCreativeWorkspaceSection(section: ConsoleSection): section is Extract<ConsoleSection, "image" | "video"> {
+  return section === "image" || section === "video";
+}
+
 const defaultFilters: Filters = {
   productSku: "all",
   provider: "all",
@@ -1031,6 +1041,7 @@ export function App() {
   const tApp: AppTranslator = (key, options) => i18n.t(`app:${key}`, { lng: appLocale, ...options });
   const tVideoApp: VideoStudioTranslator = (key, options) => i18n.t(`app:videoStudio.${key}`, { lng: appLocale, ...options });
   const activeSection = activeSectionState;
+  const activeSectionIsCreativeWorkspace = isCreativeWorkspaceSection(activeSection);
   const activeSectionLabelKey = navItems.find((item) => item.id === activeSection)?.labelKey ?? "video";
   const activeSectionLabel = tApp(`navigation.${activeSectionLabelKey}`);
   const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
@@ -1179,10 +1190,10 @@ export function App() {
   useEffect(() => {
     if (
       !consoleReady ||
-      activeSection !== "video" ||
+      !activeSectionIsCreativeWorkspace ||
       !textModelConfigured ||
       !imageModelConfigured ||
-      !videoModelConfigured
+      (activeSection === "video" && !videoModelConfigured)
     ) {
       setBillingEstimates(undefined);
       return;
@@ -1217,6 +1228,7 @@ export function App() {
     };
   }, [
     activeSection,
+    activeSectionIsCreativeWorkspace,
     consoleReady,
     duration,
     referenceImageEstimateCount,
@@ -1585,7 +1597,7 @@ export function App() {
       setVideoJobs(videoJobsResponse.jobs);
       videoJobsRef.current = videoJobsResponse.jobs;
       const currentStudioSku = selectedProductRef.current?.sku ?? selectedProductSkuRef.current;
-      const restoredStudioSku = activeSection === "video" ? restoreProductStudioSku(productsResponse.products, currentStudioSku) : "";
+      const restoredStudioSku = activeSectionIsCreativeWorkspace ? restoreProductStudioSku(productsResponse.products, currentStudioSku) : "";
       const restoredStudioProduct = productsResponse.products.find((product) => product.sku === restoredStudioSku);
       const nextProductPath = restoredStudioProduct?.path ?? (productPath && productsResponse.products.some((product) => product.path === productPath) ? productPath : "");
       setProductPath(nextProductPath);
@@ -1596,7 +1608,7 @@ export function App() {
         selectedProductSkuRef.current = undefined;
       }
       const selectedSku = selectedProductSkuRef.current;
-      if (!polling && activeSection === "video" && selectedSku && selectedProduct?.sku !== selectedSku) {
+      if (!polling && activeSectionIsCreativeWorkspace && selectedSku && selectedProduct?.sku !== selectedSku) {
         await refreshSelectedProductForStudio(selectedSku);
       }
       if (selectedSku && shouldRefreshSelectedProductForStudio(completedTransitions, selectedSku)) {
@@ -2407,7 +2419,7 @@ export function App() {
     setIsBusy(true);
     try {
       const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(sku)}`);
-      if (activeSection === "video") {
+      if (activeSectionIsCreativeWorkspace) {
         await applyProductToCreationComposerWithStoryboards(response.product);
         persistProductStudioSku(response.product.sku);
         setImportNotes([]);
@@ -2630,7 +2642,7 @@ export function App() {
         textModelConfigId: selectedTextModelConfigId
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
-      if (activeSection === "video") {
+      if (activeSectionIsCreativeWorkspace) {
         await applyProductToCreationComposerWithStoryboards(response.product);
         persistProductStudioSku(response.product.sku);
       } else {
@@ -2646,7 +2658,7 @@ export function App() {
       setPreflight(undefined);
       setPreflightSignature("");
       setStatusText([
-        activeSection === "video" ? tApp("status.importedAndEnteredVideo", { title: response.product.title_ja }) : tApp("status.importedProduct", { title: response.product.title_ja }),
+        activeSectionIsCreativeWorkspace ? tApp("status.importedAndEnteredVideo", { title: response.product.title_ja }) : tApp("status.importedProduct", { title: response.product.title_ja }),
         preview.quality.summary,
         ...preview.notes.map((note) => `- ${note}`)
       ].join("\n"));
@@ -2828,7 +2840,7 @@ export function App() {
         ...productDraft,
         source_text: productDraft.source_text || selectedProduct?.source_text || ""
       }));
-      const continueCreation = activeSection === "video";
+      const continueCreation = activeSectionIsCreativeWorkspace;
       if (editingCurrentProduct || continueCreation) {
         if (continueCreation) {
           await applyProductToCreationComposerWithStoryboards(response.product);
@@ -3086,7 +3098,7 @@ export function App() {
       setVideoJobs((current) => mergeVideoJobs([response.job], current));
       videoJobsRef.current = mergeVideoJobs([response.job], videoJobsRef.current);
       setStatusText(tApp("status.retriedTask", { jobId: response.job.id }));
-      if (activeSection === "video") {
+      if (activeSectionIsCreativeWorkspace) {
         await refreshSelectedProductForStudio();
       }
     } catch (error) {
@@ -3110,7 +3122,7 @@ export function App() {
       setVideoJobs((current) => mergeVideoJobs([response.job], current));
       videoJobsRef.current = mergeVideoJobs([response.job], videoJobsRef.current);
       setStatusText(tApp("status.recoverDownloadStarted"));
-      if (activeSection === "video") {
+      if (activeSectionIsCreativeWorkspace) {
         await refreshSelectedProductForStudio();
       }
     } catch (error) {
@@ -3218,6 +3230,7 @@ export function App() {
         return (
           <section className="grid gap-4" aria-label={tApp("navigation.video")}>
             <ProductCreationWorkspace
+              mode="video"
               appLocale={appLocale}
               products={products}
               pendingProductSku={selectedProduct?.sku ?? selectedProductSkuRef.current ?? selectedProductSummary?.sku}
@@ -3314,7 +3327,99 @@ export function App() {
       case "image":
         return (
           <section className="grid gap-4" aria-label={tApp("image.ariaLabel")}>
-            <EmptyState icon={<ImageIcon size={28} />} text={tApp("image.empty")} />
+            <ProductCreationWorkspace
+              mode="image"
+              appLocale={appLocale}
+              products={products}
+              pendingProductSku={selectedProduct?.sku ?? selectedProductSkuRef.current ?? selectedProductSummary?.sku}
+              selectedProduct={selectedProduct}
+              loadError={productStudioLoadError}
+              selectedProductGroup={selectedProductGroup}
+              ledgerJobs={ledger?.jobs ?? []}
+              videoJobs={videoJobs}
+              draft={productDraft}
+              importText={productImportText}
+              setImportText={updateProductComposerText}
+              pendingImageFiles={pendingImageFiles}
+              setPendingImageFiles={setPendingImageFiles}
+              importNotes={importNotes}
+              productAutoSaveStatus={productAutoSaveStatus}
+              billingEstimates={billingEstimates}
+              onOrganizeProductPackage={organizeProductPackage}
+              onFlushProductFactsAutoSave={flushProductFactsAutoSave}
+              onSelectProduct={openProductStudio}
+              onStartNewProduct={startNewVideoProduct}
+              onDeleteProduct={deleteProduct}
+              onGenerateVideo={queueProductVideoJobs}
+              onCancelVideoJob={cancelVideoJob}
+              onDeleteLedgerVideo={deleteLedgerVideo}
+              onRetryVideoJob={retryVideoJob}
+              onRecoverVideoJobDownload={recoverVideoJobDownload}
+              onGenerateStoryboardDraft={generateStoryboardDraft}
+              isGeneratingStoryboard={isGeneratingStoryboard}
+              onImportAssets={importProductAssets}
+              onUploadImages={uploadProductReferenceImages}
+              onGenerateReferenceImages={generateProductReferenceImages}
+              onDeleteReferenceImage={deleteProductReferenceImage}
+              onReorderReferenceImage={reorderProductReferenceImages}
+              modelSchemeOptions={modelSchemeOptions}
+              selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
+              onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
+              textModelOptions={textModelOptions}
+              selectedTextModelConfigId={selectedTextModelConfigId}
+              imageModelOptions={imageModelOptions}
+              selectedImageModelConfigId={selectedImageModelConfigId}
+              videoModelOptions={videoModelOptions}
+              selectedVideoModelConfigId={selectedVideoModelConfigId}
+              onVideoModelConfigChange={(nextConfigId) => {
+                setSelectedVideoModelConfigId(nextConfigId);
+                markPreflightStale();
+              }}
+              duration={duration}
+              onDurationChange={(nextDuration) => {
+                setDuration(nextDuration);
+                markPreflightStale();
+              }}
+              selectedVideoResolution={selectedVideoResolution}
+              onVideoResolutionChange={(nextResolution) => {
+                setSelectedVideoResolution(nextResolution);
+                markPreflightStale();
+              }}
+              selectedVideoAspectRatio={selectedVideoAspectRatio}
+              onVideoAspectRatioChange={(nextAspectRatio) => {
+                setSelectedVideoAspectRatio(nextAspectRatio);
+                markPreflightStale();
+              }}
+              versionCount={versionCount}
+              onVersionCountChange={setVersionCount}
+              template={template}
+              enabledTemplateOptions={enabledTemplateOptions}
+              onTemplateChange={(nextTemplate) => {
+                setTemplate(nextTemplate);
+                markPreflightStale();
+              }}
+              finalLanguage={finalLanguage}
+              onFinalLanguageChange={(nextLanguage) => {
+                setFinalLanguage(nextLanguage);
+                markPreflightStale();
+              }}
+              storyboardDraft={studioStoryboardDraft}
+              storyboardDraftIsGuidance={!storyboardDraftTouched}
+              storyboardDraftSource={storyboardDraftSource}
+              onStoryboardDraftChange={(nextDraft) => {
+                setStoryboardDraftTouched(true);
+                setStoryboardDraftSource("manual");
+                setStudioStoryboardDraft(nextDraft);
+                markPreflightStale();
+              }}
+              storyboardHistory={storyboardHistory}
+              onApplyStoryboardHistory={applyStoryboardHistory}
+              onDeleteStoryboardHistory={deleteStoryboardHistory}
+              onPreviewProductFileImport={previewProductFileImport}
+              onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
+              onCommitProductFileImportRows={commitProductFileImportRows}
+              onToast={showConsoleToast}
+            />
           </section>
         );
       case "ledger":
@@ -3495,7 +3600,7 @@ export function App() {
           ref={contentScrollerRef}
           className={cn(
             "min-h-0",
-            activeSection === "video"
+            activeSectionIsCreativeWorkspace
               ? "overflow-hidden p-0"
               : "overflow-y-auto px-4 py-4 min-[1100px]:px-6"
           )}
@@ -4343,6 +4448,7 @@ function PreflightPanel({ preflight, fresh }: { preflight?: Preflight; fresh: bo
 }
 
 function ProductCreationWorkspace({
+  mode,
   appLocale,
   products,
   pendingProductSku,
@@ -4411,6 +4517,7 @@ function ProductCreationWorkspace({
   onCommitProductFileImportRows,
   onToast
 }: {
+  mode: ProductCreativeWorkspaceMode;
   appLocale: AppLocale;
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -4505,6 +4612,7 @@ function ProductCreationWorkspace({
 
   return (
     <ProductCreationComposer
+      mode={mode}
       appLocale={appLocale}
       products={studioProductOptions}
       pendingProductSku={pendingProductSku}
@@ -4575,6 +4683,7 @@ function ProductCreationWorkspace({
 }
 
 function ProductCreationComposer({
+  mode,
   appLocale,
   products,
   pendingProductSku,
@@ -4641,6 +4750,7 @@ function ProductCreationComposer({
   onCommitProductFileImportRows,
   onToast
 }: {
+  mode: ProductCreativeWorkspaceMode;
   appLocale: AppLocale;
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -4709,6 +4819,7 @@ function ProductCreationComposer({
 }) {
   const [isPacking, setIsPacking] = useState(false);
   const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
+  const [isSubmittingImage, setIsSubmittingImage] = useState(false);
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
@@ -4759,7 +4870,7 @@ function ProductCreationComposer({
   const templateOptions = enabledTemplateOptions.includes(template)
     ? enabledTemplateOptions
     : [template, ...enabledTemplateOptions];
-  const packingDisabled = isPacking || isSubmittingVideo;
+  const packingDisabled = isPacking || isSubmittingVideo || isSubmittingImage;
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 8;
   const productFactsRows = Math.max(8, Math.min(15, productFactsLineCount + 1));
@@ -4789,6 +4900,23 @@ function ProductCreationComposer({
     videoResolutionLabel(selectedVideoResolution),
     videoAspectRatioLabel(selectedVideoAspectRatio, tVideo),
     finalLanguageLabel(finalLanguage, tVideo),
+    localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
+  ].join(" · ");
+  const creativeWorkspace = buildProductCreativeWorkspace({
+    mode,
+    products,
+    selectedProduct,
+    draftTitle: draft.title_ja,
+    generatedVideoCount: latestCreativeJobs.length,
+    imageAssetCount: previewableReferenceImages.length
+  });
+  const modeLabel = productCreativeWorkspaceModeLabel(mode);
+  const imageModelLabel = localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo);
+  const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
+  const imageGenerateSummary = [
+    localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
+    tVideo("summary.referenceImages", { count: previewableReferenceImages.length }),
+    `图片模型 ${imageModelLabel}`,
     localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
   ].join(" · ");
   useEffect(() => {
@@ -4868,6 +4996,26 @@ function ProductCreationComposer({
       onToast(errorMessage(error));
     } finally {
       setIsSubmittingVideo(false);
+    }
+  }
+
+  async function handleGenerateProductImages() {
+    if (creativeWorkspace.primaryAction.disabled) {
+      onToast(creativeWorkspace.primaryAction.reason ?? generationReadiness.label);
+      return;
+    }
+    if (packingDisabled) return;
+    setIsSubmittingImage(true);
+    try {
+      const autoSavedProduct = await onFlushProductFactsAutoSave();
+      const savedProduct = autoSavedProduct ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
+      if (!savedProduct) return;
+      await onGenerateReferenceImages(savedProduct.sku);
+      onToast("商品图片优化已提交", "ok");
+    } catch (error) {
+      onToast(errorMessage(error));
+    } finally {
+      setIsSubmittingImage(false);
     }
   }
 
@@ -5032,6 +5180,8 @@ function ProductCreationComposer({
           </div>
         ) : null}
 
+        <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} />
+
         <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
           <div className="model-scheme-control grid min-w-0 gap-1">
             <CompactChoiceDropdown
@@ -5043,56 +5193,75 @@ function ProductCreationComposer({
               density="compact"
             />
           </div>
-          <CompactChoiceDropdown
-            label={tVideo("controls.template")}
-            value={template}
-            options={templateOptions}
-            formatOption={(option) => localizedTemplateLabel(option, tVideo)}
-            onChange={onTemplateChange}
-            density="compact"
-          />
-          <CompactChoiceDropdown
-            label={tVideo("controls.duration")}
-            value={String(duration)}
-            options={durationOptions}
-            formatOption={(option) => `${option}s`}
-            onChange={(option) => onDurationChange(Number(option))}
-            density="compact"
-          />
-          <CompactChoiceDropdown
-            label={tVideo("controls.resolution")}
-            value={selectedVideoResolution}
-            options={videoResolutionOptions}
-            formatOption={videoResolutionLabel}
-            onChange={onVideoResolutionChange}
-            density="compact"
-          />
-          <CompactChoiceDropdown
-            label={tVideo("controls.aspectRatio")}
-            value={selectedVideoAspectRatio}
-            options={videoAspectRatioOptions}
-            formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
-            onChange={onVideoAspectRatioChange}
-            density="compact"
-          />
-          <CompactChoiceDropdown
-            label={tVideo("controls.finalLanguage")}
-            value={finalLanguage}
-            options={languageOptions}
-            formatOption={(option) => finalLanguageLabel(option, tVideo)}
-            onChange={onFinalLanguageChange}
-            density="compact"
-          />
-          <CompactChoiceDropdown
-            label={tVideo("controls.versionCount")}
-            value={String(versionCount)}
-            options={versionCountOptions}
-            formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
-            onChange={(option) => onVersionCountChange(Number(option))}
-            density="compact"
-          />
+          {mode === "video" ? (
+            <>
+              <CompactChoiceDropdown
+                label={tVideo("controls.template")}
+                value={template}
+                options={templateOptions}
+                formatOption={(option) => localizedTemplateLabel(option, tVideo)}
+                onChange={onTemplateChange}
+                density="compact"
+              />
+              <CompactChoiceDropdown
+                label={tVideo("controls.duration")}
+                value={String(duration)}
+                options={durationOptions}
+                formatOption={(option) => `${option}s`}
+                onChange={(option) => onDurationChange(Number(option))}
+                density="compact"
+              />
+              <CompactChoiceDropdown
+                label={tVideo("controls.resolution")}
+                value={selectedVideoResolution}
+                options={videoResolutionOptions}
+                formatOption={videoResolutionLabel}
+                onChange={onVideoResolutionChange}
+                density="compact"
+              />
+              <CompactChoiceDropdown
+                label={tVideo("controls.aspectRatio")}
+                value={selectedVideoAspectRatio}
+                options={videoAspectRatioOptions}
+                formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
+                onChange={onVideoAspectRatioChange}
+                density="compact"
+              />
+              <CompactChoiceDropdown
+                label={tVideo("controls.finalLanguage")}
+                value={finalLanguage}
+                options={languageOptions}
+                formatOption={(option) => finalLanguageLabel(option, tVideo)}
+                onChange={onFinalLanguageChange}
+                density="compact"
+              />
+              <CompactChoiceDropdown
+                label={tVideo("controls.versionCount")}
+                value={String(versionCount)}
+                options={versionCountOptions}
+                formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
+                onChange={(option) => onVersionCountChange(Number(option))}
+                density="compact"
+              />
+            </>
+          ) : (
+            <>
+              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片目标</span>
+                <span className="truncate text-xs font-black text-[var(--text)]">主图 / 场景图 / 细节图</span>
+              </div>
+              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片模型</span>
+                <span className="truncate text-xs font-black text-[var(--text)]">{imageModelLabel}</span>
+              </div>
+              <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">参考约束</span>
+                <span className="truncate text-xs font-black text-[var(--text)]">{tVideo("summary.referenceImages", { count: previewableReferenceImages.length })}</span>
+              </div>
+            </>
+          )}
           <div
-            className="model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5 min-[1180px]:col-span-7"
+            className={cn("model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5", mode === "video" ? "min-[1180px]:col-span-7" : "min-[1180px]:col-span-4")}
             title={schemeSummary}
             aria-label={schemeSummary}
           >
@@ -5158,61 +5327,105 @@ function ProductCreationComposer({
           </div>
 
           <div className="min-w-0 p-4">
-            <StoryboardComposerPanel
+            {mode === "video" ? (
+              <StoryboardComposerPanel
+                appLocale={appLocale}
+                tVideo={tVideo}
+                template={template}
+                duration={duration}
+                storyboardDraft={storyboardDraft}
+                storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+                storyboardHistory={storyboardHistory}
+                onStoryboardDraftChange={onStoryboardDraftChange}
+                onApplyStoryboardHistory={onApplyStoryboardHistory}
+                onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+                onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
+                isGeneratingStoryboard={isGeneratingStoryboard}
+                productReady={storyboardProductReady}
+                estimate={billingEstimates?.estimates.storyboard}
+              />
+            ) : (
+              <ProductImagePromptPanel
+                workspace={creativeWorkspace}
+                imageModelLabel={imageModelLabel}
+                referenceImageCount={previewableReferenceImages.length}
+              />
+            )}
+          </div>
+        </div>
+
+        {mode === "video" ? (
+          <>
+            <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+              <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
+                {generateVideoSummary}
+              </div>
+              <div className={generationReadinessMessageClass}>
+                {generationReadiness.label}
+              </div>
+              <div className="grid min-w-0 gap-1.5">
+                <Button
+                  className={generateVideoButtonClass}
+                  variant={generateVideoDisabled ? "default" : "primary"}
+                  disabled={generateVideoDisabled}
+                  aria-disabled={generateVideoDisabled}
+                  title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
+                  onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}
+                >
+                  {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
+                  {isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}
+                  <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.video} amountCny={billingEstimates?.estimates.video.upstreamEstimatedCostCny} />
+                </Button>
+              </div>
+            </div>
+
+            <VideoHistoryPanel
               appLocale={appLocale}
               tVideo={tVideo}
-              template={template}
-              duration={duration}
-              storyboardDraft={storyboardDraft}
-              storyboardDraftIsGuidance={storyboardDraftIsGuidance}
-              storyboardHistory={storyboardHistory}
-              onStoryboardDraftChange={onStoryboardDraftChange}
-              onApplyStoryboardHistory={onApplyStoryboardHistory}
-              onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-              onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
-              isGeneratingStoryboard={isGeneratingStoryboard}
-              productReady={storyboardProductReady}
-              estimate={billingEstimates?.estimates.storyboard}
+              jobs={latestCreativeJobs}
+              product={selectedProduct}
+              draft={draft}
+              importText={importText}
+              onPreview={setPreviewJob}
+              onDelete={setDeleteTarget}
+              onRetryVideoJob={onRetryVideoJob}
+              onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+              onToast={onToast}
             />
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+              <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
+                {imageGenerateSummary}
+              </div>
+              <div className={cn(generationReadinessMessageClass, creativeWorkspace.primaryAction.disabled && "text-[var(--danger)]")}>
+                {creativeWorkspace.primaryAction.disabled ? creativeWorkspace.primaryAction.reason : "商品图片将使用同一份商品记忆和参考图约束"}
+              </div>
+              <div className="grid min-w-0 gap-1.5">
+                <Button
+                  className={generateVideoButtonClass}
+                  variant={imageGenerateDisabled ? "default" : "primary"}
+                  disabled={imageGenerateDisabled}
+                  aria-disabled={imageGenerateDisabled}
+                  title={creativeWorkspace.primaryAction.disabled ? creativeWorkspace.primaryAction.reason : creativeWorkspace.primaryAction.label}
+                  onClick={imageGenerateDisabled ? undefined : () => void handleGenerateProductImages()}
+                >
+                  {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
+                  {isSubmittingImage ? "正在优化图片" : creativeWorkspace.primaryAction.label}
+                  <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.referenceImages} />
+                </Button>
+              </div>
+            </div>
 
-        <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-          <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
-            {generateVideoSummary}
-          </div>
-          <div className={generationReadinessMessageClass}>
-            {generationReadiness.label}
-          </div>
-          <div className="grid min-w-0 gap-1.5">
-            <Button
-              className={generateVideoButtonClass}
-              variant={generateVideoDisabled ? "default" : "primary"}
-              disabled={generateVideoDisabled}
-              aria-disabled={generateVideoDisabled}
-              title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
-              onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}
-            >
-              {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
-              {isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}
-              <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.video} amountCny={billingEstimates?.estimates.video.upstreamEstimatedCostCny} />
-            </Button>
-          </div>
-        </div>
-
-        <VideoHistoryPanel
-          appLocale={appLocale}
-          tVideo={tVideo}
-          jobs={latestCreativeJobs}
-          product={selectedProduct}
-          draft={draft}
-          importText={importText}
-          onPreview={setPreviewJob}
-          onDelete={setDeleteTarget}
-          onRetryVideoJob={onRetryVideoJob}
-          onRecoverVideoJobDownload={onRecoverVideoJobDownload}
-          onToast={onToast}
-        />
+            <ProductImageAssetPanel
+              tVideo={tVideo}
+              product={selectedProduct}
+              images={previewableReferenceImages}
+              onPreviewReferenceImage={setPreviewReferenceIndex}
+            />
+          </>
+        )}
       </ProductCreationOperationWorkspace>
 
       <VideoPreviewDialog
@@ -5263,6 +5476,156 @@ function ProductCreationComposer({
         }}
         onToast={onToast}
       />
+    </section>
+  );
+}
+
+function ProductCreativeWorkspacePanel({
+  workspace,
+  modeLabel
+}: {
+  workspace: ProductCreativeWorkspace;
+  modeLabel: string;
+}) {
+  const assetItems = [
+    { label: "参考图", value: workspace.assetSummary.referenceImages },
+    { label: "图片资产", value: workspace.assetSummary.imageAssets },
+    { label: "视频版本", value: workspace.assetSummary.videoVersions }
+  ];
+  return (
+    <section className="grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_6%,var(--panel)),var(--panel))] p-3 min-[1180px]:grid-cols-[minmax(220px,.95fr)_minmax(0,1.45fr)_minmax(260px,1fr)]">
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
+          <span className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</span>
+        </div>
+        <h3 className="m-0 mt-2 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
+        {workspace.selectedProductSku ? (
+          <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
+        ) : null}
+      </div>
+
+      <div className="grid gap-2">
+        <div className="text-[11px] font-black uppercase text-[var(--muted)]">商品记忆</div>
+        <div className="grid gap-2 sm:grid-cols-4">
+          {workspace.memoryChips.map((chip) => (
+            <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
+              <span className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</span>
+              <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <div className="text-[11px] font-black uppercase text-[var(--muted)]">共享资产</div>
+        <div className="grid grid-cols-3 gap-2">
+          {assetItems.map((item) => (
+            <div key={item.label} className="rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-2 text-center">
+              <div className="text-base font-black leading-5 text-[var(--text)]">{item.value}</div>
+              <div className="mt-0.5 text-[10px] font-black text-[var(--muted)]">{item.label}</div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
+          商品事实是源头，提示词只从这里和视觉资产编译出来。
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProductImagePromptPanel({
+  workspace,
+  imageModelLabel,
+  referenceImageCount
+}: {
+  workspace: ProductCreativeWorkspace;
+  imageModelLabel: string;
+  referenceImageCount: number;
+}) {
+  return (
+    <section className="grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)] gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-base font-black text-[var(--text)]">图片提示词编译</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">从商品记忆、参考图和图片目标生成模型输入</div>
+        </div>
+        <Badge>{workspace.primaryAction.label}</Badge>
+      </div>
+
+      <div className="grid content-start gap-2">
+        {workspace.promptCompilerSteps.map((step, index) => (
+          <article key={step.id} className="grid gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--field)] px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-black text-[var(--text)]">{step.label}</span>
+              <Badge tone={index === workspace.promptCompilerSteps.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
+            </div>
+            <p className="m-0 text-xs font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
+          </article>
+        ))}
+        <div className="rounded-[10px] border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--field))] px-3 py-2.5">
+          <div className="text-xs font-black text-[var(--text)]">当前图片模型</div>
+          <div className="mt-1 text-xs font-bold leading-5 text-[var(--muted)]">{imageModelLabel} · {referenceImageCount} 张参考图约束商品外观</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProductImageAssetPanel({
+  tVideo,
+  product,
+  images,
+  onPreviewReferenceImage
+}: {
+  tVideo: VideoStudioTranslator;
+  product?: ProductDetail;
+  images: ReferenceImageStatus[];
+  onPreviewReferenceImage: (index: number) => void;
+}) {
+  return (
+    <section className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-base font-black text-[var(--text)]">商品图片资产</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">图片模块产物会继续沉淀到同一个商品，供视频模块复用</div>
+        </div>
+        <Badge>{tVideo("counts.image", { count: images.length })}</Badge>
+      </div>
+      {images.length > 0 ? (
+        <div className="grid gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--field)] p-2 sm:grid-cols-2 lg:grid-cols-4">
+          {images.map((image, index) => (
+            <button
+              key={`${image.original}-${index}`}
+              type="button"
+              className="group/image-asset grid min-h-[156px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--panel)] text-left transition hover:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))]"
+              title={image.original}
+              onClick={() => onPreviewReferenceImage(index)}
+            >
+              <span className="grid h-[112px] place-items-center overflow-hidden bg-[var(--panel2)]">
+                {image.previewUrl ? (
+                  <img className="h-full w-full object-cover transition group-hover/image-asset:scale-[1.03]" src={image.previewUrl} alt={`${product?.sku ?? "product"} image ${index + 1}`} />
+                ) : (
+                  <span className="px-3 text-center text-xs font-bold text-[var(--muted)]">{referenceStatusLabel(image.status, tVideo)}</span>
+                )}
+              </span>
+              <span className="grid min-w-0 gap-1 px-2.5 py-2">
+                <span className="truncate text-xs font-black text-[var(--text)]">商品图 {index + 1}</span>
+                <span className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="grid min-h-[150px] place-items-center rounded-[14px] border border-dashed border-[var(--border)] bg-[var(--field)] px-4 py-6 text-center">
+          <div className="max-w-[340px]">
+            <ImageIcon className="mx-auto text-[var(--accent)]" size={26} />
+            <div className="mt-2 text-sm font-black text-[var(--text)]">还没有图片资产</div>
+            <p className="m-0 mt-1 text-xs font-bold leading-5 text-[var(--muted)]">先保存商品并添加参考图，再用图片优化动作生成可复用素材。</p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

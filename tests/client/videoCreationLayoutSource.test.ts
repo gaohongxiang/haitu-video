@@ -5,6 +5,25 @@ import { describe, expect, it } from "vitest";
 const appPath = "src/client/App.tsx";
 
 describe("video creation layout source", () => {
+  it("uses one product creative workspace for both image and video creation", async () => {
+    const source = await readFile(appPath, "utf8");
+    const appSource = source.slice(source.indexOf("export function App()"), source.indexOf("function AppLanguageSwitcher"));
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
+    const imageCase = appSource.slice(appSource.indexOf('case "image"'), appSource.indexOf('case "ledger"'));
+    const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductCreationProductLibrary"));
+    const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
+
+    expect(videoCase).toContain('mode="video"');
+    expect(imageCase).toContain('mode="image"');
+    expect(imageCase).toContain("<ProductCreationWorkspace");
+    expect(imageCase).not.toContain('tApp("image.empty")');
+    expect(workspaceSource).toContain("mode: ProductCreativeWorkspaceMode;");
+    expect(composerSource).toContain("buildProductCreativeWorkspace");
+    expect(composerSource).toContain("ProductCreativeWorkspacePanel");
+    expect(composerSource).toContain("ProductImageAssetPanel");
+    expect(composerSource).toContain("handleGenerateProductImages");
+  });
+
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
@@ -273,7 +292,7 @@ describe("video creation layout source", () => {
     expect(appShellSource).toContain("group/sidebar-nav-item relative grid min-h-9 w-full min-w-0 overflow-hidden");
     expect(appShellSource).toContain('<span className={cn("min-w-0 truncate", sidebarCollapsed && "sr-only")}>{label}</span>');
     expect(appShellSource).toContain("contentScrollerRef");
-    expect(appShellSource).toContain('activeSection === "video"');
+    expect(appShellSource).toContain("activeSectionIsCreativeWorkspace");
     expect(appShellSource).toContain("overflow-hidden p-0");
     expect(appShellSource).not.toContain("sticky top-0");
     expect(appShellSource).not.toContain("activeSectionSubtitle");

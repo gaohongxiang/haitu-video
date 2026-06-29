@@ -60,13 +60,15 @@ describe("full site i18n source boundaries", () => {
     const loadingSource = source.slice(source.indexOf("function ConsoleSectionLoadingState"), source.indexOf("function errorMessage"));
 
     expect(appSource).toContain('tApp("dashboard.ariaLabel")');
-    expect(appSource).toContain('tApp("image.empty")');
+    expect(appSource).toContain('tApp("image.ariaLabel")');
+    expect(appSource).toContain('mode="image"');
     expect(appSource).toContain('tApp("ledger.ariaLabel")');
     expect(appSource).toContain('tApp("wallet.ariaLabel")');
     expect(appSource).toContain('tApp("pricing.ariaLabel")');
     expect(appSource).toContain('tApp("settings.ariaLabel")');
     expect(appSource).not.toContain('aria-label="仪表盘"');
     expect(appSource).not.toContain('text="图片创作待上线"');
+    expect(appSource).not.toContain('tApp("image.empty")');
 
     expect(loginSource).toContain('const tAuth = (key: string, options?: Record<string, unknown>) => i18n.t(`app:auth.${key}`, options);');
     expect(loginSource).toContain('tAuth("title")');
