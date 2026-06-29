@@ -5180,7 +5180,7 @@ function ProductCreationComposer({
 
         <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} />
         <ProductAssetLedgerPanel workspace={creativeWorkspace} />
-        <ProductPromptCompilerPanel workspace={creativeWorkspace} />
+        <ProductPromptPipelinePanel workspace={creativeWorkspace} />
 
         <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
           <div className="model-scheme-control grid min-w-0 gap-1">
@@ -5705,12 +5705,29 @@ function ProductAssetLedgerPanel({ workspace }: { workspace: ProductCreativeWork
   );
 }
 
-function ProductPromptCompilerPanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
+function ProductPromptPipelinePanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
+  const pipelineStages = [
+    { label: "输入源", detail: workspace.promptPipeline.inputSource },
+    { label: workspace.promptPipeline.optimizer.label, detail: workspace.promptPipeline.optimizer.detail },
+    { label: workspace.promptPipeline.output.label, detail: workspace.promptPipeline.output.detail }
+  ];
+
   return (
     <section className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-black text-[var(--text)]">提示词编译器</div>
+        <div className="text-sm font-black text-[var(--text)]">{workspace.promptPipeline.title}</div>
         <Badge>{workspace.mode === "image" ? "Image Prompt" : "Video Prompt"}</Badge>
+      </div>
+      <div className="grid gap-2 min-[900px]:grid-cols-3">
+        {pipelineStages.map((stage, index) => (
+          <article key={stage.label} className="grid min-h-[88px] content-start gap-1 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-xs font-black text-[var(--text)]">{stage.label}</span>
+              <Badge tone={index === pipelineStages.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
+            </div>
+            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{stage.detail}</p>
+          </article>
+        ))}
       </div>
       <div className="grid gap-2 min-[1180px]:grid-cols-4">
         {workspace.promptCompilerSteps.map((step, index) => (

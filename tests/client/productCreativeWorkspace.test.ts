@@ -185,6 +185,30 @@ describe("buildProductCreativeWorkspace", () => {
     ]);
   });
 
+  it("describes prompt optimization as a compiler contract instead of product memory", () => {
+    const workspace = buildProductCreativeWorkspace({
+      mode: "video",
+      products,
+      selectedProduct: product,
+      draftTitle: "",
+      generatedVideoCount: 2,
+      imageAssetCount: 4
+    });
+
+    expect(workspace.promptPipeline).toEqual({
+      title: "视频提示词编译契约",
+      inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+      optimizer: {
+        label: "AI 可选优化层",
+        detail: "只优化表达、镜头和模型格式，不改写商品事实或禁用宣称"
+      },
+      output: {
+        label: "视频模型 Payload",
+        detail: "Seedance 输入包含镜头、动作、节奏、比例、语言和参考资产"
+      }
+    });
+  });
+
   it("keeps creation disabled until a product draft or saved product exists", () => {
     const workspace = buildProductCreativeWorkspace({
       mode: "video",

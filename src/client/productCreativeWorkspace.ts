@@ -34,6 +34,19 @@ export interface ProductCreativePromptCompilerStep {
   detail: string;
 }
 
+export interface ProductCreativePromptPipeline {
+  title: string;
+  inputSource: string;
+  optimizer: {
+    label: string;
+    detail: string;
+  };
+  output: {
+    label: string;
+    detail: string;
+  };
+}
+
 export interface ProductCreativePrimaryAction {
   mode: ProductCreativeWorkspaceMode;
   label: string;
@@ -66,6 +79,7 @@ export interface ProductCreativeWorkspace {
   memoryChips: ProductCreativeMemoryChip[];
   architectureLanes: ProductCreativeArchitectureLane[];
   promptCompilerSteps: ProductCreativePromptCompilerStep[];
+  promptPipeline: ProductCreativePromptPipeline;
   primaryAction: ProductCreativePrimaryAction;
 }
 
@@ -118,6 +132,7 @@ export function buildProductCreativeWorkspace(input: ProductCreativeWorkspaceInp
     ],
     architectureLanes: architectureLanesForMode(input.mode, summary),
     promptCompilerSteps: promptCompilerStepsForMode(input.mode, summary),
+    promptPipeline: promptPipelineForMode(input.mode),
     primaryAction: primaryActionForMode(input.mode, hasCreationSubject)
   };
 }
@@ -261,4 +276,34 @@ function promptCompilerStepsForMode(
       detail: outputDetail
     }
   ];
+}
+
+function promptPipelineForMode(mode: ProductCreativeWorkspaceMode): ProductCreativePromptPipeline {
+  if (mode === "image") {
+    return {
+      title: "图片提示词编译契约",
+      inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+      optimizer: {
+        label: "AI 可选优化层",
+        detail: "只优化画面表达、构图和模型格式，不改写商品事实或禁用宣称"
+      },
+      output: {
+        label: "图片模型 Payload",
+        detail: "图片输入包含主体、场景、构图、细节约束和参考资产"
+      }
+    };
+  }
+
+  return {
+    title: "视频提示词编译契约",
+    inputSource: "商品记忆 + 商品资产账本 + 创作意图",
+    optimizer: {
+      label: "AI 可选优化层",
+      detail: "只优化表达、镜头和模型格式，不改写商品事实或禁用宣称"
+    },
+    output: {
+      label: "视频模型 Payload",
+      detail: "Seedance 输入包含镜头、动作、节奏、比例、语言和参考资产"
+    }
+  };
 }
