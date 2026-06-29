@@ -5498,6 +5498,7 @@ function ProductCreativeWorkbench({
   return (
     <section className="product-creative-workbench grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.78fr)_minmax(360px,1.12fr)_minmax(320px,.95fr)]">
       <div className="product-creative-source-column grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">源数据</div>
         <ProductComposerReferenceTray
           tVideo={tVideo}
           className="h-full"
@@ -5549,6 +5550,7 @@ function ProductCreativeWorkbench({
       </div>
 
       <div className="product-creative-intent-column grid min-w-0 content-start gap-3">
+        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">创作意图</div>
         <section className="product-creative-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
           <div className="model-scheme-control grid min-w-0 gap-1">
             <CompactChoiceDropdown
@@ -5661,6 +5663,7 @@ function ProductCreativeWorkbench({
       </div>
 
       <div className="product-creative-output-column grid min-w-0 content-start gap-3">
+        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">输出资产</div>
         <ProductModeActionBar
           mode={mode}
           tVideo={tVideo}

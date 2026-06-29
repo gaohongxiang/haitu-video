@@ -89,6 +89,10 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("product-creative-source-column");
     expect(workbenchSource).toContain("product-creative-intent-column");
     expect(workbenchSource).toContain("product-creative-output-column");
+    expect(workbenchSource).toContain("product-creative-column-heading");
+    expect(workbenchSource).toContain("源数据");
+    expect(workbenchSource).toContain("创作意图");
+    expect(workbenchSource).toContain("输出资产");
     expect(workbenchSource).toContain("ProductComposerReferenceTray");
     expect(workbenchSource).toContain("ProductModeOutputPanel");
     expect(workbenchSource).toContain("ProductModeActionBar");
