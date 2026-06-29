@@ -139,6 +139,52 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.modeSummary).toContain("商品记忆");
   });
 
+  it("models reusable media as one product asset ledger shared by image and video modes", () => {
+    const workspace = buildProductCreativeWorkspace({
+      mode: "video",
+      products,
+      selectedProduct: product,
+      draftTitle: "",
+      generatedVideoCount: 2,
+      imageAssetCount: 4
+    });
+
+    expect(workspace.assetLedger.map((asset) => asset.id)).toEqual([
+      "reference-images",
+      "image-assets",
+      "video-versions"
+    ]);
+    expect(workspace.assetLedger).toEqual([
+      {
+        id: "reference-images",
+        label: "参考图",
+        count: 3,
+        unit: "张",
+        role: "输入约束",
+        detail: "锁定商品外观、材质和关键细节",
+        reusableBy: ["image", "video"]
+      },
+      {
+        id: "image-assets",
+        label: "图片资产",
+        count: 4,
+        unit: "个",
+        role: "图片模块输出",
+        detail: "主图、场景图、细节图会继续供视频模块复用",
+        reusableBy: ["image", "video"]
+      },
+      {
+        id: "video-versions",
+        label: "视频版本",
+        count: 2,
+        unit: "个",
+        role: "视频模块输出",
+        detail: "成片、分镜和投放版本沉淀回商品历史",
+        reusableBy: ["video"]
+      }
+    ]);
+  });
+
   it("keeps creation disabled until a product draft or saved product exists", () => {
     const workspace = buildProductCreativeWorkspace({
       mode: "video",

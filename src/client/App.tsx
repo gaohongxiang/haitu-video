@@ -5179,6 +5179,7 @@ function ProductCreationComposer({
         ) : null}
 
         <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} />
+        <ProductAssetLedgerPanel workspace={creativeWorkspace} />
         <ProductPromptCompilerPanel workspace={creativeWorkspace} />
 
         <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
@@ -5664,6 +5665,41 @@ function ProductCreativeWorkspacePanel({
 
       <div className="rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
         商品事实是源头，提示词只是编译结果；图片资产和视频版本都会沉淀回同一个商品。
+      </div>
+    </section>
+  );
+}
+
+function ProductAssetLedgerPanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
+  return (
+    <section className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-black text-[var(--text)]">商品资产账本</div>
+        <Badge>{workspace.mode === "image" ? "写入图片资产" : "读取视觉资产"}</Badge>
+      </div>
+      <div className="grid gap-2 min-[900px]:grid-cols-3">
+        {workspace.assetLedger.map((asset) => (
+          <article key={asset.id} className="grid min-h-[104px] gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-black text-[var(--text)]">{asset.label}</div>
+                <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">{asset.role}</div>
+              </div>
+              <div className="shrink-0 text-right">
+                <strong className="text-xl font-black leading-none text-[var(--text)]">{asset.count}</strong>
+                <span className="ml-0.5 text-[10px] font-black text-[var(--muted)]">{asset.unit}</span>
+              </div>
+            </div>
+            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{asset.detail}</p>
+            <div className="flex flex-wrap gap-1">
+              {asset.reusableBy.map((mode) => (
+                <span key={mode} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
+                  {productCreativeWorkspaceModeLabel(mode)}
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );

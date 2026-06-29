@@ -16,6 +16,18 @@ export interface ProductCreativeAssetSummary {
   videoVersions: number;
 }
 
+export type ProductCreativeAssetLedgerItemId = "reference-images" | "image-assets" | "video-versions";
+
+export interface ProductCreativeAssetLedgerItem {
+  id: ProductCreativeAssetLedgerItemId;
+  label: string;
+  count: number;
+  unit: string;
+  role: string;
+  detail: string;
+  reusableBy: ProductCreativeWorkspaceMode[];
+}
+
 export interface ProductCreativePromptCompilerStep {
   id: "product-memory" | "visual-assets" | "creative-intent" | "model-prompt";
   label: string;
@@ -50,6 +62,7 @@ export interface ProductCreativeWorkspace {
   modeSummary: string;
   modeSwitch: ProductCreativeModeSwitchItem[];
   assetSummary: ProductCreativeAssetSummary;
+  assetLedger: ProductCreativeAssetLedgerItem[];
   memoryChips: ProductCreativeMemoryChip[];
   architectureLanes: ProductCreativeArchitectureLane[];
   promptCompilerSteps: ProductCreativePromptCompilerStep[];
@@ -96,6 +109,7 @@ export function buildProductCreativeWorkspace(input: ProductCreativeWorkspaceInp
       imageAssets: summary.imageAssetCount,
       videoVersions: summary.generatedVideoCount
     },
+    assetLedger: assetLedgerForSummary(summary),
     memoryChips: [
       { kind: "facts", label: "可用事实", value: String(factsCount) },
       { kind: "references", label: "参考图", value: String(referenceImages) },
@@ -106,6 +120,42 @@ export function buildProductCreativeWorkspace(input: ProductCreativeWorkspaceInp
     promptCompilerSteps: promptCompilerStepsForMode(input.mode, summary),
     primaryAction: primaryActionForMode(input.mode, hasCreationSubject)
   };
+}
+
+function assetLedgerForSummary(summary: {
+  referenceImages: number;
+  imageAssetCount: number;
+  generatedVideoCount: number;
+}): ProductCreativeAssetLedgerItem[] {
+  return [
+    {
+      id: "reference-images",
+      label: "参考图",
+      count: summary.referenceImages,
+      unit: "张",
+      role: "输入约束",
+      detail: "锁定商品外观、材质和关键细节",
+      reusableBy: ["image", "video"]
+    },
+    {
+      id: "image-assets",
+      label: "图片资产",
+      count: summary.imageAssetCount,
+      unit: "个",
+      role: "图片模块输出",
+      detail: "主图、场景图、细节图会继续供视频模块复用",
+      reusableBy: ["image", "video"]
+    },
+    {
+      id: "video-versions",
+      label: "视频版本",
+      count: summary.generatedVideoCount,
+      unit: "个",
+      role: "视频模块输出",
+      detail: "成片、分镜和投放版本沉淀回商品历史",
+      reusableBy: ["video"]
+    }
+  ];
 }
 
 function productReferenceImageCount(product?: ProductDetail): number {

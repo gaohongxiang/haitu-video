@@ -28,10 +28,12 @@ describe("video creation layout source", () => {
     expect(workspaceSource).toContain("mode: ProductCreativeWorkspaceMode;");
     expect(composerSource).toContain("buildProductCreativeWorkspace");
     expect(composerSource).toContain("ProductCreativeWorkspacePanel");
+    expect(composerSource).toContain("ProductAssetLedgerPanel");
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
     expect(composerSource).toContain("workspace.modeSwitch.map");
     expect(composerSource).toContain("workspace.architectureLanes.map");
+    expect(composerSource).toContain("workspace.assetLedger.map");
     expect(composerSource).toContain("workspace.modeSummary");
     expect(composerSource).toContain("product-creative-architecture-lane");
     expect(composerSource).toContain("ProductPromptCompilerPanel");
