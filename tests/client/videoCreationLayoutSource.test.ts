@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest";
 
 const appPath = "src/client/App.tsx";
 
+function sourceBetween(source: string, start: string, end: string): string {
+  const startIndex = source.indexOf(start);
+  expect(startIndex).toBeGreaterThan(-1);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
 describe("video creation layout source", () => {
   it("uses one product creative workspace for both image and video creation", async () => {
     const source = await readFile(appPath, "utf8");
@@ -30,6 +38,28 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("ProductModeOutputPanel");
     expect(composerSource).toContain("mode === \"video\"");
     expect(composerSource).toContain("mode === \"image\"");
+  });
+
+  it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
+    const source = await readFile(appPath, "utf8");
+    const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
+    const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
+    const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductCreativeWorkspacePanel");
+
+    expect(composerBodySource).toContain("<ProductModeActionBar");
+    expect(composerBodySource).toContain("<ProductModeAssetPanel");
+    expect(composerBodySource).not.toContain("<VideoHistoryPanel");
+    expect(composerBodySource).not.toContain("<ProductImageAssetPanel");
+
+    expect(actionBarSource).toContain('mode === "video"');
+    expect(actionBarSource).toContain("generateVideoSummary");
+    expect(actionBarSource).toContain("imageGenerateSummary");
+    expect(actionBarSource).toContain("onGenerateVideo");
+    expect(actionBarSource).toContain("onGenerateProductImages");
+
+    expect(assetPanelSource).toContain('mode === "video"');
+    expect(assetPanelSource).toContain("<VideoHistoryPanel");
+    expect(assetPanelSource).toContain("<ProductImageAssetPanel");
   });
 
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
@@ -244,13 +274,14 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain('estimate={billingEstimates?.estimates.referenceImages}');
     expect(composerSource).toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
     expect(composerSource).toContain("estimate={storyboardEstimate}");
-    expect(composerSource).toContain('estimate={billingEstimates?.estimates.video}');
+    expect(composerSource).toContain('videoEstimate={billingEstimates?.estimates.video}');
+    expect(composerSource).toContain('imageEstimate={billingEstimates?.estimates.referenceImages}');
     expect(referenceTraySource).toContain("estimate?: BillingActionEstimate");
     expect(referenceTraySource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
     expect(storyboardPanelSource).toContain("estimate?: BillingActionEstimate");
     expect(storyboardPanelSource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
     expect(source).toContain("function ActionButtonCost");
-    expect(composerSource).toContain('amountCny={billingEstimates?.estimates.video.upstreamEstimatedCostCny}');
+    expect(source).toContain('amountCny={videoEstimate?.upstreamEstimatedCostCny}');
     expect(actionButtonCostSource).toContain('tVideo("costHints.estimated", {');
     expect(actionButtonCostSource).toContain("amountCny?: number");
     expect(actionButtonCostSource).not.toContain('kind === "video"');

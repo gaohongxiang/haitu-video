@@ -1086,8 +1086,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true })");
     expect(creationComposerSource).toContain("if (!productForStoryboard) return;");
     expect(creationComposerSource).toContain("await onGenerateStoryboardDraft(productForStoryboard)");
-    expect(creationComposerSource).toContain("const generateVideoButtonClass = cn(");
-    expect(creationComposerSource).toContain('generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"');
+    expect(creationComposerSource).toContain('const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm"');
+    expect(creationComposerSource).toContain('const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"');
     expect(creationComposerSource).toContain('const generationReadinessMessageClass = cn(');
     expect(creationComposerSource).toContain("generation-status-message video-generate-status-center flex min-h-12 w-full items-center justify-center text-center");
     expect(creationComposerSource).not.toContain("min-h-12 w-full max-w-[360px]");
@@ -1099,8 +1099,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("disabled={generateVideoDisabled}");
     expect(creationComposerSource).toContain("aria-disabled={generateVideoDisabled}");
     expect(creationComposerSource).toContain('variant={generateVideoDisabled ? "default" : "primary"}');
-    expect(creationComposerSource).toContain("className={generateVideoButtonClass}");
-    expect(creationComposerSource).toContain("onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}");
+    expect(creationComposerSource).toContain("className={cn(actionButtonClass, generateVideoDisabled && actionDisabledClass)}");
+    expect(creationComposerSource).toContain("onGenerateVideo={handleGenerateVideo}");
     expect(creationComposerSource).not.toContain('className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"');
     expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
     expect(creationComposerSource).toContain("generation-status-message");

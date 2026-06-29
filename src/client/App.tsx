@@ -4883,10 +4883,6 @@ function ProductCreationComposer({
     tVideo
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
-  const generateVideoButtonClass = cn(
-    "min-h-12 w-full justify-center rounded-[14px] text-sm",
-    generateVideoDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"
-  );
   const generationReadinessMessageClass = cn(
     "generation-status-message video-generate-status-center flex min-h-12 w-full items-center justify-center text-center text-xs font-black leading-5",
     generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"
@@ -4913,6 +4909,8 @@ function ProductCreationComposer({
   const modeLabel = productCreativeWorkspaceModeLabel(mode);
   const imageModelLabel = localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo);
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
+  const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
+  const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100";
   const imageGenerateSummary = [
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
     tVideo("summary.referenceImages", { count: previewableReferenceImages.length }),
@@ -5351,78 +5349,43 @@ function ProductCreationComposer({
           </div>
         </div>
 
-        {mode === "video" ? (
-          <>
-            <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-              <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
-                {generateVideoSummary}
-              </div>
-              <div className={generationReadinessMessageClass}>
-                {generationReadiness.label}
-              </div>
-              <div className="grid min-w-0 gap-1.5">
-                <Button
-                  className={generateVideoButtonClass}
-                  variant={generateVideoDisabled ? "default" : "primary"}
-                  disabled={generateVideoDisabled}
-                  aria-disabled={generateVideoDisabled}
-                  title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
-                  onClick={generateVideoDisabled ? undefined : () => void handleGenerateVideo()}
-                >
-                  {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
-                  {isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}
-                  <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.video} amountCny={billingEstimates?.estimates.video.upstreamEstimatedCostCny} />
-                </Button>
-              </div>
-            </div>
+        <ProductModeActionBar
+          mode={mode}
+          tVideo={tVideo}
+          workspace={creativeWorkspace}
+          generateVideoSummary={generateVideoSummary}
+          imageGenerateSummary={imageGenerateSummary}
+          generationReadiness={generationReadiness}
+          generationReadinessMessageClass={generationReadinessMessageClass}
+          actionButtonClass={productModeActionButtonClass}
+          actionDisabledClass={productModeActionDisabledClass}
+          generateVideoDisabled={generateVideoDisabled}
+          imageGenerateDisabled={imageGenerateDisabled}
+          generateVideoButtonLabel={generateVideoButtonLabel}
+          isSubmittingVideo={isSubmittingVideo}
+          isSubmittingImage={isSubmittingImage}
+          videoEstimate={billingEstimates?.estimates.video}
+          imageEstimate={billingEstimates?.estimates.referenceImages}
+          onGenerateVideo={handleGenerateVideo}
+          onGenerateProductImages={handleGenerateProductImages}
+        />
 
-            <VideoHistoryPanel
-              appLocale={appLocale}
-              tVideo={tVideo}
-              jobs={latestCreativeJobs}
-              product={selectedProduct}
-              draft={draft}
-              importText={importText}
-              onPreview={setPreviewJob}
-              onDelete={setDeleteTarget}
-              onRetryVideoJob={onRetryVideoJob}
-              onRecoverVideoJobDownload={onRecoverVideoJobDownload}
-              onToast={onToast}
-            />
-          </>
-        ) : (
-          <>
-            <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
-              <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
-                {imageGenerateSummary}
-              </div>
-              <div className={cn(generationReadinessMessageClass, creativeWorkspace.primaryAction.disabled && "text-[var(--danger)]")}>
-                {creativeWorkspace.primaryAction.disabled ? creativeWorkspace.primaryAction.reason : "商品图片将使用同一份商品记忆和参考图约束"}
-              </div>
-              <div className="grid min-w-0 gap-1.5">
-                <Button
-                  className={generateVideoButtonClass}
-                  variant={imageGenerateDisabled ? "default" : "primary"}
-                  disabled={imageGenerateDisabled}
-                  aria-disabled={imageGenerateDisabled}
-                  title={creativeWorkspace.primaryAction.disabled ? creativeWorkspace.primaryAction.reason : creativeWorkspace.primaryAction.label}
-                  onClick={imageGenerateDisabled ? undefined : () => void handleGenerateProductImages()}
-                >
-                  {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
-                  {isSubmittingImage ? "正在优化图片" : creativeWorkspace.primaryAction.label}
-                  <ActionButtonCost tVideo={tVideo} estimate={billingEstimates?.estimates.referenceImages} />
-                </Button>
-              </div>
-            </div>
-
-            <ProductImageAssetPanel
-              tVideo={tVideo}
-              product={selectedProduct}
-              images={previewableReferenceImages}
-              onPreviewReferenceImage={setPreviewReferenceIndex}
-            />
-          </>
-        )}
+        <ProductModeAssetPanel
+          mode={mode}
+          appLocale={appLocale}
+          tVideo={tVideo}
+          jobs={latestCreativeJobs}
+          product={selectedProduct}
+          draft={draft}
+          importText={importText}
+          images={previewableReferenceImages}
+          onPreviewVideo={setPreviewJob}
+          onDeleteVideo={setDeleteTarget}
+          onRetryVideoJob={onRetryVideoJob}
+          onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+          onToast={onToast}
+          onPreviewReferenceImage={setPreviewReferenceIndex}
+        />
       </ProductCreationOperationWorkspace>
 
       <VideoPreviewDialog
@@ -5474,6 +5437,157 @@ function ProductCreationComposer({
         onToast={onToast}
       />
     </section>
+  );
+}
+
+function ProductModeActionBar({
+  mode,
+  tVideo,
+  workspace,
+  generateVideoSummary,
+  imageGenerateSummary,
+  generationReadiness,
+  generationReadinessMessageClass,
+  actionButtonClass,
+  actionDisabledClass,
+  generateVideoDisabled,
+  imageGenerateDisabled,
+  generateVideoButtonLabel,
+  isSubmittingVideo,
+  isSubmittingImage,
+  videoEstimate,
+  imageEstimate,
+  onGenerateVideo,
+  onGenerateProductImages
+}: {
+  mode: ProductCreativeWorkspaceMode;
+  tVideo: VideoStudioTranslator;
+  workspace: ProductCreativeWorkspace;
+  generateVideoSummary: string;
+  imageGenerateSummary: string;
+  generationReadiness: { ready: boolean; label: string };
+  generationReadinessMessageClass: string;
+  actionButtonClass: string;
+  actionDisabledClass: string;
+  generateVideoDisabled: boolean;
+  imageGenerateDisabled: boolean;
+  generateVideoButtonLabel: string;
+  isSubmittingVideo: boolean;
+  isSubmittingImage: boolean;
+  videoEstimate?: BillingActionEstimate;
+  imageEstimate?: BillingActionEstimate;
+  onGenerateVideo: () => Promise<void>;
+  onGenerateProductImages: () => Promise<void>;
+}) {
+  if (mode === "video") {
+    return (
+      <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+        <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
+          {generateVideoSummary}
+        </div>
+        <div className={generationReadinessMessageClass}>
+          {generationReadiness.label}
+        </div>
+        <div className="grid min-w-0 gap-1.5">
+          <Button
+            className={cn(actionButtonClass, generateVideoDisabled && actionDisabledClass)}
+            variant={generateVideoDisabled ? "default" : "primary"}
+            disabled={generateVideoDisabled}
+            aria-disabled={generateVideoDisabled}
+            title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
+            onClick={generateVideoDisabled ? undefined : () => void onGenerateVideo()}
+          >
+            {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
+            {isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}
+            <ActionButtonCost tVideo={tVideo} estimate={videoEstimate} amountCny={videoEstimate?.upstreamEstimatedCostCny} />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="video-generate-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)] min-[900px]:items-center min-[1280px]:px-4">
+      <div className="video-generate-summary min-w-0 whitespace-normal break-words text-xs font-black leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
+        {imageGenerateSummary}
+      </div>
+      <div className={cn(generationReadinessMessageClass, workspace.primaryAction.disabled && "text-[var(--danger)]")}>
+        {workspace.primaryAction.disabled ? workspace.primaryAction.reason : "商品图片将使用同一份商品记忆和参考图约束"}
+      </div>
+      <div className="grid min-w-0 gap-1.5">
+        <Button
+          className={cn(actionButtonClass, imageGenerateDisabled && actionDisabledClass)}
+          variant={imageGenerateDisabled ? "default" : "primary"}
+          disabled={imageGenerateDisabled}
+          aria-disabled={imageGenerateDisabled}
+          title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : workspace.primaryAction.label}
+          onClick={imageGenerateDisabled ? undefined : () => void onGenerateProductImages()}
+        >
+          {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
+          {isSubmittingImage ? "正在优化图片" : workspace.primaryAction.label}
+          <ActionButtonCost tVideo={tVideo} estimate={imageEstimate} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ProductModeAssetPanel({
+  mode,
+  appLocale,
+  tVideo,
+  jobs,
+  product,
+  draft,
+  importText,
+  images,
+  onPreviewVideo,
+  onDeleteVideo,
+  onRetryVideoJob,
+  onRecoverVideoJobDownload,
+  onToast,
+  onPreviewReferenceImage
+}: {
+  mode: ProductCreativeWorkspaceMode;
+  appLocale: AppLocale;
+  tVideo: VideoStudioTranslator;
+  jobs: CreativeVersionItem[];
+  product?: ProductDetail;
+  draft: ProductDraft;
+  importText: string;
+  images: ReferenceImageStatus[];
+  onPreviewVideo: (job: CreativeVersionItem) => void;
+  onDeleteVideo: (job: CreativeVersionItem) => void;
+  onRetryVideoJob: (job: VideoJob) => Promise<void>;
+  onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
+  onToast: ConsoleToastFn;
+  onPreviewReferenceImage: (index: number) => void;
+}) {
+  if (mode === "video") {
+    return (
+      <VideoHistoryPanel
+        appLocale={appLocale}
+        tVideo={tVideo}
+        jobs={jobs}
+        product={product}
+        draft={draft}
+        importText={importText}
+        onPreview={onPreviewVideo}
+        onDelete={onDeleteVideo}
+        onRetryVideoJob={onRetryVideoJob}
+        onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+        onToast={onToast}
+      />
+    );
+  }
+
+  return (
+    <ProductImageAssetPanel
+      tVideo={tVideo}
+      product={product}
+      images={images}
+      onPreviewReferenceImage={onPreviewReferenceImage}
+    />
   );
 }
 
