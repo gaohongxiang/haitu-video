@@ -111,6 +111,34 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.promptCompilerSteps.at(-1)?.detail).toContain("主图");
   });
 
+  it("describes the shared architecture lanes and mode switch from the same product source", () => {
+    const workspace = buildProductCreativeWorkspace({
+      mode: "image",
+      products,
+      selectedProduct: product,
+      draftTitle: "",
+      generatedVideoCount: 2,
+      imageAssetCount: 4
+    });
+
+    expect(workspace.modeSwitch).toEqual([
+      { mode: "image", label: "图片工作台", active: true },
+      { mode: "video", label: "视频工作台", active: false }
+    ]);
+    expect(workspace.architectureLanes.map((lane) => lane.id)).toEqual([
+      "product-memory",
+      "visual-assets",
+      "creative-intent",
+      "model-output"
+    ]);
+    expect(workspace.architectureLanes[0].title).toBe("商品源数据");
+    expect(workspace.architectureLanes[0].items).toContain("3 条可用事实");
+    expect(workspace.architectureLanes[1].items).toContain("3 张参考图");
+    expect(workspace.architectureLanes[3].title).toBe("图片输出");
+    expect(workspace.modeSummary).toContain("图片");
+    expect(workspace.modeSummary).toContain("商品记忆");
+  });
+
   it("keeps creation disabled until a product draft or saved product exists", () => {
     const workspace = buildProductCreativeWorkspace({
       mode: "video",

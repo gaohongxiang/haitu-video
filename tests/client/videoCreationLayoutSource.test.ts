@@ -22,6 +22,14 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("ProductCreativeWorkspacePanel");
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
+    expect(composerSource).toContain("workspace.modeSwitch.map");
+    expect(composerSource).toContain("workspace.architectureLanes.map");
+    expect(composerSource).toContain("workspace.modeSummary");
+    expect(composerSource).toContain("product-creative-architecture-lane");
+    expect(composerSource).toContain("ProductPromptCompilerPanel");
+    expect(composerSource).toContain("ProductModeOutputPanel");
+    expect(composerSource).toContain("mode === \"video\"");
+    expect(composerSource).toContain("mode === \"image\"");
   });
 
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
@@ -234,7 +242,8 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("billingEstimates?: BillingEstimatesResponse");
     expect(composerSource).toContain('estimate={billingEstimates?.estimates.organizeProduct}');
     expect(composerSource).toContain('estimate={billingEstimates?.estimates.referenceImages}');
-    expect(composerSource).toContain('estimate={billingEstimates?.estimates.storyboard}');
+    expect(composerSource).toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
+    expect(composerSource).toContain("estimate={storyboardEstimate}");
     expect(composerSource).toContain('estimate={billingEstimates?.estimates.video}');
     expect(referenceTraySource).toContain("estimate?: BillingActionEstimate");
     expect(referenceTraySource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');

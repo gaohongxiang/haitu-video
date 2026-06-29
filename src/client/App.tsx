@@ -5181,6 +5181,7 @@ function ProductCreationComposer({
         ) : null}
 
         <ProductCreativeWorkspacePanel workspace={creativeWorkspace} modeLabel={modeLabel} />
+        <ProductPromptCompilerPanel workspace={creativeWorkspace} />
 
         <section className="video-generation-controls compact-generation-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 min-[1180px]:grid-cols-[minmax(260px,1.5fr)_repeat(6,minmax(98px,.72fr))] min-[1180px]:items-start">
           <div className="model-scheme-control grid min-w-0 gap-1">
@@ -5327,30 +5328,26 @@ function ProductCreationComposer({
           </div>
 
           <div className="min-w-0 p-4">
-            {mode === "video" ? (
-              <StoryboardComposerPanel
-                appLocale={appLocale}
-                tVideo={tVideo}
-                template={template}
-                duration={duration}
-                storyboardDraft={storyboardDraft}
-                storyboardDraftIsGuidance={storyboardDraftIsGuidance}
-                storyboardHistory={storyboardHistory}
-                onStoryboardDraftChange={onStoryboardDraftChange}
-                onApplyStoryboardHistory={onApplyStoryboardHistory}
-                onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-                onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
-                isGeneratingStoryboard={isGeneratingStoryboard}
-                productReady={storyboardProductReady}
-                estimate={billingEstimates?.estimates.storyboard}
-              />
-            ) : (
-              <ProductImagePromptPanel
-                workspace={creativeWorkspace}
-                imageModelLabel={imageModelLabel}
-                referenceImageCount={previewableReferenceImages.length}
-              />
-            )}
+            <ProductModeOutputPanel
+              mode={mode}
+              appLocale={appLocale}
+              tVideo={tVideo}
+              workspace={creativeWorkspace}
+              imageModelLabel={imageModelLabel}
+              referenceImageCount={previewableReferenceImages.length}
+              template={template}
+              duration={duration}
+              storyboardDraft={storyboardDraft}
+              storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+              storyboardHistory={storyboardHistory}
+              onStoryboardDraftChange={onStoryboardDraftChange}
+              onApplyStoryboardHistory={onApplyStoryboardHistory}
+              onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+              onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
+              isGeneratingStoryboard={isGeneratingStoryboard}
+              productReady={storyboardProductReady}
+              storyboardEstimate={billingEstimates?.estimates.storyboard}
+            />
           </div>
         </div>
 
@@ -5487,51 +5484,165 @@ function ProductCreativeWorkspacePanel({
   workspace: ProductCreativeWorkspace;
   modeLabel: string;
 }) {
-  const assetItems = [
-    { label: "参考图", value: workspace.assetSummary.referenceImages },
-    { label: "图片资产", value: workspace.assetSummary.imageAssets },
-    { label: "视频版本", value: workspace.assetSummary.videoVersions }
-  ];
   return (
-    <section className="grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_6%,var(--panel)),var(--panel))] p-3 min-[1180px]:grid-cols-[minmax(220px,.95fr)_minmax(0,1.45fr)_minmax(260px,1fr)]">
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
-          <span className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</span>
+    <section className="grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_6%,var(--panel)),var(--panel))] p-3">
+      <div className="grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.8fr)_minmax(0,1.5fr)_auto] min-[1180px]:items-start">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
+            <span className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</span>
+          </div>
+          <h3 className="m-0 mt-2 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
+          {workspace.selectedProductSku ? (
+            <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
+          ) : null}
         </div>
-        <h3 className="m-0 mt-2 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
-        {workspace.selectedProductSku ? (
-          <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
-        ) : null}
-      </div>
 
-      <div className="grid gap-2">
-        <div className="text-[11px] font-black uppercase text-[var(--muted)]">商品记忆</div>
-        <div className="grid gap-2 sm:grid-cols-4">
-          {workspace.memoryChips.map((chip) => (
-            <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
-              <span className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</span>
-              <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
-            </div>
+        <p className="m-0 text-xs font-bold leading-5 text-[var(--muted)]">{workspace.modeSummary}</p>
+
+        <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
+          {workspace.modeSwitch.map((item) => (
+            <span
+              key={item.mode}
+              className={cn(
+                "inline-flex min-h-8 items-center rounded-[8px] border px-2.5 text-xs font-black",
+                item.active
+                  ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
+                  : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
+              )}
+            >
+              {item.label}
+            </span>
           ))}
         </div>
       </div>
 
-      <div className="grid gap-2">
-        <div className="text-[11px] font-black uppercase text-[var(--muted)]">共享资产</div>
-        <div className="grid grid-cols-3 gap-2">
-          {assetItems.map((item) => (
-            <div key={item.label} className="rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-2 text-center">
-              <div className="text-base font-black leading-5 text-[var(--text)]">{item.value}</div>
-              <div className="mt-0.5 text-[10px] font-black text-[var(--muted)]">{item.label}</div>
+      <div className="grid gap-2 sm:grid-cols-4">
+        {workspace.memoryChips.map((chip) => (
+          <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
+            <span className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</span>
+            <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-2 min-[1180px]:grid-cols-4">
+        {workspace.architectureLanes.map((lane, index) => (
+          <article
+            key={lane.id}
+            className="product-creative-architecture-lane grid min-h-[148px] content-start gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 truncate text-sm font-black text-[var(--text)]">{lane.title}</div>
+              <Badge tone={index === workspace.architectureLanes.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
             </div>
-          ))}
-        </div>
-        <div className="rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
-          商品事实是源头，提示词只从这里和视觉资产编译出来。
-        </div>
+            <p className="m-0 text-xs font-semibold leading-5 text-[var(--muted)]">{lane.detail}</p>
+            <div className="flex flex-wrap gap-1">
+              {lane.items.map((item) => (
+                <span key={item} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_5%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
+        商品事实是源头，提示词只是编译结果；图片资产和视频版本都会沉淀回同一个商品。
       </div>
     </section>
+  );
+}
+
+function ProductPromptCompilerPanel({ workspace }: { workspace: ProductCreativeWorkspace }) {
+  return (
+    <section className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-black text-[var(--text)]">提示词编译器</div>
+        <Badge>{workspace.mode === "image" ? "Image Prompt" : "Video Prompt"}</Badge>
+      </div>
+      <div className="grid gap-2 min-[1180px]:grid-cols-4">
+        {workspace.promptCompilerSteps.map((step, index) => (
+          <article key={step.id} className="grid content-start gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-xs font-black text-[var(--text)]">{step.label}</span>
+              <span className="text-[10px] font-black text-[var(--muted)]">{index + 1}</span>
+            </div>
+            <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProductModeOutputPanel({
+  mode,
+  appLocale,
+  tVideo,
+  workspace,
+  imageModelLabel,
+  referenceImageCount,
+  template,
+  duration,
+  storyboardDraft,
+  storyboardDraftIsGuidance,
+  storyboardHistory,
+  onStoryboardDraftChange,
+  onApplyStoryboardHistory,
+  onDeleteStoryboardHistory,
+  onGenerateStoryboardDraft,
+  isGeneratingStoryboard,
+  productReady,
+  storyboardEstimate
+}: {
+  mode: ProductCreativeWorkspaceMode;
+  appLocale: AppLocale;
+  tVideo: VideoStudioTranslator;
+  workspace: ProductCreativeWorkspace;
+  imageModelLabel: string;
+  referenceImageCount: number;
+  template: TemplateName;
+  duration: number;
+  storyboardDraft: string;
+  storyboardDraftIsGuidance: boolean;
+  storyboardHistory: StoryboardHistoryRecord[];
+  onStoryboardDraftChange: (draft: string) => void;
+  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
+  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  isGeneratingStoryboard: boolean;
+  productReady: boolean;
+  storyboardEstimate?: BillingActionEstimate;
+}) {
+  if (mode === "video") {
+    return (
+      <StoryboardComposerPanel
+        appLocale={appLocale}
+        tVideo={tVideo}
+        template={template}
+        duration={duration}
+        storyboardDraft={storyboardDraft}
+        storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+        storyboardHistory={storyboardHistory}
+        onStoryboardDraftChange={onStoryboardDraftChange}
+        onApplyStoryboardHistory={onApplyStoryboardHistory}
+        onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+        onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+        isGeneratingStoryboard={isGeneratingStoryboard}
+        productReady={productReady}
+        estimate={storyboardEstimate}
+      />
+    );
+  }
+
+  return (
+    <ProductImagePromptPanel
+      workspace={workspace}
+      imageModelLabel={imageModelLabel}
+      referenceImageCount={referenceImageCount}
+    />
   );
 }
 
