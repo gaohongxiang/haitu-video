@@ -5686,6 +5686,7 @@ function ProductCreativeWorkbench({
         />
         <ProductModeAssetPanel
           mode={mode}
+          surface="workbench"
           appLocale={appLocale}
           tVideo={tVideo}
           jobs={jobs}
@@ -5921,8 +5922,11 @@ function ProductModeActionBar({
   );
 }
 
+type ProductCreativeAssetPanelSurface = "section" | "workbench";
+
 function ProductModeAssetPanel({
   mode,
+  surface = "section",
   appLocale,
   tVideo,
   jobs,
@@ -5938,6 +5942,7 @@ function ProductModeAssetPanel({
   onPreviewReferenceImage
 }: {
   mode: ProductCreativeWorkspaceMode;
+  surface?: ProductCreativeAssetPanelSurface;
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   jobs: CreativeVersionItem[];
@@ -5961,6 +5966,7 @@ function ProductModeAssetPanel({
         product={product}
         draft={draft}
         importText={importText}
+        surface={surface}
         onPreview={onPreviewVideo}
         onDelete={onDeleteVideo}
         onRetryVideoJob={onRetryVideoJob}
@@ -5975,6 +5981,7 @@ function ProductModeAssetPanel({
       tVideo={tVideo}
       product={product}
       images={images}
+      surface={surface}
       onPreviewReferenceImage={onPreviewReferenceImage}
     />
   );
@@ -6091,15 +6098,24 @@ function ProductImageAssetPanel({
   tVideo,
   product,
   images,
+  surface = "section",
   onPreviewReferenceImage
 }: {
   tVideo: VideoStudioTranslator;
   product?: ProductDetail;
   images: ReferenceImageStatus[];
+  surface?: ProductCreativeAssetPanelSurface;
   onPreviewReferenceImage: (index: number) => void;
 }) {
+  const compact = surface === "workbench";
+
   return (
-    <section className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5">
+    <section className={cn(
+      "product-creative-asset-panel grid min-w-0 gap-3",
+      compact
+        ? "rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3"
+        : "border-t border-[var(--border)] bg-[var(--card)] p-5"
+    )}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-base font-black text-[var(--text)]">商品图片资产</div>
@@ -6108,12 +6124,18 @@ function ProductImageAssetPanel({
         <Badge>{tVideo("counts.image", { count: images.length })}</Badge>
       </div>
       {images.length > 0 ? (
-        <div className="grid gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--field)] p-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={cn(
+          "grid gap-2 border border-[var(--border)] bg-[var(--field)] p-2 sm:grid-cols-2",
+          compact ? "rounded-[8px]" : "rounded-[14px] lg:grid-cols-4"
+        )}>
           {images.map((image, index) => (
             <button
               key={`${image.original}-${index}`}
               type="button"
-              className="group/image-asset grid min-h-[156px] overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--panel)] text-left transition hover:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))]"
+              className={cn(
+                "group/image-asset grid min-h-[156px] overflow-hidden border border-[var(--border)] bg-[var(--panel)] text-left transition hover:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))]",
+                compact ? "rounded-[8px]" : "rounded-[10px]"
+              )}
               title={image.original}
               onClick={() => onPreviewReferenceImage(index)}
             >
@@ -6132,7 +6154,10 @@ function ProductImageAssetPanel({
           ))}
         </div>
       ) : (
-        <div className="grid min-h-[150px] place-items-center rounded-[14px] border border-dashed border-[var(--border)] bg-[var(--field)] px-4 py-6 text-center">
+        <div className={cn(
+          "grid min-h-[150px] place-items-center border border-dashed border-[var(--border)] bg-[var(--field)] px-4 py-6 text-center",
+          compact ? "rounded-[8px]" : "rounded-[14px]"
+        )}>
           <div className="max-w-[340px]">
             <ImageIcon className="mx-auto text-[var(--accent)]" size={26} />
             <div className="mt-2 text-sm font-black text-[var(--text)]">还没有图片资产</div>
@@ -6746,6 +6771,7 @@ function VideoHistoryPanel({
   product,
   draft,
   importText,
+  surface = "section",
   onPreview,
   onDelete,
   onRetryVideoJob,
@@ -6758,6 +6784,7 @@ function VideoHistoryPanel({
   product?: ProductDetail;
   draft: ProductDraft;
   importText: string;
+  surface?: ProductCreativeAssetPanelSurface;
   onPreview: (job: CreativeVersionItem) => void;
   onDelete: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
@@ -6765,8 +6792,15 @@ function VideoHistoryPanel({
   onToast: ConsoleToastFn;
 }) {
   const productDownloadContext = videoDownloadProductContext(product, draft, importText);
+  const compact = surface === "workbench";
+
   return (
-    <section className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5">
+    <section className={cn(
+      "product-creative-asset-panel grid min-w-0 gap-3",
+      compact
+        ? "rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3"
+        : "border-t border-[var(--border)] bg-[var(--card)] p-5"
+    )}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-base font-black text-[var(--text)]">{tVideo("history.title")}</div>
@@ -6775,7 +6809,10 @@ function VideoHistoryPanel({
         <Badge>{tVideo("counts.video", { count: jobs.length })}</Badge>
       </div>
       {jobs.length > 0 ? (
-        <div className="generation-history-scroll grid max-h-[360px] overflow-y-auto rounded-[14px] border border-[var(--border)] bg-[var(--field)]">
+        <div className={cn(
+          "generation-history-scroll grid max-h-[360px] overflow-y-auto border border-[var(--border)] bg-[var(--field)]",
+          compact ? "rounded-[8px]" : "rounded-[14px]"
+        )}>
           {jobs.map((job, index) => {
             const activeVersion = isActiveCreativeVersion(job);
             const playableVideo = hasPlayableVideo(job);

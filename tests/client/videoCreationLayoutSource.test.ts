@@ -129,6 +129,24 @@ describe("video creation layout source", () => {
     expect(assetPanelSource).toContain("<ProductImageAssetPanel");
   });
 
+  it("fits mode asset history inside the output column instead of reusing a full-width page section", async () => {
+    const source = await readFile(appPath, "utf8");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
+    const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
+    const imageAssetSource = sourceBetween(source, "function ProductImageAssetPanel", "function ProductCreationProductLibrary");
+    const videoHistorySource = sourceBetween(source, "function VideoHistoryPanel", "function ProductLibraryHome");
+
+    expect(workbenchSource).toContain('surface="workbench"');
+    expect(assetPanelSource).toContain('surface?: ProductCreativeAssetPanelSurface;');
+    expect(assetPanelSource).toContain('surface={surface}');
+    expect(imageAssetSource).toContain("ProductCreativeAssetPanelSurface");
+    expect(videoHistorySource).toContain("ProductCreativeAssetPanelSurface");
+    expect(imageAssetSource).toContain("product-creative-asset-panel");
+    expect(videoHistorySource).toContain("product-creative-asset-panel");
+    expect(imageAssetSource).not.toContain('className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5"');
+    expect(videoHistorySource).not.toContain('className="grid gap-3 border-t border-[var(--border)] bg-[var(--card)] p-5"');
+  });
+
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
