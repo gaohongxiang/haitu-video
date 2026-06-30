@@ -926,6 +926,7 @@ describe("console API", () => {
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
     const settingsTraySource = sourceBetween(appSource, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
     const productDetailsSource = sourceBetween(creationComposerSource, "product-creative-product-details", "<ProductComposerReferenceTray");
+    const referenceTraySource = sourceBetween(appSource, "function ProductComposerReferenceTray", "function StoryboardComposerPanel");
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function ProductLibraryHome"));
     const productWorkflowSource = await readFile(join(import.meta.dirname, "../../src/client/productWorkflowViewModel.ts"), "utf8");
     const storyboardDraftsSource = await readFile(join(import.meta.dirname, "../../src/client/storyboardDrafts.ts"), "utf8");
@@ -1083,8 +1084,13 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("product-creative-context-strip");
     expect(creationComposerSource).not.toContain("product-creative-settings");
     expect(creationComposerSource).toContain("product-facts-editor");
-    expect(creationComposerSource).toContain("max-h-[150px]");
+    expect(creationComposerSource).toContain("product-facts-body h-[74px] min-h-[74px] max-h-[74px]");
     expect(creationComposerSource).toContain("overflow-y-auto");
+    expect(productDetailsSource).toContain("product-creative-product-details grid self-start");
+    expect(productDetailsSource).toContain("border-0 bg-transparent px-0 py-0");
+    expect(productDetailsSource).not.toContain("border-[var(--border)] bg-[var(--panel)]");
+    expect(productDetailsSource).not.toContain('<div className="min-h-5">');
+    expect(referenceTraySource).toContain("product-reference-inline grid self-start content-start gap-2");
     expect(productDetailsSource).not.toContain("<details");
     expect(productDetailsSource).not.toContain("<summary");
     expect(productDetailsSource).not.toContain("productDetailsOpen");
@@ -1249,7 +1255,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("productFactsBodyRef");
     expect(creationComposerSource).toContain("productFactsBodyRef.current.scrollTop = 0");
     expect(creationComposerSource).not.toContain("Math.max(4, Math.min(8");
-    expect(creationComposerSource).toContain("product-facts-body max-h-[150px] min-h-[92px]");
+    expect(creationComposerSource).toContain("product-facts-body h-[74px] min-h-[74px] max-h-[74px]");
+    expect(creationComposerSource).toContain("border-0 bg-transparent px-0 py-0");
     expect(creationComposerSource).toContain("resize-none overflow-y-auto");
     expect(creationComposerSource).not.toContain("submitHint");
     expect(creationComposerSource).not.toContain("{submitHint ? (");
@@ -5689,7 +5696,7 @@ describe("console API", () => {
     expect(composerSource).toContain("product-creative-context-strip");
     expect(composerSource).not.toContain("product-creative-settings");
     expect(composerSource).toContain("product-facts-editor");
-    expect(composerSource).toContain("max-h-[150px]");
+    expect(composerSource).toContain("product-facts-body h-[74px] min-h-[74px] max-h-[74px]");
     expect(composerSource).toContain("overflow-y-auto");
     expect(productDetailsSource).not.toContain("<details");
     expect(productDetailsSource).not.toContain("<summary");
@@ -5743,7 +5750,8 @@ describe("console API", () => {
     expect(composerSource).toContain("productFactsBodyRef");
     expect(composerSource).toContain("productFactsBodyRef.current.scrollTop = 0");
     expect(composerSource).not.toContain("Math.max(4, Math.min(8");
-    expect(composerSource).toContain("product-facts-body max-h-[150px] min-h-[92px]");
+    expect(composerSource).toContain("product-facts-body h-[74px] min-h-[74px] max-h-[74px]");
+    expect(composerSource).toContain("border-0 bg-transparent px-0 py-0");
     expect(composerSource).toContain("resize-none overflow-y-auto");
     expect(composerSource).not.toContain("submitHint");
     expect(composerSource).not.toContain("{submitHint ? (");

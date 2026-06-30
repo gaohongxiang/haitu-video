@@ -93,6 +93,7 @@ describe("video creation layout source", () => {
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
     const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
     const productDetailsSource = sourceBetween(workbenchSource, "product-creative-product-details", "<ProductComposerReferenceTray");
+    const referenceTraySource = sourceBetween(source, "function ProductComposerReferenceTray", "function StoryboardComposerPanel");
 
     expect(composerSource).toContain("<ProductCreativeWorkbench");
     expect(composerSource).not.toContain("video-generation-controls compact-generation-controls");
@@ -107,8 +108,13 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("product-creative-product-details");
     expect(workbenchSource).toContain("product-creative-context-strip");
     expect(workbenchSource).toContain("product-facts-editor");
-    expect(workbenchSource).toContain("max-h-[150px]");
+    expect(workbenchSource).toContain("product-facts-body h-[74px] min-h-[74px] max-h-[74px]");
     expect(workbenchSource).toContain("overflow-y-auto");
+    expect(productDetailsSource).toContain("product-creative-product-details grid self-start");
+    expect(productDetailsSource).toContain("border-0 bg-transparent px-0 py-0");
+    expect(productDetailsSource).not.toContain("border-[var(--border)] bg-[var(--panel)]");
+    expect(productDetailsSource).not.toContain('<div className="min-h-5">');
+    expect(referenceTraySource).toContain("product-reference-inline grid self-start content-start gap-2");
     expect(productDetailsSource).not.toContain("<details");
     expect(productDetailsSource).not.toContain("<summary");
     expect(productDetailsSource).not.toContain("productDetailsOpen");
