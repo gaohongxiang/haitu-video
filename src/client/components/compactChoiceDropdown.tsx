@@ -1,5 +1,5 @@
 import { CheckCircle2, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { cn } from "../lib/utils.js";
 
@@ -13,19 +13,20 @@ export function CompactChoiceDropdown<T extends string>({
   layout = "stacked",
   density = "comfortable"
 }: {
-  label: string;
+  label: ReactNode;
   value: T;
   options: T[];
   formatOption: (option: T) => string;
   onChange: (option: T) => void;
   disabled?: boolean;
-  layout?: "stacked" | "inline";
+  layout?: "stacked" | "inline" | "pill";
   density?: "comfortable" | "compact";
 }) {
   const [open, setOpen] = useState(false);
   const activeLabel = formatOption(value);
   const dropdownDisabled = disabled || options.length === 0;
   const compact = density === "compact";
+  const pill = layout === "pill";
 
   return (
     <div
@@ -34,6 +35,7 @@ export function CompactChoiceDropdown<T extends string>({
         layout === "inline"
           ? "min-h-11 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-[13px] border border-[var(--border-strong)] bg-[var(--field)] px-3 text-[13px] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition"
           : "gap-1.5",
+        pill && "block",
         layout === "inline" && open && "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
       )}
       onBlur={(event) => {
@@ -47,16 +49,19 @@ export function CompactChoiceDropdown<T extends string>({
         }
       }}
     >
-      <div className={cn(
-        "truncate font-black text-[var(--muted)]",
-        layout === "inline" ? "text-[13px]" : compact ? "text-[11px]" : "text-xs"
-      )}>{label}</div>
+      {pill ? null : (
+        <div className={cn(
+          "truncate font-black text-[var(--muted)]",
+          layout === "inline" ? "text-[13px]" : compact ? "text-[11px]" : "text-xs"
+        )}>{label}</div>
+      )}
       <button
         type="button"
         className={cn(
           "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           compact && "min-h-9 rounded-[10px] px-2.5 text-[13px] shadow-none",
           layout === "inline" && "h-full min-h-11 border-0 bg-transparent px-0 shadow-none hover:border-0 hover:bg-transparent",
+          pill && "min-h-9 w-full rounded-[8px] border-[var(--border)] bg-[var(--field)] px-2.5 text-xs shadow-none hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]",
           dropdownDisabled && "cursor-not-allowed opacity-60 shadow-none",
           layout === "stacked" && (open
             ? "border-[color-mix(in_srgb,var(--accent)_65%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.12),0_8px_18px_rgba(96,64,43,.05)]"
@@ -70,6 +75,7 @@ export function CompactChoiceDropdown<T extends string>({
           setOpen((current) => !current);
         }}
       >
+        {pill ? <span className="shrink-0 text-[var(--muted)]">{label}</span> : null}
         <span className="min-w-0 truncate">{activeLabel}</span>
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--muted)] transition", open && "rotate-180 text-[var(--accent)]")} />
       </button>

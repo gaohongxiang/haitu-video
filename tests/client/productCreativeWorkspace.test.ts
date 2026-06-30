@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildProductCreativeWorkspace,
-  productCreativeWorkspaceModeLabel,
   type ProductCreativeWorkspaceMode
 } from "../../src/client/productCreativeWorkspace.js";
 import type { ProductDetail, ProductSummary } from "../../src/client/productWorkflowViewModel.js";
@@ -112,7 +111,7 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.promptCompilerSteps.at(-1)?.detail).toContain("主图");
   });
 
-  it("describes the shared architecture lanes and mode switch from the same product source", () => {
+  it("describes the shared architecture lanes from the same product source", () => {
     const workspace = buildProductCreativeWorkspace({
       mode: "image",
       products,
@@ -122,10 +121,6 @@ describe("buildProductCreativeWorkspace", () => {
       imageAssetCount: 4
     });
 
-    expect(workspace.modeSwitch).toEqual([
-      { mode: "image", label: "图片工作台", active: true },
-      { mode: "video", label: "视频工作台", active: false }
-    ]);
     expect(workspace.architectureLanes.map((lane) => lane.id)).toEqual([
       "product-memory",
       "visual-assets",
@@ -136,9 +131,8 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.architectureLanes[0].items).toContain("3 条可用事实");
     expect(workspace.architectureLanes[1].items).toContain("3 个视觉资产");
     expect(workspace.architectureLanes[3].title).toBe("图片输出");
-    expect(workspace.modeSummary).toContain("图片");
-    expect(workspace.modeSummary).toContain("商品资料");
-    expect(workspace.modeSummary).toContain("参考图");
+    expect(workspace).not.toHaveProperty("modeSwitch");
+    expect(workspace).not.toHaveProperty("modeSummary");
   });
 
   it("models reusable media as one product asset ledger shared by image and video modes", () => {
@@ -240,14 +234,5 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.primaryAction.disabled).toBe(true);
     expect(workspace.primaryAction.reason).toBe("先填写或选择一个商品");
     expect(workspace.memoryChips[0]).toEqual({ kind: "facts", label: "可用事实", value: "0" });
-  });
-});
-
-describe("productCreativeWorkspaceModeLabel", () => {
-  it.each([
-    ["image", "图片工作台"],
-    ["video", "视频工作台"]
-  ] satisfies Array<[ProductCreativeWorkspaceMode, string]>)("labels %s mode", (mode, label) => {
-    expect(productCreativeWorkspaceModeLabel(mode)).toBe(label);
   });
 });

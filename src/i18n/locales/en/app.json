@@ -756,7 +756,7 @@
     "groups": {
       "text": {
         "title": "Text Models",
-        "description": "Text reasoning for product facts, scripts, and storyboards.",
+        "description": "Text reasoning for product facts and prompt optimization.",
         "badge": "Text"
       },
       "image": {
@@ -886,8 +886,8 @@
     "infiniSynced": "Infini top-up has settled.",
     "waitingPayment": "Payment returned. Waiting for settlement confirmation.",
     "authExpired": "Your session expired. Enter your email and password again.",
-    "storyboardApplied": "Filled from storyboard history: {{template}} / {{duration}}",
-    "storyboardDeleted": "Storyboard record deleted.",
+    "storyboardApplied": "Filled from prompt history: {{template}} / {{duration}}",
+    "storyboardDeleted": "Prompt record deleted.",
     "currentProduct": "Current product",
     "productFactsRead": "Product facts loaded",
     "autoSaved": "Facts auto-saved: {{title}}",
@@ -911,7 +911,7 @@
     "selectParsedRow": "Select a parsed product row first.",
     "filledFromFile": "Filled the current product with file data: {{title}}",
     "fileImportDone": "File import complete: {{imported}}/{{requested}} succeeded, {{failed}} failed",
-    "storyboardGenerated": "The text model generated a storyboard draft.",
+    "storyboardGenerated": "AI optimized the video prompt.",
     "storyboardTimeout": "Text model generation timed out. Check API settings or try again later.",
     "productUpdated": "Product facts updated",
     "productSavedAndVideo": "Product saved and opened in video creation",
@@ -1147,17 +1147,17 @@
       }
     },
     "storyboard": {
-      "title": "Storyboard",
+      "title": "Video Prompt",
       "subtitle": "Optional. Leave blank to generate from product facts.",
-      "generate": "AI Generate Storyboard",
-      "generating": "Generating",
-      "history": "Storyboard History",
-      "deleteRecord": "Delete storyboard record",
+      "generate": "AI Optimize Prompt",
+      "generating": "Optimizing",
+      "history": "Prompt History",
+      "deleteRecord": "Delete prompt record",
       "emptyHistory": "No AI history yet",
-      "emptyPreview": "Empty storyboard",
-      "default": "Default storyboard",
-      "ai": "AI storyboard",
-      "manual": "Manual storyboard",
+      "emptyPreview": "Empty prompt",
+      "default": "Default prompt",
+      "ai": "AI prompt",
+      "manual": "Manual prompt",
       "defaultDrafts": {
         "scene": [
           "Show the real usage environment and the full product appearance.",
@@ -1424,7 +1424,7 @@
       "groups": {
         "text": {
           "title": "Text Models",
-          "description": "Text calls for product organization, scripts, and storyboards.",
+          "description": "Text calls for product organization and prompt optimization.",
           "badge": "Text"
         },
         "image": {
@@ -1447,8 +1447,8 @@
       "completedFailed": "{{completed}} completed / {{failed}} failed",
       "totalAssets": "Video Assets",
       "assetHint": "Generated outputs and assets",
-      "totalStoryboards": "Storyboards",
-      "storyboardHint": "Saved user storyboards",
+      "totalStoryboards": "Prompts",
+      "storyboardHint": "Saved user prompts",
       "statusDistribution": "Job Status Distribution",
       "statusKinds": "{{count}} statuses",
       "emptyStatus": "No job status data",

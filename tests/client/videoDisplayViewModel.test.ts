@@ -124,8 +124,8 @@ describe("video display view-model helpers", () => {
     expect(formatAbsoluteMinuteTime("bad-date", { currentYear: 2026 })).toBe("bad-date");
     expect(formatHistoryTime("bad-date", { currentYear: 2026 })).toBe("bad-date");
     expect(historyPreview(" 第一行 \n 第二行 \n 第三行 ")).toBe("第一行\n第二行");
-    expect(historyPreview("   ")).toBe("空分镜");
-    expect(historyPreview("   ", "en")).toBe("Empty storyboard");
+    expect(historyPreview("   ")).toBe("空提示词");
+    expect(historyPreview("   ", "en")).toBe("Empty prompt");
     expect(videoExpiryLabel({ expired: true }, { currentYear: 2026 })).toBe("已过期");
     expect(videoExpiryLabel({}, { currentYear: 2026 })).toBe("24 小时内可下载");
     expect(videoExpiryLabel({}, { currentYear: 2026, locale: "en" })).toBe("Downloadable within 24 hours");

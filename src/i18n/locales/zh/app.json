@@ -756,7 +756,7 @@
     "groups": {
       "text": {
         "title": "文本模型",
-        "description": "商品整理、脚本分镜等文字推理能力。",
+        "description": "商品整理、提示词优化等文字推理能力。",
         "badge": "文本"
       },
       "image": {
@@ -886,8 +886,8 @@
     "infiniSynced": "Infini 充值已到账。",
     "waitingPayment": "支付已返回，正在等待到账确认。",
     "authExpired": "登录已过期，请重新输入邮箱和密码。",
-    "storyboardApplied": "已回填历史分镜: {{template}} / {{duration}}",
-    "storyboardDeleted": "分镜记录已删除。",
+    "storyboardApplied": "已回填历史提示词: {{template}} / {{duration}}",
+    "storyboardDeleted": "提示词记录已删除。",
     "currentProduct": "当前商品",
     "productFactsRead": "商品资料已读取",
     "autoSaved": "资料已自动保存: {{title}}",
@@ -911,7 +911,7 @@
     "selectParsedRow": "请选择已解析出商品资料的行。",
     "filledFromFile": "已把文件里的商品资料填入当前商品: {{title}}",
     "fileImportDone": "文件导入完成: 成功 {{imported}}/{{requested}}，失败 {{failed}}",
-    "storyboardGenerated": "文本模型已生成脚本分镜草稿。",
+    "storyboardGenerated": "AI 已优化视频提示词。",
     "storyboardTimeout": "文本模型生成超时，请检查 API 配置或稍后重试。",
     "productUpdated": "商品资料已更新",
     "productSavedAndVideo": "商品已保存并进入视频创作",
@@ -1147,17 +1147,17 @@
       }
     },
     "storyboard": {
-      "title": "脚本分镜",
+      "title": "视频提示词",
       "subtitle": "可选；留空会按商品资料生成。",
-      "generate": "AI 生成分镜",
-      "generating": "生成中",
-      "history": "分镜历史记录",
-      "deleteRecord": "删除分镜记录",
+      "generate": "AI 优化提示词",
+      "generating": "优化中",
+      "history": "提示词历史",
+      "deleteRecord": "删除提示词记录",
       "emptyHistory": "还没有 AI 生成历史",
-      "emptyPreview": "空分镜",
-      "default": "默认分镜",
-      "ai": "AI 生成分镜",
-      "manual": "手动分镜",
+      "emptyPreview": "空提示词",
+      "default": "默认提示词",
+      "ai": "AI 优化提示词",
+      "manual": "手动提示词",
       "defaultDrafts": {
         "scene": [
           "展示商品所处的真实使用环境和整体外观。",
@@ -1424,7 +1424,7 @@
       "groups": {
         "text": {
           "title": "文本模型",
-          "description": "商品整理、脚本分镜等文本调用。",
+          "description": "商品整理、提示词优化等文本调用。",
           "badge": "文本"
         },
         "image": {
@@ -1447,8 +1447,8 @@
       "completedFailed": "{{completed}} 完成 / {{failed}} 失败",
       "totalAssets": "视频资产",
       "assetHint": "生成产物与素材",
-      "totalStoryboards": "分镜",
-      "storyboardHint": "用户保存分镜",
+      "totalStoryboards": "提示词",
+      "storyboardHint": "用户保存提示词",
       "statusDistribution": "任务状态分布",
       "statusKinds": "{{count}} 类状态",
       "emptyStatus": "暂无任务状态",

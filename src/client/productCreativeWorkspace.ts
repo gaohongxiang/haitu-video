@@ -54,12 +54,6 @@ export interface ProductCreativePrimaryAction {
   reason?: string;
 }
 
-export interface ProductCreativeModeSwitchItem {
-  mode: ProductCreativeWorkspaceMode;
-  label: string;
-  active: boolean;
-}
-
 export interface ProductCreativeArchitectureLane {
   id: "product-memory" | "visual-assets" | "creative-intent" | "model-output";
   title: string;
@@ -72,8 +66,6 @@ export interface ProductCreativeWorkspace {
   productCount: number;
   selectedProductTitle: string;
   selectedProductSku?: string;
-  modeSummary: string;
-  modeSwitch: ProductCreativeModeSwitchItem[];
   assetSummary: ProductCreativeAssetSummary;
   assetLedger: ProductCreativeAssetLedgerItem[];
   memoryChips: ProductCreativeMemoryChip[];
@@ -90,10 +82,6 @@ export interface ProductCreativeWorkspaceInput {
   draftTitle?: string;
   generatedVideoCount: number;
   imageAssetCount: number;
-}
-
-export function productCreativeWorkspaceModeLabel(mode: ProductCreativeWorkspaceMode): string {
-  return mode === "image" ? "图片工作台" : "视频工作台";
 }
 
 export function buildProductCreativeWorkspace(input: ProductCreativeWorkspaceInput): ProductCreativeWorkspace {
@@ -116,8 +104,6 @@ export function buildProductCreativeWorkspace(input: ProductCreativeWorkspaceInp
     productCount: input.products.length,
     selectedProductTitle,
     selectedProductSku: input.selectedProduct?.sku,
-    modeSummary: modeSummaryForMode(input.mode),
-    modeSwitch: modeSwitchForMode(input.mode),
     assetSummary: {
       referenceImages,
       imageAssets: summary.imageAssetCount,
@@ -188,20 +174,6 @@ function primaryActionForMode(mode: ProductCreativeWorkspaceMode, enabled: boole
     disabled: !enabled,
     reason: enabled ? undefined : "先填写或选择一个商品"
   };
-}
-
-function modeSummaryForMode(mode: ProductCreativeWorkspaceMode): string {
-  return mode === "image"
-    ? "图片创作会复用当前商品资料和参考图，生成主图、场景图、细节图。"
-    : "视频创作会复用当前商品资料和参考图，生成分镜、节奏和成片。";
-}
-
-function modeSwitchForMode(activeMode: ProductCreativeWorkspaceMode): ProductCreativeModeSwitchItem[] {
-  return (["image", "video"] satisfies ProductCreativeWorkspaceMode[]).map((mode) => ({
-    mode,
-    label: productCreativeWorkspaceModeLabel(mode),
-    active: mode === activeMode
-  }));
 }
 
 function architectureLanesForMode(

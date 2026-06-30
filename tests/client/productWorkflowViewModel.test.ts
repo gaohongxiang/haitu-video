@@ -160,9 +160,9 @@ describe("product workflow view-model helpers", () => {
     expect(productAutoSaveStatusLabel("saving")).toBe("保存中");
     expect(productAutoSaveStatusLabel("saving", "en")).toBe("Saving");
     expect(productAutoSaveStatusLabel("idle")).toBe("");
-    expect(storyboardStatusLabel("ai")).toBe("AI 生成分镜");
-    expect(storyboardStatusLabel("ai", "en")).toBe("AI storyboard");
-    expect(storyboardStatusLabel("manual")).toBe("手动分镜");
+    expect(storyboardStatusLabel("ai")).toBe("AI 优化提示词");
+    expect(storyboardStatusLabel("ai", "en")).toBe("AI prompt");
+    expect(storyboardStatusLabel("manual")).toBe("手动提示词");
   });
 
   it("detects supported product import files by extension", () => {

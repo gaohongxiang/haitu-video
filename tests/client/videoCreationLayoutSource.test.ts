@@ -27,41 +27,42 @@ describe("video creation layout source", () => {
     expect(imageCase).not.toContain('tApp("image.empty")');
     expect(workspaceSource).toContain("mode: ProductCreativeWorkspaceMode;");
     expect(composerSource).toContain("buildProductCreativeWorkspace");
-    expect(composerSource).toContain("ProductCreativeContextBar");
+    expect(composerSource).not.toContain("ProductCreativeContextBar");
     expect(composerSource).not.toContain("ProductCreativeCommandCenter");
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
-    expect(composerSource).toContain("workspace.modeSwitch.map");
-    expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(composerSource).toContain("workspace.modeSummary");
+    expect(workspaceSource).not.toContain("onModeChange");
+    expect(composerSource).not.toContain("onModeChange={onModeChange}");
+    expect(composerSource).not.toContain("workspace.modeSwitch");
+    expect(composerSource).not.toContain("workspace.modeSummary");
     expect(composerSource).toContain("ProductModeOutputPanel");
-    expect(composerSource).toContain("mode === \"video\"");
-    expect(composerSource).toContain("mode === \"image\"");
+    expect(source).toContain('mode === "video"');
+    expect(source).toContain("<ProductImagePromptPanel");
   });
 
-  it("renders the creative mode switch as navigation buttons that keep the product context", async () => {
+  it("keeps the main composer free of duplicate product headers and mode tabs", async () => {
     const source = await readFile(appPath, "utf8");
     const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductCreationProductLibrary"));
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
-    const contextBarSource = sourceBetween(source, "function ProductCreativeContextBar", "function ProductModeActionBar");
 
-    expect(workspaceSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
-    expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(contextBarSource).toContain("workspace.modeSwitch.map");
-    expect(contextBarSource).toContain("onModeChange");
-    expect(contextBarSource).toContain('type="button"');
-    expect(contextBarSource).toContain("onClick={() => onModeChange(item.mode)}");
-    expect(contextBarSource).toContain("disabled={item.active}");
+    expect(workspaceSource).not.toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
+    expect(composerSource).not.toContain("onModeChange={onModeChange}");
+    expect(composerSource).not.toContain("<ProductCreativeContextBar");
+    expect(composerSource).not.toContain("function ProductCreativeContextBar");
+    expect(composerSource).not.toContain("product-creative-context-bar");
+    expect(composerSource).not.toContain("workspace.modeSwitch.map");
+    expect(composerSource).not.toContain("workspace.modeSummary");
+    expect(composerSource).not.toContain("图片工作台");
+    expect(composerSource).not.toContain("视频工作台");
   });
 
   it("keeps internal prompt architecture out of the user-facing creative workspace", async () => {
     const source = await readFile(appPath, "utf8");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeContextBar");
-    const contextBarSource = sourceBetween(source, "function ProductCreativeContextBar", "function ProductModeActionBar");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
     const uiWorkspaceSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreationProductLibrary");
     const workspaceModelSource = await readFile("src/client/productCreativeWorkspace.ts", "utf8");
 
-    expect(workbenchSource).toContain("<ProductCreativeContextBar");
+    expect(workbenchSource).not.toContain("<ProductCreativeContextBar");
     expect(workbenchSource).not.toContain("<ProductCreativeCommandCenter");
     expect(workbenchSource).not.toContain("<ProductCreativeWorkspacePanel");
     expect(workbenchSource).not.toContain("<ProductAssetLedgerPanel");
@@ -73,21 +74,21 @@ describe("video creation layout source", () => {
     expect(uiWorkspaceSource).not.toContain("图片提示词编译契约");
     expect(uiWorkspaceSource).not.toContain("商品资产账本");
     expect(uiWorkspaceSource).not.toContain("Payload");
-    expect(contextBarSource).toContain("product-creative-context-bar");
-    expect(contextBarSource).toContain("workspace.modeSwitch.map");
-    expect(contextBarSource).toContain("workspace.memoryChips.map");
-    expect(contextBarSource).toContain("workspace.modeSummary");
-    expect(contextBarSource).not.toContain("workspace.promptPipeline");
-    expect(contextBarSource).not.toContain("workspace.promptCompilerSteps.map");
-    expect(contextBarSource).not.toContain("workspace.assetLedger.map");
-    expect(contextBarSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(source).not.toContain("function ProductCreativeContextBar");
+    expect(source).not.toContain("product-creative-context-bar");
+    expect(uiWorkspaceSource).not.toContain("workspace.modeSwitch.map");
+    expect(uiWorkspaceSource).not.toContain("workspace.modeSummary");
+    expect(uiWorkspaceSource).not.toContain("workspace.memoryChips.map");
+    expect(uiWorkspaceSource).not.toContain("workspace.promptPipeline");
+    expect(uiWorkspaceSource).not.toContain("workspace.promptCompilerSteps.map");
+    expect(uiWorkspaceSource).not.toContain("workspace.assetLedger.map");
     expect(workspaceModelSource).toContain('"visual-asset-pool"');
     expect(workspaceModelSource).toContain('"image-output-records"');
     expect(workspaceModelSource).not.toContain('"reference-images"');
     expect(workspaceModelSource).not.toContain('"image-assets"');
   });
 
-  it("uses an operational workbench for source data, creative intent, and reusable outputs", async () => {
+  it("uses a minimal single-composer workspace instead of an architecture dashboard", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
     const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
@@ -99,9 +100,16 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("<ProductModeAssetPanel");
     expect(workbenchSource).toContain("product-creative-workbench");
     expect(workbenchSource).toContain("product-creative-studio");
-    expect(workbenchSource).toContain("product-creative-media-rail");
     expect(workbenchSource).toContain("product-creative-compose-panel");
-    expect(workbenchSource).toContain("product-creative-result-rail");
+    expect(workbenchSource).toContain("max-w-[960px]");
+    expect(workbenchSource).toContain("product-creative-product-details");
+    expect(workbenchSource).toContain("<ProductCreativeSettingsTray");
+    expect(workbenchSource).toContain("product-creative-context-strip");
+    expect(workbenchSource).not.toContain("product-creative-settings");
+    expect(workbenchSource).not.toContain("product-creative-media-rail");
+    expect(workbenchSource).not.toContain("product-creative-result-rail");
+    expect(workbenchSource).not.toContain("min-[1180px]:grid-cols");
+    expect(workbenchSource).not.toContain("min-[1760px]:grid-cols");
     expect(workbenchSource).not.toContain("product-creative-column-heading");
     expect(workbenchSource).not.toContain("源数据");
     expect(workbenchSource).not.toContain("创作意图");
@@ -110,11 +118,12 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("ProductModeOutputPanel");
     expect(workbenchSource).toContain("ProductModeActionBar");
     expect(workbenchSource).toContain("ProductModeAssetPanel");
+    expect(workbenchSource.indexOf("<ProductCreativeSettingsTray")).toBeLessThan(workbenchSource.indexOf("product-creative-context-strip"));
+    expect(workbenchSource.indexOf("product-creative-product-details")).toBeLessThan(workbenchSource.indexOf("ProductComposerReferenceTray"));
     expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
     expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
     expect(workbenchSource.indexOf("product-creative-compose-panel")).toBeLessThan(workbenchSource.indexOf("<ProductModeActionBar"));
-    expect(workbenchSource.indexOf("<ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("product-creative-controls"));
-    expect(workbenchSource.indexOf("product-creative-output-column")).toBeGreaterThan(workbenchSource.indexOf("<ProductModeActionBar"));
+    expect(workbenchSource.indexOf("ProductModeAssetPanel")).toBeGreaterThan(workbenchSource.indexOf("product-creative-compose-panel"));
   });
 
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
@@ -223,9 +232,10 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("py-2");
     expect(composerSource).toContain("model-scheme-control");
-    expect(composerSource).toContain("model-scheme-chip-row");
-    expect(composerSource).toContain("overflow-visible");
-    expect(composerSource).toContain("ModelSchemeChip");
+    expect(composerSource).toContain('layout="pill"');
+    expect(composerSource).toContain("ProductCreativeToolbarChoice");
+    expect(composerSource).not.toContain("model-scheme-chip-row");
+    expect(composerSource).not.toContain("ModelSchemeChip");
     expect(composerSource).toContain("{schemeSummary}");
     expect(composerSource).toContain('label={tVideo("controls.resolution")}');
     expect(composerSource).toContain("videoResolutionOptions");
@@ -240,7 +250,6 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
     expect(source).toContain('finalLanguageLabel(finalLanguage, tVideo)');
     expect(composerSource).toContain('density="compact"');
-    expect(composerSource).toContain("generation-status-message");
     expect(composerSource).toContain("video-generate-summary");
     expect(composerSource).toContain("{generateVideoSummary}");
     expect(composerSource).toContain("tracking-0");
@@ -250,9 +259,8 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("generateVideoSummaryItems.map");
     expect(composerSource).not.toContain("video-generate-summary-item");
     expect(composerSource).not.toContain("video-generate-summary-separator");
-    expect(composerSource).not.toContain("gap-x-2 gap-y-1");
-    expect(composerSource).toContain("video-generate-status-center");
-    expect(composerSource).toContain("justify-center text-center");
+    expect(composerSource).not.toContain("generation-status-message");
+    expect(composerSource).not.toContain("video-generate-status-center");
     expect(composerSource).not.toContain("subtitle={generateVideoSummary}");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 truncate");
@@ -319,7 +327,9 @@ describe("video creation layout source", () => {
     expect(librarySource).toContain('const tProductStatus = makeAppTranslator("productStatus")');
     expect(librarySource).toContain('const status = productLibraryStatus(product, tProductStatus)');
     expect(operationSource).toContain('{badge ? <Badge className="shrink-0" tone="neutral">{badge}</Badge> : null}');
-    expect(referenceTraySource).toContain('tVideo("reference.title")');
+    expect(referenceTraySource).toContain('tVideo("reference.add")');
+    expect(referenceTraySource).toContain('tVideo("reference.generate")');
+    expect(referenceTraySource).not.toContain('tVideo("reference.title")');
     expect(referenceTraySource).toContain('image.original');
     expect(referenceTraySource).toContain('fileName');
     expect(referenceFigureSource).toContain('tVideo("reference.item", { index: index + 1 })');
@@ -349,16 +359,19 @@ describe("video creation layout source", () => {
     expect(historyPanelSource).not.toContain(">历史记录<");
   });
 
-  it("keeps concrete model names in the model scheme summary instead of inline panels", async () => {
+  it("keeps model details summarized behind the compact model scheme control", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
     const referenceTraySource = source.slice(source.indexOf("function ProductComposerReferenceTray"), source.indexOf("function StoryboardComposerPanel"));
     const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
 
-    expect(composerSource).toContain("model-scheme-chip-row");
-    expect(composerSource).toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
-    expect(composerSource).toContain('{ label: tVideo("modelChips.image"), value: localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo) }');
-    expect(composerSource).toContain('{ label: tVideo("modelChips.video"), value: localizedModelConfigChoiceLabel(selectedVideoModelConfigId, videoModelOptions, tVideo) }');
+    expect(composerSource).toContain("localizedModelSchemeSummary");
+    expect(composerSource).toContain("schemeSummary");
+    expect(composerSource).toContain("<ProductCreativeSettingsTray");
+    expect(composerSource).not.toContain("model-scheme-chip-row");
+    expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
+    expect(composerSource).not.toContain('{ label: tVideo("modelChips.image"), value: localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo) }');
+    expect(composerSource).not.toContain('{ label: tVideo("modelChips.video"), value: localizedModelConfigChoiceLabel(selectedVideoModelConfigId, videoModelOptions, tVideo) }');
     expect(composerSource).not.toContain('{ label: "文", value: modelConfigChoiceLabel');
     expect(composerSource).not.toContain('{ label: "图", value: modelConfigChoiceLabel');
     expect(composerSource).not.toContain('{ label: "视", value: modelConfigChoiceLabel');
