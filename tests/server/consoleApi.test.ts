@@ -1345,7 +1345,8 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
     expect(creationComposerSource).toContain("DeleteCreativeVersionDialog");
-    expect(creationComposerSource).toContain("previewReferenceIndex");
+    expect(creationComposerSource).toContain("imagePromptReferenceIndex");
+    expect(creationComposerSource).toContain("selectedImagePromptReference");
     expect(creationComposerSource).toContain("previewReferenceImages");
     expect(creationComposerSource).not.toContain("InlineProductFactsFields");
     expect(creationComposerSource).not.toContain('Field label="标题"');
@@ -1388,6 +1389,7 @@ describe("console API", () => {
     expect(referenceFigureSource).toContain("group-hover:opacity-100");
     expect(referenceFigureSource).toContain("grid h-[74px] w-[176px] shrink-0");
     expect(referenceFigureSource).toContain("grid-cols-[64px_minmax(0,1fr)]");
+    expect(referenceFigureSource).toContain('title={canPreview ? tVideo("reference.selectPromptTarget") : referenceStatusLabel(image.status, tVideo)}');
     expect(referenceFigureSource).not.toContain("grid-cols-[72px_minmax(0,1fr)_auto]");
     expect(referenceFigureSource).toContain("absolute right-1 top-1/2");
     expect(referenceFigureSource).toContain("pointer-events-none");
@@ -1880,8 +1882,14 @@ describe("console API", () => {
     expect(appSource).toContain('const [imagePrompt, setImagePrompt] = useState("");');
     expect(appSource).toContain("ProductImagePromptPanel");
     expect(appSource).toContain("product-image-prompt-body");
-    expect(appSource).toContain("图片需求");
-    expect(appSource).toContain('const generateImageButtonLabel = previewableReferenceImages.length > 0 ? "优化这张图" : "生成商品图";');
+    expect(appSource).toContain("图片提示词");
+    expect(appSource).toContain("image-prompt-target-chip");
+    expect(appSource).toContain("selectedImagePromptReference={selectedImagePromptReference}");
+    expect(appSource).toContain("onImagePromptTargetClear={() => setImagePromptReferenceIndex(undefined)}");
+    expect(appSource).toContain("image-model-control");
+    expect(appSource).toContain("selectedImageModelConfigId={selectedImageModelConfigId}");
+    expect(appSource).toContain("onImageModelConfigChange={onImageModelConfigChange}");
+    expect(appSource).toContain('const generateImageButtonLabel = selectedImagePromptReference ? "优化这张图" : "生成商品图";');
     expect(appSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
     expect(appSource).toContain("textModelOptions");
     expect(appSource).toContain("imageModelOptions");
@@ -5851,7 +5859,8 @@ describe("console API", () => {
     expect(appSource).toContain('tVideo("history.tagsCopiedToast")');
     expect(appSource).toContain("normalizeDisplayHashtags");
     expect(composerSource).toContain("DeleteCreativeVersionDialog");
-    expect(composerSource).toContain("previewReferenceIndex");
+    expect(composerSource).toContain("imagePromptReferenceIndex");
+    expect(composerSource).toContain("selectedImagePromptReference");
     expect(composerSource).toContain("previewReferenceImages");
     expect(composerSource).not.toContain("InlineProductFactsFields");
     expect(composerSource).not.toContain('Field label="标题"');

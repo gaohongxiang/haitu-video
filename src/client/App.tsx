@@ -3276,6 +3276,10 @@ export function App() {
               selectedTextModelConfigId={selectedTextModelConfigId}
               imageModelOptions={imageModelOptions}
               selectedImageModelConfigId={selectedImageModelConfigId}
+              onImageModelConfigChange={(nextConfigId) => {
+                setSelectedImageModelConfigId(nextConfigId);
+                markPreflightStale();
+              }}
               videoModelOptions={videoModelOptions}
               selectedVideoModelConfigId={selectedVideoModelConfigId}
               onVideoModelConfigChange={(nextConfigId) => {
@@ -3374,6 +3378,10 @@ export function App() {
               selectedTextModelConfigId={selectedTextModelConfigId}
               imageModelOptions={imageModelOptions}
               selectedImageModelConfigId={selectedImageModelConfigId}
+              onImageModelConfigChange={(nextConfigId) => {
+                setSelectedImageModelConfigId(nextConfigId);
+                markPreflightStale();
+              }}
               videoModelOptions={videoModelOptions}
               selectedVideoModelConfigId={selectedVideoModelConfigId}
               onVideoModelConfigChange={(nextConfigId) => {
@@ -4494,6 +4502,7 @@ function ProductCreationWorkspace({
   selectedTextModelConfigId,
   imageModelOptions,
   selectedImageModelConfigId,
+  onImageModelConfigChange,
   videoModelOptions,
   selectedVideoModelConfigId,
   onVideoModelConfigChange,
@@ -4563,6 +4572,7 @@ function ProductCreationWorkspace({
   selectedTextModelConfigId: ModelConfigChoice;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   videoModelOptions: ProviderConfigItem[];
   selectedVideoModelConfigId: ModelConfigChoice;
   onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
@@ -4656,6 +4666,7 @@ function ProductCreationWorkspace({
       selectedTextModelConfigId={selectedTextModelConfigId}
       imageModelOptions={imageModelOptions}
       selectedImageModelConfigId={selectedImageModelConfigId}
+      onImageModelConfigChange={onImageModelConfigChange}
       videoModelOptions={videoModelOptions}
       selectedVideoModelConfigId={selectedVideoModelConfigId}
       onVideoModelConfigChange={onVideoModelConfigChange}
@@ -4727,6 +4738,7 @@ function ProductCreationComposer({
   selectedTextModelConfigId,
   imageModelOptions,
   selectedImageModelConfigId,
+  onImageModelConfigChange,
   videoModelOptions,
   selectedVideoModelConfigId,
   onVideoModelConfigChange,
@@ -4794,6 +4806,7 @@ function ProductCreationComposer({
   selectedTextModelConfigId: ModelConfigChoice;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   videoModelOptions: ProviderConfigItem[];
   selectedVideoModelConfigId: ModelConfigChoice;
   onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
@@ -4827,7 +4840,7 @@ function ProductCreationComposer({
   const [isSubmittingImage, setIsSubmittingImage] = useState(false);
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
-  const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
+  const [imagePromptReferenceIndex, setImagePromptReferenceIndex] = useState<number | undefined>();
   const [imagePrompt, setImagePrompt] = useState("");
   const [fileImportOpen, setFileImportOpen] = useState(false);
   const [productLibraryCollapsed, setProductLibraryCollapsed] = useState(false);
@@ -4906,11 +4919,15 @@ function ProductCreationComposer({
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
   const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
   const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100";
-  const imageTargetLabel = previewableReferenceImages.length > 0
-    ? `默认优化参考图 1 · 共 ${previewableReferenceImages.length} 张可用`
+  const selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : previewableReferenceImages[imagePromptReferenceIndex];
+  const selectedImagePromptReferenceNumber = selectedImagePromptReference
+    ? Math.max(0, previewableReferenceImages.indexOf(selectedImagePromptReference)) + 1
+    : 0;
+  const imageTargetLabel = selectedImagePromptReference
+    ? `优化参考图 ${selectedImagePromptReferenceNumber} · 共 ${previewableReferenceImages.length} 张可用`
     : "按商品资料生成";
-  const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片需求" : "默认图片需求";
-  const generateImageButtonLabel = previewableReferenceImages.length > 0 ? "优化这张图" : "生成商品图";
+  const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片提示词" : "默认图片提示词";
+  const generateImageButtonLabel = selectedImagePromptReference ? "优化这张图" : "生成商品图";
   const imageGenerateSummary = [
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
     imageTargetLabel,
@@ -4919,7 +4936,7 @@ function ProductCreationComposer({
     localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
   ].join(" · ");
   useEffect(() => {
-    setPreviewReferenceIndex(undefined);
+    setImagePromptReferenceIndex(undefined);
     setImagePrompt("");
     if (productFactsBodyRef.current) {
       productFactsBodyRef.current.scrollTop = 0;
@@ -4927,15 +4944,15 @@ function ProductCreationComposer({
   }, [selectedProduct?.sku]);
 
   useEffect(() => {
-    if (previewReferenceIndex === undefined) return;
+    if (imagePromptReferenceIndex === undefined) return;
     if (previewableReferenceImages.length === 0) {
-      setPreviewReferenceIndex(undefined);
+      setImagePromptReferenceIndex(undefined);
       return;
     }
-    if (previewReferenceIndex >= previewableReferenceImages.length) {
-      setPreviewReferenceIndex(previewableReferenceImages.length - 1);
+    if (imagePromptReferenceIndex >= previewableReferenceImages.length) {
+      setImagePromptReferenceIndex(previewableReferenceImages.length - 1);
     }
-  }, [previewableReferenceImages.length, previewReferenceIndex]);
+  }, [previewableReferenceImages.length, imagePromptReferenceIndex]);
 
   useEffect(() => {
     return () => {
@@ -5104,12 +5121,12 @@ function ProductCreationComposer({
         removeReferenceFromComposerText(importText, draftImage.original),
         removeDraftReferenceImage(draft, draftImage.original)
       );
-      setPreviewReferenceIndex(undefined);
+      setImagePromptReferenceIndex(undefined);
       return;
     }
     if (!selectedProduct) return;
     await onDeleteReferenceImage(selectedProduct.sku, index);
-    setPreviewReferenceIndex(undefined);
+    setImagePromptReferenceIndex(undefined);
   }
 
   async function handleReorderReferenceImage(fromIndex: number, toIndex: number) {
@@ -5117,7 +5134,7 @@ function ProductCreationComposer({
     if (selectedProduct && previewReferenceImages.length > 0) {
       const nextReferences = moveArrayItem(previewReferenceImages.map((image) => image.original), fromIndex, toIndex);
       await onReorderReferenceImage(selectedProduct.sku, nextReferences);
-      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
       return;
     }
     if (draftReferenceImages.length > 0) {
@@ -5129,12 +5146,12 @@ function ProductCreationComposer({
           reference_images: nextReferences.join("\n")
         }
       );
-      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
       return;
     }
     if (pendingImageFiles.length > 0) {
       setPendingImageFiles((current) => moveArrayItem(current, fromIndex, toIndex));
-      setPreviewReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
+      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
     }
   }
 
@@ -5218,9 +5235,14 @@ function ProductCreationComposer({
           versionCountOptions={versionCountOptions}
           onVersionCountChange={onVersionCountChange}
           imageModelLabel={imageModelLabel}
+          imageModelOptions={imageModelOptions}
+          selectedImageModelConfigId={selectedImageModelConfigId}
+          onImageModelConfigChange={onImageModelConfigChange}
           imagePrompt={imagePrompt}
           onImagePromptChange={setImagePrompt}
           imageTargetLabel={imageTargetLabel}
+          selectedImagePromptReference={selectedImagePromptReference}
+          onImagePromptTargetClear={() => setImagePromptReferenceIndex(undefined)}
           schemeSummary={schemeSummary}
           storyboardDraft={storyboardDraft}
           storyboardDraftIsGuidance={storyboardDraftIsGuidance}
@@ -5248,8 +5270,8 @@ function ProductCreationComposer({
           storyboardEstimate={billingEstimates?.estimates.storyboard}
           onImportAssets={onImportAssets}
           onGenerateReferenceImages={onGenerateReferenceImages}
-          onPreviewReferenceImage={setPreviewReferenceIndex}
-          onPendingPreview={(index) => setPreviewReferenceIndex(index)}
+          onPreviewReferenceImage={setImagePromptReferenceIndex}
+          onPendingPreview={(index) => setImagePromptReferenceIndex(index)}
           onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
           onReorderReferenceImage={(fromIndex, toIndex) => void handleReorderReferenceImage(fromIndex, toIndex)}
           onFilesChange={handleReferenceFiles}
@@ -5289,13 +5311,6 @@ function ProductCreationComposer({
         index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === deleteTarget?.id))}
         onClose={() => setDeleteTarget(undefined)}
         onConfirm={handleDeleteCreativeVersion}
-      />
-      <ReferenceImagePreviewDialog
-        tVideo={tVideo}
-        images={previewableReferenceImages}
-        index={previewReferenceIndex}
-        onIndexChange={setPreviewReferenceIndex}
-        onClose={() => setPreviewReferenceIndex(undefined)}
       />
       <ProductFileImportDialog
         locale={appLocale}
@@ -5358,9 +5373,14 @@ function ProductCreativeWorkbench({
   versionCountOptions,
   onVersionCountChange,
   imageModelLabel,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
   imagePrompt,
   onImagePromptChange,
   imageTargetLabel,
+  selectedImagePromptReference,
+  onImagePromptTargetClear,
   schemeSummary,
   storyboardDraft,
   storyboardDraftIsGuidance,
@@ -5443,9 +5463,14 @@ function ProductCreativeWorkbench({
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
   imageModelLabel: string;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
   imageTargetLabel: string;
+  selectedImagePromptReference?: ReferenceImageStatus;
+  onImagePromptTargetClear: () => void;
   schemeSummary: string;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
@@ -5549,10 +5574,15 @@ function ProductCreativeWorkbench({
           appLocale={appLocale}
           tVideo={tVideo}
           imageModelLabel={imageModelLabel}
+          imageModelOptions={imageModelOptions}
+          selectedImageModelConfigId={selectedImageModelConfigId}
+          onImageModelConfigChange={onImageModelConfigChange}
           imagePrompt={imagePrompt}
           onImagePromptChange={onImagePromptChange}
           referenceImageCount={previewableReferenceImages.length}
           imageTargetLabel={imageTargetLabel}
+          selectedImagePromptReference={selectedImagePromptReference}
+          onImagePromptTargetClear={onImagePromptTargetClear}
           activeModelSchemeId={activeModelSchemeId}
           modelSchemeOptions={modelSchemeOptions}
           onModelSchemeChange={onModelSchemeChange}
@@ -5939,10 +5969,15 @@ function ProductModeOutputPanel({
   appLocale,
   tVideo,
   imageModelLabel,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
   imagePrompt,
   onImagePromptChange,
   referenceImageCount,
   imageTargetLabel,
+  selectedImagePromptReference,
+  onImagePromptTargetClear,
   activeModelSchemeId,
   modelSchemeOptions,
   onModelSchemeChange,
@@ -5978,10 +6013,15 @@ function ProductModeOutputPanel({
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   imageModelLabel: string;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
   referenceImageCount: number;
   imageTargetLabel: string;
+  selectedImagePromptReference?: ReferenceImageStatus;
+  onImagePromptTargetClear: () => void;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
@@ -6054,27 +6094,45 @@ function ProductModeOutputPanel({
 
   return (
     <ProductImagePromptPanel
+      tVideo={tVideo}
       imageModelLabel={imageModelLabel}
+      imageModelOptions={imageModelOptions}
+      selectedImageModelConfigId={selectedImageModelConfigId}
+      onImageModelConfigChange={onImageModelConfigChange}
       imagePrompt={imagePrompt}
       onImagePromptChange={onImagePromptChange}
       referenceImageCount={referenceImageCount}
       imageTargetLabel={imageTargetLabel}
+      selectedImagePromptReference={selectedImagePromptReference}
+      onImagePromptTargetClear={onImagePromptTargetClear}
     />
   );
 }
 
 function ProductImagePromptPanel({
+  tVideo,
   imageModelLabel,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
   imagePrompt,
   onImagePromptChange,
   referenceImageCount,
-  imageTargetLabel
+  imageTargetLabel,
+  selectedImagePromptReference,
+  onImagePromptTargetClear
 }: {
+  tVideo: VideoStudioTranslator;
   imageModelLabel: string;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
   referenceImageCount: number;
   imageTargetLabel: string;
+  selectedImagePromptReference?: ReferenceImageStatus;
+  onImagePromptTargetClear: () => void;
 }) {
   const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
   function appendImagePromptPreset(preset: string) {
@@ -6084,14 +6142,13 @@ function ProductImagePromptPanel({
 
   return (
     <section className="product-image-prompt-panel grid content-start gap-2 border-t border-[var(--border)] pt-3">
-      <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="shrink-0 text-sm font-black text-[var(--text)]">图片需求</div>
+          <div className="shrink-0 text-sm font-black text-[var(--text)]">图片提示词</div>
           <div className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
             {imageTargetLabel}
           </div>
         </div>
-        <Badge className="max-w-[180px] truncate">{imageModelLabel}</Badge>
       </div>
       <div className="grid min-w-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
         <Textarea
@@ -6102,6 +6159,43 @@ function ProductImagePromptPanel({
           rows={4}
         />
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {selectedImagePromptReference ? (
+            <div className="image-prompt-target-chip flex min-w-[160px] max-w-full items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
+              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
+                {selectedImagePromptReference?.previewUrl ? (
+                  <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
+                ) : (
+                  <ImageIcon size={13} className="text-[var(--muted)]" />
+                )}
+              </span>
+              <span className="grid min-w-0">
+                <span className="truncate">优化目标</span>
+                <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
+              </span>
+              <button
+                type="button"
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+                title="清除目标图"
+                aria-label="清除目标图"
+                onClick={onImagePromptTargetClear}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : null}
+          <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
+            <CompactChoiceDropdown
+              label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
+              value={selectedImageModelConfigId}
+              options={configuredModelOptions(imageModelOptions)}
+              formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
+              onChange={onImageModelConfigChange}
+              layout="pill"
+              density="micro"
+              menuPlacement="top"
+              menuWidth="content"
+            />
+          </div>
           {imagePromptPresets.map((preset) => (
             <button
               key={preset}
@@ -7776,7 +7870,7 @@ function ReferenceImageFigure({
         type="button"
         className="overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--panel2)]"
         disabled={!canPreview}
-        title={canPreview ? tVideo("reference.preview") : referenceStatusLabel(image.status, tVideo)}
+        title={canPreview ? tVideo("reference.selectPromptTarget") : referenceStatusLabel(image.status, tVideo)}
         onClick={onPreview}
       >
         {image.previewUrl ? (
@@ -7798,7 +7892,7 @@ function ReferenceImageFigure({
           </Button>
         ) : null}
         {canPreview ? (
-          <Button className="h-8 w-8 p-0" size="icon" title={tVideo("reference.preview")} onClick={onPreview}>
+          <Button className="h-8 w-8 p-0" size="icon" title={tVideo("reference.selectPromptTarget")} onClick={onPreview}>
             <ImageIcon size={12} />
           </Button>
         ) : null}
