@@ -5474,12 +5474,12 @@ function ProductCreativeWorkbench({
     <section className="product-creative-workbench product-creative-studio grid w-full content-start gap-3">
       <section className="product-creative-compose-panel grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_14px_42px_rgba(96,64,43,.06)]">
         <div className="product-creative-context-strip grid min-w-0 items-start gap-2 min-[760px]:grid-cols-[minmax(240px,.82fr)_minmax(0,1.18fr)]">
-          <section className="product-creative-product-details grid self-start min-h-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
-            <div className="product-facts-header flex min-h-8 items-center justify-between gap-3 text-xs font-black text-[var(--text)]">
+          <section className="product-creative-product-details grid self-start min-h-0 grid-rows-[36px_minmax(104px,auto)] gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+            <div className="product-facts-header flex h-9 items-center justify-between gap-3 text-xs font-black text-[var(--text)]">
               <span>{tVideo("facts.title")}</span>
               <div className="flex min-w-0 shrink-0 items-center gap-2">
                 {productAutoSaveLabel ? <span className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]">{productAutoSaveLabel}</span> : null}
-                <Button className="product-facts-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px] disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
+                <Button className="product-facts-action h-9 min-h-9 justify-center rounded-[8px] px-3 text-xs disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
                   {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
                   {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
                   <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
@@ -5489,12 +5489,12 @@ function ProductCreativeWorkbench({
             <div className="product-facts-editor grid min-w-0 gap-2">
               <Textarea
                 ref={productFactsBodyRef}
-                className="product-facts-body h-[74px] min-h-[74px] max-h-[74px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
+                className="product-facts-body h-[104px] min-h-[104px] max-h-[104px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
                 onPaste={onProductFactsPaste}
                 placeholder={tVideo("facts.placeholder")}
-                rows={3}
+                rows={4}
               />
               {importNotes.length > 0 ? (
                 <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
@@ -6395,7 +6395,7 @@ function ProductComposerReferenceTray({
 
   return (
     <section
-      className={cn("product-reference-inline grid self-start content-start gap-2", className)}
+      className={cn("product-reference-inline grid self-start grid-rows-[36px_minmax(104px,auto)] content-start gap-2 rounded-[8px] px-3 py-2", className)}
       onDragEnter={handleReferenceDrag}
       onDragOver={handleReferenceDrag}
       onDragLeave={(event) => {
@@ -6405,10 +6405,10 @@ function ProductComposerReferenceTray({
       }}
       onDrop={handleReferenceDrop}
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="product-reference-actions flex h-9 min-w-0 flex-nowrap items-center gap-2">
         <label
           className={cn(
-            "inline-flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border px-3 text-xs font-black transition",
+            "reference-add-button inline-flex h-9 min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border px-3 text-xs font-black transition",
             dragOver
               ? "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--field))] text-[var(--accent)] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
               : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
@@ -6429,7 +6429,7 @@ function ProductComposerReferenceTray({
           />
         </label>
         <Button
-          className={cn("min-h-9 justify-center rounded-[8px] px-3", !product && "opacity-55")}
+          className={cn("reference-generate-action h-9 min-h-9 justify-center rounded-[8px] px-3 text-xs", !product && "opacity-55")}
           size="sm"
           variant="soft"
           aria-disabled={!product}
@@ -6451,7 +6451,7 @@ function ProductComposerReferenceTray({
         ) : null}
       </div>
       {visibleImages.length > 0 ? (
-        <div className="reference-image-list flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+        <div className="reference-image-list flex h-[104px] min-h-[104px] min-w-0 items-start gap-1.5 overflow-x-auto pb-1">
           {visibleImages.map((image, index) => (
             <ReferenceImageFigure
               tVideo={tVideo}
@@ -6481,7 +6481,7 @@ function ProductComposerReferenceTray({
           ))}
         </div>
       ) : pendingFiles.length > 0 ? (
-        <div className="reference-image-list flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+        <div className="reference-image-list flex h-[104px] min-h-[104px] min-w-0 items-start gap-1.5 overflow-x-auto pb-1">
           {pendingImages.map((image, index) => {
             const file = pendingFiles[index];
             const fileName = file?.name ?? image.original;
