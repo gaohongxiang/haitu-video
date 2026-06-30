@@ -4914,7 +4914,6 @@ function ProductCreationComposer({
     generatedVideoCount: latestCreativeJobs.length,
     imageAssetCount: productImageAssetCount
   });
-  const modeLabel = productCreativeWorkspaceModeLabel(mode);
   const imageModelLabel = localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo);
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
   const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
@@ -5186,8 +5185,6 @@ function ProductCreationComposer({
           </div>
         ) : null}
 
-        <ProductCreativeCommandCenter workspace={creativeWorkspace} modeLabel={modeLabel} onModeChange={onModeChange} />
-
         <ProductCreativeWorkbench
           mode={mode}
           appLocale={appLocale}
@@ -5272,6 +5269,7 @@ function ProductCreationComposer({
           onRetryVideoJob={onRetryVideoJob}
           onRecoverVideoJobDownload={onRecoverVideoJobDownload}
           onToast={onToast}
+          onModeChange={onModeChange}
         />
       </ProductCreationOperationWorkspace>
 
@@ -5410,7 +5408,8 @@ function ProductCreativeWorkbench({
   onDeleteVideo,
   onRetryVideoJob,
   onRecoverVideoJobDownload,
-  onToast
+  onToast,
+  onModeChange
 }: {
   mode: ProductCreativeWorkspaceMode;
   appLocale: AppLocale;
@@ -5495,337 +5494,271 @@ function ProductCreativeWorkbench({
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
 }) {
   return (
-    <section className="product-creative-workbench grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.78fr)_minmax(360px,1.12fr)_minmax(320px,.95fr)]">
-      <div className="product-creative-source-column grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
-        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">源数据</div>
-        <ProductComposerReferenceTray
-          tVideo={tVideo}
-          className="h-full"
-          estimate={referenceImagesEstimate}
-          product={selectedProduct}
-          pendingFiles={pendingImageFiles}
-          draftImages={draftReferenceImages}
-          pendingImages={pendingReferenceImageStatuses}
-          onImportAssets={onImportAssets}
-          onGenerateReferenceImages={onGenerateReferenceImages}
-          onToast={onToast}
-          onPreviewReferenceImage={onPreviewReferenceImage}
-          onPendingPreview={onPendingPreview}
-          onDeleteReferenceImage={onDeleteReferenceImage}
-          onReorderReferenceImage={onReorderReferenceImage}
-          onFilesChange={onFilesChange}
-          onClearPendingFile={onClearPendingFile}
-        />
-
-        <div className="product-facts-editor grid min-h-[320px] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
-          <div className="product-facts-actions grid gap-2">
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <div className="text-sm font-black text-[var(--text)]">{tVideo("facts.title")}</div>
-              {productAutoSaveLabel ? (
-                <span className="text-[11px] font-black text-[var(--muted)]">{productAutoSaveLabel}</span>
-              ) : null}
-            </div>
-            <Button className="min-h-9 w-full justify-center rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
-              {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
-              {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
-              <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
-            </Button>
-          </div>
-          <Textarea
-            ref={productFactsBodyRef}
-            className="product-facts-body h-full min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
-            rows={productFactsRows}
-            value={importText}
-            onChange={(event) => setImportText(event.target.value)}
-            onPaste={onProductFactsPaste}
-            placeholder={tVideo("facts.placeholder")}
+    <section className="product-creative-workbench product-creative-studio grid gap-3">
+      <ProductCreativeContextBar
+        workspace={workspace}
+        mode={mode}
+        onModeChange={onModeChange}
+      />
+      <div className="grid gap-3 min-[1180px]:grid-cols-[minmax(240px,.72fr)_minmax(420px,1.28fr)] min-[1760px]:grid-cols-[minmax(260px,.8fr)_minmax(430px,1.25fr)_minmax(300px,.88fr)]">
+        <div className="product-creative-source-column product-creative-media-rail grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+          <ProductComposerReferenceTray
+            tVideo={tVideo}
+            className="h-full"
+            estimate={referenceImagesEstimate}
+            product={selectedProduct}
+            pendingFiles={pendingImageFiles}
+            draftImages={draftReferenceImages}
+            pendingImages={pendingReferenceImageStatuses}
+            onImportAssets={onImportAssets}
+            onGenerateReferenceImages={onGenerateReferenceImages}
+            onToast={onToast}
+            onPreviewReferenceImage={onPreviewReferenceImage}
+            onPendingPreview={onPendingPreview}
+            onDeleteReferenceImage={onDeleteReferenceImage}
+            onReorderReferenceImage={onReorderReferenceImage}
+            onFilesChange={onFilesChange}
+            onClearPendingFile={onClearPendingFile}
           />
-          {importNotes.length > 0 ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
-              {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
-            </div>
-          ) : null}
-        </div>
-      </div>
 
-      <div className="product-creative-intent-column grid min-w-0 content-start gap-3">
-        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">创作意图</div>
-        <section className="product-creative-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-          <div className="model-scheme-control grid min-w-0 gap-1">
-            <CompactChoiceDropdown
-              label={tVideo("controls.modelScheme")}
-              value={activeModelSchemeId}
-              options={modelSchemeOptions.map((option) => option.id)}
-              formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
-              onChange={onModelSchemeChange}
-              density="compact"
+          <div className="product-facts-editor grid min-h-[260px] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
+            <div className="product-facts-actions grid gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-black text-[var(--text)]">{tVideo("facts.title")}</div>
+                {productAutoSaveLabel ? (
+                  <span className="text-[11px] font-black text-[var(--muted)]">{productAutoSaveLabel}</span>
+                ) : null}
+              </div>
+              <Button className="min-h-9 w-full justify-center rounded-[11px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
+                {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
+                {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
+                <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
+              </Button>
+            </div>
+            <Textarea
+              ref={productFactsBodyRef}
+              className="product-facts-body h-full min-h-0 resize-none overflow-auto border-0 bg-transparent px-0 py-1 text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
+              rows={productFactsRows}
+              value={importText}
+              onChange={(event) => setImportText(event.target.value)}
+              onPaste={onProductFactsPaste}
+              placeholder={tVideo("facts.placeholder")}
+            />
+            {importNotes.length > 0 ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
+                {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="product-creative-intent-column product-creative-compose-panel grid min-w-0 content-start gap-3">
+          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
+            <ProductModeOutputPanel
+              mode={mode}
+              appLocale={appLocale}
+              tVideo={tVideo}
+              workspace={workspace}
+              imageModelLabel={imageModelLabel}
+              referenceImageCount={previewableReferenceImages.length}
+              template={template}
+              duration={duration}
+              storyboardDraft={storyboardDraft}
+              storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+              storyboardHistory={storyboardHistory}
+              onStoryboardDraftChange={onStoryboardDraftChange}
+              onApplyStoryboardHistory={onApplyStoryboardHistory}
+              onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+              onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+              isGeneratingStoryboard={isGeneratingStoryboard}
+              productReady={storyboardProductReady}
+              storyboardEstimate={storyboardEstimate}
             />
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {mode === "video" ? (
-              <>
-                <CompactChoiceDropdown
-                  label={tVideo("controls.template")}
-                  value={template}
-                  options={templateOptions}
-                  formatOption={(option) => localizedTemplateLabel(option, tVideo)}
-                  onChange={onTemplateChange}
-                  density="compact"
-                />
-                <CompactChoiceDropdown
-                  label={tVideo("controls.duration")}
-                  value={String(duration)}
-                  options={durationOptions}
-                  formatOption={(option) => `${option}s`}
-                  onChange={(option) => onDurationChange(Number(option))}
-                  density="compact"
-                />
-                <CompactChoiceDropdown
-                  label={tVideo("controls.resolution")}
-                  value={selectedVideoResolution}
-                  options={videoResolutionOptions}
-                  formatOption={videoResolutionLabel}
-                  onChange={onVideoResolutionChange}
-                  density="compact"
-                />
-                <CompactChoiceDropdown
-                  label={tVideo("controls.aspectRatio")}
-                  value={selectedVideoAspectRatio}
-                  options={videoAspectRatioOptions}
-                  formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
-                  onChange={onVideoAspectRatioChange}
-                  density="compact"
-                />
-                <CompactChoiceDropdown
-                  label={tVideo("controls.finalLanguage")}
-                  value={finalLanguage}
-                  options={languageOptions}
-                  formatOption={(option) => finalLanguageLabel(option, tVideo)}
-                  onChange={onFinalLanguageChange}
-                  density="compact"
-                />
-                <CompactChoiceDropdown
-                  label={tVideo("controls.versionCount")}
-                  value={String(versionCount)}
-                  options={versionCountOptions}
-                  formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
-                  onChange={(option) => onVersionCountChange(Number(option))}
-                  density="compact"
-                />
-              </>
-            ) : (
-              <>
-                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
-                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片目标</span>
-                  <span className="truncate text-xs font-black text-[var(--text)]">主图 / 场景图 / 细节图</span>
-                </div>
-                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
-                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片模型</span>
-                  <span className="truncate text-xs font-black text-[var(--text)]">{imageModelLabel}</span>
-                </div>
-                <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5 sm:col-span-2">
-                  <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">参考约束</span>
-                  <span className="truncate text-xs font-black text-[var(--text)]">{tVideo("summary.referenceImages", { count: previewableReferenceImages.length })}</span>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5" title={schemeSummary} aria-label={schemeSummary}>
-            {schemeModelChips.map((item) => (
-              <ModelSchemeChip key={item.label} label={item.label} value={item.value} />
-            ))}
-          </div>
-        </section>
-
-        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3">
-          <ProductModeOutputPanel
+          <ProductModeActionBar
             mode={mode}
-            appLocale={appLocale}
             tVideo={tVideo}
             workspace={workspace}
-            imageModelLabel={imageModelLabel}
-            referenceImageCount={previewableReferenceImages.length}
-            template={template}
-            duration={duration}
-            storyboardDraft={storyboardDraft}
-            storyboardDraftIsGuidance={storyboardDraftIsGuidance}
-            storyboardHistory={storyboardHistory}
-            onStoryboardDraftChange={onStoryboardDraftChange}
-            onApplyStoryboardHistory={onApplyStoryboardHistory}
-            onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-            onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-            isGeneratingStoryboard={isGeneratingStoryboard}
-            productReady={storyboardProductReady}
-            storyboardEstimate={storyboardEstimate}
+            generateVideoSummary={generateVideoSummary}
+            imageGenerateSummary={imageGenerateSummary}
+            generationReadiness={generationReadiness}
+            generationReadinessMessageClass={generationReadinessMessageClass}
+            actionButtonClass={actionButtonClass}
+            actionDisabledClass={actionDisabledClass}
+            generateVideoDisabled={generateVideoDisabled}
+            imageGenerateDisabled={imageGenerateDisabled}
+            generateVideoButtonLabel={generateVideoButtonLabel}
+            isSubmittingVideo={isSubmittingVideo}
+            isSubmittingImage={isSubmittingImage}
+            videoEstimate={videoEstimate}
+            imageEstimate={imageEstimate}
+            onGenerateVideo={onGenerateVideo}
+            onGenerateProductImages={onGenerateProductImages}
+          />
+          <section className="product-creative-controls grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+            <div className="model-scheme-control grid min-w-0 gap-1">
+              <CompactChoiceDropdown
+                label={tVideo("controls.modelScheme")}
+                value={activeModelSchemeId}
+                options={modelSchemeOptions.map((option) => option.id)}
+                formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
+                onChange={onModelSchemeChange}
+                density="compact"
+              />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {mode === "video" ? (
+                <>
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.template")}
+                    value={template}
+                    options={templateOptions}
+                    formatOption={(option) => localizedTemplateLabel(option, tVideo)}
+                    onChange={onTemplateChange}
+                    density="compact"
+                  />
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.duration")}
+                    value={String(duration)}
+                    options={durationOptions}
+                    formatOption={(option) => `${option}s`}
+                    onChange={(option) => onDurationChange(Number(option))}
+                    density="compact"
+                  />
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.resolution")}
+                    value={selectedVideoResolution}
+                    options={videoResolutionOptions}
+                    formatOption={videoResolutionLabel}
+                    onChange={onVideoResolutionChange}
+                    density="compact"
+                  />
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.aspectRatio")}
+                    value={selectedVideoAspectRatio}
+                    options={videoAspectRatioOptions}
+                    formatOption={(option) => videoAspectRatioLabel(option, tVideo)}
+                    onChange={onVideoAspectRatioChange}
+                    density="compact"
+                  />
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.finalLanguage")}
+                    value={finalLanguage}
+                    options={languageOptions}
+                    formatOption={(option) => finalLanguageLabel(option, tVideo)}
+                    onChange={onFinalLanguageChange}
+                    density="compact"
+                  />
+                  <CompactChoiceDropdown
+                    label={tVideo("controls.versionCount")}
+                    value={String(versionCount)}
+                    options={versionCountOptions}
+                    formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
+                    onChange={(option) => onVersionCountChange(Number(option))}
+                    density="compact"
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                    <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片目标</span>
+                    <span className="truncate text-xs font-black text-[var(--text)]">主图 / 场景图 / 细节图</span>
+                  </div>
+                  <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5">
+                    <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">图片模型</span>
+                    <span className="truncate text-xs font-black text-[var(--text)]">{imageModelLabel}</span>
+                  </div>
+                  <div className="grid min-w-0 gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 py-1.5 sm:col-span-2">
+                    <span className="truncate text-[10px] font-black uppercase text-[var(--muted)]">参考约束</span>
+                    <span className="truncate text-xs font-black text-[var(--text)]">{tVideo("summary.referenceImages", { count: previewableReferenceImages.length })}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="model-scheme-chip-row flex min-w-0 flex-wrap gap-1.5 overflow-visible pb-0.5" title={schemeSummary} aria-label={schemeSummary}>
+              {schemeModelChips.map((item) => (
+                <ModelSchemeChip key={item.label} label={item.label} value={item.value} />
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="product-creative-output-column product-creative-result-rail grid min-w-0 content-start gap-3 min-[1180px]:col-span-2 min-[1760px]:col-span-1">
+          <ProductModeAssetPanel
+            mode={mode}
+            surface="workbench"
+            appLocale={appLocale}
+            tVideo={tVideo}
+            jobs={jobs}
+            product={selectedProduct}
+            draft={draft}
+            importText={importText}
+            images={previewableReferenceImages}
+            onPreviewVideo={onPreviewVideo}
+            onDeleteVideo={onDeleteVideo}
+            onRetryVideoJob={onRetryVideoJob}
+            onRecoverVideoJobDownload={onRecoverVideoJobDownload}
+            onToast={onToast}
+            onPreviewReferenceImage={onPreviewReferenceImage}
           />
         </div>
-      </div>
-
-      <div className="product-creative-output-column grid min-w-0 content-start gap-3">
-        <div className="product-creative-column-heading text-[11px] font-black uppercase text-[var(--muted)]">输出资产</div>
-        <ProductModeActionBar
-          mode={mode}
-          tVideo={tVideo}
-          workspace={workspace}
-          generateVideoSummary={generateVideoSummary}
-          imageGenerateSummary={imageGenerateSummary}
-          generationReadiness={generationReadiness}
-          generationReadinessMessageClass={generationReadinessMessageClass}
-          actionButtonClass={actionButtonClass}
-          actionDisabledClass={actionDisabledClass}
-          generateVideoDisabled={generateVideoDisabled}
-          imageGenerateDisabled={imageGenerateDisabled}
-          generateVideoButtonLabel={generateVideoButtonLabel}
-          isSubmittingVideo={isSubmittingVideo}
-          isSubmittingImage={isSubmittingImage}
-          videoEstimate={videoEstimate}
-          imageEstimate={imageEstimate}
-          onGenerateVideo={onGenerateVideo}
-          onGenerateProductImages={onGenerateProductImages}
-        />
-        <ProductModeAssetPanel
-          mode={mode}
-          surface="workbench"
-          appLocale={appLocale}
-          tVideo={tVideo}
-          jobs={jobs}
-          product={selectedProduct}
-          draft={draft}
-          importText={importText}
-          images={previewableReferenceImages}
-          onPreviewVideo={onPreviewVideo}
-          onDeleteVideo={onDeleteVideo}
-          onRetryVideoJob={onRetryVideoJob}
-          onRecoverVideoJobDownload={onRecoverVideoJobDownload}
-          onToast={onToast}
-          onPreviewReferenceImage={onPreviewReferenceImage}
-        />
       </div>
     </section>
   );
 }
 
-function ProductCreativeCommandCenter({
+function ProductCreativeContextBar({
   workspace,
-  modeLabel,
+  mode,
   onModeChange
 }: {
   workspace: ProductCreativeWorkspace;
-  modeLabel: string;
+  mode: ProductCreativeWorkspaceMode;
   onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
 }) {
-  const pipelineStages = [
-    { label: "输入源", detail: workspace.promptPipeline.inputSource },
-    { label: workspace.promptPipeline.optimizer.label, detail: workspace.promptPipeline.optimizer.detail },
-    { label: workspace.promptPipeline.output.label, detail: workspace.promptPipeline.output.detail }
-  ];
-
   return (
-    <section className="product-creative-command-center grid gap-3 rounded-[8px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_5%,var(--panel)),var(--panel))] p-3 min-[1180px]:grid-cols-[minmax(230px,.78fr)_minmax(360px,1.25fr)_minmax(280px,.9fr)]">
-      <div className="product-creative-memory-column grid content-start gap-3">
+    <section className="product-creative-context-bar grid gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 min-[1180px]:grid-cols-[minmax(0,1fr)_auto] min-[1180px]:items-center">
+      <div className="grid min-w-0 gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge tone={workspace.mode === "image" ? "ok" : "neutral"}>{modeLabel}</Badge>
-          <div className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</div>
-        </div>
-        <div className="min-w-0">
-          <h3 className="m-0 truncate text-[18px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
+          <Badge tone={mode === "image" ? "ok" : "neutral"}>{productCreativeWorkspaceModeLabel(mode)}</Badge>
+          <span className="text-[11px] font-black text-[var(--muted)]">{workspace.productCount} 个商品可复用</span>
           {workspace.selectedProductSku ? (
-            <div className="mt-1 truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</div>
+            <span className="truncate text-[11px] font-bold text-[var(--muted)]">{workspace.selectedProductSku}</span>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h3 className="m-0 max-w-[420px] truncate text-[17px] font-black leading-6 text-[var(--text)]">{workspace.selectedProductTitle}</h3>
+          <span className="min-w-0 text-xs font-bold leading-5 text-[var(--muted)]">{workspace.modeSummary}</span>
+        </div>
+        <div className="flex min-w-0 flex-wrap gap-1.5">
           {workspace.memoryChips.map((chip) => (
-            <div key={chip.kind} className="grid min-h-[54px] gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-2">
-              <div className="truncate text-[10px] font-black text-[var(--muted)]">{chip.label}</div>
-              <strong className="text-lg font-black leading-none text-[var(--text)]">{chip.value}</strong>
-            </div>
-          ))}
-        </div>
-        <p className="m-0 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-2.5 py-2 text-[11px] font-bold leading-5 text-[var(--muted)]">
-          {workspace.modeSummary}
-        </p>
-      </div>
-
-      <div className="product-creative-compiler-column grid content-start gap-3">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-black text-[var(--text)]">{workspace.promptPipeline.title}</div>
-            <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">提示词是编译结果，不是商品事实源头</div>
-          </div>
-          <Badge>{workspace.mode === "image" ? "Image Prompt" : "Video Prompt"}</Badge>
-        </div>
-        <div className="grid gap-2 min-[900px]:grid-cols-3 min-[1180px]:grid-cols-1 min-[1480px]:grid-cols-3">
-          {pipelineStages.map((stage, index) => (
-            <article key={stage.label} className="grid min-h-[82px] content-start gap-1 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--field))] px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="truncate text-xs font-black text-[var(--text)]">{stage.label}</div>
-                <Badge tone={index === pipelineStages.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
-              </div>
-              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{stage.detail}</p>
-            </article>
-          ))}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {workspace.promptCompilerSteps.map((step, index) => (
-            <article key={step.id} className="grid content-start gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="truncate text-xs font-black text-[var(--text)]">{step.label}</div>
-                <div className="text-[10px] font-black text-[var(--muted)]">{index + 1}</div>
-              </div>
-              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
-            </article>
+            <span key={chip.kind} className="inline-flex min-h-7 items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2 text-[11px] font-black text-[var(--muted)]">
+              {chip.label}
+              <strong className="text-[var(--text)]">{chip.value}</strong>
+            </span>
           ))}
         </div>
       </div>
-
-      <div className="product-creative-assets-column grid content-start gap-3">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <div className="text-sm font-black text-[var(--text)]">商品资产账本</div>
-          <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
-            {workspace.modeSwitch.map((item) => (
-              <button
-                type="button"
-                key={item.mode}
-                className={cn(
-                  "inline-flex min-h-8 cursor-pointer items-center rounded-[8px] border px-2.5 text-xs font-black transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_32%,transparent)] disabled:cursor-default disabled:opacity-100",
-                  item.active
-                    ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
-                    : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
-                )}
-                disabled={item.active}
-                onClick={() => onModeChange(item.mode)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid gap-2">
-          {workspace.assetLedger.map((asset) => (
-            <article key={asset.id} className="grid gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-3">
-              <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-black text-[var(--text)]">{asset.label}</div>
-                  <div className="mt-1 text-[11px] font-bold text-[var(--muted)]">{asset.role}</div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <strong className="text-xl font-black leading-none text-[var(--text)]">{asset.count}</strong>
-                  <span className="ml-0.5 text-[10px] font-black text-[var(--muted)]">{asset.unit}</span>
-                </div>
-              </div>
-              <p className="m-0 text-[11px] font-semibold leading-5 text-[var(--muted)]">{asset.detail}</p>
-              <div className="flex flex-wrap gap-1">
-                {asset.reusableBy.map((mode) => (
-                  <span key={mode} className="rounded-[6px] border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px] font-black leading-4 text-[var(--muted)]">
-                    {productCreativeWorkspaceModeLabel(mode)}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
+      <div className="flex min-w-0 flex-wrap gap-1.5" aria-label="创作模式">
+        {workspace.modeSwitch.map((item) => (
+          <button
+            type="button"
+            key={item.mode}
+            className={cn(
+              "inline-flex min-h-9 cursor-pointer items-center justify-center rounded-[8px] border px-3 text-xs font-black transition hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent)_32%,transparent)] disabled:cursor-default disabled:opacity-100",
+              item.active
+                ? "border-[color-mix(in_srgb,var(--accent)_42%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] text-[var(--accent)]"
+                : "border-[var(--border)] bg-[var(--field)] text-[var(--muted)]"
+            )}
+            disabled={item.active}
+            onClick={() => onModeChange(item.mode)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     </section>
   );
@@ -6066,30 +5999,35 @@ function ProductImagePromptPanel({
   imageModelLabel: string;
   referenceImageCount: number;
 }) {
+  const imageTargets = ["主图", "场景图", "细节图"];
+
   return (
-    <section className="grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)] gap-3">
+    <section className="grid h-full min-h-[320px] content-start gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-black text-[var(--text)]">图片提示词编译</div>
-          <div className="mt-1 text-xs font-bold text-[var(--muted)]">从商品记忆、参考图和图片目标生成模型输入</div>
+          <div className="text-base font-black text-[var(--text)]">图片创作目标</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">用当前商品资料和参考图优化可复用商品图片</div>
         </div>
         <Badge>{workspace.primaryAction.label}</Badge>
       </div>
 
-      <div className="grid content-start gap-2">
-        {workspace.promptCompilerSteps.map((step, index) => (
-          <article key={step.id} className="grid gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--field)] px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-black text-[var(--text)]">{step.label}</span>
-              <Badge tone={index === workspace.promptCompilerSteps.length - 1 ? "ok" : "neutral"}>{index + 1}</Badge>
-            </div>
-            <p className="m-0 text-xs font-semibold leading-5 text-[var(--muted)]">{step.detail}</p>
-          </article>
+      <div className="grid content-start gap-2 sm:grid-cols-3">
+        {imageTargets.map((target) => (
+          <div key={target} className="grid min-h-[82px] content-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--field)] px-3 py-2.5 text-center">
+            <ImageIcon className="mx-auto text-[var(--accent)]" size={18} />
+            <div className="text-sm font-black text-[var(--text)]">{target}</div>
+          </div>
         ))}
-        <div className="rounded-[10px] border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--field))] px-3 py-2.5">
-          <div className="text-xs font-black text-[var(--text)]">当前图片模型</div>
-          <div className="mt-1 text-xs font-bold leading-5 text-[var(--muted)]">{imageModelLabel} · {referenceImageCount} 张参考图约束商品外观</div>
+      </div>
+
+      <div className="grid gap-2 rounded-[10px] border border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--field))] px-3 py-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-black text-[var(--text)]">当前设置</div>
+          <Badge>{referenceImageCount} 张参考图</Badge>
         </div>
+        <p className="m-0 text-xs font-bold leading-5 text-[var(--muted)]">
+          {imageModelLabel} 会优先保持商品外观、材质和关键细节一致，再生成适合展示的商品图。
+        </p>
       </div>
     </section>
   );
@@ -6119,8 +6057,8 @@ function ProductImageAssetPanel({
     )}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-base font-black text-[var(--text)]">商品视觉资产池</div>
-          <div className="mt-1 text-xs font-bold text-[var(--muted)]">这些图片当前保存在商品参考图列表中，会作为图片优化和视频生成的共同视觉约束</div>
+          <div className="text-base font-black text-[var(--text)]">商品图片</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">保存在当前商品下，图片优化和视频生成都会复用这些参考图</div>
         </div>
         <Badge>{tVideo("counts.image", { count: images.length })}</Badge>
       </div>
@@ -6639,7 +6577,7 @@ function StoryboardComposerPanel({
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
-    <section className="storyboard-side-panel grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
+    <section className="storyboard-side-panel grid h-full min-h-[320px] grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-base font-black text-[var(--text)]">{tVideo("storyboard.title")}</div>

@@ -137,7 +137,8 @@ describe("buildProductCreativeWorkspace", () => {
     expect(workspace.architectureLanes[1].items).toContain("3 个视觉资产");
     expect(workspace.architectureLanes[3].title).toBe("图片输出");
     expect(workspace.modeSummary).toContain("图片");
-    expect(workspace.modeSummary).toContain("商品记忆");
+    expect(workspace.modeSummary).toContain("商品资料");
+    expect(workspace.modeSummary).toContain("参考图");
   });
 
   it("models reusable media as one product asset ledger shared by image and video modes", () => {

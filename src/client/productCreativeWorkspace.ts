@@ -192,8 +192,8 @@ function primaryActionForMode(mode: ProductCreativeWorkspaceMode, enabled: boole
 
 function modeSummaryForMode(mode: ProductCreativeWorkspaceMode): string {
   return mode === "image"
-    ? "图片模块读取同一份商品记忆和视觉资产池，生成可回写商品的主图、场景图、细节图。"
-    : "视频模块读取同一份商品记忆和视觉资产，产出分镜、节奏和模型视频输入。";
+    ? "图片创作会复用当前商品资料和参考图，生成主图、场景图、细节图。"
+    : "视频创作会复用当前商品资料和参考图，生成分镜、节奏和成片。";
 }
 
 function modeSwitchForMode(activeMode: ProductCreativeWorkspaceMode): ProductCreativeModeSwitchItem[] {

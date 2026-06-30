@@ -1347,7 +1347,7 @@ describe("console API", () => {
     expect(referencePreviewSource).toContain("ArrowRight");
     expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
-    expect(storyboardPanelSource).toContain("grid h-full min-h-[398px] grid-rows-[auto_minmax(0,1fr)_auto]");
+    expect(storyboardPanelSource).toContain("grid h-full min-h-[320px] grid-rows-[auto_minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain('className="min-h-0"');
     expect(storyboardPanelSource).toContain("h-full min-h-0 resize-none");
     expect(storyboardPanelSource).toContain("className=\"grid gap-2\"");
@@ -5627,6 +5627,8 @@ describe("console API", () => {
     expect(composerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
     expect(composerSource).not.toContain("footer={");
     expect(composerSource.indexOf("video-generate-bar")).toBeLessThan(composerSource.indexOf("<VideoHistoryPanel"));
+    expect(composerSource.indexOf("product-creative-compose-panel")).toBeLessThan(composerSource.indexOf("<ProductModeActionBar"));
+    expect(composerSource.indexOf("<ProductModeActionBar")).toBeLessThan(composerSource.indexOf("product-creative-output-column"));
     expect(composerSource).toContain("generateVideoButtonLabel");
     expect(composerSource).toContain('versionCount > 1 ? tVideo("generate.buttonWithCount", { count: versionCount }) : tVideo("generate.button")');
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");

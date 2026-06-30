@@ -27,14 +27,13 @@ describe("video creation layout source", () => {
     expect(imageCase).not.toContain('tApp("image.empty")');
     expect(workspaceSource).toContain("mode: ProductCreativeWorkspaceMode;");
     expect(composerSource).toContain("buildProductCreativeWorkspace");
-    expect(composerSource).toContain("ProductCreativeCommandCenter");
+    expect(composerSource).toContain("ProductCreativeContextBar");
+    expect(composerSource).not.toContain("ProductCreativeCommandCenter");
     expect(composerSource).toContain("ProductImageAssetPanel");
     expect(composerSource).toContain("handleGenerateProductImages");
     expect(composerSource).toContain("workspace.modeSwitch.map");
     expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(composerSource).toContain("workspace.assetLedger.map");
     expect(composerSource).toContain("workspace.modeSummary");
-    expect(composerSource).toContain("workspace.promptPipeline");
     expect(composerSource).toContain("ProductModeOutputPanel");
     expect(composerSource).toContain("mode === \"video\"");
     expect(composerSource).toContain("mode === \"image\"");
@@ -44,36 +43,44 @@ describe("video creation layout source", () => {
     const source = await readFile(appPath, "utf8");
     const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductCreationProductLibrary"));
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
-    const commandCenterSource = sourceBetween(source, "function ProductCreativeCommandCenter", "function ProductModeActionBar");
+    const contextBarSource = sourceBetween(source, "function ProductCreativeContextBar", "function ProductModeActionBar");
 
     expect(workspaceSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
     expect(composerSource).toContain("onModeChange={onModeChange}");
-    expect(commandCenterSource).toContain("onModeChange");
-    expect(commandCenterSource).toContain('type="button"');
-    expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
-    expect(commandCenterSource).toContain("disabled={item.active}");
+    expect(contextBarSource).toContain("workspace.modeSwitch.map");
+    expect(contextBarSource).toContain("onModeChange");
+    expect(contextBarSource).toContain('type="button"');
+    expect(contextBarSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(contextBarSource).toContain("disabled={item.active}");
   });
 
-  it("uses a single command center to connect product memory, prompt compilation, and shared assets", async () => {
+  it("keeps internal prompt architecture out of the user-facing creative workspace", async () => {
     const source = await readFile(appPath, "utf8");
-    const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductModeActionBar");
-    const commandCenterSource = sourceBetween(source, "function ProductCreativeCommandCenter", "function ProductModeActionBar");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeContextBar");
+    const contextBarSource = sourceBetween(source, "function ProductCreativeContextBar", "function ProductModeActionBar");
+    const uiWorkspaceSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreationProductLibrary");
     const workspaceModelSource = await readFile("src/client/productCreativeWorkspace.ts", "utf8");
 
-    expect(composerSource).toContain("<ProductCreativeCommandCenter");
-    expect(composerSource).not.toContain("<ProductCreativeWorkspacePanel");
-    expect(composerSource).not.toContain("<ProductAssetLedgerPanel");
-    expect(composerSource).not.toContain("<ProductPromptPipelinePanel");
-    expect(commandCenterSource).toContain("product-creative-command-center");
-    expect(commandCenterSource).toContain("product-creative-memory-column");
-    expect(commandCenterSource).toContain("product-creative-compiler-column");
-    expect(commandCenterSource).toContain("product-creative-assets-column");
-    expect(commandCenterSource).toContain("workspace.modeSwitch.map");
-    expect(commandCenterSource).toContain("workspace.memoryChips.map");
-    expect(commandCenterSource).toContain("workspace.promptPipeline");
-    expect(commandCenterSource).toContain("workspace.promptCompilerSteps.map");
-    expect(commandCenterSource).toContain("workspace.assetLedger.map");
-    expect(commandCenterSource).toContain("onClick={() => onModeChange(item.mode)}");
+    expect(workbenchSource).toContain("<ProductCreativeContextBar");
+    expect(workbenchSource).not.toContain("<ProductCreativeCommandCenter");
+    expect(workbenchSource).not.toContain("<ProductCreativeWorkspacePanel");
+    expect(workbenchSource).not.toContain("<ProductAssetLedgerPanel");
+    expect(workbenchSource).not.toContain("<ProductPromptPipelinePanel");
+    expect(source).not.toContain("function ProductCreativeCommandCenter");
+    expect(source).not.toContain("product-creative-command-center");
+    expect(source).not.toContain("product-creative-compiler-column");
+    expect(uiWorkspaceSource).not.toContain("视频提示词编译契约");
+    expect(uiWorkspaceSource).not.toContain("图片提示词编译契约");
+    expect(uiWorkspaceSource).not.toContain("商品资产账本");
+    expect(uiWorkspaceSource).not.toContain("Payload");
+    expect(contextBarSource).toContain("product-creative-context-bar");
+    expect(contextBarSource).toContain("workspace.modeSwitch.map");
+    expect(contextBarSource).toContain("workspace.memoryChips.map");
+    expect(contextBarSource).toContain("workspace.modeSummary");
+    expect(contextBarSource).not.toContain("workspace.promptPipeline");
+    expect(contextBarSource).not.toContain("workspace.promptCompilerSteps.map");
+    expect(contextBarSource).not.toContain("workspace.assetLedger.map");
+    expect(contextBarSource).toContain("onClick={() => onModeChange(item.mode)}");
     expect(workspaceModelSource).toContain('"visual-asset-pool"');
     expect(workspaceModelSource).toContain('"image-output-records"');
     expect(workspaceModelSource).not.toContain('"reference-images"');
@@ -83,7 +90,7 @@ describe("video creation layout source", () => {
   it("uses an operational workbench for source data, creative intent, and reusable outputs", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
 
     expect(composerSource).toContain("<ProductCreativeWorkbench");
     expect(composerSource).not.toContain("video-generation-controls compact-generation-controls");
@@ -91,26 +98,29 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("<ProductModeActionBar");
     expect(composerSource).not.toContain("<ProductModeAssetPanel");
     expect(workbenchSource).toContain("product-creative-workbench");
-    expect(workbenchSource).toContain("product-creative-source-column");
-    expect(workbenchSource).toContain("product-creative-intent-column");
-    expect(workbenchSource).toContain("product-creative-output-column");
-    expect(workbenchSource).toContain("product-creative-column-heading");
-    expect(workbenchSource).toContain("源数据");
-    expect(workbenchSource).toContain("创作意图");
-    expect(workbenchSource).toContain("输出资产");
+    expect(workbenchSource).toContain("product-creative-studio");
+    expect(workbenchSource).toContain("product-creative-media-rail");
+    expect(workbenchSource).toContain("product-creative-compose-panel");
+    expect(workbenchSource).toContain("product-creative-result-rail");
+    expect(workbenchSource).not.toContain("product-creative-column-heading");
+    expect(workbenchSource).not.toContain("源数据");
+    expect(workbenchSource).not.toContain("创作意图");
+    expect(workbenchSource).not.toContain("输出资产");
     expect(workbenchSource).toContain("ProductComposerReferenceTray");
     expect(workbenchSource).toContain("ProductModeOutputPanel");
     expect(workbenchSource).toContain("ProductModeActionBar");
     expect(workbenchSource).toContain("ProductModeAssetPanel");
     expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
     expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
-    expect(workbenchSource.indexOf("product-creative-output-column")).toBeLessThan(workbenchSource.indexOf("<ProductModeActionBar"));
+    expect(workbenchSource.indexOf("product-creative-compose-panel")).toBeLessThan(workbenchSource.indexOf("<ProductModeActionBar"));
+    expect(workbenchSource.indexOf("<ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("product-creative-controls"));
+    expect(workbenchSource.indexOf("product-creative-output-column")).toBeGreaterThan(workbenchSource.indexOf("<ProductModeActionBar"));
   });
 
   it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
     const source = await readFile(appPath, "utf8");
     const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
     const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
     const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
 
@@ -136,7 +146,7 @@ describe("video creation layout source", () => {
 
   it("fits mode asset history inside the output column instead of reusing a full-width page section", async () => {
     const source = await readFile(appPath, "utf8");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeCommandCenter");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
     const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
     const imageAssetSource = sourceBetween(source, "function ProductImageAssetPanel", "function ProductCreationProductLibrary");
     const videoHistorySource = sourceBetween(source, "function VideoHistoryPanel", "function ProductLibraryHome");
@@ -160,8 +170,8 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("const productImageAssetCount = 0");
     expect(composerSource).toContain("imageAssetCount: productImageAssetCount");
     expect(composerSource).not.toContain("imageAssetCount: previewableReferenceImages.length");
-    expect(imageAssetSource).toContain("商品视觉资产池");
-    expect(imageAssetSource).toContain("这些图片当前保存在商品参考图列表中，会作为图片优化和视频生成的共同视觉约束");
+    expect(imageAssetSource).toContain("商品图片");
+    expect(imageAssetSource).toContain("保存在当前商品下，图片优化和视频生成都会复用这些参考图");
     expect(imageAssetSource).not.toContain("商品图片资产");
     expect(imageAssetSource).not.toContain("图片模块产物会继续沉淀到同一个商品，供视频模块复用");
   });
@@ -209,6 +219,7 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("grid min-h-full content-start gap-3");
     expect(composerSource).toContain("ProductCreativeWorkbench");
     expect(composerSource).toContain("product-creative-workbench");
+    expect(composerSource).toContain("product-creative-studio");
     expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("py-2");
     expect(composerSource).toContain("model-scheme-control");
