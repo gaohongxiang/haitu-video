@@ -5475,9 +5475,16 @@ function ProductCreativeWorkbench({
       <section className="product-creative-compose-panel grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_14px_42px_rgba(96,64,43,.06)]">
         <div className="product-creative-context-strip grid min-w-0 gap-2 min-[760px]:grid-cols-[minmax(240px,.82fr)_minmax(0,1.18fr)]">
           <section className="product-creative-product-details grid min-h-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
-            <div className="flex min-h-7 items-center justify-between gap-3 text-xs font-black text-[var(--text)]">
+            <div className="product-facts-header flex min-h-8 items-center justify-between gap-3 text-xs font-black text-[var(--text)]">
               <span>{tVideo("facts.title")}</span>
-              {productAutoSaveLabel ? <span className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]">{productAutoSaveLabel}</span> : null}
+              <div className="flex min-w-0 shrink-0 items-center gap-2">
+                {productAutoSaveLabel ? <span className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]">{productAutoSaveLabel}</span> : null}
+                <Button className="product-facts-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px] disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
+                  {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
+                  {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
+                  <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
+                </Button>
+              </div>
             </div>
             <div className="product-facts-editor grid min-w-0 gap-2">
               <Textarea
@@ -5489,17 +5496,12 @@ function ProductCreativeWorkbench({
                 placeholder={tVideo("facts.placeholder")}
                 rows={4}
               />
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-h-5">
                 {importNotes.length > 0 ? (
                   <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs font-bold text-[var(--muted)]">
                     {importNotes.slice(0, 3).map((note) => <span key={note} className="truncate">· {note}</span>)}
                   </div>
-                ) : <span />}
-                <Button className="min-h-9 justify-center rounded-[8px] px-3 disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
-                  {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
-                  {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
-                  <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
-                </Button>
+                ) : null}
               </div>
             </div>
           </section>
@@ -5671,6 +5673,7 @@ function ProductCreativeSettingsTray({
           layout="pill"
           density="micro"
           menuPlacement="top"
+          menuWidth="content"
         />
       </div>
       <ProductCreativeToolbarChoice
@@ -5751,6 +5754,7 @@ function ProductCreativeToolbarChoice<T extends string>({
         layout="pill"
         density="micro"
         menuPlacement="top"
+        menuWidth="content"
       />
     </div>
   );
@@ -6621,8 +6625,24 @@ function StoryboardComposerPanel({
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <section className="storyboard-side-panel grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)] gap-2 border-t border-[var(--border)] pt-3">
-      <div className="flex items-center gap-3">
+      <div className="storyboard-title-row flex items-center justify-between gap-3">
         <div className="min-w-0 text-sm font-black text-[var(--text)]">{tVideo("storyboard.title")}</div>
+        <Button
+          className="storyboard-title-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px]"
+          size="sm"
+          variant="soft"
+          disabled={isGeneratingStoryboard || !productReady}
+          onClick={() => {
+            if (!productReady) {
+              return;
+            }
+            void onGenerateStoryboardDraft();
+          }}
+        >
+          {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
+          {isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}
+          <ActionButtonCost tVideo={tVideo} estimate={estimate} />
+        </Button>
       </div>
 
       <div
@@ -6671,22 +6691,6 @@ function StoryboardComposerPanel({
             onVersionCountChange={onVersionCountChange}
             schemeSummary={schemeSummary}
           />
-          <Button
-            className="min-h-7 justify-center rounded-[8px] px-2 text-[11px]"
-            size="sm"
-            variant="soft"
-            disabled={isGeneratingStoryboard || !productReady}
-            onClick={() => {
-              if (!productReady) {
-                return;
-              }
-              void onGenerateStoryboardDraft();
-            }}
-          >
-            {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
-            {isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}
-            <ActionButtonCost tVideo={tVideo} estimate={estimate} />
-          </Button>
           <button
             type="button"
             className={cn(

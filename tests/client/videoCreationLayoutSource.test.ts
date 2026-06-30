@@ -193,6 +193,7 @@ describe("video creation layout source", () => {
 
   it("renders video creation as product library plus operation workspace instead of a top control bar", async () => {
     const source = await readFile(appPath, "utf8");
+    const dropdownSource = await readFile("src/client/components/compactChoiceDropdown.tsx", "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
 
     expect(composerSource).toContain("video-workspace-shell");
@@ -240,7 +241,15 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("flex-nowrap");
     expect(composerSource).toContain("overflow-visible");
     expect(composerSource).toContain('menuPlacement="top"');
+    expect(composerSource).toContain('menuWidth="content"');
     expect(composerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
+    expect(dropdownSource).toContain('menuWidth?: "trigger" | "content";');
+    expect(dropdownSource).toContain('menuWidth === "content"');
+    expect(dropdownSource).toContain("w-max");
+    expect(dropdownSource).toContain("max-w-[min(280px,calc(100vw-48px))]");
+    expect(dropdownSource).toContain("grid-cols-[14px_minmax(0,1fr)]");
+    expect(dropdownSource).toContain("CheckCircle2 size={11}");
+    expect(dropdownSource).not.toContain('<span className="min-w-0 truncate">{formatOption(option)}</span>');
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain('layout="pill"');
     expect(composerSource).toContain("ProductCreativeToolbarChoice");
@@ -385,6 +394,7 @@ describe("video creation layout source", () => {
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
     expect(settingsTraySource).toContain('menuPlacement="top"');
+    expect(settingsTraySource).toContain('menuWidth="content"');
     expect(storyboardPanelSource.indexOf("prompt-composer-footer")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeSettingsTray"));
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
@@ -409,6 +419,8 @@ describe("video creation layout source", () => {
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
     const referenceTraySource = source.slice(source.indexOf("function ProductComposerReferenceTray"), source.indexOf("function StoryboardComposerPanel"));
     const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
+    const productDetailsSource = sourceBetween(source, "product-creative-product-details", "<ProductComposerReferenceTray");
+    const storyboardFooterSource = sourceBetween(storyboardPanelSource, "prompt-composer-footer", "{historyOpen ?");
     const actionButtonCostSource = source.slice(source.indexOf("function ActionButtonCost"), source.indexOf("function versionLabel"));
 
     expect(appSource).toContain('postJson<BillingEstimatesResponse>("/api/billing-estimates"');
@@ -426,6 +438,15 @@ describe("video creation layout source", () => {
     expect(referenceTraySource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
     expect(storyboardPanelSource).toContain("estimate?: BillingActionEstimate");
     expect(storyboardPanelSource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
+    expect(productDetailsSource).toContain("product-facts-header");
+    expect(productDetailsSource).toContain("product-facts-action");
+    expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
+    expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
+    expect(storyboardPanelSource).toContain("storyboard-title-row");
+    expect(storyboardPanelSource).toContain("storyboard-title-action");
+    expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
+    expect(storyboardFooterSource).not.toContain('tVideo("storyboard.generate")');
+    expect(storyboardFooterSource).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
     expect(source).toContain("function ActionButtonCost");
     expect(source).toContain('amountCny={videoEstimate?.upstreamEstimatedCostCny}');
     expect(actionButtonCostSource).toContain('tVideo("costHints.estimated", {');

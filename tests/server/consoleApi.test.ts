@@ -1090,6 +1090,7 @@ describe("console API", () => {
     expect(productDetailsSource).not.toContain("productDetailsOpen");
     expect(creationComposerSource).toContain("overflow-visible");
     expect(creationComposerSource).toContain('menuPlacement="top"');
+    expect(creationComposerSource).toContain('menuWidth="content"');
     expect(creationComposerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
     expect(creationComposerSource.indexOf("product-creative-product-details")).toBeLessThan(creationComposerSource.indexOf("ProductComposerReferenceTray"));
     expect(creationComposerSource).not.toContain("product-creative-media-rail");
@@ -1303,6 +1304,15 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("await onFlushProductFactsAutoSave()");
     expect(storyboardPanelSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
     expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
+    expect(productDetailsSource).toContain("product-facts-header");
+    expect(productDetailsSource).toContain("product-facts-action");
+    expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
+    expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
+    expect(storyboardPanelSource).toContain("storyboard-title-row");
+    expect(storyboardPanelSource).toContain("storyboard-title-action");
+    expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
+    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf("{historyOpen ?"))).not.toContain('tVideo("storyboard.generate")');
+    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf("{historyOpen ?"))).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
     expect(creationComposerSource).toContain("placeholder=\"\"");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain('label={tVideo("controls.template")}');
@@ -1389,6 +1399,7 @@ describe("console API", () => {
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
     expect(settingsTraySource).toContain('menuPlacement="top"');
+    expect(settingsTraySource).toContain('menuWidth="content"');
     expect(storyboardPanelSource).toContain("absolute bottom-20 left-3 right-3");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
@@ -5685,6 +5696,7 @@ describe("console API", () => {
     expect(productDetailsSource).not.toContain("productDetailsOpen");
     expect(composerSource).toContain("overflow-visible");
     expect(composerSource).toContain('menuPlacement="top"');
+    expect(composerSource).toContain('menuWidth="content"');
     expect(composerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
     expect(composerSource.indexOf("product-creative-product-details")).toBeLessThan(composerSource.indexOf("ProductComposerReferenceTray"));
     expect(composerSource).not.toContain("product-creative-media-rail");
@@ -5782,6 +5794,12 @@ describe("console API", () => {
     expect(composerSource).toContain("await onFlushProductFactsAutoSave()");
     expect(composerSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
     expect(composerSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
+    expect(productDetailsSource).toContain("product-facts-header");
+    expect(productDetailsSource).toContain("product-facts-action");
+    expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
+    expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
+    expect(composerSource).toContain("storyboard-title-row");
+    expect(composerSource).toContain("storyboard-title-action");
     expect(composerSource).toContain("placeholder=\"\"");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain('label={tVideo("controls.template")}');

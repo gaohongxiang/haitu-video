@@ -12,7 +12,8 @@ export function CompactChoiceDropdown<T extends string>({
   disabled = false,
   layout = "stacked",
   density = "comfortable",
-  menuPlacement = "bottom"
+  menuPlacement = "bottom",
+  menuWidth = "trigger"
 }: {
   label: ReactNode;
   value: T;
@@ -23,6 +24,7 @@ export function CompactChoiceDropdown<T extends string>({
   layout?: "stacked" | "inline" | "pill";
   density?: "comfortable" | "compact" | "micro";
   menuPlacement?: "bottom" | "top";
+  menuWidth?: "trigger" | "content";
 }) {
   const [open, setOpen] = useState(false);
   const activeLabel = formatOption(value);
@@ -88,7 +90,7 @@ export function CompactChoiceDropdown<T extends string>({
           className={cn(
             "absolute right-0 z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]",
             menuPlacement === "top" ? "bottom-[calc(100%+8px)] top-auto" : "top-[calc(100%+8px)]",
-            "left-0"
+            menuWidth === "content" ? "left-auto min-w-full w-max max-w-[min(280px,calc(100vw-48px))]" : "left-0"
           )}
           role="listbox"
         >
@@ -101,7 +103,7 @@ export function CompactChoiceDropdown<T extends string>({
                 role="option"
                 aria-selected={active}
                 className={cn(
-                  "grid min-h-10 grid-cols-[18px_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-black transition",
+                  "grid min-h-9 grid-cols-[14px_minmax(0,1fr)] items-center gap-1.5 rounded-lg px-2 text-left text-[12px] font-black transition",
                   active
                     ? "bg-[color-mix(in_srgb,var(--accent)_12%,var(--panel))] text-[var(--text)]"
                     : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
@@ -111,10 +113,10 @@ export function CompactChoiceDropdown<T extends string>({
                   setOpen(false);
                 }}
               >
-                <span className={cn("grid h-4 w-4 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
-                  <CheckCircle2 size={14} />
+                <span className={cn("grid h-3.5 w-3.5 place-items-center rounded-full", active ? "text-[var(--accent)]" : "text-transparent")}>
+                  <CheckCircle2 size={11} />
                 </span>
-                <span className="min-w-0 truncate">{formatOption(option)}</span>
+                <span className="min-w-0 whitespace-nowrap">{formatOption(option)}</span>
               </button>
             );
           })}
