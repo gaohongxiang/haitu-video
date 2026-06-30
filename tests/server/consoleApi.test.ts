@@ -1093,7 +1093,8 @@ describe("console API", () => {
     expect(productDetailsSource).toContain("border-0 bg-transparent px-0 py-0");
     expect(productDetailsSource).not.toContain("border-[var(--border)] bg-[var(--panel)]");
     expect(productDetailsSource).not.toContain('<div className="min-h-5">');
-    expect(referenceTraySource).toContain("product-reference-inline grid self-start grid-rows-[36px_minmax(104px,auto)] content-start gap-2 rounded-[8px] px-3 py-2");
+    expect(referenceTraySource).toContain("product-reference-inline grid self-start content-start gap-2 rounded-[8px] px-3 py-2");
+    expect(referenceTraySource).toContain('referenceCount > 0 ? "grid-rows-[36px_minmax(104px,auto)]" : "grid-rows-[36px]"');
     expect(referenceTraySource).toContain("product-reference-actions flex h-9 min-w-0 flex-nowrap items-center gap-2");
     expect(referenceTraySource).toContain("reference-add-button inline-flex h-9 min-h-9");
     expect(referenceTraySource).toContain("reference-generate-action h-9 min-h-9");
@@ -1873,6 +1874,14 @@ describe("console API", () => {
     expect(buildModelSchemeOptionsSource).not.toContain("自动推荐");
     expect(appSource).toContain("textModelConfigId: selectedTextModelConfigId");
     expect(appSource).toContain("imageModelConfigId: selectedImageModelConfigId");
+    expect(appSource).toContain("async function generateProductReferenceImages(sku: string, prompt?: string)");
+    expect(appSource).toContain("prompt: prompt?.trim() || undefined");
+    expect(appSource).toContain("await onGenerateReferenceImages(savedProduct.sku, imagePrompt);");
+    expect(appSource).toContain('const [imagePrompt, setImagePrompt] = useState("");');
+    expect(appSource).toContain("ProductImagePromptPanel");
+    expect(appSource).toContain("product-image-prompt-body");
+    expect(appSource).toContain("图片需求");
+    expect(appSource).toContain('const generateImageButtonLabel = previewableReferenceImages.length > 0 ? "优化这张图" : "生成商品图";');
     expect(appSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
     expect(appSource).toContain("textModelOptions");
     expect(appSource).toContain("imageModelOptions");

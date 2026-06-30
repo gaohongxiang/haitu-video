@@ -2966,7 +2966,7 @@ export function App() {
     }
   }
 
-  async function generateProductReferenceImages(sku: string) {
+  async function generateProductReferenceImages(sku: string, prompt?: string) {
     if (!sku) {
       return;
     }
@@ -2979,7 +2979,8 @@ export function App() {
         generated: Array<{ reference: string }>;
         product: ProductDetail;
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {
-        imageModelConfigId: selectedImageModelConfigId
+        imageModelConfigId: selectedImageModelConfigId,
+        prompt: prompt?.trim() || undefined
       });
       await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
@@ -4552,7 +4553,7 @@ function ProductCreationWorkspace({
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   modelSchemeOptions: ModelSchemeOption[];
@@ -4783,7 +4784,7 @@ function ProductCreationComposer({
   isGeneratingStoryboard: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   modelSchemeOptions: ModelSchemeOption[];
@@ -4827,6 +4828,7 @@ function ProductCreationComposer({
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
   const [previewReferenceIndex, setPreviewReferenceIndex] = useState<number | undefined>();
+  const [imagePrompt, setImagePrompt] = useState("");
   const [fileImportOpen, setFileImportOpen] = useState(false);
   const [productLibraryCollapsed, setProductLibraryCollapsed] = useState(false);
   const tVideo = (key: string, options?: Record<string, unknown>) => i18n.t(`app:videoStudio.${key}`, { lng: appLocale, ...options });
@@ -4904,14 +4906,21 @@ function ProductCreationComposer({
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
   const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
   const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100";
+  const imageTargetLabel = previewableReferenceImages.length > 0
+    ? `默认优化参考图 1 · 共 ${previewableReferenceImages.length} 张可用`
+    : "按商品资料生成";
+  const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片需求" : "默认图片需求";
+  const generateImageButtonLabel = previewableReferenceImages.length > 0 ? "优化这张图" : "生成商品图";
   const imageGenerateSummary = [
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
-    tVideo("summary.referenceImages", { count: previewableReferenceImages.length }),
+    imageTargetLabel,
+    imagePromptReadyLabel,
     `图片模型 ${imageModelLabel}`,
     localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
   ].join(" · ");
   useEffect(() => {
     setPreviewReferenceIndex(undefined);
+    setImagePrompt("");
     if (productFactsBodyRef.current) {
       productFactsBodyRef.current.scrollTop = 0;
     }
@@ -5001,7 +5010,7 @@ function ProductCreationComposer({
       const autoSavedProduct = await onFlushProductFactsAutoSave();
       const savedProduct = autoSavedProduct ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
-      await onGenerateReferenceImages(savedProduct.sku);
+      await onGenerateReferenceImages(savedProduct.sku, imagePrompt);
       onToast("商品图片优化已提交", "ok");
     } catch (error) {
       onToast(errorMessage(error));
@@ -5209,6 +5218,9 @@ function ProductCreationComposer({
           versionCountOptions={versionCountOptions}
           onVersionCountChange={onVersionCountChange}
           imageModelLabel={imageModelLabel}
+          imagePrompt={imagePrompt}
+          onImagePromptChange={setImagePrompt}
+          imageTargetLabel={imageTargetLabel}
           schemeSummary={schemeSummary}
           storyboardDraft={storyboardDraft}
           storyboardDraftIsGuidance={storyboardDraftIsGuidance}
@@ -5226,6 +5238,7 @@ function ProductCreationComposer({
           generateVideoDisabled={generateVideoDisabled}
           imageGenerateDisabled={imageGenerateDisabled}
           generateVideoButtonLabel={generateVideoButtonLabel}
+          generateImageButtonLabel={generateImageButtonLabel}
           isSubmittingVideo={isSubmittingVideo}
           isSubmittingImage={isSubmittingImage}
           videoEstimate={billingEstimates?.estimates.video}
@@ -5345,6 +5358,9 @@ function ProductCreativeWorkbench({
   versionCountOptions,
   onVersionCountChange,
   imageModelLabel,
+  imagePrompt,
+  onImagePromptChange,
+  imageTargetLabel,
   schemeSummary,
   storyboardDraft,
   storyboardDraftIsGuidance,
@@ -5362,6 +5378,7 @@ function ProductCreativeWorkbench({
   generateVideoDisabled,
   imageGenerateDisabled,
   generateVideoButtonLabel,
+  generateImageButtonLabel,
   isSubmittingVideo,
   isSubmittingImage,
   videoEstimate,
@@ -5426,6 +5443,9 @@ function ProductCreativeWorkbench({
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
   imageModelLabel: string;
+  imagePrompt: string;
+  onImagePromptChange: (prompt: string) => void;
+  imageTargetLabel: string;
   schemeSummary: string;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
@@ -5443,6 +5463,7 @@ function ProductCreativeWorkbench({
   generateVideoDisabled: boolean;
   imageGenerateDisabled: boolean;
   generateVideoButtonLabel: string;
+  generateImageButtonLabel: string;
   isSubmittingVideo: boolean;
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
@@ -5451,7 +5472,7 @@ function ProductCreativeWorkbench({
   organizeProductEstimate?: BillingActionEstimate;
   storyboardEstimate?: BillingActionEstimate;
   onImportAssets: (sku: string) => Promise<void>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
@@ -5528,7 +5549,10 @@ function ProductCreativeWorkbench({
           appLocale={appLocale}
           tVideo={tVideo}
           imageModelLabel={imageModelLabel}
+          imagePrompt={imagePrompt}
+          onImagePromptChange={onImagePromptChange}
           referenceImageCount={previewableReferenceImages.length}
+          imageTargetLabel={imageTargetLabel}
           activeModelSchemeId={activeModelSchemeId}
           modelSchemeOptions={modelSchemeOptions}
           onModelSchemeChange={onModelSchemeChange}
@@ -5573,6 +5597,7 @@ function ProductCreativeWorkbench({
           generateVideoDisabled={generateVideoDisabled}
           imageGenerateDisabled={imageGenerateDisabled}
           generateVideoButtonLabel={generateVideoButtonLabel}
+          generateImageButtonLabel={generateImageButtonLabel}
           isSubmittingVideo={isSubmittingVideo}
           isSubmittingImage={isSubmittingImage}
           videoEstimate={videoEstimate}
@@ -5770,6 +5795,7 @@ function ProductModeActionBar({
   generateVideoDisabled,
   imageGenerateDisabled,
   generateVideoButtonLabel,
+  generateImageButtonLabel,
   isSubmittingVideo,
   isSubmittingImage,
   videoEstimate,
@@ -5788,6 +5814,7 @@ function ProductModeActionBar({
   generateVideoDisabled: boolean;
   imageGenerateDisabled: boolean;
   generateVideoButtonLabel: string;
+  generateImageButtonLabel: string;
   isSubmittingVideo: boolean;
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
@@ -5830,11 +5857,11 @@ function ProductModeActionBar({
           variant={imageGenerateDisabled ? "default" : "primary"}
           disabled={imageGenerateDisabled}
           aria-disabled={imageGenerateDisabled}
-          title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : workspace.primaryAction.label}
+          title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : generateImageButtonLabel}
           onClick={imageGenerateDisabled ? undefined : () => void onGenerateProductImages()}
         >
           {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
-          {isSubmittingImage ? "正在优化图片" : workspace.primaryAction.label}
+          {isSubmittingImage ? "正在生成图片" : generateImageButtonLabel}
           <ActionButtonCost tVideo={tVideo} estimate={imageEstimate} />
         </Button>
       </div>
@@ -5912,7 +5939,10 @@ function ProductModeOutputPanel({
   appLocale,
   tVideo,
   imageModelLabel,
+  imagePrompt,
+  onImagePromptChange,
   referenceImageCount,
+  imageTargetLabel,
   activeModelSchemeId,
   modelSchemeOptions,
   onModelSchemeChange,
@@ -5948,7 +5978,10 @@ function ProductModeOutputPanel({
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   imageModelLabel: string;
+  imagePrompt: string;
+  onImagePromptChange: (prompt: string) => void;
   referenceImageCount: number;
+  imageTargetLabel: string;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
@@ -6022,26 +6055,64 @@ function ProductModeOutputPanel({
   return (
     <ProductImagePromptPanel
       imageModelLabel={imageModelLabel}
+      imagePrompt={imagePrompt}
+      onImagePromptChange={onImagePromptChange}
       referenceImageCount={referenceImageCount}
+      imageTargetLabel={imageTargetLabel}
     />
   );
 }
 
 function ProductImagePromptPanel({
   imageModelLabel,
-  referenceImageCount
+  imagePrompt,
+  onImagePromptChange,
+  referenceImageCount,
+  imageTargetLabel
 }: {
   imageModelLabel: string;
+  imagePrompt: string;
+  onImagePromptChange: (prompt: string) => void;
   referenceImageCount: number;
+  imageTargetLabel: string;
 }) {
+  const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
+  function appendImagePromptPreset(preset: string) {
+    const trimmedPrompt = imagePrompt.trim();
+    onImagePromptChange(trimmedPrompt ? `${trimmedPrompt}，${preset}` : preset);
+  }
+
   return (
-    <section className="grid content-start gap-3">
-      <div className="flex items-start justify-between gap-3 border-t border-[var(--border)] pt-3">
-        <div className="min-w-0">
-          <div className="text-sm font-black text-[var(--text)]">优化商品图片</div>
-          <div className="mt-1 text-xs font-bold text-[var(--muted)]">主图 / 场景图 / 细节图 · {referenceImageCount} 张参考图</div>
+    <section className="product-image-prompt-panel grid content-start gap-2 border-t border-[var(--border)] pt-3">
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="shrink-0 text-sm font-black text-[var(--text)]">图片需求</div>
+          <div className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
+            {imageTargetLabel}
+          </div>
         </div>
-        <Badge>{imageModelLabel}</Badge>
+        <Badge className="max-w-[180px] truncate">{imageModelLabel}</Badge>
+      </div>
+      <div className="grid min-w-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+        <Textarea
+          className="product-image-prompt-body h-[104px] min-h-[104px] max-h-[104px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
+          value={imagePrompt}
+          onChange={(event) => onImagePromptChange(event.target.value)}
+          placeholder={referenceImageCount > 0 ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。" : "例如：生成白底主图，突出材质、尺寸和使用场景。"}
+          rows={4}
+        />
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {imagePromptPresets.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className="rounded-[7px] border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              onClick={() => appendImagePromptPreset(preset)}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -6358,7 +6429,7 @@ function ProductComposerReferenceTray({
   draftImages: ReferenceImageStatus[];
   pendingImages: ReferenceImageStatus[];
   onImportAssets: (sku: string) => Promise<void>;
-  onGenerateReferenceImages: (sku: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
   onToast: ConsoleToastFn;
   onPreviewReferenceImage: (index: number) => void;
   onPendingPreview: (index: number) => void;
@@ -6395,7 +6466,11 @@ function ProductComposerReferenceTray({
 
   return (
     <section
-      className={cn("product-reference-inline grid self-start grid-rows-[36px_minmax(104px,auto)] content-start gap-2 rounded-[8px] px-3 py-2", className)}
+      className={cn(
+        "product-reference-inline grid self-start content-start gap-2 rounded-[8px] px-3 py-2",
+        referenceCount > 0 ? "grid-rows-[36px_minmax(104px,auto)]" : "grid-rows-[36px]",
+        className
+      )}
       onDragEnter={handleReferenceDrag}
       onDragOver={handleReferenceDrag}
       onDragLeave={(event) => {

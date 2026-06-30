@@ -117,7 +117,8 @@ describe("video creation layout source", () => {
     expect(productDetailsSource).toContain("border-0 bg-transparent px-0 py-0");
     expect(productDetailsSource).not.toContain("border-[var(--border)] bg-[var(--panel)]");
     expect(productDetailsSource).not.toContain('<div className="min-h-5">');
-    expect(referenceTraySource).toContain("product-reference-inline grid self-start grid-rows-[36px_minmax(104px,auto)] content-start gap-2 rounded-[8px] px-3 py-2");
+    expect(referenceTraySource).toContain("product-reference-inline grid self-start content-start gap-2 rounded-[8px] px-3 py-2");
+    expect(referenceTraySource).toContain('referenceCount > 0 ? "grid-rows-[36px_minmax(104px,auto)]" : "grid-rows-[36px]"');
     expect(referenceTraySource).toContain("product-reference-actions flex h-9 min-w-0 flex-nowrap items-center gap-2");
     expect(referenceTraySource).toContain("reference-add-button inline-flex h-9 min-h-9");
     expect(referenceTraySource).toContain("reference-generate-action h-9 min-h-9");
@@ -170,6 +171,45 @@ describe("video creation layout source", () => {
     expect(assetPanelSource).toContain('mode === "video"');
     expect(assetPanelSource).toContain("<VideoHistoryPanel");
     expect(assetPanelSource).toContain("<ProductImageAssetPanel");
+  });
+
+  it("routes image creation through a compact product-aware prompt box", async () => {
+    const source = await readFile(appPath, "utf8");
+    const appSource = sourceBetween(source, "export function App()", "function AppLanguageSwitcher");
+    const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
+    const outputPanelSource = sourceBetween(source, "function ProductModeOutputPanel", "function ProductImagePromptPanel");
+    const imagePromptSource = sourceBetween(source, "function ProductImagePromptPanel", "function ProductImageAssetPanel");
+    const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
+
+    expect(appSource).toContain("async function generateProductReferenceImages(sku: string, prompt?: string)");
+    expect(appSource).toContain("prompt: prompt?.trim() || undefined");
+    expect(composerSource).toContain('const [imagePrompt, setImagePrompt] = useState("");');
+    expect(composerSource).toContain("setImagePrompt(\"\");");
+    expect(composerSource).toContain("const imageTargetLabel = previewableReferenceImages.length > 0");
+    expect(composerSource).toContain("const generateImageButtonLabel = previewableReferenceImages.length > 0 ? \"优化这张图\" : \"生成商品图\";");
+    expect(composerSource).toContain("imagePromptReadyLabel");
+    expect(composerSource).toContain("await onGenerateReferenceImages(savedProduct.sku, imagePrompt);");
+    expect(composerSource).toContain("imagePrompt={imagePrompt}");
+    expect(composerSource).toContain("onImagePromptChange={setImagePrompt}");
+    expect(composerSource).toContain("imageTargetLabel={imageTargetLabel}");
+    expect(composerSource).toContain("generateImageButtonLabel={generateImageButtonLabel}");
+    expect(workbenchSource).toContain("imagePrompt: string;");
+    expect(workbenchSource).toContain("onImagePromptChange: (prompt: string) => void;");
+    expect(workbenchSource).toContain("imageTargetLabel: string;");
+    expect(workbenchSource).toContain("generateImageButtonLabel: string;");
+    expect(outputPanelSource).toContain("imagePrompt={imagePrompt}");
+    expect(outputPanelSource).toContain("onImagePromptChange={onImagePromptChange}");
+    expect(outputPanelSource).toContain("imageTargetLabel={imageTargetLabel}");
+    expect(imagePromptSource).toContain("图片需求");
+    expect(imagePromptSource).toContain("product-image-prompt-body");
+    expect(imagePromptSource).toContain("value={imagePrompt}");
+    expect(imagePromptSource).toContain("onChange={(event) => onImagePromptChange(event.target.value)}");
+    expect(imagePromptSource).toContain("imagePromptPresets");
+    expect(imagePromptSource).toContain("appendImagePromptPreset");
+    expect(actionBarSource).toContain("generateImageButtonLabel: string;");
+    expect(actionBarSource).toContain('isSubmittingImage ? "正在生成图片" : generateImageButtonLabel');
+    expect(actionBarSource).toContain("title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : generateImageButtonLabel}");
   });
 
   it("fits mode asset history inside the output column instead of reusing a full-width page section", async () => {
