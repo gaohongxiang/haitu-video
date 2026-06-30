@@ -16,6 +16,14 @@ import { WalletStore } from "../../src/server/walletStore.js";
 
 let tempDirs: string[] = [];
 
+function sourceBetween(source: string, start: string, end: string): string {
+  const startIndex = source.indexOf(start);
+  expect(startIndex).toBeGreaterThan(-1);
+  const endIndex = source.indexOf(end, startIndex + start.length);
+  expect(endIndex).toBeGreaterThan(startIndex);
+  return source.slice(startIndex, endIndex);
+}
+
 beforeEach(() => {
   vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1");
 });
@@ -911,10 +919,12 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<VideoAssetsPanel");
     const creationWorkspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
+    const productCreativeWorkbenchSource = sourceBetween(appSource, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
     const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
     const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
     const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
+    const settingsTraySource = sourceBetween(appSource, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function ProductLibraryHome"));
     const productWorkflowSource = await readFile(join(import.meta.dirname, "../../src/client/productWorkflowViewModel.ts"), "utf8");
     const storyboardDraftsSource = await readFile(join(import.meta.dirname, "../../src/client/storyboardDrafts.ts"), "utf8");
@@ -1028,7 +1038,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("ProductCreativeWorkbench");
     expect(creationComposerSource).toContain("product-creative-workbench");
     expect(creationComposerSource).toContain("product-creative-controls");
-    expect(creationComposerSource).toContain("px-3 py-2");
+    expect(creationComposerSource).toContain("prompt-inline-settings");
     expect(creationComposerSource).toContain("model-scheme-control");
     expect(creationComposerSource).toContain('layout="pill"');
     expect(creationComposerSource).toContain("ProductCreativeToolbarChoice");
@@ -1048,7 +1058,7 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
     expect(appSource).toContain('if (value === "en") return t("languages.en");');
     expect(queueProductVideoJobsSource).toContain("resolution: videoGenerationOptions.resolution ?? selectedVideoResolution");
-    expect(creationComposerSource).toContain('density="compact"');
+    expect(creationComposerSource).toContain('density="micro"');
     expect(creationComposerSource).toContain("video-generate-summary");
     expect(creationComposerSource).toContain("{generateVideoSummary}");
     expect(creationComposerSource).toContain("tracking-0");
@@ -1065,14 +1075,14 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
     expect(creationComposerSource).not.toContain("footer={");
     expect(creationComposerSource.indexOf("video-generate-bar")).toBeLessThan(creationComposerSource.indexOf("<VideoHistoryPanel"));
-    expect(creationComposerSource).toContain("max-w-[960px]");
+    expect(productCreativeWorkbenchSource).not.toContain("max-w-[960px]");
+    expect(productCreativeWorkbenchSource).not.toContain("mx-auto");
     expect(creationComposerSource).toContain("product-creative-product-details");
     expect(creationComposerSource).toContain("<ProductCreativeSettingsTray");
     expect(creationComposerSource).toContain("product-creative-context-strip");
     expect(creationComposerSource).not.toContain("product-creative-settings");
     expect(creationComposerSource).toContain("const productNeedsFacts = !selectedProduct && !importText.trim()");
     expect(creationComposerSource).toContain("open={productDetailsOpen}");
-    expect(creationComposerSource.indexOf("<ProductCreativeSettingsTray")).toBeLessThan(creationComposerSource.indexOf("product-creative-context-strip"));
     expect(creationComposerSource.indexOf("product-creative-product-details")).toBeLessThan(creationComposerSource.indexOf("ProductComposerReferenceTray"));
     expect(creationComposerSource).not.toContain("product-creative-media-rail");
     expect(creationComposerSource).not.toContain("product-creative-result-rail");
@@ -1361,10 +1371,13 @@ describe("console API", () => {
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)]");
     expect(storyboardPanelSource).toContain("h-full min-h-[230px] resize-none");
-    expect(storyboardPanelSource).toContain("pb-16");
+    expect(storyboardPanelSource).toContain("pb-20");
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown relative min-h-0");
-    expect(storyboardPanelSource).toContain("absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-2");
-    expect(storyboardPanelSource).toContain("absolute bottom-14 left-3 right-3");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-3 left-3 right-3");
+    expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1.5");
+    expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
+    expect(settingsTraySource).toContain("prompt-inline-settings");
+    expect(storyboardPanelSource).toContain("absolute bottom-20 left-3 right-3");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
     expect(storyboardPanelSource).toContain('tVideo("storyboard.generate")');
@@ -5561,6 +5574,7 @@ describe("console API", () => {
     expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
+    const productCreativeWorkbenchSource = sourceBetween(appSource, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
     expect(composerSource).toContain("video-workspace-shell");
     expect(composerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
     expect(composerSource).toContain("transition-[grid-template-columns] duration-200");
@@ -5606,7 +5620,7 @@ describe("console API", () => {
     expect(composerSource).toContain("ProductCreativeWorkbench");
     expect(composerSource).toContain("product-creative-workbench");
     expect(composerSource).toContain("product-creative-controls");
-    expect(composerSource).toContain("px-3 py-2");
+    expect(composerSource).toContain("prompt-inline-settings");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain('layout="pill"');
     expect(composerSource).toContain("ProductCreativeToolbarChoice");
@@ -5625,7 +5639,7 @@ describe("console API", () => {
     expect(composerSource).toContain("aspectRatio: selectedVideoAspectRatio");
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
     expect(appSource).toContain('if (value === "en") return t("languages.en");');
-    expect(composerSource).toContain('density="compact"');
+    expect(composerSource).toContain('density="micro"');
     expect(composerSource).toContain("video-generate-summary");
     expect(composerSource).toContain("{generateVideoSummary}");
     expect(composerSource).toContain("tracking-0");
@@ -5644,14 +5658,14 @@ describe("console API", () => {
     expect(composerSource.indexOf("video-generate-bar")).toBeLessThan(composerSource.indexOf("<VideoHistoryPanel"));
     expect(composerSource.indexOf("product-creative-compose-panel")).toBeLessThan(composerSource.indexOf("<ProductModeActionBar"));
     expect(composerSource.indexOf("<ProductModeActionBar")).toBeLessThan(composerSource.indexOf("product-creative-history"));
-    expect(composerSource).toContain("max-w-[960px]");
+    expect(productCreativeWorkbenchSource).not.toContain("max-w-[960px]");
+    expect(productCreativeWorkbenchSource).not.toContain("mx-auto");
     expect(composerSource).toContain("product-creative-product-details");
     expect(composerSource).toContain("<ProductCreativeSettingsTray");
     expect(composerSource).toContain("product-creative-context-strip");
     expect(composerSource).not.toContain("product-creative-settings");
     expect(composerSource).toContain("const productNeedsFacts = !selectedProduct && !importText.trim()");
     expect(composerSource).toContain("open={productDetailsOpen}");
-    expect(composerSource.indexOf("<ProductCreativeSettingsTray")).toBeLessThan(composerSource.indexOf("product-creative-context-strip"));
     expect(composerSource.indexOf("product-creative-product-details")).toBeLessThan(composerSource.indexOf("ProductComposerReferenceTray"));
     expect(composerSource).not.toContain("product-creative-media-rail");
     expect(composerSource).not.toContain("product-creative-result-rail");

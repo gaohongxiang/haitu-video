@@ -23,7 +23,6 @@ import {
   Globe2,
   Image as ImageIcon,
   Languages,
-  Layers2,
   Plus,
   KeyRound,
   LayoutDashboard,
@@ -5486,36 +5485,9 @@ function ProductCreativeWorkbench({
   }, [productNeedsFacts]);
 
   return (
-    <section className="product-creative-workbench product-creative-studio mx-auto grid w-full max-w-[960px] content-start gap-3">
+    <section className="product-creative-workbench product-creative-studio grid w-full content-start gap-3">
       <section className="product-creative-compose-panel grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_14px_42px_rgba(96,64,43,.06)]">
-        <ProductCreativeSettingsTray
-          mode={mode}
-          tVideo={tVideo}
-          activeModelSchemeId={activeModelSchemeId}
-          modelSchemeOptions={modelSchemeOptions}
-          onModelSchemeChange={onModelSchemeChange}
-          template={template}
-          templateOptions={templateOptions}
-          onTemplateChange={onTemplateChange}
-          duration={duration}
-          durationOptions={durationOptions}
-          onDurationChange={onDurationChange}
-          selectedVideoResolution={selectedVideoResolution}
-          onVideoResolutionChange={onVideoResolutionChange}
-          selectedVideoAspectRatio={selectedVideoAspectRatio}
-          onVideoAspectRatioChange={onVideoAspectRatioChange}
-          finalLanguage={finalLanguage}
-          languageOptions={languageOptions}
-          onFinalLanguageChange={onFinalLanguageChange}
-          versionCount={versionCount}
-          versionCountOptions={versionCountOptions}
-          onVersionCountChange={onVersionCountChange}
-          imageModelLabel={imageModelLabel}
-          referenceImageCount={previewableReferenceImages.length}
-          schemeSummary={schemeSummary}
-        />
-
-        <div className="product-creative-context-strip grid min-w-0 gap-2 border-t border-[var(--border)] pt-3 min-[760px]:grid-cols-[minmax(240px,.82fr)_minmax(0,1.18fr)]">
+        <div className="product-creative-context-strip grid min-w-0 gap-2 min-[760px]:grid-cols-[minmax(240px,.82fr)_minmax(0,1.18fr)]">
           <details
             className="product-creative-product-details group/product rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2"
             open={productDetailsOpen}
@@ -5578,8 +5550,26 @@ function ProductCreativeWorkbench({
           tVideo={tVideo}
           imageModelLabel={imageModelLabel}
           referenceImageCount={previewableReferenceImages.length}
+          activeModelSchemeId={activeModelSchemeId}
+          modelSchemeOptions={modelSchemeOptions}
+          onModelSchemeChange={onModelSchemeChange}
           template={template}
+          templateOptions={templateOptions}
+          onTemplateChange={onTemplateChange}
           duration={duration}
+          durationOptions={durationOptions}
+          onDurationChange={onDurationChange}
+          selectedVideoResolution={selectedVideoResolution}
+          onVideoResolutionChange={onVideoResolutionChange}
+          selectedVideoAspectRatio={selectedVideoAspectRatio}
+          onVideoAspectRatioChange={onVideoAspectRatioChange}
+          finalLanguage={finalLanguage}
+          languageOptions={languageOptions}
+          onFinalLanguageChange={onFinalLanguageChange}
+          versionCount={versionCount}
+          versionCountOptions={versionCountOptions}
+          onVersionCountChange={onVersionCountChange}
+          schemeSummary={schemeSummary}
           storyboardDraft={storyboardDraft}
           storyboardDraftIsGuidance={storyboardDraftIsGuidance}
           storyboardHistory={storyboardHistory}
@@ -5646,7 +5636,6 @@ function ProductCreativeWorkbench({
 }
 
 function ProductCreativeSettingsTray({
-  mode,
   tVideo,
   activeModelSchemeId,
   modelSchemeOptions,
@@ -5667,11 +5656,8 @@ function ProductCreativeSettingsTray({
   versionCount,
   versionCountOptions,
   onVersionCountChange,
-  imageModelLabel,
-  referenceImageCount,
   schemeSummary
 }: {
-  mode: ProductCreativeWorkspaceMode;
   tVideo: VideoStudioTranslator;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
@@ -5692,13 +5678,11 @@ function ProductCreativeSettingsTray({
   versionCount: number;
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
-  imageModelLabel: string;
-  referenceImageCount: number;
   schemeSummary: string;
 }) {
   return (
-    <section className="product-creative-controls flex min-w-0 flex-wrap items-center gap-1.5" title={schemeSummary} aria-label={schemeSummary}>
-      <div className="model-scheme-control min-w-[190px] max-w-full flex-1 sm:flex-none">
+    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto rounded-[8px] bg-transparent pr-1 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
+      <div className="model-scheme-control min-w-[112px] max-w-[168px] shrink-0">
         <CompactChoiceDropdown
           label={tVideo("controls.modelScheme")}
           value={activeModelSchemeId}
@@ -5706,68 +5690,58 @@ function ProductCreativeSettingsTray({
           formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
           onChange={onModelSchemeChange}
           layout="pill"
-          density="compact"
+          density="micro"
         />
       </div>
-      {mode === "video" ? (
-        <>
-          <ProductCreativeToolbarChoice
-            icon={Clapperboard}
-            label={tVideo("controls.template")}
-            value={template}
-            options={templateOptions}
-            formatOption={(option) => localizedTemplateLabel(option, tVideo)}
-            onChange={onTemplateChange}
-          />
-          <ProductCreativeToolbarChoice
-            icon={RectangleHorizontal}
-            label={tVideo("controls.aspectRatio")}
-            value={selectedVideoAspectRatio}
-            options={videoAspectRatioOptions}
-            formatOption={(option) => videoAspectRatioLabel(option, tVideo).replace(/^.*? /, "")}
-            onChange={onVideoAspectRatioChange}
-          />
-          <ProductCreativeToolbarChoice
-            icon={Clock}
-            label={tVideo("controls.duration")}
-            value={String(duration)}
-            options={durationOptions}
-            formatOption={(option) => `${option}s`}
-            onChange={(option) => onDurationChange(Number(option))}
-          />
-          <ProductCreativeToolbarChoice
-            icon={Monitor}
-            label={tVideo("controls.resolution")}
-            value={selectedVideoResolution}
-            options={videoResolutionOptions}
-            formatOption={videoResolutionLabel}
-            onChange={onVideoResolutionChange}
-          />
-          <ProductCreativeToolbarChoice
-            icon={Languages}
-            label={tVideo("controls.finalLanguage")}
-            value={finalLanguage}
-            options={languageOptions}
-            formatOption={(option) => finalLanguageLabel(option, tVideo)}
-            onChange={onFinalLanguageChange}
-          />
-          <ProductCreativeToolbarChoice
-            icon={Rows3}
-            label={tVideo("controls.versionCount")}
-            value={String(versionCount)}
-            options={versionCountOptions}
-            formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
-            onChange={(option) => onVersionCountChange(Number(option))}
-          />
-        </>
-      ) : (
-        <>
-          <ProductCreativeToolbarValue icon={ImageIcon} label="图片目标" value="主图 / 场景图 / 细节图" />
-          <ProductCreativeToolbarValue icon={Layers2} label={tVideo("controls.modelScheme")} value={imageModelLabel} />
-          <ProductCreativeToolbarValue icon={RectangleHorizontal} label="参考图" value={tVideo("summary.referenceImages", { count: referenceImageCount })} />
-        </>
-      )}
-    </section>
+      <ProductCreativeToolbarChoice
+        icon={Clapperboard}
+        label={tVideo("controls.template")}
+        value={template}
+        options={templateOptions}
+        formatOption={(option) => localizedTemplateLabel(option, tVideo)}
+        onChange={onTemplateChange}
+      />
+      <ProductCreativeToolbarChoice
+        icon={RectangleHorizontal}
+        label={tVideo("controls.aspectRatio")}
+        value={selectedVideoAspectRatio}
+        options={videoAspectRatioOptions}
+        formatOption={(option) => videoAspectRatioLabel(option, tVideo).replace(/^.*? /, "")}
+        onChange={onVideoAspectRatioChange}
+      />
+      <ProductCreativeToolbarChoice
+        icon={Clock}
+        label={tVideo("controls.duration")}
+        value={String(duration)}
+        options={durationOptions}
+        formatOption={(option) => `${option}s`}
+        onChange={(option) => onDurationChange(Number(option))}
+      />
+      <ProductCreativeToolbarChoice
+        icon={Monitor}
+        label={tVideo("controls.resolution")}
+        value={selectedVideoResolution}
+        options={videoResolutionOptions}
+        formatOption={videoResolutionLabel}
+        onChange={onVideoResolutionChange}
+      />
+      <ProductCreativeToolbarChoice
+        icon={Languages}
+        label={tVideo("controls.finalLanguage")}
+        value={finalLanguage}
+        options={languageOptions}
+        formatOption={(option) => finalLanguageLabel(option, tVideo)}
+        onChange={onFinalLanguageChange}
+      />
+      <ProductCreativeToolbarChoice
+        icon={Rows3}
+        label={tVideo("controls.versionCount")}
+        value={String(versionCount)}
+        options={versionCountOptions}
+        formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
+        onChange={(option) => onVersionCountChange(Number(option))}
+      />
+    </div>
   );
 }
 
@@ -5787,37 +5761,16 @@ function ProductCreativeToolbarChoice<T extends string>({
   onChange: (option: T) => void;
 }) {
   return (
-    <div className="product-creative-toolbar-choice min-w-[86px] max-w-[190px]" title={label}>
+    <div className="product-creative-toolbar-choice min-w-[48px] max-w-[118px] shrink-0" title={label}>
       <CompactChoiceDropdown
-        label={<Icon size={14} className="shrink-0" aria-hidden="true" />}
+        label={<Icon size={12} className="shrink-0" aria-hidden="true" />}
         value={value}
         options={options}
         formatOption={formatOption}
         onChange={onChange}
         layout="pill"
-        density="compact"
+        density="micro"
       />
-    </div>
-  );
-}
-
-function ProductCreativeToolbarValue({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: ComponentType<{ size?: number; className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div
-      className="flex min-h-9 min-w-[120px] max-w-full items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 text-xs font-black text-[var(--text)]"
-      title={`${label}: ${value}`}
-      aria-label={`${label}: ${value}`}
-    >
-      <Icon size={14} className="shrink-0 text-[var(--muted)]" aria-hidden="true" />
-      <span className="min-w-0 truncate">{value}</span>
     </div>
   );
 }
@@ -5977,8 +5930,26 @@ function ProductModeOutputPanel({
   tVideo,
   imageModelLabel,
   referenceImageCount,
+  activeModelSchemeId,
+  modelSchemeOptions,
+  onModelSchemeChange,
   template,
+  templateOptions,
+  onTemplateChange,
   duration,
+  durationOptions,
+  onDurationChange,
+  selectedVideoResolution,
+  onVideoResolutionChange,
+  selectedVideoAspectRatio,
+  onVideoAspectRatioChange,
+  finalLanguage,
+  languageOptions,
+  onFinalLanguageChange,
+  versionCount,
+  versionCountOptions,
+  onVersionCountChange,
+  schemeSummary,
   storyboardDraft,
   storyboardDraftIsGuidance,
   storyboardHistory,
@@ -5995,8 +5966,26 @@ function ProductModeOutputPanel({
   tVideo: VideoStudioTranslator;
   imageModelLabel: string;
   referenceImageCount: number;
+  activeModelSchemeId: ModelSchemeChoice;
+  modelSchemeOptions: ModelSchemeOption[];
+  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   template: TemplateName;
+  templateOptions: TemplateName[];
+  onTemplateChange: (template: TemplateName) => void;
   duration: number;
+  durationOptions: string[];
+  onDurationChange: (duration: number) => void;
+  selectedVideoResolution: VideoResolution;
+  onVideoResolutionChange: (resolution: VideoResolution) => void;
+  selectedVideoAspectRatio: VideoAspectRatio;
+  onVideoAspectRatioChange: (aspectRatio: VideoAspectRatio) => void;
+  finalLanguage: FinalVideoLanguage;
+  languageOptions: FinalVideoLanguage[];
+  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
+  versionCount: number;
+  versionCountOptions: string[];
+  onVersionCountChange: (versionCount: number) => void;
+  schemeSummary: string;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -6013,8 +6002,26 @@ function ProductModeOutputPanel({
       <StoryboardComposerPanel
         appLocale={appLocale}
         tVideo={tVideo}
+        activeModelSchemeId={activeModelSchemeId}
+        modelSchemeOptions={modelSchemeOptions}
+        onModelSchemeChange={onModelSchemeChange}
         template={template}
+        templateOptions={templateOptions}
+        onTemplateChange={onTemplateChange}
         duration={duration}
+        durationOptions={durationOptions}
+        onDurationChange={onDurationChange}
+        selectedVideoResolution={selectedVideoResolution}
+        onVideoResolutionChange={onVideoResolutionChange}
+        selectedVideoAspectRatio={selectedVideoAspectRatio}
+        onVideoAspectRatioChange={onVideoAspectRatioChange}
+        finalLanguage={finalLanguage}
+        languageOptions={languageOptions}
+        onFinalLanguageChange={onFinalLanguageChange}
+        versionCount={versionCount}
+        versionCountOptions={versionCountOptions}
+        onVersionCountChange={onVersionCountChange}
+        schemeSummary={schemeSummary}
         storyboardDraft={storyboardDraft}
         storyboardDraftIsGuidance={storyboardDraftIsGuidance}
         storyboardHistory={storyboardHistory}
@@ -6567,8 +6574,26 @@ function StoryboardComposerPanel({
   appLocale,
   tVideo,
   estimate,
+  activeModelSchemeId,
+  modelSchemeOptions,
+  onModelSchemeChange,
   template,
+  templateOptions,
+  onTemplateChange,
   duration,
+  durationOptions,
+  onDurationChange,
+  selectedVideoResolution,
+  onVideoResolutionChange,
+  selectedVideoAspectRatio,
+  onVideoAspectRatioChange,
+  finalLanguage,
+  languageOptions,
+  onFinalLanguageChange,
+  versionCount,
+  versionCountOptions,
+  onVersionCountChange,
+  schemeSummary,
   storyboardDraft,
   storyboardDraftIsGuidance,
   storyboardHistory,
@@ -6582,8 +6607,26 @@ function StoryboardComposerPanel({
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   estimate?: BillingActionEstimate;
+  activeModelSchemeId: ModelSchemeChoice;
+  modelSchemeOptions: ModelSchemeOption[];
+  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   template: TemplateName;
+  templateOptions: TemplateName[];
+  onTemplateChange: (template: TemplateName) => void;
   duration: number;
+  durationOptions: string[];
+  onDurationChange: (duration: number) => void;
+  selectedVideoResolution: VideoResolution;
+  onVideoResolutionChange: (resolution: VideoResolution) => void;
+  selectedVideoAspectRatio: VideoAspectRatio;
+  onVideoAspectRatioChange: (aspectRatio: VideoAspectRatio) => void;
+  finalLanguage: FinalVideoLanguage;
+  languageOptions: FinalVideoLanguage[];
+  onFinalLanguageChange: (language: FinalVideoLanguage) => void;
+  versionCount: number;
+  versionCountOptions: string[];
+  onVersionCountChange: (versionCount: number) => void;
+  schemeSummary: string;
   storyboardDraft: string;
   storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -6622,16 +6665,39 @@ function StoryboardComposerPanel({
       >
         <Textarea
           className={cn(
-            "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-16 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
+            "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-20 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
             storyboardDraftIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
           )}
           value={storyboardDraft}
           onChange={(event) => onStoryboardDraftChange(event.target.value)}
           placeholder=""
         />
-        <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-2">
+        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
+          <ProductCreativeSettingsTray
+            tVideo={tVideo}
+            activeModelSchemeId={activeModelSchemeId}
+            modelSchemeOptions={modelSchemeOptions}
+            onModelSchemeChange={onModelSchemeChange}
+            template={template}
+            templateOptions={templateOptions}
+            onTemplateChange={onTemplateChange}
+            duration={duration}
+            durationOptions={durationOptions}
+            onDurationChange={onDurationChange}
+            selectedVideoResolution={selectedVideoResolution}
+            onVideoResolutionChange={onVideoResolutionChange}
+            selectedVideoAspectRatio={selectedVideoAspectRatio}
+            onVideoAspectRatioChange={onVideoAspectRatioChange}
+            finalLanguage={finalLanguage}
+            languageOptions={languageOptions}
+            onFinalLanguageChange={onFinalLanguageChange}
+            versionCount={versionCount}
+            versionCountOptions={versionCountOptions}
+            onVersionCountChange={onVersionCountChange}
+            schemeSummary={schemeSummary}
+          />
           <Button
-            className="min-h-9 justify-center rounded-[8px] px-3"
+            className="min-h-7 justify-center rounded-[8px] px-2 text-[11px]"
             size="sm"
             variant="soft"
             disabled={isGeneratingStoryboard || !productReady}
@@ -6649,7 +6715,7 @@ function StoryboardComposerPanel({
           <button
             type="button"
             className={cn(
-              "flex min-h-9 w-fit items-center justify-between gap-2 rounded-[8px] border bg-[var(--card)] px-3 py-2 text-left text-xs font-black text-[var(--muted)] transition",
+              "flex min-h-7 w-fit items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
               historyOpen
                 ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
                 : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
@@ -6667,7 +6733,7 @@ function StoryboardComposerPanel({
         </div>
         {historyOpen ? (
           <div
-            className="absolute bottom-14 left-3 right-3 z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
+            className="absolute bottom-20 left-3 right-3 z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
             role="listbox"
           >
             {storyboardHistory.length > 0 ? (

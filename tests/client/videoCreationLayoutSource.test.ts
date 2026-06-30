@@ -101,9 +101,9 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("product-creative-workbench");
     expect(workbenchSource).toContain("product-creative-studio");
     expect(workbenchSource).toContain("product-creative-compose-panel");
-    expect(workbenchSource).toContain("max-w-[960px]");
+    expect(workbenchSource).not.toContain("max-w-[960px]");
+    expect(workbenchSource).not.toContain("mx-auto");
     expect(workbenchSource).toContain("product-creative-product-details");
-    expect(workbenchSource).toContain("<ProductCreativeSettingsTray");
     expect(workbenchSource).toContain("product-creative-context-strip");
     expect(workbenchSource).not.toContain("product-creative-settings");
     expect(workbenchSource).not.toContain("product-creative-media-rail");
@@ -118,7 +118,6 @@ describe("video creation layout source", () => {
     expect(workbenchSource).toContain("ProductModeOutputPanel");
     expect(workbenchSource).toContain("ProductModeActionBar");
     expect(workbenchSource).toContain("ProductModeAssetPanel");
-    expect(workbenchSource.indexOf("<ProductCreativeSettingsTray")).toBeLessThan(workbenchSource.indexOf("product-creative-context-strip"));
     expect(workbenchSource.indexOf("product-creative-product-details")).toBeLessThan(workbenchSource.indexOf("ProductComposerReferenceTray"));
     expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
     expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
@@ -230,7 +229,9 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("product-creative-workbench");
     expect(composerSource).toContain("product-creative-studio");
     expect(composerSource).toContain("product-creative-controls");
-    expect(composerSource).toContain("py-2");
+    expect(composerSource).toContain("prompt-inline-settings");
+    expect(composerSource).toContain("flex-nowrap");
+    expect(composerSource).toContain("overflow-x-auto");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain('layout="pill"');
     expect(composerSource).toContain("ProductCreativeToolbarChoice");
@@ -249,7 +250,7 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("onVideoAspectRatioChange");
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
     expect(source).toContain('finalLanguageLabel(finalLanguage, tVideo)');
-    expect(composerSource).toContain('density="compact"');
+    expect(composerSource).toContain('density="micro"');
     expect(composerSource).toContain("video-generate-summary");
     expect(composerSource).toContain("{generateVideoSummary}");
     expect(composerSource).toContain("tracking-0");
@@ -364,10 +365,14 @@ describe("video creation layout source", () => {
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
     const referenceTraySource = source.slice(source.indexOf("function ProductComposerReferenceTray"), source.indexOf("function StoryboardComposerPanel"));
     const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
+    const settingsTraySource = sourceBetween(source, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
 
     expect(composerSource).toContain("localizedModelSchemeSummary");
     expect(composerSource).toContain("schemeSummary");
-    expect(composerSource).toContain("<ProductCreativeSettingsTray");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer");
+    expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
+    expect(settingsTraySource).toContain("prompt-inline-settings");
+    expect(storyboardPanelSource.indexOf("prompt-composer-footer")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeSettingsTray"));
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.image"), value: localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo) }');
