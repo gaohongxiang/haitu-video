@@ -925,6 +925,7 @@ describe("console API", () => {
     const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
     const settingsTraySource = sourceBetween(appSource, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
+    const productDetailsSource = sourceBetween(creationComposerSource, "product-creative-product-details", "<ProductComposerReferenceTray");
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function ProductLibraryHome"));
     const productWorkflowSource = await readFile(join(import.meta.dirname, "../../src/client/productWorkflowViewModel.ts"), "utf8");
     const storyboardDraftsSource = await readFile(join(import.meta.dirname, "../../src/client/storyboardDrafts.ts"), "utf8");
@@ -1081,8 +1082,15 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("<ProductCreativeSettingsTray");
     expect(creationComposerSource).toContain("product-creative-context-strip");
     expect(creationComposerSource).not.toContain("product-creative-settings");
-    expect(creationComposerSource).toContain("const productNeedsFacts = !selectedProduct && !importText.trim()");
-    expect(creationComposerSource).toContain("open={productDetailsOpen}");
+    expect(creationComposerSource).toContain("product-facts-editor");
+    expect(creationComposerSource).toContain("max-h-[150px]");
+    expect(creationComposerSource).toContain("overflow-y-auto");
+    expect(productDetailsSource).not.toContain("<details");
+    expect(productDetailsSource).not.toContain("<summary");
+    expect(productDetailsSource).not.toContain("productDetailsOpen");
+    expect(creationComposerSource).toContain("overflow-visible");
+    expect(creationComposerSource).toContain('menuPlacement="top"');
+    expect(creationComposerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
     expect(creationComposerSource.indexOf("product-creative-product-details")).toBeLessThan(creationComposerSource.indexOf("ProductComposerReferenceTray"));
     expect(creationComposerSource).not.toContain("product-creative-media-rail");
     expect(creationComposerSource).not.toContain("product-creative-result-rail");
@@ -1239,9 +1247,9 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("product-facts-body");
     expect(creationComposerSource).toContain("productFactsBodyRef");
     expect(creationComposerSource).toContain("productFactsBodyRef.current.scrollTop = 0");
-    expect(creationComposerSource).toContain("Math.max(4, Math.min(8");
-    expect(creationComposerSource).toContain("product-facts-body min-h-[120px]");
-    expect(creationComposerSource).toContain("resize-y overflow-auto");
+    expect(creationComposerSource).not.toContain("Math.max(4, Math.min(8");
+    expect(creationComposerSource).toContain("product-facts-body max-h-[150px] min-h-[92px]");
+    expect(creationComposerSource).toContain("resize-none overflow-y-auto");
     expect(creationComposerSource).not.toContain("submitHint");
     expect(creationComposerSource).not.toContain("{submitHint ? (");
     expect(creationComposerSource).not.toContain("{submitHint}");
@@ -1368,6 +1376,8 @@ describe("console API", () => {
     expect(referencePreviewSource).toContain("ArrowLeft");
     expect(referencePreviewSource).toContain("ArrowRight");
     expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
+    expect(storyboardPanelSource).not.toContain("<Badge>{localizedTemplateLabel(template, tVideo)}</Badge>");
+    expect(storyboardPanelSource).not.toContain("<Badge>{formatDuration(duration)}</Badge>");
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)]");
     expect(storyboardPanelSource).toContain("h-full min-h-[230px] resize-none");
@@ -1377,6 +1387,8 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1.5");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
     expect(settingsTraySource).toContain("prompt-inline-settings");
+    expect(settingsTraySource).toContain("overflow-visible");
+    expect(settingsTraySource).toContain('menuPlacement="top"');
     expect(storyboardPanelSource).toContain("absolute bottom-20 left-3 right-3");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
@@ -5575,6 +5587,7 @@ describe("console API", () => {
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     const productCreativeWorkbenchSource = sourceBetween(appSource, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
+    const productDetailsSource = sourceBetween(composerSource, "product-creative-product-details", "<ProductComposerReferenceTray");
     expect(composerSource).toContain("video-workspace-shell");
     expect(composerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
     expect(composerSource).toContain("transition-[grid-template-columns] duration-200");
@@ -5664,8 +5677,15 @@ describe("console API", () => {
     expect(composerSource).toContain("<ProductCreativeSettingsTray");
     expect(composerSource).toContain("product-creative-context-strip");
     expect(composerSource).not.toContain("product-creative-settings");
-    expect(composerSource).toContain("const productNeedsFacts = !selectedProduct && !importText.trim()");
-    expect(composerSource).toContain("open={productDetailsOpen}");
+    expect(composerSource).toContain("product-facts-editor");
+    expect(composerSource).toContain("max-h-[150px]");
+    expect(composerSource).toContain("overflow-y-auto");
+    expect(productDetailsSource).not.toContain("<details");
+    expect(productDetailsSource).not.toContain("<summary");
+    expect(productDetailsSource).not.toContain("productDetailsOpen");
+    expect(composerSource).toContain("overflow-visible");
+    expect(composerSource).toContain('menuPlacement="top"');
+    expect(composerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
     expect(composerSource.indexOf("product-creative-product-details")).toBeLessThan(composerSource.indexOf("ProductComposerReferenceTray"));
     expect(composerSource).not.toContain("product-creative-media-rail");
     expect(composerSource).not.toContain("product-creative-result-rail");
@@ -5710,9 +5730,9 @@ describe("console API", () => {
     expect(composerSource).toContain("product-facts-body");
     expect(composerSource).toContain("productFactsBodyRef");
     expect(composerSource).toContain("productFactsBodyRef.current.scrollTop = 0");
-    expect(composerSource).toContain("Math.max(4, Math.min(8");
-    expect(composerSource).toContain("product-facts-body min-h-[120px]");
-    expect(composerSource).toContain("resize-y overflow-auto");
+    expect(composerSource).not.toContain("Math.max(4, Math.min(8");
+    expect(composerSource).toContain("product-facts-body max-h-[150px] min-h-[92px]");
+    expect(composerSource).toContain("resize-none overflow-y-auto");
     expect(composerSource).not.toContain("submitHint");
     expect(composerSource).not.toContain("{submitHint ? (");
     expect(composerSource).not.toContain("{submitHint}");

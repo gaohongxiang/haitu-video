@@ -11,7 +11,8 @@ export function CompactChoiceDropdown<T extends string>({
   onChange,
   disabled = false,
   layout = "stacked",
-  density = "comfortable"
+  density = "comfortable",
+  menuPlacement = "bottom"
 }: {
   label: ReactNode;
   value: T;
@@ -21,6 +22,7 @@ export function CompactChoiceDropdown<T extends string>({
   disabled?: boolean;
   layout?: "stacked" | "inline" | "pill";
   density?: "comfortable" | "compact" | "micro";
+  menuPlacement?: "bottom" | "top";
 }) {
   const [open, setOpen] = useState(false);
   const activeLabel = formatOption(value);
@@ -84,7 +86,8 @@ export function CompactChoiceDropdown<T extends string>({
       {open && !dropdownDisabled ? (
         <div
           className={cn(
-            "absolute right-0 top-[calc(100%+8px)] z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]",
+            "absolute right-0 z-40 grid max-h-[240px] gap-1 overflow-auto rounded-xl border border-[var(--border-strong)] bg-[var(--panel)] p-1.5 shadow-[0_18px_42px_rgba(96,64,43,.16)]",
+            menuPlacement === "top" ? "bottom-[calc(100%+8px)] top-auto" : "top-[calc(100%+8px)]",
             "left-0"
           )}
           role="listbox"

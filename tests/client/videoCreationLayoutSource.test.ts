@@ -92,6 +92,7 @@ describe("video creation layout source", () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
     const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
+    const productDetailsSource = sourceBetween(workbenchSource, "product-creative-product-details", "<ProductComposerReferenceTray");
 
     expect(composerSource).toContain("<ProductCreativeWorkbench");
     expect(composerSource).not.toContain("video-generation-controls compact-generation-controls");
@@ -105,6 +106,12 @@ describe("video creation layout source", () => {
     expect(workbenchSource).not.toContain("mx-auto");
     expect(workbenchSource).toContain("product-creative-product-details");
     expect(workbenchSource).toContain("product-creative-context-strip");
+    expect(workbenchSource).toContain("product-facts-editor");
+    expect(workbenchSource).toContain("max-h-[150px]");
+    expect(workbenchSource).toContain("overflow-y-auto");
+    expect(productDetailsSource).not.toContain("<details");
+    expect(productDetailsSource).not.toContain("<summary");
+    expect(productDetailsSource).not.toContain("productDetailsOpen");
     expect(workbenchSource).not.toContain("product-creative-settings");
     expect(workbenchSource).not.toContain("product-creative-media-rail");
     expect(workbenchSource).not.toContain("product-creative-result-rail");
@@ -231,7 +238,9 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("prompt-inline-settings");
     expect(composerSource).toContain("flex-nowrap");
-    expect(composerSource).toContain("overflow-x-auto");
+    expect(composerSource).toContain("overflow-visible");
+    expect(composerSource).toContain('menuPlacement="top"');
+    expect(composerSource).not.toContain("prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto");
     expect(composerSource).toContain("model-scheme-control");
     expect(composerSource).toContain('layout="pill"');
     expect(composerSource).toContain("ProductCreativeToolbarChoice");
@@ -338,6 +347,8 @@ describe("video creation layout source", () => {
     expect(referencePreviewSource).toContain('aria-label={tVideo("reference.previewDialogTitle")}');
     expect(referencePreviewSource).toContain('{image.original}');
     expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
+    expect(storyboardPanelSource).not.toContain("<Badge>{localizedTemplateLabel(template, tVideo)}</Badge>");
+    expect(storyboardPanelSource).not.toContain("<Badge>{formatDuration(duration)}</Badge>");
     expect(storyboardPanelSource).toContain("historyPreview(record.script, appLocale)");
     expect(historyPanelSource).toContain('tVideo("history.title")');
     expect(historyPanelSource).toContain("<VideoHashtagChips tVideo={tVideo}");
@@ -372,6 +383,8 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource).toContain("prompt-composer-footer");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
     expect(settingsTraySource).toContain("prompt-inline-settings");
+    expect(settingsTraySource).toContain("overflow-visible");
+    expect(settingsTraySource).toContain('menuPlacement="top"');
     expect(storyboardPanelSource.indexOf("prompt-composer-footer")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeSettingsTray"));
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');

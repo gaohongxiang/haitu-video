@@ -4871,8 +4871,6 @@ function ProductCreationComposer({
     : [template, ...enabledTemplateOptions];
   const packingDisabled = isPacking || isSubmittingVideo || isSubmittingImage;
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
-  const productFactsLineCount = importText.trim() ? importText.split(/\r?\n/).length : 4;
-  const productFactsRows = Math.max(4, Math.min(8, productFactsLineCount + 1));
   const productAutoSaveLabel = localizedProductAutoSaveStatusLabel(productAutoSaveStatus, tVideo);
   const generateVideoButtonLabel = versionCount > 1 ? tVideo("generate.buttonWithCount", { count: versionCount }) : tVideo("generate.button");
   const storyboardProductReady = Boolean(selectedProduct || importText.trim());
@@ -5191,7 +5189,6 @@ function ProductCreationComposer({
           isPacking={isPacking}
           packingDisabled={packingDisabled}
           productFactsBodyRef={productFactsBodyRef}
-          productFactsRows={productFactsRows}
           activeModelSchemeId={activeModelSchemeId}
           modelSchemeOptions={modelSchemeOptions}
           onModelSchemeChange={onModelSchemeChange}
@@ -5328,7 +5325,6 @@ function ProductCreativeWorkbench({
   isPacking,
   packingDisabled,
   productFactsBodyRef,
-  productFactsRows,
   activeModelSchemeId,
   modelSchemeOptions,
   onModelSchemeChange,
@@ -5410,7 +5406,6 @@ function ProductCreativeWorkbench({
   isPacking: boolean;
   packingDisabled: boolean;
   productFactsBodyRef: React.RefObject<HTMLTextAreaElement | null>;
-  productFactsRows: number;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
@@ -5475,40 +5470,24 @@ function ProductCreativeWorkbench({
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
 }) {
-  const productNeedsFacts = !selectedProduct && !importText.trim();
-  const [productDetailsOpen, setProductDetailsOpen] = useState(productNeedsFacts);
-
-  useEffect(() => {
-    if (productNeedsFacts) {
-      setProductDetailsOpen(true);
-    }
-  }, [productNeedsFacts]);
-
   return (
     <section className="product-creative-workbench product-creative-studio grid w-full content-start gap-3">
       <section className="product-creative-compose-panel grid min-w-0 content-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-3 shadow-[0_14px_42px_rgba(96,64,43,.06)]">
         <div className="product-creative-context-strip grid min-w-0 gap-2 min-[760px]:grid-cols-[minmax(240px,.82fr)_minmax(0,1.18fr)]">
-          <details
-            className="product-creative-product-details group/product rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2"
-            open={productDetailsOpen}
-            onToggle={(event) => setProductDetailsOpen(event.currentTarget.open)}
-          >
-            <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-3 text-xs font-black text-[var(--text)] marker:hidden">
+          <section className="product-creative-product-details grid min-h-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+            <div className="flex min-h-7 items-center justify-between gap-3 text-xs font-black text-[var(--text)]">
               <span>{tVideo("facts.title")}</span>
-              <span className="flex min-w-0 items-center gap-2 text-[11px] font-bold text-[var(--muted)]">
-                {productAutoSaveLabel ? <span className="truncate">{productAutoSaveLabel}</span> : null}
-                <ChevronDown size={14} className="transition group-open/product:rotate-180" />
-              </span>
-            </summary>
-            <div className="product-facts-editor mt-2 grid min-w-0 gap-2 border-t border-[var(--border)] pt-2">
+              {productAutoSaveLabel ? <span className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]">{productAutoSaveLabel}</span> : null}
+            </div>
+            <div className="product-facts-editor grid min-w-0 gap-2">
               <Textarea
                 ref={productFactsBodyRef}
-                className="product-facts-body min-h-[120px] resize-y overflow-auto border-[var(--border)] bg-[var(--panel)] text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
-                rows={productFactsRows}
+                className="product-facts-body max-h-[150px] min-h-[92px] resize-none overflow-y-auto border-[var(--border)] bg-[var(--panel)] text-sm font-bold leading-6 shadow-none focus-visible:ring-0"
                 value={importText}
                 onChange={(event) => setImportText(event.target.value)}
                 onPaste={onProductFactsPaste}
                 placeholder={tVideo("facts.placeholder")}
+                rows={4}
               />
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 {importNotes.length > 0 ? (
@@ -5523,7 +5502,7 @@ function ProductCreativeWorkbench({
                 </Button>
               </div>
             </div>
-          </details>
+          </section>
 
           <ProductComposerReferenceTray
             tVideo={tVideo}
@@ -5681,7 +5660,7 @@ function ProductCreativeSettingsTray({
   schemeSummary: string;
 }) {
   return (
-    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto rounded-[8px] bg-transparent pr-1 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
+    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-visible rounded-[8px] bg-transparent pr-1 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
       <div className="model-scheme-control min-w-[112px] max-w-[168px] shrink-0">
         <CompactChoiceDropdown
           label={tVideo("controls.modelScheme")}
@@ -5691,6 +5670,7 @@ function ProductCreativeSettingsTray({
           onChange={onModelSchemeChange}
           layout="pill"
           density="micro"
+          menuPlacement="top"
         />
       </div>
       <ProductCreativeToolbarChoice
@@ -5770,6 +5750,7 @@ function ProductCreativeToolbarChoice<T extends string>({
         onChange={onChange}
         layout="pill"
         density="micro"
+        menuPlacement="top"
       />
     </div>
   );
@@ -6640,14 +6621,8 @@ function StoryboardComposerPanel({
   const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <section className="storyboard-side-panel grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)] gap-2 border-t border-[var(--border)] pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-black text-[var(--text)]">{tVideo("storyboard.title")}</div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Badge>{localizedTemplateLabel(template, tVideo)}</Badge>
-          <Badge>{formatDuration(duration)}</Badge>
-        </div>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 text-sm font-black text-[var(--text)]">{tVideo("storyboard.title")}</div>
       </div>
 
       <div
