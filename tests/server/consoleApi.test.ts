@@ -1330,9 +1330,9 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
-    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf("{historyOpen ?"))).not.toContain('tVideo("storyboard.generate")');
-    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf("{historyOpen ?"))).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
-    expect(creationComposerSource).toContain("placeholder=\"\"");
+    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain('tVideo("storyboard.generate")');
+    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
+    expect(creationComposerSource).toContain("placeholder={promptPlaceholder}");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
     expect(creationComposerSource).toContain('label={tVideo("controls.template")}');
     expect(creationComposerSource).toContain('label={tVideo("controls.duration")}');
@@ -1884,8 +1884,9 @@ describe("console API", () => {
     expect(appSource).toContain("prompt: prompt?.trim() || undefined");
     expect(appSource).toContain("await onGenerateReferenceImages(savedProduct.sku, imagePrompt);");
     expect(appSource).toContain('const [imagePrompt, setImagePrompt] = useState("");');
-    expect(appSource).toContain("ProductImagePromptPanel");
-    expect(appSource).toContain("product-image-prompt-body");
+    expect(appSource).toContain("StoryboardComposerPanel");
+    expect(appSource).not.toContain("ProductImagePromptPanel");
+    expect(appSource).not.toContain("product-image-prompt-body");
     expect(appSource).toContain("图片提示词");
     expect(appSource).toContain("ProductCreativeModeSwitch");
     expect(appSource).toContain("image-prompt-target-chip");
@@ -5840,7 +5841,7 @@ describe("console API", () => {
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(composerSource).toContain("storyboard-title-row");
     expect(composerSource).toContain("storyboard-title-action");
-    expect(composerSource).toContain("placeholder=\"\"");
+    expect(composerSource).toContain("placeholder={promptPlaceholder}");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain('label={tVideo("controls.template")}');
     expect(composerSource).toContain('label={tVideo("controls.duration")}');

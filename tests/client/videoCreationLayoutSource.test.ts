@@ -44,7 +44,8 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("workspace.modeSummary");
     expect(composerSource).toContain("ProductModeOutputPanel");
     expect(source).toContain('mode === "video"');
-    expect(source).toContain("<ProductImagePromptPanel");
+    expect(source).toContain("<StoryboardComposerPanel");
+    expect(source).not.toContain("<ProductImagePromptPanel");
   });
 
   it("keeps the main composer free of duplicate product headers and mode tabs", async () => {
@@ -185,8 +186,8 @@ describe("video creation layout source", () => {
     const appSource = sourceBetween(source, "export function App()", "function AppLanguageSwitcher");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
     const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
-    const outputPanelSource = sourceBetween(source, "function ProductModeOutputPanel", "function ProductImagePromptPanel");
-    const imagePromptSource = sourceBetween(source, "function ProductImagePromptPanel", "function ProductImageAssetPanel");
+    const outputPanelSource = sourceBetween(source, "function ProductModeOutputPanel", "function ProductImageAssetPanel");
+    const promptPanelSource = sourceBetween(source, "function StoryboardComposerPanel", "function VideoHistoryPanel");
     const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
 
     expect(appSource).toContain("async function generateProductReferenceImages(sku: string, prompt?: string)");
@@ -227,29 +228,33 @@ describe("video creation layout source", () => {
     expect(outputPanelSource).toContain("selectedImageModelConfigId={selectedImageModelConfigId}");
     expect(outputPanelSource).toContain("onImageModelConfigChange={onImageModelConfigChange}");
     expect(outputPanelSource).toContain("onModeChange={onModeChange}");
-    expect(imagePromptSource).toContain("图片提示词");
-    expect(imagePromptSource).not.toContain("图片需求");
-    expect(imagePromptSource).toContain("mode: ProductCreativeWorkspaceMode;");
-    expect(imagePromptSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
-    expect(imagePromptSource).toContain("selectedImagePromptReference?: ReferenceImageStatus;");
-    expect(imagePromptSource).toContain("image-prompt-target-chip");
-    expect(imagePromptSource).toContain("selectedImagePromptReference?.previewUrl");
-    expect(imagePromptSource).toContain("selectedImagePromptReference.original");
-    expect(imagePromptSource).toContain("onImagePromptTargetClear");
-    expect(imagePromptSource).toContain("清除目标图");
-    expect(imagePromptSource).toContain("product-image-prompt-body");
-    expect(imagePromptSource).toContain("value={imagePrompt}");
-    expect(imagePromptSource).toContain("onChange={(event) => onImagePromptChange(event.target.value)}");
-    expect(imagePromptSource).toContain("imagePromptPresets");
-    expect(imagePromptSource).toContain("appendImagePromptPreset");
-    expect(imagePromptSource).toContain("image-model-control");
-    expect(imagePromptSource).toContain("<ProductCreativeModeSwitch");
-    expect(imagePromptSource).toContain("<CompactChoiceDropdown");
-    expect(imagePromptSource).toContain("value={selectedImageModelConfigId}");
-    expect(imagePromptSource).toContain("options={configuredModelOptions(imageModelOptions)}");
-    expect(imagePromptSource).toContain("formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}");
-    expect(imagePromptSource).toContain("onChange={onImageModelConfigChange}");
-    expect(imagePromptSource).not.toContain("<Badge className=\"max-w-[180px] truncate\">{imageModelLabel}</Badge>");
+    expect(outputPanelSource).toContain("<StoryboardComposerPanel");
+    expect(outputPanelSource).not.toContain('if (mode === "video")');
+    expect(promptPanelSource).toContain('const promptTitle = mode === "image" ? "图片提示词" : tVideo("storyboard.title");');
+    expect(promptPanelSource).not.toContain("图片需求");
+    expect(promptPanelSource).toContain("storyboard-title-row flex min-h-8 items-center");
+    expect(promptPanelSource).toContain("mode: ProductCreativeWorkspaceMode;");
+    expect(promptPanelSource).toContain("onModeChange: (mode: ProductCreativeWorkspaceMode) => void;");
+    expect(promptPanelSource).toContain("selectedImagePromptReference?: ReferenceImageStatus;");
+    expect(promptPanelSource).toContain('value={mode === "image" ? imagePrompt : storyboardDraft}');
+    expect(promptPanelSource).toContain("onPromptDraftChange(event.target.value)");
+    expect(promptPanelSource).toContain("h-full min-h-[230px] resize-none");
+    expect(promptPanelSource).not.toContain("product-image-prompt-body");
+    expect(promptPanelSource).toContain("image-prompt-target-chip");
+    expect(promptPanelSource).toContain("selectedImagePromptReference?.previewUrl");
+    expect(promptPanelSource).toContain("selectedImagePromptReference.original");
+    expect(promptPanelSource).toContain("onImagePromptTargetClear");
+    expect(promptPanelSource).toContain("清除目标图");
+    expect(promptPanelSource).toContain("imagePromptPresets");
+    expect(promptPanelSource).toContain("appendImagePromptPreset");
+    expect(promptPanelSource).toContain("image-model-control");
+    expect(promptPanelSource).toContain("<ProductCreativeModeSwitch");
+    expect(promptPanelSource).toContain("<CompactChoiceDropdown");
+    expect(promptPanelSource).toContain("value={selectedImageModelConfigId}");
+    expect(promptPanelSource).toContain("options={configuredModelOptions(imageModelOptions)}");
+    expect(promptPanelSource).toContain("formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}");
+    expect(promptPanelSource).toContain("onChange={onImageModelConfigChange}");
+    expect(promptPanelSource).not.toContain("<Badge className=\"max-w-[180px] truncate\">{imageModelLabel}</Badge>");
     expect(actionBarSource).toContain("generateImageButtonLabel: string;");
     expect(actionBarSource).toContain('isSubmittingImage ? tVideo("generate.submitting") : generateImageButtonLabel');
     expect(actionBarSource).toContain("title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : generateImageButtonLabel}");
@@ -519,7 +524,7 @@ describe("video creation layout source", () => {
     const referenceTraySource = source.slice(source.indexOf("function ProductComposerReferenceTray"), source.indexOf("function StoryboardComposerPanel"));
     const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
     const productDetailsSource = sourceBetween(source, "product-creative-product-details", "<ProductComposerReferenceTray");
-    const storyboardFooterSource = sourceBetween(storyboardPanelSource, "prompt-composer-footer", "{historyOpen ?");
+    const storyboardFooterSource = sourceBetween(storyboardPanelSource, "prompt-composer-footer", '{mode === "video" && historyOpen ?');
     const actionButtonCostSource = source.slice(source.indexOf("function ActionButtonCost"), source.indexOf("function versionLabel"));
 
     expect(appSource).toContain('postJson<BillingEstimatesResponse>("/api/billing-estimates"');

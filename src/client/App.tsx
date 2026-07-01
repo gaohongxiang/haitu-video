@@ -6016,49 +6016,9 @@ function ProductModeOutputPanel({
   productReady: boolean;
   storyboardEstimate?: BillingActionEstimate;
 }) {
-  if (mode === "video") {
-    return (
-      <StoryboardComposerPanel
-        appLocale={appLocale}
-        tVideo={tVideo}
-        mode={mode}
-        onModeChange={onModeChange}
-        activeModelSchemeId={activeModelSchemeId}
-        modelSchemeOptions={modelSchemeOptions}
-        onModelSchemeChange={onModelSchemeChange}
-        template={template}
-        templateOptions={templateOptions}
-        onTemplateChange={onTemplateChange}
-        duration={duration}
-        durationOptions={durationOptions}
-        onDurationChange={onDurationChange}
-        selectedVideoResolution={selectedVideoResolution}
-        onVideoResolutionChange={onVideoResolutionChange}
-        selectedVideoAspectRatio={selectedVideoAspectRatio}
-        onVideoAspectRatioChange={onVideoAspectRatioChange}
-        finalLanguage={finalLanguage}
-        languageOptions={languageOptions}
-        onFinalLanguageChange={onFinalLanguageChange}
-        versionCount={versionCount}
-        versionCountOptions={versionCountOptions}
-        onVersionCountChange={onVersionCountChange}
-        schemeSummary={schemeSummary}
-        storyboardDraft={storyboardDraft}
-        storyboardDraftIsGuidance={storyboardDraftIsGuidance}
-        storyboardHistory={storyboardHistory}
-        onStoryboardDraftChange={onStoryboardDraftChange}
-        onApplyStoryboardHistory={onApplyStoryboardHistory}
-        onDeleteStoryboardHistory={onDeleteStoryboardHistory}
-        onGenerateStoryboardDraft={onGenerateStoryboardDraft}
-        isGeneratingStoryboard={isGeneratingStoryboard}
-        productReady={productReady}
-        estimate={storyboardEstimate}
-      />
-    );
-  }
-
   return (
-    <ProductImagePromptPanel
+    <StoryboardComposerPanel
+      appLocale={appLocale}
       tVideo={tVideo}
       mode={mode}
       onModeChange={onModeChange}
@@ -6072,116 +6032,37 @@ function ProductModeOutputPanel({
       imageTargetLabel={imageTargetLabel}
       selectedImagePromptReference={selectedImagePromptReference}
       onImagePromptTargetClear={onImagePromptTargetClear}
+      activeModelSchemeId={activeModelSchemeId}
+      modelSchemeOptions={modelSchemeOptions}
+      onModelSchemeChange={onModelSchemeChange}
+      template={template}
+      templateOptions={templateOptions}
+      onTemplateChange={onTemplateChange}
+      duration={duration}
+      durationOptions={durationOptions}
+      onDurationChange={onDurationChange}
+      selectedVideoResolution={selectedVideoResolution}
+      onVideoResolutionChange={onVideoResolutionChange}
+      selectedVideoAspectRatio={selectedVideoAspectRatio}
+      onVideoAspectRatioChange={onVideoAspectRatioChange}
+      finalLanguage={finalLanguage}
+      languageOptions={languageOptions}
+      onFinalLanguageChange={onFinalLanguageChange}
+      versionCount={versionCount}
+      versionCountOptions={versionCountOptions}
+      onVersionCountChange={onVersionCountChange}
+      schemeSummary={schemeSummary}
+      storyboardDraft={storyboardDraft}
+      storyboardDraftIsGuidance={storyboardDraftIsGuidance}
+      storyboardHistory={storyboardHistory}
+      onStoryboardDraftChange={onStoryboardDraftChange}
+      onApplyStoryboardHistory={onApplyStoryboardHistory}
+      onDeleteStoryboardHistory={onDeleteStoryboardHistory}
+      onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+      isGeneratingStoryboard={isGeneratingStoryboard}
+      productReady={productReady}
+      estimate={storyboardEstimate}
     />
-  );
-}
-
-function ProductImagePromptPanel({
-  tVideo,
-  mode,
-  onModeChange,
-  imageModelLabel,
-  imageModelOptions,
-  selectedImageModelConfigId,
-  onImageModelConfigChange,
-  imagePrompt,
-  onImagePromptChange,
-  referenceImageCount,
-  imageTargetLabel,
-  selectedImagePromptReference,
-  onImagePromptTargetClear
-}: {
-  tVideo: VideoStudioTranslator;
-  mode: ProductCreativeWorkspaceMode;
-  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
-  imageModelLabel: string;
-  imageModelOptions: ProviderConfigItem[];
-  selectedImageModelConfigId: ModelConfigChoice;
-  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
-  imagePrompt: string;
-  onImagePromptChange: (prompt: string) => void;
-  referenceImageCount: number;
-  imageTargetLabel: string;
-  selectedImagePromptReference?: ReferenceImageStatus;
-  onImagePromptTargetClear: () => void;
-}) {
-  const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
-  function appendImagePromptPreset(preset: string) {
-    const trimmedPrompt = imagePrompt.trim();
-    onImagePromptChange(trimmedPrompt ? `${trimmedPrompt}，${preset}` : preset);
-  }
-
-  return (
-    <section className="product-image-prompt-panel grid content-start gap-2 border-t border-[var(--border)] pt-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="shrink-0 text-sm font-black text-[var(--text)]">图片提示词</div>
-        </div>
-      </div>
-      <div className="relative grid min-w-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
-        <Textarea
-          className="product-image-prompt-body h-[132px] min-h-[132px] max-h-[132px] resize-none overflow-y-auto border-0 bg-transparent px-0 pb-12 pt-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
-          value={imagePrompt}
-          onChange={(event) => onImagePromptChange(event.target.value)}
-          placeholder={referenceImageCount > 0 ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。" : "例如：生成白底主图，突出材质、尺寸和使用场景。"}
-          rows={4}
-        />
-        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
-          <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
-          {selectedImagePromptReference ? (
-            <div className="image-prompt-target-chip flex min-w-[160px] max-w-full items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
-              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
-                {selectedImagePromptReference?.previewUrl ? (
-                  <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
-                ) : (
-                  <ImageIcon size={13} className="text-[var(--muted)]" />
-                )}
-              </span>
-              <span className="grid min-w-0">
-                <span className="truncate">优化目标</span>
-                <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
-              </span>
-              <button
-                type="button"
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-                title="清除目标图"
-                aria-label="清除目标图"
-                onClick={onImagePromptTargetClear}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
-              <span className="truncate">{imageTargetLabel}</span>
-            </div>
-          )}
-          <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
-            <CompactChoiceDropdown
-              label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
-              value={selectedImageModelConfigId}
-              options={configuredModelOptions(imageModelOptions)}
-              formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
-              onChange={onImageModelConfigChange}
-              layout="pill"
-              density="micro"
-              menuPlacement="top"
-              menuWidth="content"
-            />
-          </div>
-          {imagePromptPresets.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-              onClick={() => appendImagePromptPreset(preset)}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -6701,6 +6582,16 @@ function StoryboardComposerPanel({
   mode,
   onModeChange,
   estimate,
+  imageModelLabel,
+  imageModelOptions,
+  selectedImageModelConfigId,
+  onImageModelConfigChange,
+  imagePrompt,
+  onImagePromptChange,
+  referenceImageCount,
+  imageTargetLabel,
+  selectedImagePromptReference,
+  onImagePromptTargetClear,
   activeModelSchemeId,
   modelSchemeOptions,
   onModelSchemeChange,
@@ -6736,6 +6627,16 @@ function StoryboardComposerPanel({
   mode: ProductCreativeWorkspaceMode;
   onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   estimate?: BillingActionEstimate;
+  imageModelLabel: string;
+  imageModelOptions: ProviderConfigItem[];
+  selectedImageModelConfigId: ModelConfigChoice;
+  onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  imagePrompt: string;
+  onImagePromptChange: (prompt: string) => void;
+  referenceImageCount: number;
+  imageTargetLabel: string;
+  selectedImagePromptReference?: ReferenceImageStatus;
+  onImagePromptTargetClear: () => void;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
   onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
@@ -6767,26 +6668,50 @@ function StoryboardComposerPanel({
   productReady: boolean;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
+  const promptTitle = mode === "image" ? "图片提示词" : tVideo("storyboard.title");
+  const promptIsGuidance = mode === "video" && storyboardDraftIsGuidance;
+  const promptPlaceholder = mode === "image"
+    ? referenceImageCount > 0
+      ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。"
+      : "例如：生成白底主图，突出材质、尺寸和使用场景。"
+    : "";
+
+  function onPromptDraftChange(value: string) {
+    if (mode === "image") {
+      onImagePromptChange(value);
+      return;
+    }
+    onStoryboardDraftChange(value);
+  }
+
+  function appendImagePromptPreset(preset: string) {
+    const trimmedPrompt = imagePrompt.trim();
+    onImagePromptChange(trimmedPrompt ? `${trimmedPrompt}，${preset}` : preset);
+  }
+
   return (
     <section className="storyboard-side-panel grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)] gap-2 border-t border-[var(--border)] pt-3">
-      <div className="storyboard-title-row flex items-center justify-between gap-3">
-        <div className="min-w-0 text-sm font-black text-[var(--text)]">{tVideo("storyboard.title")}</div>
-        <Button
-          className="storyboard-title-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px]"
-          size="sm"
-          variant="soft"
-          disabled={isGeneratingStoryboard || !productReady}
-          onClick={() => {
-            if (!productReady) {
-              return;
-            }
-            void onGenerateStoryboardDraft();
-          }}
-        >
-          {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
-          {isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}
-          <ActionButtonCost tVideo={tVideo} estimate={estimate} />
-        </Button>
+      <div className="storyboard-title-row flex min-h-8 items-center justify-between gap-3">
+        <div className="min-w-0 text-sm font-black text-[var(--text)]">{promptTitle}</div>
+        {mode === "video" ? (
+          <Button
+            className="storyboard-title-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px]"
+            size="sm"
+            variant="soft"
+            disabled={isGeneratingStoryboard || !productReady}
+            onClick={() => {
+              if (!productReady) {
+                return;
+              }
+              void onGenerateStoryboardDraft();
+            }}
+          >
+            {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
+            {isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}
+            <ActionButtonCost tVideo={tVideo} estimate={estimate} />
+          </Button>
+        ) : null}
       </div>
 
       <div
@@ -6805,57 +6730,115 @@ function StoryboardComposerPanel({
         <Textarea
           className={cn(
             "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-20 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
-            storyboardDraftIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
+            promptIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
           )}
-          value={storyboardDraft}
-          onChange={(event) => onStoryboardDraftChange(event.target.value)}
-          placeholder=""
+          value={mode === "image" ? imagePrompt : storyboardDraft}
+          onChange={(event) => onPromptDraftChange(event.target.value)}
+          placeholder={promptPlaceholder}
         />
         <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
           <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
-          <ProductCreativeSettingsTray
-            tVideo={tVideo}
-            activeModelSchemeId={activeModelSchemeId}
-            modelSchemeOptions={modelSchemeOptions}
-            onModelSchemeChange={onModelSchemeChange}
-            template={template}
-            templateOptions={templateOptions}
-            onTemplateChange={onTemplateChange}
-            duration={duration}
-            durationOptions={durationOptions}
-            onDurationChange={onDurationChange}
-            selectedVideoResolution={selectedVideoResolution}
-            onVideoResolutionChange={onVideoResolutionChange}
-            selectedVideoAspectRatio={selectedVideoAspectRatio}
-            onVideoAspectRatioChange={onVideoAspectRatioChange}
-            finalLanguage={finalLanguage}
-            languageOptions={languageOptions}
-            onFinalLanguageChange={onFinalLanguageChange}
-            versionCount={versionCount}
-            versionCountOptions={versionCountOptions}
-            onVersionCountChange={onVersionCountChange}
-            schemeSummary={schemeSummary}
-          />
-          <button
-            type="button"
-            className={cn(
-              "flex min-h-7 w-fit items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
-              historyOpen
-                ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
-                : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
-            )}
-            aria-haspopup="listbox"
-            aria-expanded={historyOpen}
-            onClick={() => setHistoryOpen((open) => !open)}
-          >
-            <span>{tVideo("storyboard.history")}</span>
-            <span className="flex items-center gap-2">
-              <Badge>{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
-              <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
-            </span>
-          </button>
+          {mode === "video" ? (
+            <>
+              <ProductCreativeSettingsTray
+                tVideo={tVideo}
+                activeModelSchemeId={activeModelSchemeId}
+                modelSchemeOptions={modelSchemeOptions}
+                onModelSchemeChange={onModelSchemeChange}
+                template={template}
+                templateOptions={templateOptions}
+                onTemplateChange={onTemplateChange}
+                duration={duration}
+                durationOptions={durationOptions}
+                onDurationChange={onDurationChange}
+                selectedVideoResolution={selectedVideoResolution}
+                onVideoResolutionChange={onVideoResolutionChange}
+                selectedVideoAspectRatio={selectedVideoAspectRatio}
+                onVideoAspectRatioChange={onVideoAspectRatioChange}
+                finalLanguage={finalLanguage}
+                languageOptions={languageOptions}
+                onFinalLanguageChange={onFinalLanguageChange}
+                versionCount={versionCount}
+                versionCountOptions={versionCountOptions}
+                onVersionCountChange={onVersionCountChange}
+                schemeSummary={schemeSummary}
+              />
+              <button
+                type="button"
+                className={cn(
+                  "flex min-h-7 w-fit items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
+                  historyOpen
+                    ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
+                    : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
+                )}
+                aria-haspopup="listbox"
+                aria-expanded={historyOpen}
+                onClick={() => setHistoryOpen((open) => !open)}
+              >
+                <span>{tVideo("storyboard.history")}</span>
+                <span className="flex items-center gap-2">
+                  <Badge>{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
+                  <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              {selectedImagePromptReference ? (
+                <div className="image-prompt-target-chip flex min-w-[160px] max-w-full items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
+                    {selectedImagePromptReference?.previewUrl ? (
+                      <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
+                    ) : (
+                      <ImageIcon size={13} className="text-[var(--muted)]" />
+                    )}
+                  </span>
+                  <span className="grid min-w-0">
+                    <span className="truncate">优化目标</span>
+                    <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+                    title="清除目标图"
+                    aria-label="清除目标图"
+                    onClick={onImagePromptTargetClear}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
+                  <span className="truncate">{imageTargetLabel}</span>
+                </div>
+              )}
+              <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
+                <CompactChoiceDropdown
+                  label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
+                  value={selectedImageModelConfigId}
+                  options={configuredModelOptions(imageModelOptions)}
+                  formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
+                  onChange={onImageModelConfigChange}
+                  layout="pill"
+                  density="micro"
+                  menuPlacement="top"
+                  menuWidth="content"
+                />
+              </div>
+              {imagePromptPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  onClick={() => appendImagePromptPreset(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </>
+          )}
         </div>
-        {historyOpen ? (
+        {mode === "video" && historyOpen ? (
           <div
             className="absolute bottom-20 left-3 right-3 z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
             role="listbox"
