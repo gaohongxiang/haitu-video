@@ -61,6 +61,11 @@ describe("console navigation", () => {
     expect(productStudioProductUrl("http://127.0.0.1:4173/?section=video&step=generate&productSku=TK-001", "")).toBe("http://127.0.0.1:4173/?section=video&step=generate");
   });
 
+  it("keeps the current creative mode when writing the selected product", () => {
+    expect(productStudioProductUrl("http://127.0.0.1:4173/?section=image", "TK-001")).toBe("http://127.0.0.1:4173/?section=image&productSku=TK-001");
+    expect(productStudioProductUrl("http://127.0.0.1:4173/?section=image&productSku=TK-001", "")).toBe("http://127.0.0.1:4173/?section=image");
+  });
+
   it.each<ConsoleSection>(["dashboard", "video", "image", "ledger", "wallet", "pricing", "settings"])(
     "accepts %s as a known console section",
     (section) => {

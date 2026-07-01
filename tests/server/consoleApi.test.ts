@@ -619,8 +619,8 @@ describe("console API", () => {
     const managementNavSource = appSource.slice(appSource.indexOf("const managementNavItems"), appSource.indexOf("const navItems"));
     expect(dashboardNavSource).toContain('labelKey: "dashboard"');
     expect(primaryNavSource).not.toContain("仪表盘");
-    expect(primaryNavSource).toContain('labelKey: "video"');
-    expect(primaryNavSource).toContain('labelKey: "image"');
+    expect(primaryNavSource).toContain('labelKey: "creative"');
+    expect(primaryNavSource).not.toContain('labelKey: "image"');
     expect(primaryNavSource).toContain('labelKey: "ledger"');
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
@@ -904,12 +904,16 @@ describe("console API", () => {
     expect(appSource).not.toContain("useProductForVideo");
     expect(appSource).not.toContain("onUseForVideo");
     expect(appSource).not.toContain("用此商品做视频");
-    expect(appSource).toContain('labelKey: "video"');
+    expect(appSource).toContain('labelKey: "creative"');
     expect(appSource).not.toContain('aria-label="商品管理"');
     expect(appSource).toContain('tVideo("history.title")');
     expect(appSource).not.toContain("高级新建任务");
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
-    expect(videoCase).toContain("<ProductCreationWorkspace");
+    const renderCreativeWorkspaceSource = sourceBetween(appSource, "function renderCreativeWorkspace", "function renderActiveSection");
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    expect(renderCreativeWorkspaceSource).toContain("<ProductCreationWorkspace");
+    expect(videoCase).toContain('case "image"');
+    expect(renderCreativeWorkspaceSource).toContain("mode={creativeWorkspaceMode}");
+    expect(renderCreativeWorkspaceSource).toContain("onModeChange={(nextMode) => setActiveSection(nextMode)}");
     expect(videoCase).not.toContain("<VideoJobsPanel");
     expect(videoCase).not.toContain("<ReportsPanel");
     expect(videoCase).not.toContain("手动生成参数");
@@ -956,12 +960,12 @@ describe("console API", () => {
       appSource.indexOf("async function recoverVideoJobDownload"),
       appSource.indexOf("async function createBackupArchive")
     );
-    expect(videoCase).toContain("onOrganizeProductPackage={organizeProductPackage}");
-    expect(videoCase).toContain("onStartNewProduct={startNewVideoProduct}");
-    expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
-    expect(videoCase).toContain("pendingImageFiles={pendingImageFiles}");
-    expect(videoCase).toContain("setPendingImageFiles={setPendingImageFiles}");
-    expect(videoCase).toContain("ledgerJobs={ledger?.jobs ?? []}");
+    expect(renderCreativeWorkspaceSource).toContain("onOrganizeProductPackage={organizeProductPackage}");
+    expect(renderCreativeWorkspaceSource).toContain("onStartNewProduct={startNewVideoProduct}");
+    expect(renderCreativeWorkspaceSource).toContain("onDeleteProduct={deleteProduct}");
+    expect(renderCreativeWorkspaceSource).toContain("pendingImageFiles={pendingImageFiles}");
+    expect(renderCreativeWorkspaceSource).toContain("setPendingImageFiles={setPendingImageFiles}");
+    expect(renderCreativeWorkspaceSource).toContain("ledgerJobs={ledger?.jobs ?? []}");
     expect(creationWorkspaceSource).toContain("<ProductCreationComposer");
     expect(creationWorkspaceSource).toContain("selectedProductStoryboardHistory");
     expect(creationWorkspaceSource).toContain("ledgerJobs: LedgerJob[];");
@@ -1883,13 +1887,14 @@ describe("console API", () => {
     expect(appSource).toContain("ProductImagePromptPanel");
     expect(appSource).toContain("product-image-prompt-body");
     expect(appSource).toContain("图片提示词");
+    expect(appSource).toContain("ProductCreativeModeSwitch");
     expect(appSource).toContain("image-prompt-target-chip");
     expect(appSource).toContain("selectedImagePromptReference={selectedImagePromptReference}");
     expect(appSource).toContain("onImagePromptTargetClear={() => setImagePromptReferenceIndex(undefined)}");
     expect(appSource).toContain("image-model-control");
     expect(appSource).toContain("selectedImageModelConfigId={selectedImageModelConfigId}");
     expect(appSource).toContain("onImageModelConfigChange={onImageModelConfigChange}");
-    expect(appSource).toContain('const generateImageButtonLabel = selectedImagePromptReference ? "优化这张图" : "生成商品图";');
+    expect(appSource).toContain('const generateImageButtonLabel = "生成图片";');
     expect(appSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
     expect(appSource).toContain("textModelOptions");
     expect(appSource).toContain("imageModelOptions");
@@ -5503,8 +5508,8 @@ describe("console API", () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
 
     const primaryNavSource = appSource.slice(appSource.indexOf("const primaryNavItems"), appSource.indexOf("const managementNavItems"));
-    expect(primaryNavSource).toContain('labelKey: "video"');
-    expect(primaryNavSource).toContain('labelKey: "image"');
+    expect(primaryNavSource).toContain('labelKey: "creative"');
+    expect(primaryNavSource).not.toContain('labelKey: "image"');
     expect(primaryNavSource).toContain('labelKey: "ledger"');
     expect(primaryNavSource).not.toContain("商品管理");
     expect(primaryNavSource).not.toContain("审核发布");
@@ -5515,9 +5520,12 @@ describe("console API", () => {
     expect(appSource).not.toContain('case "products"');
     expect(appSource).not.toContain('aria-label="商品管理"');
 
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
-    expect(videoCase).toContain("<ProductCreationWorkspace");
-    expect(videoCase).toContain("onDeleteProduct={deleteProduct}");
+    const renderCreativeWorkspaceSource = sourceBetween(appSource, "function renderCreativeWorkspace", "function renderActiveSection");
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    expect(renderCreativeWorkspaceSource).toContain("<ProductCreationWorkspace");
+    expect(renderCreativeWorkspaceSource).toContain("onDeleteProduct={deleteProduct}");
+    expect(videoCase).toContain('case "image"');
+    expect(renderCreativeWorkspaceSource).toContain("mode={creativeWorkspaceMode}");
     expect(videoCase).not.toContain("<VideoJobsPanel");
     expect(videoCase).not.toContain("<ReportsPanel");
     expect(videoCase).not.toContain("手动生成参数");
@@ -5525,11 +5533,8 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<AuditLogPanel");
     expect(videoCase).not.toContain("<VideoAssetsPanel");
 
-    const imageCase = appSource.slice(appSource.indexOf('case "image"'), appSource.indexOf('case "ledger"'));
-    expect(imageCase).toContain('aria-label={tApp("image.ariaLabel")}');
-    expect(imageCase).toContain("<ProductCreationWorkspace");
-    expect(imageCase).toContain('mode="image"');
-    expect(imageCase).not.toContain('tApp("image.empty")');
+    expect(renderCreativeWorkspaceSource).toContain("onModeChange={(nextMode) => setActiveSection(nextMode)}");
+    expect(videoCase).not.toContain('tApp("image.empty")');
 
     const productCreationWorkspace = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     expect(productCreationWorkspace).toContain("<ProductCreationComposer");
@@ -5587,10 +5592,13 @@ describe("console API", () => {
     const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
     const storyboardDraftsSource = await readFile(join(process.cwd(), "src", "client", "storyboardDrafts.ts"), "utf8");
 
-    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "image"'));
-    expect(videoCase).toContain("<ProductCreationWorkspace");
-    expect(videoCase).toContain("onOrganizeProductPackage");
-    expect(videoCase).toContain("onStartNewProduct");
+    const renderCreativeWorkspaceSource = sourceBetween(appSource, "function renderCreativeWorkspace", "function renderActiveSection");
+    const videoCase = appSource.slice(appSource.indexOf('case "video"'), appSource.indexOf('case "ledger"'));
+    expect(renderCreativeWorkspaceSource).toContain("<ProductCreationWorkspace");
+    expect(videoCase).toContain('case "image"');
+    expect(renderCreativeWorkspaceSource).toContain("mode={creativeWorkspaceMode}");
+    expect(renderCreativeWorkspaceSource).toContain("onOrganizeProductPackage");
+    expect(renderCreativeWorkspaceSource).toContain("onStartNewProduct");
     expect(videoCase).not.toContain("<ProductLibraryDialogMount");
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
@@ -5797,8 +5805,8 @@ describe("console API", () => {
     expect(composerSource).not.toContain("product-creative-intent-column");
     expect(composerSource).not.toContain("product-creative-output-column");
     expect(appSource).toContain("const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);");
-    expect(videoCase).toContain("pendingImageFiles={pendingImageFiles}");
-    expect(videoCase).toContain("setPendingImageFiles={setPendingImageFiles}");
+    expect(renderCreativeWorkspaceSource).toContain("pendingImageFiles={pendingImageFiles}");
+    expect(renderCreativeWorkspaceSource).toContain("setPendingImageFiles={setPendingImageFiles}");
     expect(workspaceSource).toContain("pendingImageFiles: File[];");
     expect(workspaceSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
     expect(composerSource).toContain("pendingImageFiles: File[];");

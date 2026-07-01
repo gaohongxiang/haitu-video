@@ -2,6 +2,7 @@
   "navigation": {
     "dashboard": "仪表盘",
     "workflow": "主流程",
+    "creative": "创作",
     "video": "视频创作",
     "image": "图片创作",
     "ledger": "任务记录",

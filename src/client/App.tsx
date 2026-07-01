@@ -233,7 +233,7 @@ import {
 } from "../i18n/client.js";
 import { walletTransactionDescriptionLabel } from "./walletDisplayViewModel.js";
 
-type NavLabelKey = "dashboard" | "video" | "image" | "ledger" | "wallet" | "pricing" | "settings";
+type NavLabelKey = "dashboard" | "creative" | "video" | "image" | "ledger" | "wallet" | "pricing" | "settings";
 type AppTranslator = (key: string, options?: Record<string, unknown>) => string;
 type VideoStudioTranslator = (key: string, options?: Record<string, unknown>) => string;
 
@@ -817,8 +817,7 @@ const dashboardNavItems: Array<{ id: ConsoleSection; labelKey: NavLabelKey; icon
 ];
 
 const primaryNavItems: Array<{ id: ConsoleSection; labelKey: NavLabelKey; icon: typeof LayoutDashboard }> = [
-  { id: "video", labelKey: "video", icon: Clapperboard },
-  { id: "image", labelKey: "image", icon: ImageIcon },
+  { id: "video", labelKey: "creative", icon: Clapperboard },
   { id: "ledger", labelKey: "ledger", icon: ClipboardCheck }
 ];
 
@@ -1000,6 +999,11 @@ export function App() {
     if (typeof window === "undefined") return defaultConsoleSection;
     return consoleSectionFromUrl(window.location.href);
   });
+  const [creativeWorkspaceMode, setCreativeWorkspaceMode] = useState<ProductCreativeWorkspaceMode>(() => {
+    if (typeof window === "undefined") return "video";
+    const section = consoleSectionFromUrl(window.location.href);
+    return isCreativeWorkspaceSection(section) ? section : "video";
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const contentScrollerRef = useRef<HTMLDivElement | null>(null);
   const videoJobsRef = useRef<VideoJob[]>([]);
@@ -1046,9 +1050,8 @@ export function App() {
   const tVideoApp: VideoStudioTranslator = (key, options) => i18n.t(`app:videoStudio.${key}`, { lng: appLocale, ...options });
   const activeSection = activeSectionState;
   const activeSectionIsCreativeWorkspace = isCreativeWorkspaceSection(activeSection);
-  const activeSectionLabelKey = navItems.find((item) => item.id === activeSection)?.labelKey ?? "video";
+  const activeSectionLabelKey = activeSectionIsCreativeWorkspace ? "creative" : navItems.find((item) => item.id === activeSection)?.labelKey ?? "creative";
   const activeSectionLabel = tApp(`navigation.${activeSectionLabelKey}`);
-  const activeSectionInVisibleNav = navGroups.some((group) => group.items.some((item) => item.id === activeSection));
   const apiOwner = modelServicePreference.serviceMode;
   const platformBundles = useMemo(
     () => modelBundles.filter((bundle) => bundle.apiOwner === "platform" && bundle.enabled),
@@ -1113,6 +1116,9 @@ export function App() {
 
   function setActiveSection(section: ConsoleSection) {
     setActiveSectionState(section);
+    if (isCreativeWorkspaceSection(section)) {
+      setCreativeWorkspaceMode(section);
+    }
     setConsoleToast(undefined);
     contentScrollerRef.current?.scrollTo({ top: 0, behavior: "instant" });
     if (typeof window === "undefined") return;
@@ -1197,7 +1203,7 @@ export function App() {
       !activeSectionIsCreativeWorkspace ||
       !textModelConfigured ||
       !imageModelConfigured ||
-      (activeSection === "video" && !videoModelConfigured)
+      (creativeWorkspaceMode === "video" && !videoModelConfigured)
     ) {
       setBillingEstimates(undefined);
       return;
@@ -1231,9 +1237,9 @@ export function App() {
       window.clearTimeout(timer);
     };
   }, [
-    activeSection,
     activeSectionIsCreativeWorkspace,
     consoleReady,
+    creativeWorkspaceMode,
     duration,
     referenceImageEstimateCount,
     safeVersionCount,
@@ -2446,7 +2452,7 @@ export function App() {
     setPreflight(undefined);
     setPreflightSignature("");
     setProductStudioLoadError("");
-    setActiveSection("video");
+    setActiveSection(creativeWorkspaceMode);
     setIsBusy(true);
     try {
       const response = await getJson<{ product: ProductDetail }>(`/api/products/${encodeURIComponent(product.sku)}`);
@@ -2491,7 +2497,7 @@ export function App() {
     setStoryboardDraftSource("default");
     setStudioStoryboardCnDraft("");
     setStoryboardHistory([]);
-    setActiveSection("video");
+    setActiveSection(creativeWorkspaceMode);
     setStatusText(tApp("status.newProduct"));
   }
 
@@ -3199,6 +3205,111 @@ export function App() {
     setStatusText(message);
   }
 
+  function renderCreativeWorkspace() {
+    return (
+      <section className="grid gap-4" aria-label={tApp("navigation.creative")}>
+        <ProductCreationWorkspace
+          mode={creativeWorkspaceMode}
+          onModeChange={(nextMode) => setActiveSection(nextMode)}
+          appLocale={appLocale}
+          products={products}
+          pendingProductSku={selectedProduct?.sku ?? selectedProductSkuRef.current ?? selectedProductSummary?.sku}
+          selectedProduct={selectedProduct}
+          loadError={productStudioLoadError}
+          selectedProductGroup={selectedProductGroup}
+          ledgerJobs={ledger?.jobs ?? []}
+          videoJobs={videoJobs}
+          draft={productDraft}
+          importText={productImportText}
+          setImportText={updateProductComposerText}
+          pendingImageFiles={pendingImageFiles}
+          setPendingImageFiles={setPendingImageFiles}
+          importNotes={importNotes}
+          productAutoSaveStatus={productAutoSaveStatus}
+          billingEstimates={billingEstimates}
+          onOrganizeProductPackage={organizeProductPackage}
+          onFlushProductFactsAutoSave={flushProductFactsAutoSave}
+          onSelectProduct={openProductStudio}
+          onStartNewProduct={startNewVideoProduct}
+          onDeleteProduct={deleteProduct}
+          onGenerateVideo={queueProductVideoJobs}
+          onCancelVideoJob={cancelVideoJob}
+          onDeleteLedgerVideo={deleteLedgerVideo}
+          onRetryVideoJob={retryVideoJob}
+          onRecoverVideoJobDownload={recoverVideoJobDownload}
+          onGenerateStoryboardDraft={generateStoryboardDraft}
+          isGeneratingStoryboard={isGeneratingStoryboard}
+          onImportAssets={importProductAssets}
+          onUploadImages={uploadProductReferenceImages}
+          onGenerateReferenceImages={generateProductReferenceImages}
+          onDeleteReferenceImage={deleteProductReferenceImage}
+          onReorderReferenceImage={reorderProductReferenceImages}
+          modelSchemeOptions={modelSchemeOptions}
+          selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
+          onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
+          textModelOptions={textModelOptions}
+          selectedTextModelConfigId={selectedTextModelConfigId}
+          imageModelOptions={imageModelOptions}
+          selectedImageModelConfigId={selectedImageModelConfigId}
+          onImageModelConfigChange={(nextConfigId) => {
+            setSelectedImageModelConfigId(nextConfigId);
+            markPreflightStale();
+          }}
+          videoModelOptions={videoModelOptions}
+          selectedVideoModelConfigId={selectedVideoModelConfigId}
+          onVideoModelConfigChange={(nextConfigId) => {
+            setSelectedVideoModelConfigId(nextConfigId);
+            markPreflightStale();
+          }}
+          duration={duration}
+          onDurationChange={(nextDuration) => {
+            setDuration(nextDuration);
+            markPreflightStale();
+          }}
+          selectedVideoResolution={selectedVideoResolution}
+          onVideoResolutionChange={(nextResolution) => {
+            setSelectedVideoResolution(nextResolution);
+            markPreflightStale();
+          }}
+          selectedVideoAspectRatio={selectedVideoAspectRatio}
+          onVideoAspectRatioChange={(nextAspectRatio) => {
+            setSelectedVideoAspectRatio(nextAspectRatio);
+            markPreflightStale();
+          }}
+          versionCount={versionCount}
+          onVersionCountChange={setVersionCount}
+          template={template}
+          enabledTemplateOptions={enabledTemplateOptions}
+          onTemplateChange={(nextTemplate) => {
+            setTemplate(nextTemplate);
+            markPreflightStale();
+          }}
+          finalLanguage={finalLanguage}
+          onFinalLanguageChange={(nextLanguage) => {
+            setFinalLanguage(nextLanguage);
+            markPreflightStale();
+          }}
+          storyboardDraft={studioStoryboardDraft}
+          storyboardDraftIsGuidance={!storyboardDraftTouched}
+          storyboardDraftSource={storyboardDraftSource}
+          onStoryboardDraftChange={(nextDraft) => {
+            setStoryboardDraftTouched(true);
+            setStoryboardDraftSource("manual");
+            setStudioStoryboardDraft(nextDraft);
+            markPreflightStale();
+          }}
+          storyboardHistory={storyboardHistory}
+          onApplyStoryboardHistory={applyStoryboardHistory}
+          onDeleteStoryboardHistory={deleteStoryboardHistory}
+          onPreviewProductFileImport={previewProductFileImport}
+          onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
+          onCommitProductFileImportRows={commitProductFileImportRows}
+          onToast={showConsoleToast}
+        />
+      </section>
+    );
+  }
+
   function renderActiveSection() {
     if (!consoleReady) {
       return consoleLoadError
@@ -3232,209 +3343,8 @@ export function App() {
           </section>
         );
       case "video":
-        return (
-          <section className="grid gap-4" aria-label={tApp("navigation.video")}>
-            <ProductCreationWorkspace
-              mode="video"
-              appLocale={appLocale}
-              products={products}
-              pendingProductSku={selectedProduct?.sku ?? selectedProductSkuRef.current ?? selectedProductSummary?.sku}
-              selectedProduct={selectedProduct}
-              loadError={productStudioLoadError}
-              selectedProductGroup={selectedProductGroup}
-              ledgerJobs={ledger?.jobs ?? []}
-              videoJobs={videoJobs}
-              draft={productDraft}
-              importText={productImportText}
-              setImportText={updateProductComposerText}
-              pendingImageFiles={pendingImageFiles}
-              setPendingImageFiles={setPendingImageFiles}
-              importNotes={importNotes}
-              productAutoSaveStatus={productAutoSaveStatus}
-              billingEstimates={billingEstimates}
-              onOrganizeProductPackage={organizeProductPackage}
-              onFlushProductFactsAutoSave={flushProductFactsAutoSave}
-              onSelectProduct={openProductStudio}
-              onStartNewProduct={startNewVideoProduct}
-              onDeleteProduct={deleteProduct}
-              onGenerateVideo={queueProductVideoJobs}
-              onCancelVideoJob={cancelVideoJob}
-              onDeleteLedgerVideo={deleteLedgerVideo}
-              onRetryVideoJob={retryVideoJob}
-              onRecoverVideoJobDownload={recoverVideoJobDownload}
-              onGenerateStoryboardDraft={generateStoryboardDraft}
-              isGeneratingStoryboard={isGeneratingStoryboard}
-              onImportAssets={importProductAssets}
-              onUploadImages={uploadProductReferenceImages}
-              onGenerateReferenceImages={generateProductReferenceImages}
-              onDeleteReferenceImage={deleteProductReferenceImage}
-              onReorderReferenceImage={reorderProductReferenceImages}
-              modelSchemeOptions={modelSchemeOptions}
-              selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
-              onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
-              textModelOptions={textModelOptions}
-              selectedTextModelConfigId={selectedTextModelConfigId}
-              imageModelOptions={imageModelOptions}
-              selectedImageModelConfigId={selectedImageModelConfigId}
-              onImageModelConfigChange={(nextConfigId) => {
-                setSelectedImageModelConfigId(nextConfigId);
-                markPreflightStale();
-              }}
-              videoModelOptions={videoModelOptions}
-              selectedVideoModelConfigId={selectedVideoModelConfigId}
-              onVideoModelConfigChange={(nextConfigId) => {
-                setSelectedVideoModelConfigId(nextConfigId);
-                markPreflightStale();
-              }}
-              duration={duration}
-              onDurationChange={(nextDuration) => {
-                setDuration(nextDuration);
-                markPreflightStale();
-              }}
-              selectedVideoResolution={selectedVideoResolution}
-              onVideoResolutionChange={(nextResolution) => {
-                setSelectedVideoResolution(nextResolution);
-                markPreflightStale();
-              }}
-              selectedVideoAspectRatio={selectedVideoAspectRatio}
-              onVideoAspectRatioChange={(nextAspectRatio) => {
-                setSelectedVideoAspectRatio(nextAspectRatio);
-                markPreflightStale();
-              }}
-              versionCount={versionCount}
-              onVersionCountChange={setVersionCount}
-              template={template}
-              enabledTemplateOptions={enabledTemplateOptions}
-              onTemplateChange={(nextTemplate) => {
-                setTemplate(nextTemplate);
-                markPreflightStale();
-              }}
-              finalLanguage={finalLanguage}
-              onFinalLanguageChange={(nextLanguage) => {
-                setFinalLanguage(nextLanguage);
-                markPreflightStale();
-              }}
-              storyboardDraft={studioStoryboardDraft}
-              storyboardDraftIsGuidance={!storyboardDraftTouched}
-              storyboardDraftSource={storyboardDraftSource}
-              onStoryboardDraftChange={(nextDraft) => {
-                setStoryboardDraftTouched(true);
-                setStoryboardDraftSource("manual");
-                setStudioStoryboardDraft(nextDraft);
-                markPreflightStale();
-              }}
-              storyboardHistory={storyboardHistory}
-              onApplyStoryboardHistory={applyStoryboardHistory}
-              onDeleteStoryboardHistory={deleteStoryboardHistory}
-              onPreviewProductFileImport={previewProductFileImport}
-              onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
-              onCommitProductFileImportRows={commitProductFileImportRows}
-              onToast={showConsoleToast}
-            />
-          </section>
-        );
       case "image":
-        return (
-          <section className="grid gap-4" aria-label={tApp("image.ariaLabel")}>
-            <ProductCreationWorkspace
-              mode="image"
-              appLocale={appLocale}
-              products={products}
-              pendingProductSku={selectedProduct?.sku ?? selectedProductSkuRef.current ?? selectedProductSummary?.sku}
-              selectedProduct={selectedProduct}
-              loadError={productStudioLoadError}
-              selectedProductGroup={selectedProductGroup}
-              ledgerJobs={ledger?.jobs ?? []}
-              videoJobs={videoJobs}
-              draft={productDraft}
-              importText={productImportText}
-              setImportText={updateProductComposerText}
-              pendingImageFiles={pendingImageFiles}
-              setPendingImageFiles={setPendingImageFiles}
-              importNotes={importNotes}
-              productAutoSaveStatus={productAutoSaveStatus}
-              billingEstimates={billingEstimates}
-              onOrganizeProductPackage={organizeProductPackage}
-              onFlushProductFactsAutoSave={flushProductFactsAutoSave}
-              onSelectProduct={openProductStudio}
-              onStartNewProduct={startNewVideoProduct}
-              onDeleteProduct={deleteProduct}
-              onGenerateVideo={queueProductVideoJobs}
-              onCancelVideoJob={cancelVideoJob}
-              onDeleteLedgerVideo={deleteLedgerVideo}
-              onRetryVideoJob={retryVideoJob}
-              onRecoverVideoJobDownload={recoverVideoJobDownload}
-              onGenerateStoryboardDraft={generateStoryboardDraft}
-              isGeneratingStoryboard={isGeneratingStoryboard}
-              onImportAssets={importProductAssets}
-              onUploadImages={uploadProductReferenceImages}
-              onGenerateReferenceImages={generateProductReferenceImages}
-              onDeleteReferenceImage={deleteProductReferenceImage}
-              onReorderReferenceImage={reorderProductReferenceImages}
-              modelSchemeOptions={modelSchemeOptions}
-              selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
-              onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
-              textModelOptions={textModelOptions}
-              selectedTextModelConfigId={selectedTextModelConfigId}
-              imageModelOptions={imageModelOptions}
-              selectedImageModelConfigId={selectedImageModelConfigId}
-              onImageModelConfigChange={(nextConfigId) => {
-                setSelectedImageModelConfigId(nextConfigId);
-                markPreflightStale();
-              }}
-              videoModelOptions={videoModelOptions}
-              selectedVideoModelConfigId={selectedVideoModelConfigId}
-              onVideoModelConfigChange={(nextConfigId) => {
-                setSelectedVideoModelConfigId(nextConfigId);
-                markPreflightStale();
-              }}
-              duration={duration}
-              onDurationChange={(nextDuration) => {
-                setDuration(nextDuration);
-                markPreflightStale();
-              }}
-              selectedVideoResolution={selectedVideoResolution}
-              onVideoResolutionChange={(nextResolution) => {
-                setSelectedVideoResolution(nextResolution);
-                markPreflightStale();
-              }}
-              selectedVideoAspectRatio={selectedVideoAspectRatio}
-              onVideoAspectRatioChange={(nextAspectRatio) => {
-                setSelectedVideoAspectRatio(nextAspectRatio);
-                markPreflightStale();
-              }}
-              versionCount={versionCount}
-              onVersionCountChange={setVersionCount}
-              template={template}
-              enabledTemplateOptions={enabledTemplateOptions}
-              onTemplateChange={(nextTemplate) => {
-                setTemplate(nextTemplate);
-                markPreflightStale();
-              }}
-              finalLanguage={finalLanguage}
-              onFinalLanguageChange={(nextLanguage) => {
-                setFinalLanguage(nextLanguage);
-                markPreflightStale();
-              }}
-              storyboardDraft={studioStoryboardDraft}
-              storyboardDraftIsGuidance={!storyboardDraftTouched}
-              storyboardDraftSource={storyboardDraftSource}
-              onStoryboardDraftChange={(nextDraft) => {
-                setStoryboardDraftTouched(true);
-                setStoryboardDraftSource("manual");
-                setStudioStoryboardDraft(nextDraft);
-                markPreflightStale();
-              }}
-              storyboardHistory={storyboardHistory}
-              onApplyStoryboardHistory={applyStoryboardHistory}
-              onDeleteStoryboardHistory={deleteStoryboardHistory}
-              onPreviewProductFileImport={previewProductFileImport}
-              onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
-              onCommitProductFileImportRows={commitProductFileImportRows}
-              onToast={showConsoleToast}
-            />
-          </section>
-        );
+        return renderCreativeWorkspace();
       case "ledger":
         return (
           <section className="grid gap-4" aria-label={tApp("ledger.ariaLabel")}>
@@ -3555,7 +3465,7 @@ export function App() {
                 <div className={cn("px-3 text-[11px] font-black uppercase tracking-[.12em] text-[var(--muted)]", sidebarCollapsed && "sr-only")}>{tApp(`navigation.${group.labelKey}`)}</div>
               ) : null}
               {group.items.map(({ id, labelKey, icon: Icon }) => {
-                const active = activeSection === id;
+                const active = id === "video" ? activeSectionIsCreativeWorkspace : activeSection === id;
                 const label = tApp(`navigation.${labelKey}`);
                 return (
                   <button
@@ -4462,6 +4372,7 @@ function PreflightPanel({ preflight, fresh }: { preflight?: Preflight; fresh: bo
 
 function ProductCreationWorkspace({
   mode,
+  onModeChange,
   appLocale,
   products,
   pendingProductSku,
@@ -4532,6 +4443,7 @@ function ProductCreationWorkspace({
   onToast
 }: {
   mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   appLocale: AppLocale;
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -4628,6 +4540,7 @@ function ProductCreationWorkspace({
   return (
     <ProductCreationComposer
       mode={mode}
+      onModeChange={onModeChange}
       appLocale={appLocale}
       products={studioProductOptions}
       pendingProductSku={pendingProductSku}
@@ -4700,6 +4613,7 @@ function ProductCreationWorkspace({
 
 function ProductCreationComposer({
   mode,
+  onModeChange,
   appLocale,
   products,
   pendingProductSku,
@@ -4768,6 +4682,7 @@ function ProductCreationComposer({
   onToast
 }: {
   mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   appLocale: AppLocale;
   products: ProductSummary[];
   pendingProductSku?: string;
@@ -4927,7 +4842,7 @@ function ProductCreationComposer({
     ? `优化参考图 ${selectedImagePromptReferenceNumber} · 共 ${previewableReferenceImages.length} 张可用`
     : "按商品资料生成";
   const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片提示词" : "默认图片提示词";
-  const generateImageButtonLabel = selectedImagePromptReference ? "优化这张图" : "生成商品图";
+  const generateImageButtonLabel = "生成图片";
   const imageGenerateSummary = [
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
     imageTargetLabel,
@@ -5199,6 +5114,7 @@ function ProductCreationComposer({
 
         <ProductCreativeWorkbench
           mode={mode}
+          onModeChange={onModeChange}
           appLocale={appLocale}
           tVideo={tVideo}
           workspace={creativeWorkspace}
@@ -5337,6 +5253,7 @@ function ProductCreationComposer({
 
 function ProductCreativeWorkbench({
   mode,
+  onModeChange,
   appLocale,
   tVideo,
   workspace,
@@ -5427,6 +5344,7 @@ function ProductCreativeWorkbench({
   onToast
 }: {
   mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   workspace: ProductCreativeWorkspace;
@@ -5571,6 +5489,7 @@ function ProductCreativeWorkbench({
 
         <ProductModeOutputPanel
           mode={mode}
+          onModeChange={onModeChange}
           appLocale={appLocale}
           tVideo={tVideo}
           imageModelLabel={imageModelLabel}
@@ -5781,6 +5700,48 @@ function ProductCreativeSettingsTray({
   );
 }
 
+function ProductCreativeModeSwitch({
+  mode,
+  onModeChange
+}: {
+  mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
+}) {
+  const options: Array<{ mode: ProductCreativeWorkspaceMode; label: string; icon: typeof ImageIcon }> = [
+    { mode: "image", label: "图片", icon: ImageIcon },
+    { mode: "video", label: "视频", icon: Clapperboard }
+  ];
+
+  return (
+    <div className="product-creative-mode-switch flex h-7 shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] p-0.5 text-[11px] font-black">
+      {options.map(({ mode: optionMode, label, icon: Icon }) => {
+        const active = mode === optionMode;
+        return (
+          <button
+            key={optionMode}
+            type="button"
+            className={cn(
+              "inline-flex h-6 min-w-[48px] items-center justify-center gap-1 rounded-[6px] px-1.5 transition",
+              active
+                ? "bg-[var(--text)] text-[var(--card)] shadow-[0_6px_14px_rgba(96,64,43,.14)]"
+                : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+            )}
+            aria-pressed={active}
+            onClick={() => {
+              if (!active) {
+                onModeChange(optionMode);
+              }
+            }}
+          >
+            <Icon size={12} />
+            <span>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProductCreativeToolbarChoice<T extends string>({
   icon: Icon,
   label,
@@ -5891,7 +5852,7 @@ function ProductModeActionBar({
           onClick={imageGenerateDisabled ? undefined : () => void onGenerateProductImages()}
         >
           {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
-          {isSubmittingImage ? "正在生成图片" : generateImageButtonLabel}
+          {isSubmittingImage ? tVideo("generate.submitting") : generateImageButtonLabel}
           <ActionButtonCost tVideo={tVideo} estimate={imageEstimate} />
         </Button>
       </div>
@@ -5966,6 +5927,7 @@ function ProductModeAssetPanel({
 
 function ProductModeOutputPanel({
   mode,
+  onModeChange,
   appLocale,
   tVideo,
   imageModelLabel,
@@ -6010,6 +5972,7 @@ function ProductModeOutputPanel({
   storyboardEstimate
 }: {
   mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   imageModelLabel: string;
@@ -6058,6 +6021,8 @@ function ProductModeOutputPanel({
       <StoryboardComposerPanel
         appLocale={appLocale}
         tVideo={tVideo}
+        mode={mode}
+        onModeChange={onModeChange}
         activeModelSchemeId={activeModelSchemeId}
         modelSchemeOptions={modelSchemeOptions}
         onModelSchemeChange={onModelSchemeChange}
@@ -6095,6 +6060,8 @@ function ProductModeOutputPanel({
   return (
     <ProductImagePromptPanel
       tVideo={tVideo}
+      mode={mode}
+      onModeChange={onModeChange}
       imageModelLabel={imageModelLabel}
       imageModelOptions={imageModelOptions}
       selectedImageModelConfigId={selectedImageModelConfigId}
@@ -6111,6 +6078,8 @@ function ProductModeOutputPanel({
 
 function ProductImagePromptPanel({
   tVideo,
+  mode,
+  onModeChange,
   imageModelLabel,
   imageModelOptions,
   selectedImageModelConfigId,
@@ -6123,6 +6092,8 @@ function ProductImagePromptPanel({
   onImagePromptTargetClear
 }: {
   tVideo: VideoStudioTranslator;
+  mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   imageModelLabel: string;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
@@ -6145,20 +6116,18 @@ function ProductImagePromptPanel({
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <div className="shrink-0 text-sm font-black text-[var(--text)]">图片提示词</div>
-          <div className="min-w-0 truncate text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
-            {imageTargetLabel}
-          </div>
         </div>
       </div>
-      <div className="grid min-w-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
+      <div className="relative grid min-w-0 gap-2 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-3 py-2">
         <Textarea
-          className="product-image-prompt-body h-[104px] min-h-[104px] max-h-[104px] resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
+          className="product-image-prompt-body h-[132px] min-h-[132px] max-h-[132px] resize-none overflow-y-auto border-0 bg-transparent px-0 pb-12 pt-0 text-sm font-bold leading-6 shadow-none focus:border-transparent focus:shadow-none focus-visible:ring-0"
           value={imagePrompt}
           onChange={(event) => onImagePromptChange(event.target.value)}
           placeholder={referenceImageCount > 0 ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。" : "例如：生成白底主图，突出材质、尺寸和使用场景。"}
           rows={4}
         />
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
+          <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           {selectedImagePromptReference ? (
             <div className="image-prompt-target-chip flex min-w-[160px] max-w-full items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
               <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
@@ -6182,7 +6151,11 @@ function ProductImagePromptPanel({
                 <X size={12} />
               </button>
             </div>
-          ) : null}
+          ) : (
+            <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
+              <span className="truncate">{imageTargetLabel}</span>
+            </div>
+          )}
           <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
             <CompactChoiceDropdown
               label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
@@ -6200,7 +6173,7 @@ function ProductImagePromptPanel({
             <button
               key={preset}
               type="button"
-              className="rounded-[7px] border border-[var(--border)] bg-[var(--panel)] px-2 py-1 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
               onClick={() => appendImagePromptPreset(preset)}
             >
               {preset}
@@ -6725,6 +6698,8 @@ function ProductComposerReferenceTray({
 function StoryboardComposerPanel({
   appLocale,
   tVideo,
+  mode,
+  onModeChange,
   estimate,
   activeModelSchemeId,
   modelSchemeOptions,
@@ -6758,6 +6733,8 @@ function StoryboardComposerPanel({
 }: {
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
+  mode: ProductCreativeWorkspaceMode;
+  onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
   estimate?: BillingActionEstimate;
   activeModelSchemeId: ModelSchemeChoice;
   modelSchemeOptions: ModelSchemeOption[];
@@ -6835,6 +6812,7 @@ function StoryboardComposerPanel({
           placeholder=""
         />
         <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
+          <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           <ProductCreativeSettingsTray
             tVideo={tVideo}
             activeModelSchemeId={activeModelSchemeId}

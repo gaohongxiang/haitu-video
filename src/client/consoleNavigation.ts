@@ -56,7 +56,8 @@ export function productStudioProductSkuFromUrl(currentUrl: string): string {
 
 export function productStudioProductUrl(currentUrl: string, productSku: string): string {
   const url = new URL(currentUrl);
-  url.searchParams.set("section", "video");
+  const currentSection = consoleSectionFromUrl(currentUrl);
+  url.searchParams.set("section", currentSection === "image" ? "image" : "video");
   if (productSku.trim()) {
     url.searchParams.set("productSku", productSku.trim());
   } else {

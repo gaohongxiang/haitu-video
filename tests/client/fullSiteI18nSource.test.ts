@@ -60,8 +60,9 @@ describe("full site i18n source boundaries", () => {
     const loadingSource = source.slice(source.indexOf("function ConsoleSectionLoadingState"), source.indexOf("function errorMessage"));
 
     expect(appSource).toContain('tApp("dashboard.ariaLabel")');
-    expect(appSource).toContain('tApp("image.ariaLabel")');
-    expect(appSource).toContain('mode="image"');
+    expect(appSource).toContain('tApp("navigation.creative")');
+    expect(appSource).toContain("creativeWorkspaceMode");
+    expect(appSource).toContain("mode={creativeWorkspaceMode}");
     expect(appSource).toContain('tApp("ledger.ariaLabel")');
     expect(appSource).toContain('tApp("wallet.ariaLabel")');
     expect(appSource).toContain('tApp("pricing.ariaLabel")');

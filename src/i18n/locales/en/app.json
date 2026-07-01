@@ -2,6 +2,7 @@
   "navigation": {
     "dashboard": "Dashboard",
     "workflow": "Workflow",
+    "creative": "Create",
     "video": "Video Studio",
     "image": "Image Studio",
     "ledger": "Task Records",
