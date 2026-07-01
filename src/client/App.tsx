@@ -5715,18 +5715,20 @@ function ProductCreativeSettingsTray({
   schemeSummary: string;
 }) {
   return (
-    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-visible rounded-[8px] bg-transparent pr-1 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
-      <div className="model-scheme-control min-w-[112px] max-w-[168px] shrink-0">
+    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-visible rounded-[8px] bg-transparent pr-0.5 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
+      <div className="model-scheme-control min-w-[96px] max-w-[136px] shrink-0">
         <CompactChoiceDropdown
           label={tVideo("controls.modelScheme")}
           value={activeModelSchemeId}
           options={modelSchemeOptions.map((option) => option.id)}
           formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
+          formatActiveLabel={(option) => localizedCompactModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
           onChange={onModelSchemeChange}
           layout="pill"
           density="micro"
           menuPlacement="top"
           menuWidth="content"
+          hidePillLabel
         />
       </div>
       <ProductCreativeToolbarChoice
@@ -5735,6 +5737,7 @@ function ProductCreativeSettingsTray({
         value={template}
         options={templateOptions}
         formatOption={(option) => localizedTemplateLabel(option, tVideo)}
+        formatActiveLabel={(option) => compactTemplateLabel(option, tVideo)}
         onChange={onTemplateChange}
       />
       <ProductCreativeToolbarChoice
@@ -5767,6 +5770,7 @@ function ProductCreativeSettingsTray({
         value={finalLanguage}
         options={languageOptions}
         formatOption={(option) => finalLanguageLabel(option, tVideo)}
+        formatActiveLabel={(option) => compactFinalLanguageLabel(option, tVideo)}
         onChange={onFinalLanguageChange}
       />
       <ProductCreativeToolbarChoice
@@ -5774,7 +5778,7 @@ function ProductCreativeSettingsTray({
         label={tVideo("controls.versionCount")}
         value={String(versionCount)}
         options={versionCountOptions}
-        formatOption={(option) => tVideo("counts.video", { count: Number(option) })}
+        formatOption={(option) => `${option} 个`}
         onChange={(option) => onVersionCountChange(Number(option))}
       />
     </div>
@@ -5802,7 +5806,7 @@ function ProductCreativeModeSwitch({
             key={optionMode}
             type="button"
             className={cn(
-              "inline-flex h-6 min-w-[48px] items-center justify-center gap-1 rounded-[6px] px-1.5 transition",
+              "inline-flex h-6 min-w-[42px] items-center justify-center gap-0.5 rounded-[6px] px-1 transition",
               active
                 ? "bg-[var(--text)] text-[var(--card)] shadow-[0_6px_14px_rgba(96,64,43,.14)]"
                 : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
@@ -5814,7 +5818,7 @@ function ProductCreativeModeSwitch({
               }
             }}
           >
-            <Icon size={12} />
+            <Icon size={11} />
             <span>{label}</span>
           </button>
         );
@@ -5829,6 +5833,7 @@ function ProductCreativeToolbarChoice<T extends string>({
   value,
   options,
   formatOption,
+  formatActiveLabel,
   onChange
 }: {
   icon: ComponentType<{ size?: number; className?: string }>;
@@ -5836,15 +5841,17 @@ function ProductCreativeToolbarChoice<T extends string>({
   value: T;
   options: T[];
   formatOption: (option: T) => string;
+  formatActiveLabel?: (option: T) => string;
   onChange: (option: T) => void;
 }) {
   return (
-    <div className="product-creative-toolbar-choice min-w-[48px] max-w-[118px] shrink-0" title={label}>
+    <div className="product-creative-toolbar-choice min-w-[42px] max-w-[96px] shrink-0" title={label}>
       <CompactChoiceDropdown
         label={<Icon size={12} className="shrink-0" aria-hidden="true" />}
         value={value}
         options={options}
         formatOption={formatOption}
+        formatActiveLabel={formatActiveLabel}
         onChange={onChange}
         layout="pill"
         density="micro"
@@ -6830,11 +6837,11 @@ function StoryboardComposerPanel({
           onChange={(event) => onPromptDraftChange(event.target.value)}
           placeholder={promptPlaceholder}
         />
-        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_128px] items-center gap-1.5">
+        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_150px] items-center gap-1">
           <div className="prompt-composer-mode-slot shrink-0">
             <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           </div>
-          <div className="prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
+          <div className="prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1 overflow-visible">
             {mode === "video" ? (
               <ProductCreativeSettingsTray
                 tVideo={tVideo}
@@ -6889,7 +6896,7 @@ function StoryboardComposerPanel({
                     <span className="truncate">{imageTargetLabel}</span>
                   </div>
                 )}
-                <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
+                <div className="image-model-control min-w-[112px] max-w-[160px] shrink-0" title={imageModelLabel}>
                   <CompactChoiceDropdown
                     label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
                     value={selectedImageModelConfigId}
@@ -6919,7 +6926,7 @@ function StoryboardComposerPanel({
             <button
               type="button"
               className={cn(
-                "flex h-7 min-h-7 w-[128px] items-center justify-between gap-1.5 overflow-hidden whitespace-nowrap rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-left text-[11px] font-bold text-[var(--muted)] transition",
+                "flex h-7 min-h-7 w-[150px] items-center justify-between gap-1 overflow-hidden whitespace-nowrap rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-1.5 text-left text-[11px] font-bold text-[var(--muted)] transition",
                 mode === "image" && "invisible pointer-events-none",
                 historyOpen
                   ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
@@ -6934,9 +6941,9 @@ function StoryboardComposerPanel({
                 }
               }}
             >
-              <span className="min-w-0 truncate">{tVideo("storyboard.history")}</span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <Badge className="shrink-0">{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
+              <span className="shrink-0">{tVideo("storyboard.history")}</span>
+              <span className="flex shrink-0 items-center gap-1">
+                <Badge className="min-h-5 shrink-0 px-1.5 text-[10px]">{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
                 <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
               </span>
             </button>
@@ -9931,6 +9938,10 @@ function finalLanguageLabel(value?: string, tVideo?: VideoStudioTranslator): str
   return t("languages.ja");
 }
 
+function compactFinalLanguageLabel(value?: string, tVideo?: VideoStudioTranslator): string {
+  return finalLanguageLabel(value, tVideo).replace(/文$|语$|ese$/i, "");
+}
+
 function videoResolutionLabel(value?: string): string {
   if (value === "4k") return "4K";
   return value || defaultVideoResolution;
@@ -10000,6 +10011,10 @@ function localizedTemplateLabel(value: string | undefined, tVideo: VideoStudioTr
   return value || "-";
 }
 
+function compactTemplateLabel(value: string | undefined, tVideo: VideoStudioTranslator): string {
+  return localizedTemplateLabel(value, tVideo).replace(/\s*型$/, "");
+}
+
 function localizedModelConfigChoiceLabel(value: ModelConfigChoice, models: ProviderConfigItem[], tVideo: VideoStudioTranslator): string {
   if (value === "auto") {
     return tVideo("models.auto");
@@ -10019,6 +10034,10 @@ function localizedModelSchemeChoiceLabel(value: ModelSchemeChoice, options: Mode
   if (option.apiOwner === "platform") return tVideo("models.platformCustom", { label: stripModelSchemeOwnerPrefix(option.label) });
   if (option.apiOwner === "byok") return tVideo("models.byokCustom", { label: stripModelSchemeOwnerPrefix(option.label) });
   return option.label;
+}
+
+function localizedCompactModelSchemeChoiceLabel(value: ModelSchemeChoice, options: ModelSchemeOption[], tVideo: VideoStudioTranslator): string {
+  return stripModelSchemeOwnerPrefix(localizedModelSchemeChoiceLabel(value, options, tVideo));
 }
 
 function stripModelSchemeOwnerPrefix(label: string): string {
