@@ -1331,6 +1331,10 @@ describe("console API", () => {
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
+    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_128px]");
+    expect(storyboardPanelSource).toContain("h-7 min-h-7");
+    expect(storyboardPanelSource).toContain("whitespace-nowrap");
     expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
@@ -1417,9 +1421,9 @@ describe("console API", () => {
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)]");
     expect(storyboardPanelSource).toContain("h-full min-h-[230px] resize-none");
-    expect(storyboardPanelSource).toContain("pb-20");
+    expect(storyboardPanelSource).toContain("pb-12");
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown relative min-h-0");
-    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-3 left-3 right-3");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
     expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1.5");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
     expect(settingsTraySource).toContain("prompt-inline-settings");
@@ -5847,6 +5851,10 @@ describe("console API", () => {
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(composerSource).toContain("storyboard-title-row");
     expect(composerSource).toContain("storyboard-title-action");
+    expect(composerSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
+    expect(composerSource).toContain("grid-cols-[auto_minmax(0,1fr)_128px]");
+    expect(composerSource).toContain("h-7 min-h-7");
+    expect(composerSource).toContain("whitespace-nowrap");
     expect(composerSource).toContain("prompt-composer-mode-slot");
     expect(composerSource).toContain("prompt-composer-settings-slot");
     expect(composerSource).toContain("prompt-composer-history-slot");

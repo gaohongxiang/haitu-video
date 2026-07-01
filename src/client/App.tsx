@@ -6823,14 +6823,14 @@ function StoryboardComposerPanel({
       >
         <Textarea
           className={cn(
-            "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-20 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
+            "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-12 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
             promptIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
           )}
           value={mode === "image" ? imagePrompt : storyboardDraft}
           onChange={(event) => onPromptDraftChange(event.target.value)}
           placeholder={promptPlaceholder}
         />
-        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_112px] items-center gap-1.5">
+        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_128px] items-center gap-1.5">
           <div className="prompt-composer-mode-slot shrink-0">
             <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           </div>
@@ -6915,11 +6915,11 @@ function StoryboardComposerPanel({
               </>
             )}
           </div>
-          <div className="prompt-composer-history-slot flex justify-end">
+          <div className="prompt-composer-history-slot flex h-7 min-h-7 justify-end overflow-hidden">
             <button
               type="button"
               className={cn(
-                "flex min-h-7 w-[112px] items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
+                "flex h-7 min-h-7 w-[128px] items-center justify-between gap-1.5 overflow-hidden whitespace-nowrap rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-left text-[11px] font-bold text-[var(--muted)] transition",
                 mode === "image" && "invisible pointer-events-none",
                 historyOpen
                   ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
@@ -6934,9 +6934,9 @@ function StoryboardComposerPanel({
                 }
               }}
             >
-              <span>{tVideo("storyboard.history")}</span>
-              <span className="flex items-center gap-1.5">
-                <Badge>{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
+              <span className="min-w-0 truncate">{tVideo("storyboard.history")}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <Badge className="shrink-0">{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
                 <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
               </span>
             </button>

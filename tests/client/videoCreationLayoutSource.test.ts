@@ -497,9 +497,13 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource).toContain("prompt-composer-footer");
     expect(storyboardPanelSource).toContain("<ProductCreativeModeSwitch");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
+    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_128px]");
+    expect(storyboardPanelSource).toContain("h-7 min-h-7");
     expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
+    expect(storyboardPanelSource).toContain("whitespace-nowrap");
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
     expect(settingsTraySource).toContain('menuPlacement="top"');
