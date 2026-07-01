@@ -303,6 +303,11 @@ interface StoryboardDraftResponse {
   notes: string[];
 }
 
+interface ImagePromptDraftResponse {
+  prompt: string;
+  notes: string[];
+}
+
 interface StoryboardHistoryRecord {
   id: string;
   createdAt: string;
@@ -931,6 +936,7 @@ export function App() {
   const [storyboardDraftSource, setStoryboardDraftSource] = useState<StoryboardDraftSource>("default");
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
   const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>([]);
+  const [isGeneratingImagePrompt, setIsGeneratingImagePrompt] = useState(false);
   const [reuseManifest, setReuseManifest] = useState("");
   const [preflight, setPreflight] = useState<Preflight | undefined>();
   const [preflightSignature, setPreflightSignature] = useState("");
@@ -2841,6 +2847,48 @@ export function App() {
     }
   }
 
+  async function generateImagePromptDraft(product: ProductDetail, options: { prompt?: string; targetImage?: string } = {}) {
+    if (!product) {
+      setStatusText(tApp("status.selectProduct"));
+      return undefined;
+    }
+    if (isGeneratingImagePrompt) {
+      return undefined;
+    }
+    if (!ensureTextModelConfigured()) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45000);
+    setIsGeneratingImagePrompt(true);
+    try {
+      const response = await postJsonWithSignal<ImagePromptDraftResponse>(
+        `/api/products/${encodeURIComponent(product.sku)}/image-prompt-draft`,
+        {
+          prompt: options.prompt?.trim() || undefined,
+          targetImage: options.targetImage?.trim() || undefined,
+          textModelConfigId: selectedTextModelConfigId
+        },
+        controller.signal
+      );
+      setStatusText([
+        "图片提示词已优化。",
+        ...response.notes.map((note) => `- ${note}`)
+      ].join("\n"));
+      return response;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        showError(new Error(tApp("status.storyboardTimeout")));
+      } else {
+        showError(error);
+      }
+      return undefined;
+    } finally {
+      window.clearTimeout(timeout);
+      setIsGeneratingImagePrompt(false);
+    }
+  }
+
   async function saveProductDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsBusy(true);
@@ -3239,6 +3287,8 @@ export function App() {
           onRecoverVideoJobDownload={recoverVideoJobDownload}
           onGenerateStoryboardDraft={generateStoryboardDraft}
           isGeneratingStoryboard={isGeneratingStoryboard}
+          onGenerateImagePromptDraft={generateImagePromptDraft}
+          isGeneratingImagePrompt={isGeneratingImagePrompt}
           onImportAssets={importProductAssets}
           onUploadImages={uploadProductReferenceImages}
           onGenerateReferenceImages={generateProductReferenceImages}
@@ -4401,6 +4451,8 @@ function ProductCreationWorkspace({
   onRecoverVideoJobDownload,
   onGenerateStoryboardDraft,
   isGeneratingStoryboard,
+  onGenerateImagePromptDraft,
+  isGeneratingImagePrompt,
   onImportAssets,
   onUploadImages,
   onGenerateReferenceImages,
@@ -4472,6 +4524,8 @@ function ProductCreationWorkspace({
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
+  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string }) => Promise<ImagePromptDraftResponse | undefined>;
+  isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
@@ -4567,6 +4621,8 @@ function ProductCreationWorkspace({
       onRecoverVideoJobDownload={onRecoverVideoJobDownload}
       onGenerateStoryboardDraft={onGenerateStoryboardDraft}
       isGeneratingStoryboard={isGeneratingStoryboard}
+      onGenerateImagePromptDraft={onGenerateImagePromptDraft}
+      isGeneratingImagePrompt={isGeneratingImagePrompt}
       onImportAssets={onImportAssets}
       onUploadImages={onUploadImages}
       onGenerateReferenceImages={onGenerateReferenceImages}
@@ -4640,6 +4696,8 @@ function ProductCreationComposer({
   onRecoverVideoJobDownload,
   onGenerateStoryboardDraft,
   isGeneratingStoryboard,
+  onGenerateImagePromptDraft,
+  isGeneratingImagePrompt,
   onImportAssets,
   onUploadImages,
   onGenerateReferenceImages,
@@ -4709,6 +4767,8 @@ function ProductCreationComposer({
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   isGeneratingStoryboard: boolean;
+  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string }) => Promise<ImagePromptDraftResponse | undefined>;
+  isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
   onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
@@ -4957,6 +5017,19 @@ function ProductCreationComposer({
     await onGenerateStoryboardDraft(productForStoryboard);
   }
 
+  async function handleGenerateImagePromptDraft() {
+    const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
+    if (!productForPrompt) return;
+    const response = await onGenerateImagePromptDraft(productForPrompt, {
+      prompt: imagePrompt,
+      targetImage: selectedImagePromptReference?.original
+    });
+    if (response?.prompt) {
+      setImagePrompt(response.prompt);
+      onToast("图片提示词已优化", "ok");
+    }
+  }
+
   function handleReferenceFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
     const incomingFiles = Array.from(files);
@@ -5195,6 +5268,8 @@ function ProductCreationComposer({
           onOrganizeProductPackage={() => void handleOrganizeProductPackage()}
           onProductFactsPaste={handleProductFactsPaste}
           onGenerateStoryboardDraft={handleGenerateStoryboardDraft}
+          onGenerateImagePromptDraft={handleGenerateImagePromptDraft}
+          isGeneratingImagePrompt={isGeneratingImagePrompt}
           onGenerateVideo={handleGenerateVideo}
           onGenerateProductImages={handleGenerateProductImages}
           jobs={latestCreativeJobs}
@@ -5334,6 +5409,8 @@ function ProductCreativeWorkbench({
   onOrganizeProductPackage,
   onProductFactsPaste,
   onGenerateStoryboardDraft,
+  onGenerateImagePromptDraft,
+  isGeneratingImagePrompt,
   onGenerateVideo,
   onGenerateProductImages,
   jobs,
@@ -5425,6 +5502,8 @@ function ProductCreativeWorkbench({
   onOrganizeProductPackage: () => void;
   onProductFactsPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateImagePromptDraft: () => Promise<void>;
+  isGeneratingImagePrompt: boolean;
   onGenerateVideo: () => Promise<void>;
   onGenerateProductImages: () => Promise<void>;
   jobs: CreativeVersionItem[];
@@ -5529,7 +5608,9 @@ function ProductCreativeWorkbench({
           onApplyStoryboardHistory={onApplyStoryboardHistory}
           onDeleteStoryboardHistory={onDeleteStoryboardHistory}
           onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+          onGenerateImagePromptDraft={onGenerateImagePromptDraft}
           isGeneratingStoryboard={isGeneratingStoryboard}
+          isGeneratingImagePrompt={isGeneratingImagePrompt}
           productReady={storyboardProductReady}
           storyboardEstimate={storyboardEstimate}
         />
@@ -5967,7 +6048,9 @@ function ProductModeOutputPanel({
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
   onGenerateStoryboardDraft,
+  onGenerateImagePromptDraft,
   isGeneratingStoryboard,
+  isGeneratingImagePrompt,
   productReady,
   storyboardEstimate
 }: {
@@ -6012,7 +6095,9 @@ function ProductModeOutputPanel({
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateImagePromptDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
+  isGeneratingImagePrompt: boolean;
   productReady: boolean;
   storyboardEstimate?: BillingActionEstimate;
 }) {
@@ -6059,7 +6144,9 @@ function ProductModeOutputPanel({
       onApplyStoryboardHistory={onApplyStoryboardHistory}
       onDeleteStoryboardHistory={onDeleteStoryboardHistory}
       onGenerateStoryboardDraft={onGenerateStoryboardDraft}
+      onGenerateImagePromptDraft={onGenerateImagePromptDraft}
       isGeneratingStoryboard={isGeneratingStoryboard}
+      isGeneratingImagePrompt={isGeneratingImagePrompt}
       productReady={productReady}
       estimate={storyboardEstimate}
     />
@@ -6619,7 +6706,9 @@ function StoryboardComposerPanel({
   onApplyStoryboardHistory,
   onDeleteStoryboardHistory,
   onGenerateStoryboardDraft,
+  onGenerateImagePromptDraft,
   isGeneratingStoryboard,
+  isGeneratingImagePrompt,
   productReady
 }: {
   appLocale: AppLocale;
@@ -6664,13 +6753,20 @@ function StoryboardComposerPanel({
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
   onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateImagePromptDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
+  isGeneratingImagePrompt: boolean;
   productReady: boolean;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
   const promptTitle = mode === "image" ? "图片提示词" : tVideo("storyboard.title");
   const promptIsGuidance = mode === "video" && storyboardDraftIsGuidance;
+  const promptOptimizeActionLoading = mode === "image" ? isGeneratingImagePrompt : isGeneratingStoryboard;
+  const promptOptimizeActionDisabled = promptOptimizeActionLoading || !productReady;
+  const promptOptimizeActionLabel = promptOptimizeActionLoading
+    ? tVideo("storyboard.generating")
+    : mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate");
   const promptPlaceholder = mode === "image"
     ? referenceImageCount > 0
       ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。"
@@ -6694,24 +6790,22 @@ function StoryboardComposerPanel({
     <section className="storyboard-side-panel grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)] gap-2 border-t border-[var(--border)] pt-3">
       <div className="storyboard-title-row flex min-h-8 items-center justify-between gap-3">
         <div className="min-w-0 text-sm font-black text-[var(--text)]">{promptTitle}</div>
-        {mode === "video" ? (
-          <Button
-            className="storyboard-title-action min-h-8 justify-center rounded-[8px] px-2.5 text-[11px]"
-            size="sm"
-            variant="soft"
-            disabled={isGeneratingStoryboard || !productReady}
-            onClick={() => {
-              if (!productReady) {
-                return;
-              }
-              void onGenerateStoryboardDraft();
-            }}
-          >
-            {isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
-            {isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}
-            <ActionButtonCost tVideo={tVideo} estimate={estimate} />
-          </Button>
-        ) : null}
+        <Button
+          className="storyboard-title-action min-h-8 w-[168px] justify-center rounded-[8px] px-2.5 text-[11px]"
+          size="sm"
+          variant="soft"
+          disabled={promptOptimizeActionDisabled}
+          onClick={() => {
+            if (!productReady) {
+              return;
+            }
+            void (mode === "image" ? onGenerateImagePromptDraft() : onGenerateStoryboardDraft());
+          }}
+        >
+          {promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
+          <span className="truncate">{promptOptimizeActionLabel}</span>
+          <ActionButtonCost tVideo={tVideo} estimate={estimate} />
+        </Button>
       </div>
 
       <div
@@ -6736,10 +6830,12 @@ function StoryboardComposerPanel({
           onChange={(event) => onPromptDraftChange(event.target.value)}
           placeholder={promptPlaceholder}
         />
-        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 flex min-w-0 flex-nowrap items-center gap-1.5">
-          <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
-          {mode === "video" ? (
-            <>
+        <div className="prompt-composer-footer absolute bottom-3 left-3 right-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_112px] items-center gap-1.5">
+          <div className="prompt-composer-mode-slot shrink-0">
+            <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
+          </div>
+          <div className="prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
+            {mode === "video" ? (
               <ProductCreativeSettingsTray
                 tVideo={tVideo}
                 activeModelSchemeId={activeModelSchemeId}
@@ -6763,80 +6859,88 @@ function StoryboardComposerPanel({
                 onVersionCountChange={onVersionCountChange}
                 schemeSummary={schemeSummary}
               />
-              <button
-                type="button"
-                className={cn(
-                  "flex min-h-7 w-fit items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
-                  historyOpen
-                    ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
-                    : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
+            ) : (
+              <>
+                {selectedImagePromptReference ? (
+                  <div className="image-prompt-target-chip flex min-w-[160px] max-w-[210px] items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
+                      {selectedImagePromptReference?.previewUrl ? (
+                        <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
+                      ) : (
+                        <ImageIcon size={13} className="text-[var(--muted)]" />
+                      )}
+                    </span>
+                    <span className="grid min-w-0">
+                      <span className="truncate">优化目标</span>
+                      <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+                      title="清除目标图"
+                      aria-label="清除目标图"
+                      onClick={onImagePromptTargetClear}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
+                    <span className="truncate">{imageTargetLabel}</span>
+                  </div>
                 )}
-                aria-haspopup="listbox"
-                aria-expanded={historyOpen}
-                onClick={() => setHistoryOpen((open) => !open)}
-              >
-                <span>{tVideo("storyboard.history")}</span>
-                <span className="flex items-center gap-2">
-                  <Badge>{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
-                  <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
-                </span>
-              </button>
-            </>
-          ) : (
-            <>
-              {selectedImagePromptReference ? (
-                <div className="image-prompt-target-chip flex min-w-[160px] max-w-full items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
-                    {selectedImagePromptReference?.previewUrl ? (
-                      <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
-                    ) : (
-                      <ImageIcon size={13} className="text-[var(--muted)]" />
-                    )}
-                  </span>
-                  <span className="grid min-w-0">
-                    <span className="truncate">优化目标</span>
-                    <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
-                  </span>
+                <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
+                  <CompactChoiceDropdown
+                    label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
+                    value={selectedImageModelConfigId}
+                    options={configuredModelOptions(imageModelOptions)}
+                    formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
+                    onChange={onImageModelConfigChange}
+                    layout="pill"
+                    density="micro"
+                    menuPlacement="top"
+                    menuWidth="content"
+                  />
+                </div>
+                {imagePromptPresets.map((preset) => (
                   <button
+                    key={preset}
                     type="button"
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-                    title="清除目标图"
-                    aria-label="清除目标图"
-                    onClick={onImagePromptTargetClear}
+                    className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    onClick={() => appendImagePromptPreset(preset)}
                   >
-                    <X size={12} />
+                    {preset}
                   </button>
-                </div>
-              ) : (
-                <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
-                  <span className="truncate">{imageTargetLabel}</span>
-                </div>
+                ))}
+              </>
+            )}
+          </div>
+          <div className="prompt-composer-history-slot flex justify-end">
+            <button
+              type="button"
+              className={cn(
+                "flex min-h-7 w-[112px] items-center justify-between gap-1.5 rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 py-1 text-left text-[11px] font-bold text-[var(--muted)] transition",
+                mode === "image" && "invisible pointer-events-none",
+                historyOpen
+                  ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
+                  : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
               )}
-              <div className="image-model-control min-w-[128px] max-w-[190px] shrink-0" title={imageModelLabel}>
-                <CompactChoiceDropdown
-                  label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
-                  value={selectedImageModelConfigId}
-                  options={configuredModelOptions(imageModelOptions)}
-                  formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
-                  onChange={onImageModelConfigChange}
-                  layout="pill"
-                  density="micro"
-                  menuPlacement="top"
-                  menuWidth="content"
-                />
-              </div>
-              {imagePromptPresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                  onClick={() => appendImagePromptPreset(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </>
-          )}
+              aria-haspopup="listbox"
+              aria-expanded={historyOpen}
+              tabIndex={mode === "image" ? -1 : 0}
+              onClick={() => {
+                if (mode === "video") {
+                  setHistoryOpen((open) => !open);
+                }
+              }}
+            >
+              <span>{tVideo("storyboard.history")}</span>
+              <span className="flex items-center gap-1.5">
+                <Badge>{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
+                <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
+              </span>
+            </button>
+          </div>
         </div>
         {mode === "video" && historyOpen ? (
           <div

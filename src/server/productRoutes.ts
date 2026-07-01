@@ -1,7 +1,9 @@
 import {
+  buildAiImagePromptDraft,
   buildAiStoryboardDraft,
   generateProductReferenceImages,
   type GenerateProductReferenceImagesRequest,
+  type ImagePromptDraftRequest,
   type StoryboardDraftRequest
 } from "./productAiGenerationService.js";
 import { handleProductImportRoutes } from "./productImportRoutes.js";
@@ -124,6 +126,25 @@ export async function handleProductRoutes(input: {
       modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion,
       fetchImpl,
       input: (await request.json()) as StoryboardDraftRequest
+    }));
+  }
+  const productImagePromptDraftMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/image-prompt-draft$/);
+  if (request.method === "POST" && productImagePromptDraftMatch) {
+    const sku = decodeURIComponent(productImagePromptDraftMatch[1] ?? "");
+    return jsonResponse(await buildAiImagePromptDraft({
+      sku,
+      fixturesDir: requestContext.fixturesDir,
+      rootDir: dataDir,
+      modelConfigStore: requestContext.modelConfigStore,
+      platformModelConfigStore: requestContext.platformModelConfigStore,
+      modelBundleStore: requestContext.modelBundleStore,
+      modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+      walletStore: requestContext.walletStore,
+      billingPolicyStore: requestContext.billingPolicyStore,
+      modelPricingCatalog: requestContext.modelPricingCatalog,
+      modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion,
+      fetchImpl,
+      input: (await request.json()) as ImagePromptDraftRequest
     }));
   }
   const productStoryboardsMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/storyboards$/);

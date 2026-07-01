@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildChineseScriptFallback,
   buildChineseStoryboardFallback,
+  buildProductImagePromptDraftFallback,
   buildProductReferenceImagePrompt,
   clampInteger,
   extensionFromMimeType,
@@ -29,6 +30,13 @@ describe("product AI generation content helpers", () => {
     expect(prompt).toContain("Materials: ナイロン, ポリウレタン");
     expect(prompt).toContain("Avoid implying these unverified claims: No.1");
     expect(prompt).toContain("Extra direction: show pair layout");
+  });
+
+  it("builds a concise image prompt draft fallback from product facts and user intent", () => {
+    expect(buildProductImagePromptDraftFallback(product, "  白底主图  ")).toBe(
+      "保留冷感アームカバー的真实外观、材质和比例，白底主图，突出轻量、通気性，适合通勤场景；避免 No.1 等未确认宣称。"
+    );
+    expect(buildProductImagePromptDraftFallback(product, "")).toContain("清晰电商商品图");
   });
 
   it("normalizes model arrays and detects unexpected Japanese fragments", () => {

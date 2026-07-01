@@ -34,6 +34,25 @@ export function buildProductReferenceImagePrompt(
   ].filter(Boolean).join("\n");
 }
 
+export function buildProductImagePromptDraftFallback(
+  product: ProductGenerationFacts,
+  userPrompt: string | undefined
+): string {
+  const intent = typeof userPrompt === "string" && userPrompt.trim()
+    ? userPrompt.trim()
+    : "清晰电商商品图";
+  const sellingPoints = product.verified_selling_points.slice(0, 2).join("、") || "核心卖点";
+  const scene = product.usage_scenes[0] || "真实使用";
+  const forbiddenClaims = product.forbidden_claims.slice(0, 2).join("、");
+  return [
+    `保留${product.title_ja}的真实外观、材质和比例`,
+    intent,
+    `突出${sellingPoints}`,
+    `适合${scene}场景`,
+    forbiddenClaims ? `避免 ${forbiddenClaims} 等未确认宣称` : "不添加未确认功效、销量或排名宣称"
+  ].join("，").replace(/，避免 /, "；避免 ") + "。";
+}
+
 export function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];

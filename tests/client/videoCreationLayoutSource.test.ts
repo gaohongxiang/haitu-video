@@ -249,6 +249,9 @@ describe("video creation layout source", () => {
     expect(promptPanelSource).toContain("appendImagePromptPreset");
     expect(promptPanelSource).toContain("image-model-control");
     expect(promptPanelSource).toContain("<ProductCreativeModeSwitch");
+    expect(promptPanelSource).toContain("onGenerateImagePromptDraft");
+    expect(promptPanelSource).toContain('mode === "image" ? onGenerateImagePromptDraft() : onGenerateStoryboardDraft()');
+    expect(promptPanelSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
     expect(promptPanelSource).toContain("<CompactChoiceDropdown");
     expect(promptPanelSource).toContain("value={selectedImageModelConfigId}");
     expect(promptPanelSource).toContain("options={configuredModelOptions(imageModelOptions)}");
@@ -494,12 +497,17 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource).toContain("prompt-composer-footer");
     expect(storyboardPanelSource).toContain("<ProductCreativeModeSwitch");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
+    expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
+    expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
+    expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
     expect(settingsTraySource).toContain('menuPlacement="top"');
     expect(settingsTraySource).toContain('menuWidth="content"');
     expect(storyboardPanelSource.indexOf("prompt-composer-footer")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeModeSwitch"));
     expect(storyboardPanelSource.indexOf("<ProductCreativeModeSwitch")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeSettingsTray"));
+    expect(storyboardPanelSource.indexOf("prompt-composer-mode-slot")).toBeLessThan(storyboardPanelSource.indexOf("prompt-composer-settings-slot"));
+    expect(storyboardPanelSource.indexOf("prompt-composer-settings-slot")).toBeLessThan(storyboardPanelSource.indexOf("prompt-composer-history-slot"));
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.image"), value: localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo) }');
@@ -548,6 +556,8 @@ describe("video creation layout source", () => {
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
+    expect(storyboardPanelSource).toContain("promptOptimizeActionLabel");
+    expect(storyboardPanelSource).toContain("promptOptimizeActionDisabled");
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
     expect(storyboardFooterSource).not.toContain('tVideo("storyboard.generate")');
     expect(storyboardFooterSource).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");

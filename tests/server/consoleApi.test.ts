@@ -1257,7 +1257,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("productReady: boolean");
-    expect(storyboardPanelSource).toContain("disabled={isGeneratingStoryboard || !productReady}");
+    expect(storyboardPanelSource).toContain("promptOptimizeActionDisabled");
+    expect(storyboardPanelSource).toContain("promptOptimizeActionLoading");
     expect(storyboardPanelSource).toContain("bg-[var(--card)]");
     expect(storyboardPanelSource).toContain("text-[#9a8776]");
     expect(storyboardPanelSource).toContain("text-[var(--text)]");
@@ -1321,14 +1322,18 @@ describe("console API", () => {
     expect(appSource).toContain("onFlushProductFactsAutoSave={flushProductFactsAutoSave}");
     expect(creationComposerSource).toContain("onFlushProductFactsAutoSave");
     expect(creationComposerSource).toContain("await onFlushProductFactsAutoSave()");
-    expect(storyboardPanelSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
-    expect(storyboardPanelSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
+    expect(storyboardPanelSource).toContain('promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
+    expect(storyboardPanelSource).toContain("promptOptimizeActionLabel");
+    expect(storyboardPanelSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
     expect(productDetailsSource).toContain("product-facts-header");
     expect(productDetailsSource).toContain("product-facts-action");
     expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
+    expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
+    expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
+    expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
     expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain('tVideo("storyboard.generate")');
     expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
@@ -5833,14 +5838,18 @@ describe("console API", () => {
     expect(appSource).toContain("onFlushProductFactsAutoSave={flushProductFactsAutoSave}");
     expect(composerSource).toContain("onFlushProductFactsAutoSave");
     expect(composerSource).toContain("await onFlushProductFactsAutoSave()");
-    expect(composerSource).toContain('isGeneratingStoryboard ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
-    expect(composerSource).toContain('{isGeneratingStoryboard ? tVideo("storyboard.generating") : tVideo("storyboard.generate")}');
+    expect(composerSource).toContain('promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
+    expect(composerSource).toContain("promptOptimizeActionLabel");
+    expect(composerSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
     expect(productDetailsSource).toContain("product-facts-header");
     expect(productDetailsSource).toContain("product-facts-action");
     expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(composerSource).toContain("storyboard-title-row");
     expect(composerSource).toContain("storyboard-title-action");
+    expect(composerSource).toContain("prompt-composer-mode-slot");
+    expect(composerSource).toContain("prompt-composer-settings-slot");
+    expect(composerSource).toContain("prompt-composer-history-slot");
     expect(composerSource).toContain("placeholder={promptPlaceholder}");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain('label={tVideo("controls.template")}');
@@ -6589,6 +6598,77 @@ describe("console API", () => {
       expect(body.messages.at(-1).content).toContain("接触冷感アームカバー");
       expect(body.messages[0].content).toContain("storyboardCnLines");
       expect(body.messages[0].content).toContain("storyboardLines 必须使用简体中文");
+    } finally {
+      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("uses the configured text model to optimize image prompt drafts for the selected product", async () => {
+    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.TEXT_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-image-prompt-ai-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      await writeProduct(testProductPath(fixturesDir, "image-prompt"), {
+        sku: "IMAGE-PROMPT-001",
+        title_ja: "接触冷感アームカバー",
+        category: "スポーツ用スリーブ",
+        materials: ["ポリエステル"],
+        dimensions: "15x10x5cm / 0.1kg",
+        verified_selling_points: ["指先までカバーしやすい", "通気性のある生地"],
+        usage_scenes: ["通勤", "スポーツ"],
+        forbidden_claims: ["UVカット率は未確認"],
+        reference_images: ["arm-01.jpg", "arm-02.jpg"]
+      });
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  prompt: "保留接触冷感アームカバー真实外观，生成白底主图，突出指孔、面料纹理和轻薄质感，不添加文字。",
+                  notes: ["未使用未确认 UV 宣称。"]
+                })
+              }
+            }
+          ],
+          usage: {
+            total_tokens: 188
+          }
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "text-image-prompt-secret-7777",
+          apiMode: "chat_completions"
+        })
+      });
+
+      await topUpWalletForAiUsage(server);
+      const response = await server.fetchJson("/api/products/IMAGE-PROMPT-001/image-prompt-draft", {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: "白底主图",
+          targetImage: "arm-02.jpg"
+        })
+      });
+
+      expect(response.prompt).toBe("保留接触冷感アームカバー真实外观，生成白底主图，突出指孔、面料纹理和轻薄质感，不添加文字。");
+      expect(response.notes).toContain("未使用未确认 UV 宣称。");
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        authorization: "Bearer text-image-prompt-secret-7777"
+      }));
+      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
+      expect(body.messages[0].content).toContain("图片提示词优化助手");
+      expect(body.messages.at(-1).content).toContain("白底主图");
+      expect(body.messages.at(-1).content).toContain("arm-02.jpg");
+      expect(body.messages.at(-1).content).toContain("接触冷感アームカバー");
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);

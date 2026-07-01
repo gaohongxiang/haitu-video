@@ -11,6 +11,7 @@ import {
 import {
   buildChineseScriptFallback,
   buildChineseStoryboardFallback,
+  buildProductImagePromptDraftFallback,
   buildProductReferenceImagePrompt,
   clampInteger,
   extensionFromMimeType,
@@ -42,9 +43,96 @@ export interface StoryboardDraftRequest {
   textModelConfigId?: string;
 }
 
+export interface ImagePromptDraftRequest {
+  prompt?: string;
+  targetImage?: string;
+  textModelConfigId?: string;
+}
+
 export interface GeneratedProductReferenceImage {
   path: string;
   reference: string;
+}
+
+export async function buildAiImagePromptDraft(input: {
+  sku: string;
+  fixturesDir: string;
+  rootDir: string;
+  modelConfigStore: ModelConfigStore;
+  platformModelConfigStore?: ModelConfigStore;
+  modelBundleStore?: ModelBundleStore;
+  modelServicePreferenceStore?: ModelServicePreferenceStore;
+  walletStore: WalletStore;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+  fetchImpl?: typeof fetch;
+  input: ImagePromptDraftRequest;
+}): Promise<{ prompt: string; notes: string[] }> {
+  const product = await getProductBySku({
+    fixturesDir: input.fixturesDir,
+    rootDir: input.rootDir,
+    sku: input.sku
+  });
+  const textModel = await createTextModelProvider({
+    modelConfigStore: input.modelConfigStore,
+    platformModelConfigStore: input.platformModelConfigStore,
+    modelBundleStore: input.modelBundleStore,
+    modelServicePreferenceStore: input.modelServicePreferenceStore,
+    textModelConfigId: input.input.textModelConfigId,
+    fetchImpl: input.fetchImpl
+  });
+  const draft = await runMeteredAiAction({
+    walletStore: input.walletStore,
+    billingPolicyStore: input.billingPolicyStore,
+    kind: "text",
+    modelConfig: textModel.config,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion,
+    reserveDescription: "AI 图片提示词预扣",
+    chargeDescription: "AI 图片提示词扣费",
+    action: async () => {
+      const result = await textModel.provider.generateJsonWithUsage<{
+        prompt?: unknown;
+        notes?: unknown;
+      }>({
+        system: [
+          "你是 TikTok Shop Japan 商品图片提示词优化助手。",
+          "只输出 JSON object，不要 markdown。",
+          "输出字段必须是 prompt、notes。",
+          "prompt 必须使用简体中文，写给图片生成模型，保留商品真实外观、材质、比例和可验证卖点。",
+          "如果用户选择了目标图，prompt 要说明是在优化该参考图；否则说明按商品资料生成。",
+          "不要添加日文文案、文字贴片、logo、水印、未确认功效、销量、排名、UV 数值等宣称。"
+        ].join("\n"),
+        user: [
+          `用户原始图片意图: ${input.input.prompt?.trim() || "未填写"}`,
+          `目标图: ${input.input.targetImage?.trim() || "按商品资料生成"}`,
+          "商品资料 JSON:",
+          JSON.stringify({
+            title_ja: product.title_ja,
+            category: product.category,
+            materials: product.materials,
+            dimensions: product.dimensions,
+            verified_selling_points: product.verified_selling_points,
+            usage_scenes: product.usage_scenes,
+            forbidden_claims: product.forbidden_claims,
+            reference_images: product.reference_images
+          }, null, 2)
+        ].join("\n")
+      });
+      return {
+        value: result.value,
+        metering: {
+          textUsage: result.usage
+        }
+      };
+    }
+  });
+  const prompt = typeof draft.prompt === "string" ? draft.prompt.trim() : "";
+  return {
+    prompt: prompt || buildProductImagePromptDraftFallback(product, input.input.prompt),
+    notes: normalizeStringArray(draft.notes)
+  };
 }
 
 export async function buildAiStoryboardDraft(input: {
