@@ -35,6 +35,9 @@ describe("video job service source boundaries", () => {
     expect(serviceSource).toContain("resolveVideoRequestModel");
     expect(serviceSource).toContain("modelPricingCatalog?: readonly ModelPricingEntry[]");
     expect(serviceSource).toContain("modelPricingCatalog: options.modelPricingCatalog");
+    expect(serviceSource).toContain("referenceImages?: string[]");
+    expect(serviceSource).toContain("referenceImages: sanitizeReferenceImages(body.referenceImages)");
+    expect(serviceSource).toContain("function sanitizeReferenceImages(lines?: string[]): string[] | undefined");
     expect(productRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
     expect(videoRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
   });

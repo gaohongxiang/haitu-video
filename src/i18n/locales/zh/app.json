@@ -775,7 +775,7 @@
       "label": "服务模式",
       "platform": {
         "title": "平台托管 API",
-        "subtitle": "省心不用配 Key，不用自己申请和维护各家账号；平台已接入官方 API，直接选择文本、图片、视频模型组合。",
+        "subtitle": "省心不用配 Key，不用自己申请和维护各家账号；平台已接入官方 API，直接选择文本、图片、视频模型。",
         "badge": "官方 API 成本 + 平台服务费"
       },
       "byok": {
@@ -791,7 +791,6 @@
       "addService": "添加{{badge}}服务",
       "edit": "编辑",
       "delete": "删除",
-      "deleteBundle": "删除{{label}}",
       "save": "保存",
       "cancel": "取消",
       "refreshModels": "刷新可用模型",
@@ -814,24 +813,6 @@
       "officialModelId": "官方模型 ID 已内置",
       "modelVersions": "模型版本",
       "testingMessage": "测试配置中..."
-    },
-    "bundles": {
-      "empty": "暂无可用组合",
-      "enable": "启用",
-      "disabled": "停用",
-      "incomplete": "未完成",
-      "draft": "草稿",
-      "ready": "可启用",
-      "new": "新增组合",
-      "save": "保存组合",
-      "autoModel": "自动",
-      "newIndexed": "新增组合{{index}}",
-      "platformSaved": "平台自定义组合已保存。",
-      "platformEnabled": "平台自定义组合已启用。",
-      "platformDisabled": "平台自定义组合已停用。",
-      "byokSaved": "自带 API 组合已保存。",
-      "byokEnabled": "自带 API 组合已启用。",
-      "byokDisabled": "自带 API 组合已停用。"
     },
     "emptyServices": "还没有配置可用服务，添加 API Key 后这里会显示已启用的模型服务。",
     "available": "{{count}} 条可用",
@@ -869,9 +850,6 @@
     "modelDisabled": "模型服务已停用。",
     "platformMode": "已切换为平台模型模式。",
     "byokMode": "已切换为自带 API 模式。",
-    "bundleSaved": "模型组合已保存。",
-    "bundleDeleted": "模型组合已删除。",
-    "bundleIncomplete": "模型组合尚未配置完整，请补齐文本、图片和视频模型后再用于视频创作。",
     "testFailedApiKey": "测试失败：请先填写 API Key。",
     "testing": "测试配置中...",
     "testSuccess": "测试成功：{{message}}\n模型: {{model}}",
@@ -992,7 +970,6 @@
       "failed": "保存失败"
     },
     "controls": {
-      "modelScheme": "模型方案",
       "template": "视频风格",
       "duration": "视频时长",
       "resolution": "视频分辨率",
@@ -1076,7 +1053,7 @@
       "video": "视"
     },
     "models": {
-      "auto": "自动推荐",
+      "auto": "默认模型",
       "deleted": "已删除模型",
       "unselected": "未选择",
       "platformQuality": "平台 · 高质量",
@@ -1120,23 +1097,20 @@
       "willOrganize": "将先整理资料包，再生成视频。"
     },
     "reference": {
-      "title": "参考图",
+      "title": "商品图片",
       "addSubtitle": "添加图片",
       "add": "添加图片",
-      "addHint": "可多选 · 拖拽或粘贴图片",
-      "generate": "AI 生成参考图",
-      "generateDisabledTitle": "先整理资料包后可生成参考图",
-      "generateDisabledToast": "请先整理资料包，再生成参考图。",
+      "addHint": "点击图片加入本次创作",
       "reorderTitle": "拖动参考图调整顺序",
       "preview": "查看参考图",
-      "selectPromptTarget": "选为图片提示词目标",
+      "selectPromptTarget": "加入本次创作",
       "importAsset": "导入资产",
       "delete": "删除参考图",
       "item": "参考图 {{index}}",
       "previewDialogTitle": "参考图预览",
       "previous": "上一张",
       "next": "下一张",
-      "previewPending": "选为图片提示词目标",
+      "previewPending": "加入本次创作",
       "pending": "待上传 {{index}}",
       "pendingImageName": "待上传图片 {{index}}",
       "removePending": "移除待上传图片",
@@ -1275,7 +1249,7 @@
     "shell": {
       "title": "项目方后台",
       "navigationLabel": "后台导航",
-      "keyHint": "平台 Key 只在后台加密保存，普通用户只选择可用组合。",
+      "keyHint": "平台 Key 只在后台加密保存，普通用户只选择可用模型。",
       "checkingSession": "检查登录状态",
       "refreshing": "刷新数据中",
       "refresh": "刷新",

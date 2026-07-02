@@ -12,8 +12,7 @@ export async function handleBillingEstimateRoutes(input: {
       billingPolicyStore: input.requestContext.billingPolicyStore,
       modelConfigStore: input.requestContext.modelConfigStore,
       platformModelConfigStore: input.requestContext.platformModelConfigStore,
-      modelBundleStore: input.requestContext.modelBundleStore,
-      modelServicePreferenceStore: input.requestContext.modelServicePreferenceStore,
+          modelServicePreferenceStore: input.requestContext.modelServicePreferenceStore,
       modelPricingCatalog: input.requestContext.modelPricingCatalog,
       input: (await input.request.json()) as BillingEstimatesRequest
     }));

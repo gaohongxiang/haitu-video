@@ -7,8 +7,8 @@ const requestHandlerPath = "src/server/consoleRequestHandler.ts";
 const apiRoutesPath = "src/server/consoleApiRoutes.ts";
 const routesPath = "src/server/walletModelRoutes.ts";
 
-describe("wallet and model bundle routes source boundaries", () => {
-  it("keeps wallet, model bundle, and service preference routing out of the console server module", async () => {
+describe("wallet and model preference routes source boundaries", () => {
+  it("keeps wallet and model preference routing out of the console server module", async () => {
     const consoleServerSource = await readFile(consoleServerPath, "utf8");
     const requestHandlerSource = await readFile(requestHandlerPath, "utf8");
     const apiRoutesSource = await readFile(apiRoutesPath, "utf8");
@@ -28,7 +28,7 @@ describe("wallet and model bundle routes source boundaries", () => {
     expect(consoleServerSource).not.toContain("const modelBundleMatch");
   });
 
-  it("centralizes wallet, model bundle, and service preference API routes", async () => {
+  it("centralizes wallet and type-based model service preference API routes", async () => {
     const routesSource = await readFile(routesPath, "utf8");
 
     expect(routesSource).toContain("export async function handleWalletModelRoutes(");
@@ -37,12 +37,15 @@ describe("wallet and model bundle routes source boundaries", () => {
     expect(routesSource).not.toContain("WalletTopUpRequest");
     expect(routesSource).not.toContain("wallet.top_up");
     expect(routesSource).toContain('url.pathname === "/api/wallet/recharge-orders"');
-    expect(routesSource).toContain('url.pathname === "/api/model-bundles"');
     expect(routesSource).toContain('url.pathname === "/api/model-service-preference"');
-    expect(routesSource).toContain("modelBundleMatch");
-    expect(routesSource).toContain("assertModelBundleConfigsExist");
-    expect(routesSource).toContain("assertModelServicePreferenceBundlesExist");
-    expect(routesSource).toContain("ensureMissingPlatformBundles(");
-    expect(routesSource).toContain("ensurePlatformBundles({");
+    expect(routesSource).toContain("textModelConfigId: input.textModelConfigId");
+    expect(routesSource).toContain("imageModelConfigId: input.imageModelConfigId");
+    expect(routesSource).toContain("videoModelConfigId: input.videoModelConfigId");
+    expect(routesSource).not.toContain('url.pathname === "/api/model-bundles"');
+    expect(routesSource).not.toContain("modelBundleMatch");
+    expect(routesSource).not.toContain("assertModelBundleConfigsExist");
+    expect(routesSource).not.toContain("assertModelServicePreferenceBundlesExist");
+    expect(routesSource).not.toContain("ensureMissingPlatformBundles(");
+    expect(routesSource).not.toContain("ensurePlatformBundles({");
   });
 });

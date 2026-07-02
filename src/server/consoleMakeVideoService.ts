@@ -8,7 +8,6 @@ import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
 import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { resolveWithin } from "./consoleAssetService.js";
 import type { ConsoleSettingsStore } from "./consoleSettings.js";
-import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { selectedVideoModelConfig } from "./modelConfigSelection.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
@@ -25,7 +24,6 @@ export async function runConsoleMakeVideo(
     settingsStore: ConsoleSettingsStore;
     modelConfigStore: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
-    modelBundleStore?: ModelBundleStore;
     modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
     runMakeVideoPipeline?: typeof runMakeVideoPipeline;
@@ -47,7 +45,6 @@ export async function runConsoleMakeVideo(
   const providerConfig = await selectedVideoModelConfig({
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore,
     provider: providerName,
     providerModelConfigId: body.providerModelConfigId

@@ -24,7 +24,6 @@ import {
   tokenPriceCnyPerMillionForVideoModel
 } from "./videoJobBilling.js";
 import { assertTemplateEnabled } from "./videoTemplateService.js";
-import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { resolveVideoRequestModel } from "./modelConfigSelection.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
@@ -53,7 +52,6 @@ export async function runConsolePreflight(
     billingPolicyStore?: BillingPolicyStore;
     modelConfigStore?: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
-    modelBundleStore?: ModelBundleStore;
     modelServicePreferenceStore?: ModelServicePreferenceStore;
   }
 ) {
@@ -74,7 +72,6 @@ export async function runConsolePreflight(
     body,
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore
   });
   const apiBillingMode = videoModel.config?.apiOwner === "platform" ? "platform" : "byok";
@@ -160,7 +157,6 @@ async function preflightVideoModel(input: {
   body: Pick<PreflightRequest, "providerModelConfigId" | "providerModel">;
   modelConfigStore?: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
 }): Promise<{ providerModel?: string; config?: { apiOwner?: string } }> {
   if (input.provider === "mock" || !input.modelConfigStore) {
@@ -172,7 +168,6 @@ async function preflightVideoModel(input: {
     const resolved = await resolveVideoRequestModel({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
       provider: input.provider,
       body: input.body

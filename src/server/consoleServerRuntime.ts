@@ -16,10 +16,8 @@ import type { DatabaseHandle } from "./db/client.js";
 import {
   closeDatabase,
   createConsoleDatabaseHandle,
-  ensurePlatformBundlesForAllWorkspaces,
   startVideoRetentionCleanup
 } from "./consoleLifecycleService.js";
-import { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { ModelPricingCatalogStore } from "./modelPricingCatalogStore.js";
 import type { ModelPricingCatalogContext } from "./modelPricingCatalogContext.js";
@@ -87,11 +85,6 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
     databaseHandle,
     workspaceId: DEFAULT_WORKSPACE_ID
   });
-  const defaultModelBundleStore = new ModelBundleStore({
-    handle: databaseHandle,
-    workspaceId: DEFAULT_WORKSPACE_ID,
-    now: options.now
-  });
   const defaultModelServicePreferenceStore = new ModelServicePreferenceStore({
     handle: databaseHandle,
     workspaceId: DEFAULT_WORKSPACE_ID,
@@ -122,7 +115,6 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
   const runConfiguredMakeVideoPipeline = createConfiguredMakeVideoPipeline({
     modelConfigStore: defaultModelConfigStore,
     platformModelConfigStore: defaultModelConfigStore,
-    modelBundleStore: defaultModelBundleStore,
     modelServicePreferenceStore: defaultModelServicePreferenceStore,
     billingPolicyStore,
     modelPricingCatalog: getModelPricingCatalogContext().catalog,
@@ -152,13 +144,6 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
   const workspaceVideoJobQueues = new Map<string, LocalVideoJobQueue>([
     [DEFAULT_WORKSPACE_ID, videoJobQueue]
   ]);
-  void ensurePlatformBundlesForAllWorkspaces({
-    databaseHandle,
-    platformModelConfigStore: defaultModelConfigStore,
-    now: options.now
-  }).catch((error: unknown) => {
-    console.warn("Failed to provision platform model bundles.", error);
-  });
   const videoRetentionTimer = startVideoRetentionCleanup({
     dataDir,
     databaseHandle,

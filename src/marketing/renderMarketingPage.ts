@@ -496,34 +496,38 @@ function renderConfiguredHeadingLines(lines: string[]): string {
 }
 
 type SeoFooterGroup =
-  | { label: string; prefix: string; slugs?: never }
-  | { label: string; slugs: string[]; prefix?: never };
+  { label: string; slugs: string[] };
 
 function renderSeoFooter(locale: MarketingLocale, i18n: ReturnType<typeof createServerI18n>): string {
   const groups: SeoFooterGroup[] = [
     {
       label: i18n.t("common:seo.footerFeatures"),
-      prefix: "features/"
+      slugs: [
+        "features/product-image-optimization",
+        "features/ai-product-video-generator",
+        "features/image-to-product-video",
+        "features/product-copy-generator",
+        "features/hosted-ai-models",
+        "features/bring-your-own-model"
+      ]
     },
     {
       label: i18n.t("common:seo.footerPlatforms"),
-      prefix: "platforms/"
+      slugs: [
+        "platforms/tiktok-shop",
+        "platforms/amazon",
+        "platforms/shopee",
+        "platforms/shopify"
+      ]
     },
     {
-      label: i18n.t("common:seo.footerTools"),
-      prefix: "tools/"
-    },
-    {
-      label: i18n.t("common:seo.footerUseCases"),
-      prefix: "use-cases/"
-    },
-    {
-      label: i18n.t("common:seo.footerCategories"),
-      prefix: "categories/"
-    },
-    {
-      label: i18n.t("common:seo.footerCompare"),
-      prefix: "compare/"
+      label: i18n.t("common:seo.footerWorkflows"),
+      slugs: [
+        "use-cases/cross-border-ecommerce",
+        "use-cases/tiktok-shop-product-video",
+        "use-cases/amazon-product-image-optimization",
+        "features/product-creative-workflow"
+      ]
     },
     {
       label: i18n.t("common:seo.footerTrust"),
@@ -532,16 +536,19 @@ function renderSeoFooter(locale: MarketingLocale, i18n: ReturnType<typeof create
   ];
   const groupHtml = groups.map((group) => {
     const links = marketingPages
-      .filter((page) => group.slugs ? group.slugs.includes(page.slug) : page.slug.startsWith(group.prefix))
+      .filter((page) => group.slugs.includes(page.slug))
       .map((page) => {
         const content = getMarketingPageContent(locale, page.slug);
         return `<a href="${marketingPath(locale, page.slug)}">${escapeHtml(content.h1)}</a>`;
       })
       .join("");
-    return `<section><h2>${escapeHtml(group.label)}</h2><div>${links}</div></section>`;
+    return `<section class="footer-link-group"><h2>${escapeHtml(group.label)}</h2><div>${links}</div></section>`;
   }).join("");
   return `<footer class="seo-footer" aria-label="${escapeAttribute(i18n.t("common:seo.footerLabel"))}">
-      <a class="footer-brand" href="${marketingPath(locale, "")}">Haitu</a>
+      <section class="footer-brand-panel">
+        <a class="footer-brand" href="${marketingPath(locale, "")}">Haitu</a>
+        <p>${escapeHtml(i18n.t("common:seo.footerIntro"))}</p>
+      </section>
       ${groupHtml}
     </footer>`;
 }
@@ -969,15 +976,17 @@ h1 .title-context{color:var(--accent2);font-size:.72em;font-weight:740;line-heig
 .faq details+details{margin-top:10px}
 .faq summary{cursor:pointer;color:var(--text);font-size:15px;font-weight:950}
 .faq details p{margin:10px 0 0}
-.seo-footer{display:grid;grid-template-columns:minmax(120px,.7fr) repeat(4,minmax(0,1fr));gap:18px;border-top:1px solid var(--border);background:rgba(255,250,243,.82);padding:28px clamp(18px,5vw,72px) 36px}
-.footer-brand{font-size:20px;font-weight:950;color:var(--text)}
+.seo-footer{display:grid;grid-template-columns:minmax(220px,.95fr) repeat(4,minmax(128px,.58fr));gap:28px;border-top:1px solid var(--border);background:rgba(255,250,243,.9);padding:32px clamp(18px,5vw,72px) 38px}
+.footer-brand-panel{min-width:0;max-width:360px}
+.footer-brand{display:inline-flex;margin-bottom:10px;font-size:20px;font-weight:950;color:var(--text)}
+.footer-brand-panel p{margin:0;color:var(--muted);font-size:13px;font-weight:640;line-height:1.7}
 .seo-footer section{min-width:0}
 .seo-footer h2{margin:0 0 10px;color:var(--accent2);font-size:12px;font-weight:950}
-.seo-footer div{display:grid;gap:7px}
-.seo-footer a{color:var(--muted);font-size:12px;font-weight:850;line-height:1.35}
+.seo-footer div{display:grid;gap:8px}
+.seo-footer a{color:var(--muted);font-size:12px;font-weight:850;line-height:1.42;overflow-wrap:anywhere}
 .seo-footer a:hover{color:var(--accent)}
 @media (max-width:1080px){.hero-stage{grid-template-columns:1fr;min-height:auto;padding-top:40px}.hero-stage::before{inset:16px 10px auto;height:92%}.studio-preview{max-width:840px}}
-@media (max-width:960px){.section-heading,.payment-band{grid-template-columns:1fr}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr 1fr}.trust-band .section-heading a{justify-self:start}}
+@media (max-width:960px){.section-heading,.payment-band{grid-template-columns:1fr}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr 1fr}.trust-band .section-heading a{justify-self:start}.seo-footer{grid-template-columns:repeat(2,minmax(0,1fr))}.footer-brand-panel{grid-column:1/-1;max-width:620px}}
 @media (max-width:860px){.geo-answer-block,.growth-grid{grid-template-columns:1fr}.studio-shell{grid-template-columns:1fr}.preview-sidebar,.preview-inspector{border:0;border-bottom:1px solid var(--border)}.preview-sidebar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.preview-sidebar strong{grid-column:1/-1}.preview-inspector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.preview-inspector small:last-child{margin-top:0}.creative-board{grid-template-columns:1fr}}
 @media (max-width:780px){.site-header{align-items:flex-start;flex-direction:column}.header-console,.language-switcher{margin-left:0}.language-menu{left:0;right:auto}.growth-card ul{grid-template-columns:1fr}nav{flex-wrap:wrap}h1{font-size:clamp(34px,9.5vw,52px);line-height:1.1}.lead{font-size:15px;line-height:1.72}.asset-rail{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr}.metric-strip strong{border-right:0;border-bottom:1px solid var(--border)}.metric-strip strong:last-child{border-bottom:0}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr}.home-capability-band,.payment-band,.trust-band{padding-top:40px;padding-bottom:40px}.final-cta{margin-bottom:52px;padding:38px 18px}.seo-footer{grid-template-columns:1fr}.breadcrumb{padding-top:14px}}
 `;

@@ -31,6 +31,7 @@ describe("console video job pipeline input source boundaries", () => {
     expect(pipelineInputSource).toContain("durationSeconds: input.record.durationSeconds ?? 8");
     expect(pipelineInputSource).toContain("template: input.record.template ?? \"scene\"");
     expect(pipelineInputSource).toContain("cta: input.record.cta ?? \"今すぐチェック\"");
+    expect(pipelineInputSource).toContain("referenceImages: input.record.referenceImages");
     expect(pipelineInputSource).toContain("reuseManifestPath: input.record.reuseManifest");
     expect(pipelineInputSource).toContain("referenceImageUrlResolver: input.referenceImageUrlResolver");
   });

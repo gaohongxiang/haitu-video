@@ -70,7 +70,7 @@ export function CompactChoiceDropdown<T extends string>({
           "flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-[13px] border bg-[var(--field)] px-3 text-left text-sm font-black text-[var(--text)] shadow-[0_8px_18px_rgba(96,64,43,.05)] transition",
           compact && "min-h-9 rounded-[10px] px-2.5 text-[13px] shadow-none",
           layout === "inline" && "h-full min-h-11 border-0 bg-transparent px-0 shadow-none hover:border-0 hover:bg-transparent",
-          pill && "min-h-9 w-full rounded-[8px] border-[var(--border)] bg-[var(--field)] px-2.5 text-xs shadow-none hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]",
+          pill && "min-h-9 w-auto rounded-[8px] border-[var(--border)] bg-[var(--field)] px-2.5 text-xs shadow-none hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border-strong))]",
           pill && micro && "min-h-7 gap-0.5 rounded-[7px] border-transparent bg-transparent px-1 text-[11px] font-bold text-[color-mix(in_srgb,var(--text)_78%,var(--muted))] hover:border-transparent hover:bg-[color-mix(in_srgb,var(--text)_6%,transparent)]",
           dropdownDisabled && "cursor-not-allowed opacity-60 shadow-none",
           layout === "stacked" && (open

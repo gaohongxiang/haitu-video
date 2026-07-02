@@ -62,7 +62,6 @@ export interface ConsoleSnapshotTypes {
   walletResponse: unknown;
   paymentMethodsResponse: unknown;
   modelPricingCatalogResponse: unknown;
-  modelBundlesResponse: unknown;
   modelServicePreferenceResponse: unknown;
 }
 
@@ -84,7 +83,6 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     walletResponse,
     paymentMethodsResponse,
     modelPricingCatalogResponse,
-    modelBundlesResponse,
     modelServicePreferenceResponse
   ] = await Promise.all([
     getJsonWithSignal<T["productsResponse"]>("/api/products", signal),
@@ -101,7 +99,6 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     getJsonWithSignal<T["walletResponse"]>("/api/wallet", signal),
     getJsonWithSignal<T["paymentMethodsResponse"]>("/api/payment-methods", signal),
     getJsonWithSignal<T["modelPricingCatalogResponse"]>("/api/model-pricing-catalog", signal),
-    getJsonWithSignal<T["modelBundlesResponse"]>("/api/model-bundles", signal),
     getJsonWithSignal<T["modelServicePreferenceResponse"]>("/api/model-service-preference", signal)
   ]);
   return {
@@ -119,7 +116,6 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     walletResponse,
     paymentMethodsResponse,
     modelPricingCatalogResponse,
-    modelBundlesResponse,
     modelServicePreferenceResponse
   } as T;
 }

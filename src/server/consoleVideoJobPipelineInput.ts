@@ -24,6 +24,7 @@ export function createMakeVideoPipelineInput(input: {
     cta: input.record.cta ?? "今すぐチェック",
     scriptLines: input.record.scriptLines,
     storyboardLines: input.record.storyboardLines,
+    referenceImages: input.record.referenceImages,
     confirmPaid: input.record.confirmPaid,
     reuseManifestPath: input.record.reuseManifest,
     fetchImpl: input.fetchImpl,

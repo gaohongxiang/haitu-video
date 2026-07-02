@@ -18,22 +18,3 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
 CREATE INDEX IF NOT EXISTS wallet_transactions_workspace_id_idx ON wallet_transactions(workspace_id);
 CREATE INDEX IF NOT EXISTS wallet_transactions_reservation_idx ON wallet_transactions(workspace_id, reservation_id);
 CREATE INDEX IF NOT EXISTS wallet_transactions_job_idx ON wallet_transactions(workspace_id, job_id);
-
-CREATE TABLE IF NOT EXISTS model_bundles (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  bundle_id TEXT NOT NULL,
-  label TEXT NOT NULL,
-  description TEXT,
-  text_model_config_id TEXT,
-  image_model_config_id TEXT,
-  video_model_config_id TEXT,
-  enabled INTEGER NOT NULL DEFAULT 1,
-  priority INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE (workspace_id, bundle_id)
-);
-
-CREATE INDEX IF NOT EXISTS model_bundles_workspace_id_idx ON model_bundles(workspace_id);
-CREATE INDEX IF NOT EXISTS model_bundles_enabled_idx ON model_bundles(workspace_id, enabled, priority);

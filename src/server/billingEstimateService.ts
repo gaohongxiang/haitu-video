@@ -6,7 +6,6 @@ import {
   estimateTextUpstreamCostCny
 } from "./modelPricing.js";
 import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
-import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore, ModelStoredConfig } from "./modelConfigStore.js";
 import { selectModelConfig } from "./modelConfigSelection.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
@@ -46,7 +45,6 @@ export async function estimateBillingActions(input: {
   billingPolicyStore: BillingPolicyStore;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   modelPricingCatalog?: readonly ModelPricingEntry[];
   input: BillingEstimatesRequest;
@@ -55,29 +53,23 @@ export async function estimateBillingActions(input: {
     selectModelConfig({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
-      providerId: "openai-compatible-text",
-      bundleConfigSelector: (bundle) => bundle.textModelConfigId,
-      configId: normalizeConfigId(input.input.textModelConfigId)
+      capability: "text",
+      requestedConfigId: normalizeConfigId(input.input.textModelConfigId)
     }),
     selectModelConfig({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
-      providerId: "openai-compatible-image",
-      bundleConfigSelector: (bundle) => bundle.imageModelConfigId,
-      configId: normalizeConfigId(input.input.imageModelConfigId)
+      capability: "image",
+      requestedConfigId: normalizeConfigId(input.input.imageModelConfigId)
     }),
     selectModelConfig({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
-      providerId: "volcengine-seedance",
-      bundleConfigSelector: (bundle) => bundle.videoModelConfigId,
-      configId: normalizeConfigId(input.input.videoModelConfigId)
+      capability: "video",
+      requestedConfigId: normalizeConfigId(input.input.videoModelConfigId)
     })
   ]);
   const referenceImageCount = clampInteger(input.input.referenceImageCount, 1, 4, 1);

@@ -10,6 +10,13 @@ export interface OpenAiCompatibleImageProviderOptions {
 export interface ImageGenerationRequest {
   prompt: string;
   count?: number;
+  referenceImages?: ImageGenerationReference[];
+}
+
+export interface ImageGenerationReference {
+  bytes: Buffer;
+  fileName: string;
+  mimeType: string;
 }
 
 export interface GeneratedImageAsset {
@@ -45,7 +52,23 @@ export class OpenAiCompatibleImageProvider {
     if (!this.apiKey) {
       throw new Error("请先在 API 管理配置图片模型 API Key。");
     }
-    const response = await this.fetchImpl(`${this.baseUrl}/images/generations`, {
+    const response = request.referenceImages?.length
+      ? await this.generateEditedImages(request)
+      : await this.generateNewImages(request);
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`图片模型请求失败 ${response.status}: ${text}`);
+    }
+    const payload = text ? JSON.parse(text) as ImageGenerationResponse : {};
+    const images = payload.data ?? [];
+    if (images.length === 0) {
+      throw new Error(payload.error?.message ?? "图片模型没有返回图片。");
+    }
+    return Promise.all(images.map((image) => this.toGeneratedImage(image)));
+  }
+
+  private async generateNewImages(request: ImageGenerationRequest): Promise<Response> {
+    return this.fetchImpl(`${this.baseUrl}/images/generations`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${this.apiKey}`,
@@ -59,16 +82,27 @@ export class OpenAiCompatibleImageProvider {
         response_format: "b64_json"
       })
     });
-    const text = await response.text();
-    if (!response.ok) {
-      throw new Error(`图片模型请求失败 ${response.status}: ${text}`);
+  }
+
+  private async generateEditedImages(request: ImageGenerationRequest): Promise<Response> {
+    const formData = new FormData();
+    formData.set("model", this.model);
+    formData.set("prompt", request.prompt);
+    formData.set("n", String(clampImageCount(request.count)));
+    formData.set("size", "1024x1024");
+    formData.set("response_format", "b64_json");
+    for (const image of request.referenceImages ?? []) {
+      formData.append("image", new File([new Uint8Array(image.bytes)], image.fileName, {
+        type: normalizeImageMimeType(image.mimeType)
+      }));
     }
-    const payload = text ? JSON.parse(text) as ImageGenerationResponse : {};
-    const images = payload.data ?? [];
-    if (images.length === 0) {
-      throw new Error(payload.error?.message ?? "图片模型没有返回图片。");
-    }
-    return Promise.all(images.map((image) => this.toGeneratedImage(image)));
+    return this.fetchImpl(`${this.baseUrl}/images/edits`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.apiKey}`
+      },
+      body: formData
+    });
   }
 
   private async toGeneratedImage(image: NonNullable<ImageGenerationResponse["data"]>[number]): Promise<GeneratedImageAsset> {

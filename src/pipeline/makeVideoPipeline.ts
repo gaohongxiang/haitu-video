@@ -22,6 +22,7 @@ export interface MakeVideoPipelineInput {
   finalLanguage?: FinalVideoLanguage;
   scriptLines?: string[];
   storyboardLines?: string[];
+  referenceImages?: string[];
   confirmPaid: boolean;
   cwd?: string;
   fetchImpl?: typeof fetch;
@@ -90,7 +91,7 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
   const product = parseProductFacts(rawProduct);
   const productWithResolvedAssets = {
     ...product,
-    reference_images: resolveReferenceImages(product.reference_images, {
+    reference_images: resolveReferenceImages(input.referenceImages === undefined ? product.reference_images : input.referenceImages, {
       productFilePath: input.productPath
     })
   };

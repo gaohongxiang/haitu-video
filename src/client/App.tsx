@@ -185,30 +185,13 @@ import {
   type ProviderConfigLedger
 } from "./components/modelServiceConfig.js";
 import {
-  buildModelSchemeOptions,
-  bundleIdFromModelSchemeId,
-  bundleModelConfigIds,
   byokConfiguredModels,
   configuredModelOptions,
-  isCompleteModelBundle,
-  isSelectableModelBundle,
-  localizedModelSchemeBundleLabel,
-  modelConfigChoiceExists,
-  modelSchemeIdForBundle,
-  modelSchemeOptionExists,
-  modelSchemeOwner,
-  normalizeModelBundleItem,
-  platformLowCostBundleId,
-  platformQualityBundleId,
+  effectiveModelConfigChoice,
   platformConfiguredModels,
-  sortByokModelBundlesForDisplay,
-  sortSelectableModelBundles,
-  type ModelBundleItem,
   type ModelConfigChoice,
-  type ModelSchemeChoice,
-  type ModelSchemeOption,
   type ModelServicePreference
-} from "./modelServiceBundles.js";
+} from "./modelServiceSelection.js";
 import {
   modelLabelForId
 } from "../providers/modelCatalog.js";
@@ -444,6 +427,12 @@ interface ProductVideoGenerationOptions {
   providerModel?: string;
   resolution?: VideoResolution;
   aspectRatio?: VideoAspectRatio;
+  referenceImages?: string[];
+}
+
+interface ProductImageGenerationOptions {
+  prompt?: string;
+  referenceImages?: string[];
 }
 
 interface Preflight {
@@ -918,7 +907,6 @@ export function App() {
   const [videoJobs, setVideoJobs] = useState<VideoJob[]>([]);
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [productPath, setProductPath] = useState("");
-  const [selectedModelSchemeId, setSelectedModelSchemeId] = useState<ModelSchemeChoice>("");
   const [selectedTextModelConfigId, setSelectedTextModelConfigId] = useState<ModelConfigChoice>("auto");
   const [selectedImageModelConfigId, setSelectedImageModelConfigId] = useState<ModelConfigChoice>("auto");
   const [selectedVideoModelConfigId, setSelectedVideoModelConfigId] = useState<ModelConfigChoice>("auto");
@@ -931,8 +919,7 @@ export function App() {
   const [appLocale, setAppLocale] = useState<AppLocale>(supportedLocales.includes(i18n.language as AppLocale) ? i18n.language as AppLocale : "zh");
   const [cta, setCta] = useState("今すぐチェック");
   const [studioScriptDraft, setStudioScriptDraft] = useState("");
-  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState(() => localizedDefaultStoryboardDraft(defaultVideoTemplate, defaultVideoDurationSeconds, appLocale));
-  const [storyboardDraftTouched, setStoryboardDraftTouched] = useState(false);
+  const [studioStoryboardDraft, setStudioStoryboardDraft] = useState("");
   const [storyboardDraftSource, setStoryboardDraftSource] = useState<StoryboardDraftSource>("default");
   const [studioStoryboardCnDraft, setStudioStoryboardCnDraft] = useState("");
   const [storyboardHistory, setStoryboardHistory] = useState<StoryboardHistoryRecord[]>([]);
@@ -986,7 +973,6 @@ export function App() {
     source: "built_in",
     entries: []
   });
-  const [modelBundles, setModelBundles] = useState<ModelBundleItem[]>([]);
   const [modelServicePreference, setModelServicePreference] = useState<ModelServicePreference>({
     serviceMode: "byok"
   });
@@ -1026,13 +1012,6 @@ export function App() {
   const handledWalletPaymentReturnRef = useRef(false);
 
   const enabledTemplateOptions = settings.enabledTemplates;
-  const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: selectedVideoModelConfigId, duration, resolution: selectedVideoResolution, aspectRatio: selectedVideoAspectRatio, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
-  const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
-  const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
-  const referenceImageEstimateCount = selectedProduct ? estimatedReferenceImageGenerationCount(selectedProduct.reference_images.length) : 1;
-  const batchEstimatedCostCny = freshPreflight
-    ? roundMoney(((freshPreflight.walletEstimatedChargeCny?.expected ?? freshPreflight.estimatedCostCny.expected) || 0) * safeVersionCount)
-    : undefined;
   const selectedProductSummary = products.find((product) => product.path === productPath);
   const selectedProductGroup = selectedProduct
     ? ledger?.products.find((group) => group.productSku === selectedProduct.sku)
@@ -1059,16 +1038,6 @@ export function App() {
   const activeSectionLabelKey = activeSectionIsCreativeWorkspace ? "creative" : navItems.find((item) => item.id === activeSection)?.labelKey ?? "creative";
   const activeSectionLabel = tApp(`navigation.${activeSectionLabelKey}`);
   const apiOwner = modelServicePreference.serviceMode;
-  const platformBundles = useMemo(
-    () => modelBundles.filter((bundle) => bundle.apiOwner === "platform" && bundle.enabled),
-    [modelBundles]
-  );
-  const byokBundles = useMemo(
-    () => sortByokModelBundlesForDisplay(modelBundles.filter((bundle) => bundle.apiOwner === "byok" && bundle.enabled)),
-    [modelBundles]
-  );
-  const selectablePlatformBundles = platformBundles.filter(isSelectableModelBundle);
-  const selectableByokBundles = byokBundles.filter(isSelectableModelBundle);
   const platformTextModelOptions = useMemo(
     () => platformConfiguredModels(providerConfig.textModels),
     [providerConfig.textModels]
@@ -1093,26 +1062,22 @@ export function App() {
     () => byokConfiguredModels(providerConfig.videoModels),
     [providerConfig.videoModels]
   );
-  const modelSchemeOptions = useMemo(
-    () => buildModelSchemeOptions({
-      platformBundles: selectablePlatformBundles,
-      byokBundles: selectableByokBundles
-    }).map((option) => {
-      const bundle = option.bundleId ? modelBundles.find((item) => item.bundleId === option.bundleId) : undefined;
-      return bundle ? { ...option, label: localizedModelSchemeBundleLabel(bundle, appLocale) } : option;
-    }),
-    [appLocale, modelBundles, selectablePlatformBundles, selectableByokBundles]
-  );
-  const effectiveSelectedModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)
-    ? selectedModelSchemeId
-    : modelSchemeOptions[0]?.id;
-  const selectedSchemeOwner = effectiveSelectedModelSchemeId ? modelSchemeOwner(effectiveSelectedModelSchemeId, modelSchemeOptions) ?? apiOwner : apiOwner;
-  const textModelOptions = selectedSchemeOwner === "platform" ? platformTextModelOptions : byokTextModelOptions;
-  const imageModelOptions = selectedSchemeOwner === "platform" ? platformImageModelOptions : byokImageModelOptions;
-  const videoModelOptions = selectedSchemeOwner === "platform" ? platformVideoModelOptions : byokVideoModelOptions;
-  const textModelConfigured = textModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.textModelConfigId));
-  const imageModelConfigured = imageModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.imageModelConfigId));
-  const videoModelConfigured = videoModelOptions.length > 0 || modelBundles.some((bundle) => bundle.apiOwner === apiOwner && bundle.enabled && Boolean(bundle.videoModelConfigId));
+  const textModelOptions = apiOwner === "platform" ? platformTextModelOptions : byokTextModelOptions;
+  const imageModelOptions = apiOwner === "platform" ? platformImageModelOptions : byokImageModelOptions;
+  const videoModelOptions = apiOwner === "platform" ? platformVideoModelOptions : byokVideoModelOptions;
+  const effectiveSelectedTextModelConfigId = effectiveModelConfigChoice(selectedTextModelConfigId, textModelOptions);
+  const effectiveSelectedImageModelConfigId = effectiveModelConfigChoice(selectedImageModelConfigId, imageModelOptions);
+  const effectiveSelectedVideoModelConfigId = effectiveModelConfigChoice(selectedVideoModelConfigId, videoModelOptions);
+  const textModelConfigured = textModelOptions.length > 0;
+  const imageModelConfigured = imageModelOptions.length > 0;
+  const videoModelConfigured = videoModelOptions.length > 0;
+  const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: effectiveSelectedVideoModelConfigId, duration, resolution: selectedVideoResolution, aspectRatio: selectedVideoAspectRatio, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
+  const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
+  const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
+  const referenceImageEstimateCount = selectedProduct ? estimatedReferenceImageGenerationCount(selectedProduct.reference_images.length) : 1;
+  const batchEstimatedCostCny = freshPreflight
+    ? roundMoney(((freshPreflight.walletEstimatedChargeCny?.expected ?? freshPreflight.estimatedCostCny.expected) || 0) * safeVersionCount)
+    : undefined;
 
   consoleToastCloseRef.current = () => setConsoleToast(undefined);
   const handleConsoleToastClose = useMemo(
@@ -1219,9 +1184,9 @@ export function App() {
       void (async () => {
         try {
           const response = await postJson<BillingEstimatesResponse>("/api/billing-estimates", {
-            textModelConfigId: selectedTextModelConfigId,
-            imageModelConfigId: selectedImageModelConfigId,
-            videoModelConfigId: selectedVideoModelConfigId,
+            textModelConfigId: effectiveSelectedTextModelConfigId,
+            imageModelConfigId: effectiveSelectedImageModelConfigId,
+            videoModelConfigId: effectiveSelectedVideoModelConfigId,
             referenceImageCount: referenceImageEstimateCount,
             videoDurationSeconds: duration,
             videoResolution: selectedVideoResolution,
@@ -1254,9 +1219,9 @@ export function App() {
     textModelConfigured,
     imageModelConfigured,
     videoModelConfigured,
-    selectedImageModelConfigId,
-    selectedTextModelConfigId,
-    selectedVideoModelConfigId
+    effectiveSelectedImageModelConfigId,
+    effectiveSelectedTextModelConfigId,
+    effectiveSelectedVideoModelConfigId
   ]);
 
   useEffect(() => {
@@ -1330,24 +1295,16 @@ export function App() {
   useEffect(() => {
     if (!selectedProduct) {
       setStudioScriptDraft("");
-      setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale));
-      setStoryboardDraftTouched(false);
+      setStudioStoryboardDraft("");
       setStoryboardDraftSource("default");
       setStudioStoryboardCnDraft("");
       return;
     }
     setStudioScriptDraft("");
-    setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale));
-    setStoryboardDraftTouched(false);
+    setStudioStoryboardDraft("");
     setStoryboardDraftSource("default");
     setStudioStoryboardCnDraft("");
   }, [selectedProduct?.sku]);
-
-  useEffect(() => {
-    // Preserve the storyboard once the user edits it manually.
-    if (storyboardDraftTouched) return;
-    setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale));
-  }, [template, duration, appLocale, storyboardDraftTouched]);
 
   useEffect(() => {
     if (!authSession.authenticated || !hasActiveVideoJobs) return;
@@ -1557,7 +1514,6 @@ export function App() {
         walletResponse,
         paymentMethodsResponse,
         modelPricingCatalogResponse,
-        modelBundlesResponse,
         modelServicePreferenceResponse
       } = await fetchConsoleSnapshot<{
         productsResponse: { products: ProductSummary[] };
@@ -1574,7 +1530,6 @@ export function App() {
         walletResponse: WalletLedger;
         paymentMethodsResponse: PaymentMethodsResponse;
         modelPricingCatalogResponse: ModelPricingCatalogResponse;
-        modelBundlesResponse: { bundles: ModelBundleItem[] };
         modelServicePreferenceResponse: { preference: ModelServicePreference };
       }>();
       const ledgerWithQc = attachQcToLedger(ledgerResponse, qcSummaryResponse);
@@ -1592,22 +1547,10 @@ export function App() {
       setWallet(walletResponse);
       setPaymentMethods(paymentMethodsResponse.methods);
       setModelPricingCatalog(modelPricingCatalogResponse.active);
-      const normalizedBundles = modelBundlesResponse.bundles.map(normalizeModelBundleItem);
-      setModelBundles(normalizedBundles);
       setModelServicePreference(modelServicePreferenceResponse.preference);
-      const selectedBundleId = modelServicePreferenceResponse.preference.serviceMode === "platform"
-        ? modelServicePreferenceResponse.preference.platformBundleId
-        : modelServicePreferenceResponse.preference.byokBundleId;
-      const selectableBundles = sortSelectableModelBundles(normalizedBundles);
-      const selectedBundle = selectedBundleId ? selectableBundles.find((bundle) => bundle.bundleId === selectedBundleId) : undefined;
-      const fallbackBundle = selectedBundle ?? selectableBundles[0];
-      setSelectedModelSchemeId(fallbackBundle ? modelSchemeIdForBundle(fallbackBundle.bundleId) : "");
-      if (fallbackBundle) {
-        const { textModelConfigId, imageModelConfigId, videoModelConfigId } = bundleModelConfigIds(fallbackBundle, appLocale);
-        setSelectedTextModelConfigId(textModelConfigId);
-        setSelectedImageModelConfigId(imageModelConfigId);
-        setSelectedVideoModelConfigId(videoModelConfigId);
-      }
+      setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? "auto");
+      setSelectedImageModelConfigId(modelServicePreferenceResponse.preference.imageModelConfigId ?? "auto");
+      setSelectedVideoModelConfigId(modelServicePreferenceResponse.preference.videoModelConfigId ?? "auto");
       setModelConfigDrafts((current) => syncModelConfigDraftsFromLedger(providerConfigResponse, current));
       setSettings(settingsResponse.settings);
       setVideoJobs(videoJobsResponse.jobs);
@@ -1691,11 +1634,18 @@ export function App() {
     setDuration(record.duration);
     setStudioScriptDraft("");
     setStudioStoryboardDraft(record.script);
-    setStoryboardDraftTouched(true);
     setStoryboardDraftSource("ai");
     setStudioStoryboardCnDraft("");
     markPreflightStale();
     setStatusText(tApp("status.storyboardApplied", { template: localizedTemplateLabel(record.style, tVideoApp), duration: formatDuration(record.duration) }));
+  }
+
+  function injectTemplateStoryboardDraft(nextTemplate: TemplateName) {
+    setStudioScriptDraft("");
+    setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale));
+    setStoryboardDraftSource("default");
+    setStudioStoryboardCnDraft("");
+    markPreflightStale();
   }
 
   async function deleteStoryboardHistory(recordId: string) {
@@ -1720,7 +1670,7 @@ export function App() {
       const response = await postJson<{ preflight: Preflight }>("/api/preflight", {
         productPath,
         provider: "volcengine-seedance",
-        providerModelConfigId: selectedVideoModelConfigId,
+        providerModelConfigId: effectiveSelectedVideoModelConfigId,
         duration,
         resolution: selectedVideoResolution,
         aspectRatio: selectedVideoAspectRatio,
@@ -1757,7 +1707,7 @@ export function App() {
         productPath,
         outDirName: `${selectedProductSummary.sku}-${Date.now()}`,
         provider: "volcengine-seedance",
-        providerModelConfigId: selectedVideoModelConfigId,
+        providerModelConfigId: effectiveSelectedVideoModelConfigId,
         duration,
         template,
         finalLanguage,
@@ -1879,86 +1829,10 @@ export function App() {
     setIsBusy(true);
     try {
       const preference = await persistModelServicePreference(patch);
-      const selectedBundleId = preference.serviceMode === "platform" ? preference.platformBundleId : preference.byokBundleId;
-      const selectedBundle = selectedBundleId ? modelBundles.find((bundle) => bundle.bundleId === selectedBundleId) : undefined;
-      if (selectedBundle) {
-        applyModelBundleSelection(selectedBundle);
-        setSelectedModelSchemeId(modelSchemeIdForBundle(selectedBundle.bundleId));
-      }
+      setSelectedTextModelConfigId(preference.textModelConfigId ?? "auto");
+      setSelectedImageModelConfigId(preference.imageModelConfigId ?? "auto");
+      setSelectedVideoModelConfigId(preference.videoModelConfigId ?? "auto");
       setStatusText(preference.serviceMode === "platform" ? tApp("status.platformMode") : tApp("status.byokMode"));
-      await refreshConsole();
-    } catch (error) {
-      showError(error);
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function saveModelBundle(input: Partial<ModelBundleItem> & {
-    apiOwner: ModelBundleItem["apiOwner"];
-    label: string;
-    statusText?: string;
-    activate?: boolean;
-  }) {
-    setIsBusy(true);
-    try {
-      const nextBundleInput = {
-        bundleId: input.bundleId,
-        apiOwner: input.apiOwner,
-        label: input.label,
-        description: input.description,
-        textModelConfigId: input.textModelConfigId,
-        imageModelConfigId: input.imageModelConfigId,
-        videoModelConfigId: input.videoModelConfigId,
-        enabled: input.enabled ?? true
-      };
-      const savedBundleResponse = await putJson<{ bundle: ModelBundleItem }>("/api/model-bundles", nextBundleInput);
-      const savedBundle = normalizeModelBundleItem(savedBundleResponse.bundle);
-      setModelBundles((current) => {
-        const existingIndex = current.findIndex((bundle) => bundle.bundleId === savedBundle.bundleId);
-        if (existingIndex === -1) {
-          return [...current, savedBundle];
-        }
-        return current.map((bundle) => bundle.bundleId === savedBundle.bundleId ? savedBundle : bundle);
-      });
-      const shouldActivateSavedBundle = input.activate !== false && isSelectableModelBundle(savedBundle);
-      if (shouldActivateSavedBundle) {
-        applyModelBundleSelection(savedBundle);
-        await persistModelServicePreference({
-          serviceMode: input.apiOwner === "platform" ? "platform" : "byok",
-          ...(input.apiOwner === "platform" ? { platformBundleId: savedBundle.bundleId } : { byokBundleId: savedBundle.bundleId })
-        });
-        setSelectedModelSchemeId(modelSchemeIdForBundle(savedBundle.bundleId));
-      }
-      setStatusText(input.statusText ?? tApp("status.bundleSaved"));
-      await refreshConsole();
-      return savedBundle;
-    } catch (error) {
-      showError(error);
-      return undefined;
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function deleteModelBundle(bundleId: string) {
-    setIsBusy(true);
-    try {
-      await deleteJson<{ ok: true }>(`/api/model-bundles/${encodeURIComponent(bundleId)}`);
-      setModelBundles((current) => current.filter((bundle) => bundle.bundleId !== bundleId));
-      const clearsSelectedByok = modelServicePreference.byokBundleId === bundleId;
-      const clearsSelectedPlatform = modelServicePreference.platformBundleId === bundleId;
-      if (clearsSelectedByok || clearsSelectedPlatform) {
-        await persistModelServicePreference({
-          ...(clearsSelectedByok ? { byokBundleId: null } : {}),
-          ...(clearsSelectedPlatform ? { platformBundleId: null } : {})
-        });
-        setSelectedModelSchemeId("");
-        setSelectedTextModelConfigId("auto");
-        setSelectedImageModelConfigId("auto");
-        setSelectedVideoModelConfigId("auto");
-      }
-      setStatusText(tApp("status.bundleDeleted"));
       await refreshConsole();
     } catch (error) {
       showError(error);
@@ -1974,44 +1848,8 @@ export function App() {
     };
     const response = await putJson<{ preference: ModelServicePreference }>("/api/model-service-preference", nextPreference);
     setModelServicePreference(response.preference);
-    if (!patch.platformBundleId && !patch.byokBundleId) {
-      setSelectedTextModelConfigId("auto");
-      setSelectedImageModelConfigId("auto");
-      setSelectedVideoModelConfigId("auto");
-    }
     markPreflightStale();
     return response.preference;
-  }
-
-  function applyModelBundleSelection(bundle: ModelBundleItem) {
-    if (!isSelectableModelBundle(bundle)) {
-      setStatusText(tApp("status.bundleIncomplete"));
-      return;
-    }
-    const { textModelConfigId, imageModelConfigId, videoModelConfigId } = bundleModelConfigIds(bundle, appLocale);
-    setSelectedTextModelConfigId(textModelConfigId);
-    setSelectedImageModelConfigId(imageModelConfigId);
-    setSelectedVideoModelConfigId(videoModelConfigId);
-    markPreflightStale();
-  }
-
-  async function applyModelSchemeSelection(nextSchemeId: ModelSchemeChoice) {
-    setSelectedModelSchemeId(nextSchemeId);
-    const bundleId = bundleIdFromModelSchemeId(nextSchemeId);
-    if (!bundleId) {
-      return;
-    }
-    const bundle = modelBundles.find((item) => item.bundleId === bundleId);
-    if (bundle && isSelectableModelBundle(bundle)) {
-      applyModelBundleSelection(bundle);
-      await saveModelServicePreference(
-        bundle.apiOwner === "platform"
-          ? { serviceMode: "platform", platformBundleId: bundle.bundleId }
-          : { serviceMode: "byok", byokBundleId: bundle.bundleId }
-      );
-      return;
-    }
-    setStatusText(tApp("status.bundleIncomplete"));
   }
 
   async function testModelConfig(providerId: ModelConfigProviderId) {
@@ -2498,8 +2336,7 @@ export function App() {
     setPreflight(undefined);
     setPreflightSignature("");
     setStudioScriptDraft("");
-    setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale));
-    setStoryboardDraftTouched(false);
+    setStudioStoryboardDraft("");
     setStoryboardDraftSource("default");
     setStudioStoryboardCnDraft("");
     setStoryboardHistory([]);
@@ -2520,7 +2357,7 @@ export function App() {
     try {
       const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
         text: importText,
-        textModelConfigId: selectedTextModelConfigId
+        textModelConfigId: effectiveSelectedTextModelConfigId
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       await applyProductToCreationComposerWithStoryboards(response.product);
@@ -2578,7 +2415,7 @@ export function App() {
     }
     const videoGenerationOptions: ProductVideoGenerationOptions = options ?? {
       provider: "volcengine-seedance",
-      providerModelConfigId: selectedVideoModelConfigId
+      providerModelConfigId: effectiveSelectedVideoModelConfigId
     };
     const selectedDuration = Math.max(4, Math.min(15, Math.floor(duration || 8)));
     const selectedVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
@@ -2595,6 +2432,7 @@ export function App() {
         duration: selectedDuration,
         resolution: videoGenerationOptions.resolution ?? selectedVideoResolution,
         aspectRatio: videoGenerationOptions.aspectRatio ?? selectedVideoAspectRatio,
+        referenceImages: videoGenerationOptions.referenceImages,
         template,
         finalLanguage,
         cta,
@@ -2655,7 +2493,7 @@ export function App() {
     try {
       const preview = await postJson<ProductImportPreviewResponse>("/api/products/import-ai-preview", {
         text: productImportText,
-        textModelConfigId: selectedTextModelConfigId
+        textModelConfigId: effectiveSelectedTextModelConfigId
       });
       const response = await postJson<{ product: ProductDetail }>("/api/products", preview.product);
       if (activeSectionIsCreativeWorkspace) {
@@ -2813,7 +2651,7 @@ export function App() {
         {
           duration,
           template,
-          textModelConfigId: selectedTextModelConfigId
+          textModelConfigId: effectiveSelectedTextModelConfigId
         },
         controller.signal
       );
@@ -2821,7 +2659,6 @@ export function App() {
       const nextStoryboardDraft = response.storyboardLines.join("\n");
       setStudioScriptDraft(nextScriptDraft);
       setStudioStoryboardDraft(nextStoryboardDraft);
-      setStoryboardDraftTouched(true);
       setStoryboardDraftSource("ai");
       setStudioStoryboardCnDraft("");
       await pushStoryboardHistory({
@@ -2867,7 +2704,7 @@ export function App() {
         {
           prompt: options.prompt?.trim() || undefined,
           targetImage: options.targetImage?.trim() || undefined,
-          textModelConfigId: selectedTextModelConfigId
+          textModelConfigId: effectiveSelectedTextModelConfigId
         },
         controller.signal
       );
@@ -3020,7 +2857,7 @@ export function App() {
     }
   }
 
-  async function generateProductReferenceImages(sku: string, prompt?: string) {
+  async function generateProductReferenceImages(sku: string, options: ProductImageGenerationOptions = {}) {
     if (!sku) {
       return;
     }
@@ -3033,8 +2870,9 @@ export function App() {
         generated: Array<{ reference: string }>;
         product: ProductDetail;
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {
-        imageModelConfigId: selectedImageModelConfigId,
-        prompt: prompt?.trim() || undefined
+        imageModelConfigId: effectiveSelectedImageModelConfigId,
+        prompt: options.prompt?.trim() || undefined,
+        referenceImages: options.referenceImages ?? []
       });
       await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
@@ -3294,21 +3132,20 @@ export function App() {
           onGenerateReferenceImages={generateProductReferenceImages}
           onDeleteReferenceImage={deleteProductReferenceImage}
           onReorderReferenceImage={reorderProductReferenceImages}
-          modelSchemeOptions={modelSchemeOptions}
-          selectedModelSchemeId={effectiveSelectedModelSchemeId ?? ""}
-          onModelSchemeChange={(schemeId) => void applyModelSchemeSelection(schemeId)}
           textModelOptions={textModelOptions}
           selectedTextModelConfigId={selectedTextModelConfigId}
           imageModelOptions={imageModelOptions}
           selectedImageModelConfigId={selectedImageModelConfigId}
           onImageModelConfigChange={(nextConfigId) => {
             setSelectedImageModelConfigId(nextConfigId);
+            void persistModelServicePreference({ imageModelConfigId: nextConfigId });
             markPreflightStale();
           }}
           videoModelOptions={videoModelOptions}
           selectedVideoModelConfigId={selectedVideoModelConfigId}
           onVideoModelConfigChange={(nextConfigId) => {
             setSelectedVideoModelConfigId(nextConfigId);
+            void persistModelServicePreference({ videoModelConfigId: nextConfigId });
             markPreflightStale();
           }}
           duration={duration}
@@ -3332,7 +3169,7 @@ export function App() {
           enabledTemplateOptions={enabledTemplateOptions}
           onTemplateChange={(nextTemplate) => {
             setTemplate(nextTemplate);
-            markPreflightStale();
+            injectTemplateStoryboardDraft(nextTemplate);
           }}
           finalLanguage={finalLanguage}
           onFinalLanguageChange={(nextLanguage) => {
@@ -3340,10 +3177,8 @@ export function App() {
             markPreflightStale();
           }}
           storyboardDraft={studioStoryboardDraft}
-          storyboardDraftIsGuidance={!storyboardDraftTouched}
           storyboardDraftSource={storyboardDraftSource}
           onStoryboardDraftChange={(nextDraft) => {
-            setStoryboardDraftTouched(true);
             setStoryboardDraftSource("manual");
             setStudioStoryboardDraft(nextDraft);
             markPreflightStale();
@@ -3419,7 +3254,6 @@ export function App() {
           <section className="grid gap-4" aria-label={tApp("settings.ariaLabel")}>
             <ApiModelConfigPanel
               config={providerConfig}
-              modelBundles={modelBundles}
               servicePreference={modelServicePreference}
               drafts={modelConfigDrafts}
               testStatuses={modelConfigTestStatus}
@@ -3432,9 +3266,6 @@ export function App() {
               onClear={clearModelConfig}
               onToggleEnabled={toggleModelConfigEnabled}
               onServicePreferenceChange={saveModelServicePreference}
-              onApplyBundleSelection={applyModelBundleSelection}
-              onSaveBundle={saveModelBundle}
-              onDeleteBundle={deleteModelBundle}
               isBusy={isBusy}
             />
           </section>
@@ -4458,9 +4289,6 @@ function ProductCreationWorkspace({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onReorderReferenceImage,
-  modelSchemeOptions,
-  selectedModelSchemeId,
-  onModelSchemeChange,
   textModelOptions,
   selectedTextModelConfigId,
   imageModelOptions,
@@ -4483,7 +4311,6 @@ function ProductCreationWorkspace({
   finalLanguage,
   onFinalLanguageChange,
   storyboardDraft,
-  storyboardDraftIsGuidance,
   storyboardDraftSource,
   onStoryboardDraftChange,
   storyboardHistory,
@@ -4528,12 +4355,9 @@ function ProductCreationWorkspace({
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
-  modelSchemeOptions: ModelSchemeOption[];
-  selectedModelSchemeId: ModelSchemeChoice;
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   textModelOptions: ProviderConfigItem[];
   selectedTextModelConfigId: ModelConfigChoice;
   imageModelOptions: ProviderConfigItem[];
@@ -4556,7 +4380,6 @@ function ProductCreationWorkspace({
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
-  storyboardDraftIsGuidance: boolean;
   storyboardDraftSource: StoryboardDraftSource;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -4628,9 +4451,6 @@ function ProductCreationWorkspace({
       onGenerateReferenceImages={onGenerateReferenceImages}
       onDeleteReferenceImage={onDeleteReferenceImage}
       onReorderReferenceImage={onReorderReferenceImage}
-      modelSchemeOptions={modelSchemeOptions}
-      selectedModelSchemeId={modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions) ? selectedModelSchemeId : modelSchemeOptions[0]?.id ?? ""}
-      onModelSchemeChange={onModelSchemeChange}
       textModelOptions={textModelOptions}
       selectedTextModelConfigId={selectedTextModelConfigId}
       imageModelOptions={imageModelOptions}
@@ -4653,7 +4473,6 @@ function ProductCreationWorkspace({
       finalLanguage={finalLanguage}
       onFinalLanguageChange={onFinalLanguageChange}
       storyboardDraft={storyboardDraft}
-      storyboardDraftIsGuidance={storyboardDraftIsGuidance}
       storyboardDraftSource={storyboardDraftSource}
       onStoryboardDraftChange={onStoryboardDraftChange}
       storyboardHistory={selectedProductStoryboardHistory}
@@ -4703,9 +4522,6 @@ function ProductCreationComposer({
   onGenerateReferenceImages,
   onDeleteReferenceImage,
   onReorderReferenceImage,
-  modelSchemeOptions,
-  selectedModelSchemeId,
-  onModelSchemeChange,
   textModelOptions,
   selectedTextModelConfigId,
   imageModelOptions,
@@ -4728,7 +4544,6 @@ function ProductCreationComposer({
   finalLanguage,
   onFinalLanguageChange,
   storyboardDraft,
-  storyboardDraftIsGuidance,
   storyboardDraftSource,
   onStoryboardDraftChange,
   storyboardHistory,
@@ -4771,12 +4586,9 @@ function ProductCreationComposer({
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<void>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
-  modelSchemeOptions: ModelSchemeOption[];
-  selectedModelSchemeId: ModelSchemeChoice;
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   textModelOptions: ProviderConfigItem[];
   selectedTextModelConfigId: ModelConfigChoice;
   imageModelOptions: ProviderConfigItem[];
@@ -4799,7 +4611,6 @@ function ProductCreationComposer({
   finalLanguage: FinalVideoLanguage;
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
-  storyboardDraftIsGuidance: boolean;
   storyboardDraftSource: StoryboardDraftSource;
   onStoryboardDraftChange: (draft: string) => void;
   storyboardHistory: StoryboardHistoryRecord[];
@@ -4815,6 +4626,9 @@ function ProductCreationComposer({
   const [isSubmittingImage, setIsSubmittingImage] = useState(false);
   const [previewJob, setPreviewJob] = useState<CreativeVersionItem | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CreativeVersionItem | undefined>();
+  const [previewReferenceImageIndex, setPreviewReferenceImageIndex] = useState<number | undefined>();
+  const [previewImagePromptReferenceIndex, setPreviewImagePromptReferenceIndex] = useState<number | undefined>();
+  const [imagePromptReferences, setImagePromptReferences] = useState<ReferenceImageStatus[]>([]);
   const [imagePromptReferenceIndex, setImagePromptReferenceIndex] = useState<number | undefined>();
   const [imagePrompt, setImagePrompt] = useState("");
   const [fileImportOpen, setFileImportOpen] = useState(false);
@@ -4839,20 +4653,6 @@ function ProductCreationComposer({
   const previewableReferenceImages = selectedProduct
     ? previewReferenceImages.length > 0 ? previewReferenceImages : draftReferenceImages
     : draftReferenceImages.length > 0 ? draftReferenceImages : pendingReferenceImageStatuses;
-  const activeModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)
-    ? selectedModelSchemeId
-    : modelSchemeOptions[0]?.id ?? "";
-  const schemeSummary = localizedModelSchemeSummary({
-    schemeId: activeModelSchemeId,
-    options: modelSchemeOptions,
-    textModels: textModelOptions,
-    imageModels: imageModelOptions,
-    videoModels: videoModelOptions,
-    selectedTextModelConfigId,
-    selectedImageModelConfigId,
-    selectedVideoModelConfigId,
-    tVideo
-  });
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
   const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"];
@@ -4870,16 +4670,21 @@ function ProductCreationComposer({
     tVideo
   });
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
+  const effectiveSelectedImageModelConfigId = effectiveModelConfigChoice(selectedImageModelConfigId, imageModelOptions);
+  const effectiveSelectedVideoModelConfigId = effectiveModelConfigChoice(selectedVideoModelConfigId, videoModelOptions);
+  const selectedCreationReferenceImages = imagePromptReferences.map((image) => image.original).filter(Boolean);
+  const activeCreationReferenceCount = selectedCreationReferenceImages.length > 0 ? selectedCreationReferenceImages.length : previewableReferenceImages.length;
+  const videoModelLabel = localizedModelConfigChoiceLabel(effectiveSelectedVideoModelConfigId, videoModelOptions, tVideo);
   const generateVideoSummary = [
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
-    tVideo("summary.referenceImages", { count: previewableReferenceImages.length }),
+    tVideo("summary.referenceImages", { count: activeCreationReferenceCount }),
     localizedStoryboardStatusLabel(storyboardDraftSource, tVideo),
     localizedTemplateLabel(template, tVideo),
     formatDuration(duration),
     videoResolutionLabel(selectedVideoResolution),
     videoAspectRatioLabel(selectedVideoAspectRatio, tVideo),
     finalLanguageLabel(finalLanguage, tVideo),
-    localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
+    tVideo("models.videoModel", { model: videoModelLabel })
   ].join(" · ");
   const productImageAssetCount = 0;
   const creativeWorkspace = buildProductCreativeWorkspace({
@@ -4890,16 +4695,16 @@ function ProductCreationComposer({
     generatedVideoCount: latestCreativeJobs.length,
     imageAssetCount: productImageAssetCount
   });
-  const imageModelLabel = localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo);
+  const imageModelLabel = localizedModelConfigChoiceLabel(effectiveSelectedImageModelConfigId, imageModelOptions, tVideo);
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
   const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
   const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100";
-  const selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : previewableReferenceImages[imagePromptReferenceIndex];
+  const selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : imagePromptReferences[imagePromptReferenceIndex];
   const selectedImagePromptReferenceNumber = selectedImagePromptReference
-    ? Math.max(0, previewableReferenceImages.indexOf(selectedImagePromptReference)) + 1
+    ? Math.max(0, imagePromptReferences.indexOf(selectedImagePromptReference)) + 1
     : 0;
   const imageTargetLabel = selectedImagePromptReference
-    ? `优化参考图 ${selectedImagePromptReferenceNumber} · 共 ${previewableReferenceImages.length} 张可用`
+    ? `优化参考图 ${selectedImagePromptReferenceNumber} · 共 ${imagePromptReferences.length} 张已选`
     : "按商品资料生成";
   const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片提示词" : "默认图片提示词";
   const generateImageButtonLabel = "生成图片";
@@ -4907,10 +4712,10 @@ function ProductCreationComposer({
     localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
     imageTargetLabel,
     imagePromptReadyLabel,
-    `图片模型 ${imageModelLabel}`,
-    localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)
+    tVideo("models.imageModel", { model: imageModelLabel })
   ].join(" · ");
   useEffect(() => {
+    setImagePromptReferences([]);
     setImagePromptReferenceIndex(undefined);
     setImagePrompt("");
     if (productFactsBodyRef.current) {
@@ -4920,14 +4725,14 @@ function ProductCreationComposer({
 
   useEffect(() => {
     if (imagePromptReferenceIndex === undefined) return;
-    if (previewableReferenceImages.length === 0) {
+    if (imagePromptReferences.length === 0) {
       setImagePromptReferenceIndex(undefined);
       return;
     }
-    if (imagePromptReferenceIndex >= previewableReferenceImages.length) {
-      setImagePromptReferenceIndex(previewableReferenceImages.length - 1);
+    if (imagePromptReferenceIndex >= imagePromptReferences.length) {
+      setImagePromptReferenceIndex(imagePromptReferences.length - 1);
     }
-  }, [previewableReferenceImages.length, imagePromptReferenceIndex]);
+  }, [imagePromptReferences.length, imagePromptReferenceIndex]);
 
   useEffect(() => {
     return () => {
@@ -4979,9 +4784,10 @@ function ProductCreationComposer({
       if (!savedProduct) return;
       await onGenerateVideo(productActionSummary(savedProduct), {
         provider: "volcengine-seedance",
-        providerModelConfigId: selectedVideoModelConfigId,
+        providerModelConfigId: effectiveSelectedVideoModelConfigId,
         resolution: selectedVideoResolution,
-        aspectRatio: selectedVideoAspectRatio
+        aspectRatio: selectedVideoAspectRatio,
+        referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []
       });
       onToast(tVideo("generate.queuedToast"), "ok");
     } catch (error) {
@@ -5002,7 +4808,10 @@ function ProductCreationComposer({
       const autoSavedProduct = await onFlushProductFactsAutoSave();
       const savedProduct = autoSavedProduct ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
-      await onGenerateReferenceImages(savedProduct.sku, imagePrompt);
+      await onGenerateReferenceImages(savedProduct.sku, {
+        prompt: imagePrompt,
+        referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []
+      });
       onToast("商品图片优化已提交", "ok");
     } catch (error) {
       onToast(errorMessage(error));
@@ -5031,6 +4840,38 @@ function ProductCreationComposer({
   }
 
   function handleReferenceFiles(files: FileList | File[] | null) {
+    const acceptedFiles = acceptedReferenceFiles(files);
+    if (!acceptedFiles) return;
+    if (selectedProduct) {
+      void onUploadImages(selectedProduct.sku, acceptedFiles);
+      return;
+    }
+    setPendingImageFiles((current) => [...current, ...acceptedFiles]);
+  }
+
+  async function handleImagePromptReferenceFiles(files: FileList | File[] | null) {
+    const acceptedFiles = acceptedReferenceFiles(files);
+    if (!acceptedFiles) return;
+    if (selectedProduct) {
+      const productBeforeUploadCount = previewReferenceImages.length;
+      const uploadedProduct = await onUploadImages(selectedProduct.sku, acceptedFiles);
+      const uploadedReferences = uploadedProduct?.reference_image_statuses?.slice(productBeforeUploadCount) ?? [];
+      if (uploadedReferences.length > 0) {
+        addImagePromptReferences(uploadedReferences);
+      }
+      return;
+    }
+    const pendingReferences = acceptedFiles.map((file, index) => ({
+      original: file.name || tVideo("reference.pendingImageName", { index: pendingImageFiles.length + index + 1 }),
+      resolvedPath: file.name,
+      previewUrl: URL.createObjectURL(file),
+      status: "previewable" as const
+    }));
+    setPendingImageFiles((current) => [...current, ...acceptedFiles]);
+    addImagePromptReferences(pendingReferences);
+  }
+
+  function acceptedReferenceFiles(files: FileList | File[] | null): File[] | undefined {
     if (!files || files.length === 0) return;
     const incomingFiles = Array.from(files);
     const acceptedFiles = incomingFiles.filter(isReferenceImageFile);
@@ -5041,11 +4882,7 @@ function ProductCreationComposer({
     if (acceptedFiles.length < incomingFiles.length) {
       onToast(tVideo("generate.ignoredFileToast"));
     }
-    if (selectedProduct) {
-      void onUploadImages(selectedProduct.sku, acceptedFiles);
-      return;
-    }
-    setPendingImageFiles((current) => [...current, ...acceptedFiles]);
+    return acceptedFiles;
   }
 
   async function copyPastedMediaReferencesToProduct(references: string[]) {
@@ -5071,6 +4908,12 @@ function ProductCreationComposer({
     const files = clipboardReferenceFiles(event.clipboardData);
     if (!files.some(isReferenceImageFile)) return;
     event.preventDefault();
+    const pasteInsidePrompt = event.target instanceof Node
+      && event.currentTarget.querySelector(".storyboard-history-dropdown")?.contains(event.target);
+    if (pasteInsidePrompt) {
+      void handleImagePromptReferenceFiles(files);
+      return;
+    }
     handleReferenceFiles(files);
   }
 
@@ -5092,6 +4935,79 @@ function ProductCreationComposer({
     void copyPastedMediaReferencesToProduct(mediaReferences);
   }
 
+  function handleSelectReferenceImage(index: number) {
+    const reference = previewableReferenceImages[index];
+    if (!reference) return;
+    addImagePromptReferences([reference]);
+  }
+
+  function handlePreviewReferenceImage(index: number) {
+    if (!previewableReferenceImages[index]) return;
+    setPreviewReferenceImageIndex(index);
+  }
+
+  function handleSelectImagePromptReference(index: number) {
+    if (!imagePromptReferences[index]) return;
+    setImagePromptReferenceIndex(index);
+  }
+
+  function handlePreviewImagePromptReference(index: number) {
+    if (!imagePromptReferences[index]) return;
+    setPreviewImagePromptReferenceIndex(index);
+  }
+
+  function selectedCreationReferenceImagesForProduct(product: ProductDetail): string[] | undefined {
+    if (imagePromptReferences.length === 0) return undefined;
+    const productReferences: ReferenceImageStatus[] = (product.reference_image_statuses ?? product.reference_images.map((reference) => ({
+      original: reference,
+      resolvedPath: reference,
+      previewUrl: null,
+      status: "previewable" as const
+    })));
+    const recentlyUploadedReferences = productReferences.slice(Math.max(0, productReferences.length - pendingReferenceImageStatuses.length));
+    const resolvedReferences = imagePromptReferences
+      .map((reference) => {
+        const exactReference = productReferences.find((item) => referenceImageKey(item) === referenceImageKey(reference));
+        if (exactReference) return exactReference.original;
+        const pendingIndex = pendingReferenceImageStatuses.findIndex((item) => referenceImageKey(item) === referenceImageKey(reference));
+        if (pendingIndex >= 0) {
+          return recentlyUploadedReferences[pendingIndex]?.original ?? reference.original;
+        }
+        return reference.original;
+      })
+      .filter(Boolean);
+    return resolvedReferences.length > 0 ? resolvedReferences : undefined;
+  }
+
+  function addImagePromptReferences(references: ReferenceImageStatus[]) {
+    if (references.length === 0) return;
+    setImagePromptReferences((current) => {
+      const nextReferences = [...current];
+      let selectedIndex = current.length;
+      for (const reference of references) {
+        const existingIndex = nextReferences.findIndex((item) => referenceImageKey(item) === referenceImageKey(reference));
+        if (existingIndex >= 0) {
+          selectedIndex = existingIndex;
+          continue;
+        }
+        selectedIndex = nextReferences.length;
+        nextReferences.push(reference);
+      }
+      setImagePromptReferenceIndex(selectedIndex);
+      return nextReferences;
+    });
+  }
+
+  function handleRemoveImagePromptReference(index: number) {
+    setImagePromptReferences((current) => current.filter((_, promptIndex) => promptIndex !== index));
+    setImagePromptReferenceIndex((current) => {
+      if (current === undefined) return undefined;
+      if (current === index) return undefined;
+      if (current > index) return current - 1;
+      return current;
+    });
+  }
+
   async function handleDeleteCreativeVersion(job: CreativeVersionItem) {
     if (job.source === "video-job") {
       await onCancelVideoJob(job.id);
@@ -5109,11 +5025,16 @@ function ProductCreationComposer({
         removeReferenceFromComposerText(importText, draftImage.original),
         removeDraftReferenceImage(draft, draftImage.original)
       );
+      setImagePromptReferences((current) => current.filter((image) => referenceImageKey(image) !== referenceImageKey(draftImage)));
       setImagePromptReferenceIndex(undefined);
       return;
     }
     if (!selectedProduct) return;
+    const deletedImage = previewReferenceImages[index];
     await onDeleteReferenceImage(selectedProduct.sku, index);
+    if (deletedImage) {
+      setImagePromptReferences((current) => current.filter((image) => referenceImageKey(image) !== referenceImageKey(deletedImage)));
+    }
     setImagePromptReferenceIndex(undefined);
   }
 
@@ -5122,7 +5043,6 @@ function ProductCreationComposer({
     if (selectedProduct && previewReferenceImages.length > 0) {
       const nextReferences = moveArrayItem(previewReferenceImages.map((image) => image.original), fromIndex, toIndex);
       await onReorderReferenceImage(selectedProduct.sku, nextReferences);
-      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
       return;
     }
     if (draftReferenceImages.length > 0) {
@@ -5134,12 +5054,10 @@ function ProductCreationComposer({
           reference_images: nextReferences.join("\n")
         }
       );
-      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
       return;
     }
     if (pendingImageFiles.length > 0) {
       setPendingImageFiles((current) => moveArrayItem(current, fromIndex, toIndex));
-      setImagePromptReferenceIndex((current) => current === undefined ? undefined : indexAfterMove(current, fromIndex, toIndex));
     }
   }
 
@@ -5204,9 +5122,6 @@ function ProductCreationComposer({
           isPacking={isPacking}
           packingDisabled={packingDisabled}
           productFactsBodyRef={productFactsBodyRef}
-          activeModelSchemeId={activeModelSchemeId}
-          modelSchemeOptions={modelSchemeOptions}
-          onModelSchemeChange={onModelSchemeChange}
           template={template}
           templateOptions={templateOptions}
           onTemplateChange={onTemplateChange}
@@ -5227,14 +5142,19 @@ function ProductCreationComposer({
           imageModelOptions={imageModelOptions}
           selectedImageModelConfigId={selectedImageModelConfigId}
           onImageModelConfigChange={onImageModelConfigChange}
+          videoModelOptions={videoModelOptions}
+          selectedVideoModelConfigId={selectedVideoModelConfigId}
+          onVideoModelConfigChange={onVideoModelConfigChange}
           imagePrompt={imagePrompt}
           onImagePromptChange={setImagePrompt}
-          imageTargetLabel={imageTargetLabel}
+          imagePromptReferences={imagePromptReferences}
+          imagePromptReferenceIndex={imagePromptReferenceIndex}
           selectedImagePromptReference={selectedImagePromptReference}
-          onImagePromptTargetClear={() => setImagePromptReferenceIndex(undefined)}
-          schemeSummary={schemeSummary}
+          onImagePromptReferenceSelect={handleSelectImagePromptReference}
+          onImagePromptReferencePreview={handlePreviewImagePromptReference}
+          onImagePromptReferenceRemove={handleRemoveImagePromptReference}
+          onImagePromptReferenceFilesChange={handleImagePromptReferenceFiles}
           storyboardDraft={storyboardDraft}
-          storyboardDraftIsGuidance={storyboardDraftIsGuidance}
           storyboardHistory={storyboardHistory}
           onStoryboardDraftChange={onStoryboardDraftChange}
           onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -5254,13 +5174,12 @@ function ProductCreationComposer({
           isSubmittingImage={isSubmittingImage}
           videoEstimate={billingEstimates?.estimates.video}
           imageEstimate={billingEstimates?.estimates.referenceImages}
-          referenceImagesEstimate={billingEstimates?.estimates.referenceImages}
           organizeProductEstimate={billingEstimates?.estimates.organizeProduct}
           storyboardEstimate={billingEstimates?.estimates.storyboard}
-          onImportAssets={onImportAssets}
-          onGenerateReferenceImages={onGenerateReferenceImages}
-          onPreviewReferenceImage={setImagePromptReferenceIndex}
-          onPendingPreview={(index) => setImagePromptReferenceIndex(index)}
+          onSelectReferenceImage={handleSelectReferenceImage}
+          onPreviewReferenceImage={handlePreviewReferenceImage}
+          onPendingSelect={handleSelectReferenceImage}
+          onPendingPreview={handlePreviewReferenceImage}
           onDeleteReferenceImage={(index) => void handleDeleteReferenceImage(index)}
           onReorderReferenceImage={(fromIndex, toIndex) => void handleReorderReferenceImage(fromIndex, toIndex)}
           onFilesChange={handleReferenceFiles}
@@ -5302,6 +5221,20 @@ function ProductCreationComposer({
         index={Math.max(0, latestCreativeJobs.findIndex((job) => job.id === deleteTarget?.id))}
         onClose={() => setDeleteTarget(undefined)}
         onConfirm={handleDeleteCreativeVersion}
+      />
+      <ReferenceImagePreviewDialog
+        tVideo={tVideo}
+        images={previewableReferenceImages}
+        index={previewReferenceImageIndex}
+        onIndexChange={setPreviewReferenceImageIndex}
+        onClose={() => setPreviewReferenceImageIndex(undefined)}
+      />
+      <ReferenceImagePreviewDialog
+        tVideo={tVideo}
+        images={imagePromptReferences}
+        index={previewImagePromptReferenceIndex}
+        onIndexChange={setPreviewImagePromptReferenceIndex}
+        onClose={() => setPreviewImagePromptReferenceIndex(undefined)}
       />
       <ProductFileImportDialog
         locale={appLocale}
@@ -5345,9 +5278,6 @@ function ProductCreativeWorkbench({
   isPacking,
   packingDisabled,
   productFactsBodyRef,
-  activeModelSchemeId,
-  modelSchemeOptions,
-  onModelSchemeChange,
   template,
   templateOptions,
   onTemplateChange,
@@ -5368,14 +5298,19 @@ function ProductCreativeWorkbench({
   imageModelOptions,
   selectedImageModelConfigId,
   onImageModelConfigChange,
+  videoModelOptions,
+  selectedVideoModelConfigId,
+  onVideoModelConfigChange,
   imagePrompt,
   onImagePromptChange,
-  imageTargetLabel,
+  imagePromptReferences,
+  imagePromptReferenceIndex,
   selectedImagePromptReference,
-  onImagePromptTargetClear,
-  schemeSummary,
+  onImagePromptReferenceSelect,
+  onImagePromptReferencePreview,
+  onImagePromptReferenceRemove,
+  onImagePromptReferenceFilesChange,
   storyboardDraft,
-  storyboardDraftIsGuidance,
   storyboardHistory,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
@@ -5395,12 +5330,11 @@ function ProductCreativeWorkbench({
   isSubmittingImage,
   videoEstimate,
   imageEstimate,
-  referenceImagesEstimate,
   organizeProductEstimate,
   storyboardEstimate,
-  onImportAssets,
-  onGenerateReferenceImages,
+  onSelectReferenceImage,
   onPreviewReferenceImage,
+  onPendingSelect,
   onPendingPreview,
   onDeleteReferenceImage,
   onReorderReferenceImage,
@@ -5438,9 +5372,6 @@ function ProductCreativeWorkbench({
   isPacking: boolean;
   packingDisabled: boolean;
   productFactsBodyRef: React.RefObject<HTMLTextAreaElement | null>;
-  activeModelSchemeId: ModelSchemeChoice;
-  modelSchemeOptions: ModelSchemeOption[];
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   template: TemplateName;
   templateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -5461,14 +5392,19 @@ function ProductCreativeWorkbench({
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
   onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  videoModelOptions: ProviderConfigItem[];
+  selectedVideoModelConfigId: ModelConfigChoice;
+  onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
-  imageTargetLabel: string;
+  imagePromptReferences: ReferenceImageStatus[];
+  imagePromptReferenceIndex?: number;
   selectedImagePromptReference?: ReferenceImageStatus;
-  onImagePromptTargetClear: () => void;
-  schemeSummary: string;
+  onImagePromptReferenceSelect: (index: number) => void;
+  onImagePromptReferencePreview: (index: number) => void;
+  onImagePromptReferenceRemove: (index: number) => void;
+  onImagePromptReferenceFilesChange: (files: FileList | File[] | null) => void;
   storyboardDraft: string;
-  storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -5488,12 +5424,11 @@ function ProductCreativeWorkbench({
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
   imageEstimate?: BillingActionEstimate;
-  referenceImagesEstimate?: BillingActionEstimate;
   organizeProductEstimate?: BillingActionEstimate;
   storyboardEstimate?: BillingActionEstimate;
-  onImportAssets: (sku: string) => Promise<void>;
-  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
+  onSelectReferenceImage: (index: number) => void;
   onPreviewReferenceImage: (index: number) => void;
+  onPendingSelect: (index: number) => void;
   onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
   onReorderReferenceImage: (fromIndex: number, toIndex: number) => void;
@@ -5549,15 +5484,13 @@ function ProductCreativeWorkbench({
 
           <ProductComposerReferenceTray
             tVideo={tVideo}
-            estimate={referenceImagesEstimate}
             product={selectedProduct}
             pendingFiles={pendingImageFiles}
             draftImages={draftReferenceImages}
             pendingImages={pendingReferenceImageStatuses}
-            onImportAssets={onImportAssets}
-            onGenerateReferenceImages={onGenerateReferenceImages}
-            onToast={onToast}
+            onSelectReferenceImage={onSelectReferenceImage}
             onPreviewReferenceImage={onPreviewReferenceImage}
+            onPendingSelect={onPendingSelect}
             onPendingPreview={onPendingPreview}
             onDeleteReferenceImage={onDeleteReferenceImage}
             onReorderReferenceImage={onReorderReferenceImage}
@@ -5575,15 +5508,18 @@ function ProductCreativeWorkbench({
           imageModelOptions={imageModelOptions}
           selectedImageModelConfigId={selectedImageModelConfigId}
           onImageModelConfigChange={onImageModelConfigChange}
+          videoModelOptions={videoModelOptions}
+          selectedVideoModelConfigId={selectedVideoModelConfigId}
+          onVideoModelConfigChange={onVideoModelConfigChange}
           imagePrompt={imagePrompt}
           onImagePromptChange={onImagePromptChange}
-          referenceImageCount={previewableReferenceImages.length}
-          imageTargetLabel={imageTargetLabel}
+          imagePromptReferences={imagePromptReferences}
+          imagePromptReferenceIndex={imagePromptReferenceIndex}
           selectedImagePromptReference={selectedImagePromptReference}
-          onImagePromptTargetClear={onImagePromptTargetClear}
-          activeModelSchemeId={activeModelSchemeId}
-          modelSchemeOptions={modelSchemeOptions}
-          onModelSchemeChange={onModelSchemeChange}
+          onImagePromptReferenceSelect={onImagePromptReferenceSelect}
+          onImagePromptReferencePreview={onImagePromptReferencePreview}
+          onImagePromptReferenceRemove={onImagePromptReferenceRemove}
+          onImagePromptReferenceFilesChange={onImagePromptReferenceFilesChange}
           template={template}
           templateOptions={templateOptions}
           onTemplateChange={onTemplateChange}
@@ -5600,9 +5536,7 @@ function ProductCreativeWorkbench({
           versionCount={versionCount}
           versionCountOptions={versionCountOptions}
           onVersionCountChange={onVersionCountChange}
-          schemeSummary={schemeSummary}
           storyboardDraft={storyboardDraft}
-          storyboardDraftIsGuidance={storyboardDraftIsGuidance}
           storyboardHistory={storyboardHistory}
           onStoryboardDraftChange={onStoryboardDraftChange}
           onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -5639,9 +5573,9 @@ function ProductCreativeWorkbench({
 
       <details className="product-creative-history group/history rounded-[8px] border border-[var(--border)] bg-[var(--panel)] px-3 py-2" open={jobs.length > 0}>
         <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-3 text-xs font-black text-[var(--text)] marker:hidden">
-          <span>{mode === "video" ? tVideo("history.title") : "商品图片"}</span>
+          <span>{tVideo("history.title")}</span>
           <span className="flex min-w-0 items-center gap-2 text-[11px] font-bold text-[var(--muted)]">
-            <span>{mode === "video" ? tVideo("counts.video", { count: jobs.length }) : tVideo("counts.image", { count: previewableReferenceImages.length })}</span>
+            <span>{mode === "video" ? tVideo("counts.video", { count: jobs.length }) : tVideo("counts.record", { count: workspace.assetSummary.imageAssets })}</span>
             <ChevronDown size={14} className="transition group-open/history:rotate-180" />
           </span>
         </summary>
@@ -5655,13 +5589,11 @@ function ProductCreativeWorkbench({
             product={selectedProduct}
             draft={draft}
             importText={importText}
-            images={previewableReferenceImages}
             onPreviewVideo={onPreviewVideo}
             onDeleteVideo={onDeleteVideo}
             onRetryVideoJob={onRetryVideoJob}
             onRecoverVideoJobDownload={onRecoverVideoJobDownload}
             onToast={onToast}
-            onPreviewReferenceImage={onPreviewReferenceImage}
           />
         </div>
       </details>
@@ -5671,9 +5603,6 @@ function ProductCreativeWorkbench({
 
 function ProductCreativeSettingsTray({
   tVideo,
-  activeModelSchemeId,
-  modelSchemeOptions,
-  onModelSchemeChange,
   template,
   templateOptions,
   onTemplateChange,
@@ -5689,13 +5618,9 @@ function ProductCreativeSettingsTray({
   onFinalLanguageChange,
   versionCount,
   versionCountOptions,
-  onVersionCountChange,
-  schemeSummary
+  onVersionCountChange
 }: {
   tVideo: VideoStudioTranslator;
-  activeModelSchemeId: ModelSchemeChoice;
-  modelSchemeOptions: ModelSchemeOption[];
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
   template: TemplateName;
   templateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -5712,25 +5637,9 @@ function ProductCreativeSettingsTray({
   versionCount: number;
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
-  schemeSummary: string;
 }) {
   return (
-    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-visible rounded-[8px] bg-transparent pr-0.5 text-[11px]" title={schemeSummary} aria-label={schemeSummary}>
-      <div className="model-scheme-control min-w-[96px] max-w-[136px] shrink-0">
-        <CompactChoiceDropdown
-          label={tVideo("controls.modelScheme")}
-          value={activeModelSchemeId}
-          options={modelSchemeOptions.map((option) => option.id)}
-          formatOption={(option) => localizedModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
-          formatActiveLabel={(option) => localizedCompactModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}
-          onChange={onModelSchemeChange}
-          layout="pill"
-          density="micro"
-          menuPlacement="top"
-          menuWidth="content"
-          hidePillLabel
-        />
-      </div>
+    <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-visible rounded-[8px] bg-transparent pr-0.5 text-[11px]">
       <ProductCreativeToolbarChoice
         icon={Clapperboard}
         label={tVideo("controls.template")}
@@ -5798,7 +5707,7 @@ function ProductCreativeModeSwitch({
   ];
 
   return (
-    <div className="product-creative-mode-switch flex h-7 shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] p-0.5 text-[11px] font-black">
+    <div className="product-creative-mode-switch flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] p-0.5 text-[11px] font-black">
       {options.map(({ mode: optionMode, label, icon: Icon }) => {
         const active = mode === optionMode;
         return (
@@ -5959,13 +5868,11 @@ function ProductModeAssetPanel({
   product,
   draft,
   importText,
-  images,
   onPreviewVideo,
   onDeleteVideo,
   onRetryVideoJob,
   onRecoverVideoJobDownload,
-  onToast,
-  onPreviewReferenceImage
+  onToast
 }: {
   mode: ProductCreativeWorkspaceMode;
   surface?: ProductCreativeAssetPanelSurface;
@@ -5975,13 +5882,11 @@ function ProductModeAssetPanel({
   product?: ProductDetail;
   draft: ProductDraft;
   importText: string;
-  images: ReferenceImageStatus[];
   onPreviewVideo: (job: CreativeVersionItem) => void;
   onDeleteVideo: (job: CreativeVersionItem) => void;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
   onToast: ConsoleToastFn;
-  onPreviewReferenceImage: (index: number) => void;
 }) {
   if (mode === "video") {
     return (
@@ -6003,13 +5908,7 @@ function ProductModeAssetPanel({
   }
 
   return (
-    <ProductImageAssetPanel
-      tVideo={tVideo}
-      product={product}
-      images={images}
-      surface={surface}
-      onPreviewReferenceImage={onPreviewReferenceImage}
-    />
+    <ProductImageHistoryPanel surface={surface} />
   );
 }
 
@@ -6022,15 +5921,18 @@ function ProductModeOutputPanel({
   imageModelOptions,
   selectedImageModelConfigId,
   onImageModelConfigChange,
+  videoModelOptions,
+  selectedVideoModelConfigId,
+  onVideoModelConfigChange,
   imagePrompt,
   onImagePromptChange,
-  referenceImageCount,
-  imageTargetLabel,
+  imagePromptReferences,
+  imagePromptReferenceIndex,
   selectedImagePromptReference,
-  onImagePromptTargetClear,
-  activeModelSchemeId,
-  modelSchemeOptions,
-  onModelSchemeChange,
+  onImagePromptReferenceSelect,
+  onImagePromptReferencePreview,
+  onImagePromptReferenceRemove,
+  onImagePromptReferenceFilesChange,
   template,
   templateOptions,
   onTemplateChange,
@@ -6047,9 +5949,7 @@ function ProductModeOutputPanel({
   versionCount,
   versionCountOptions,
   onVersionCountChange,
-  schemeSummary,
   storyboardDraft,
-  storyboardDraftIsGuidance,
   storyboardHistory,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
@@ -6069,15 +5969,18 @@ function ProductModeOutputPanel({
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
   onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  videoModelOptions: ProviderConfigItem[];
+  selectedVideoModelConfigId: ModelConfigChoice;
+  onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
-  referenceImageCount: number;
-  imageTargetLabel: string;
+  imagePromptReferences: ReferenceImageStatus[];
+  imagePromptReferenceIndex?: number;
   selectedImagePromptReference?: ReferenceImageStatus;
-  onImagePromptTargetClear: () => void;
-  activeModelSchemeId: ModelSchemeChoice;
-  modelSchemeOptions: ModelSchemeOption[];
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
+  onImagePromptReferenceSelect: (index: number) => void;
+  onImagePromptReferencePreview: (index: number) => void;
+  onImagePromptReferenceRemove: (index: number) => void;
+  onImagePromptReferenceFilesChange: (files: FileList | File[] | null) => void;
   template: TemplateName;
   templateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -6094,9 +5997,7 @@ function ProductModeOutputPanel({
   versionCount: number;
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
-  schemeSummary: string;
   storyboardDraft: string;
-  storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -6118,15 +6019,18 @@ function ProductModeOutputPanel({
       imageModelOptions={imageModelOptions}
       selectedImageModelConfigId={selectedImageModelConfigId}
       onImageModelConfigChange={onImageModelConfigChange}
+      videoModelOptions={videoModelOptions}
+      selectedVideoModelConfigId={selectedVideoModelConfigId}
+      onVideoModelConfigChange={onVideoModelConfigChange}
       imagePrompt={imagePrompt}
       onImagePromptChange={onImagePromptChange}
-      referenceImageCount={referenceImageCount}
-      imageTargetLabel={imageTargetLabel}
+      imagePromptReferences={imagePromptReferences}
+      imagePromptReferenceIndex={imagePromptReferenceIndex}
       selectedImagePromptReference={selectedImagePromptReference}
-      onImagePromptTargetClear={onImagePromptTargetClear}
-      activeModelSchemeId={activeModelSchemeId}
-      modelSchemeOptions={modelSchemeOptions}
-      onModelSchemeChange={onModelSchemeChange}
+      onImagePromptReferenceSelect={onImagePromptReferenceSelect}
+      onImagePromptReferencePreview={onImagePromptReferencePreview}
+      onImagePromptReferenceRemove={onImagePromptReferenceRemove}
+      onImagePromptReferenceFilesChange={onImagePromptReferenceFilesChange}
       template={template}
       templateOptions={templateOptions}
       onTemplateChange={onTemplateChange}
@@ -6143,9 +6047,7 @@ function ProductModeOutputPanel({
       versionCount={versionCount}
       versionCountOptions={versionCountOptions}
       onVersionCountChange={onVersionCountChange}
-      schemeSummary={schemeSummary}
       storyboardDraft={storyboardDraft}
-      storyboardDraftIsGuidance={storyboardDraftIsGuidance}
       storyboardHistory={storyboardHistory}
       onStoryboardDraftChange={onStoryboardDraftChange}
       onApplyStoryboardHistory={onApplyStoryboardHistory}
@@ -6160,18 +6062,10 @@ function ProductModeOutputPanel({
   );
 }
 
-function ProductImageAssetPanel({
-  tVideo,
-  product,
-  images,
-  surface = "section",
-  onPreviewReferenceImage
+function ProductImageHistoryPanel({
+  surface = "section"
 }: {
-  tVideo: VideoStudioTranslator;
-  product?: ProductDetail;
-  images: ReferenceImageStatus[];
   surface?: ProductCreativeAssetPanelSurface;
-  onPreviewReferenceImage: (index: number) => void;
 }) {
   const compact = surface === "workbench";
 
@@ -6184,53 +6078,21 @@ function ProductImageAssetPanel({
     )}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-base font-black text-[var(--text)]">商品图片</div>
-          <div className="mt-1 text-xs font-bold text-[var(--muted)]">保存在当前商品下，图片优化和视频生成都会复用这些参考图</div>
+          <div className="text-base font-black text-[var(--text)]">图片历史</div>
+          <div className="mt-1 text-xs font-bold text-[var(--muted)]">当前商品生成过的图片记录会显示在这里。</div>
         </div>
-        <Badge>{tVideo("counts.image", { count: images.length })}</Badge>
+        <Badge>0 条</Badge>
       </div>
-      {images.length > 0 ? (
-        <div className={cn(
-          "grid gap-2 bg-[var(--field)] p-2 sm:grid-cols-2",
-          compact ? "rounded-[8px] border border-[var(--border)]" : "rounded-[14px] border border-[var(--border)] lg:grid-cols-4"
-        )}>
-          {images.map((image, index) => (
-            <button
-              key={`${image.original}-${index}`}
-              type="button"
-              className={cn(
-                "group/image-asset grid min-h-[156px] overflow-hidden border border-[var(--border)] bg-[var(--panel)] text-left transition hover:border-[color-mix(in_srgb,var(--accent)_50%,var(--border))]",
-                compact ? "rounded-[8px]" : "rounded-[10px]"
-              )}
-              title={image.original}
-              onClick={() => onPreviewReferenceImage(index)}
-            >
-              <span className="grid h-[112px] place-items-center overflow-hidden bg-[var(--panel2)]">
-                {image.previewUrl ? (
-                  <img className="h-full w-full object-cover transition group-hover/image-asset:scale-[1.03]" src={image.previewUrl} alt={`${product?.sku ?? "product"} image ${index + 1}`} />
-                ) : (
-                  <span className="px-3 text-center text-xs font-bold text-[var(--muted)]">{referenceStatusLabel(image.status, tVideo)}</span>
-                )}
-              </span>
-              <span className="grid min-w-0 gap-1 px-2.5 py-2">
-                <span className="truncate text-xs font-black text-[var(--text)]">商品图 {index + 1}</span>
-                <span className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</span>
-              </span>
-            </button>
-          ))}
+      <div className={cn(
+        "grid min-h-[118px] place-items-center border border-dashed border-[var(--border)] bg-[var(--field)] px-4 py-5 text-center",
+        compact ? "rounded-[8px]" : "rounded-[14px]"
+      )}>
+        <div className="max-w-[340px]">
+          <ImageIcon className="mx-auto text-[var(--accent)]" size={24} />
+          <div className="mt-2 text-sm font-black text-[var(--text)]">暂无图片生成记录</div>
+          <p className="m-0 mt-1 text-xs font-bold leading-5 text-[var(--muted)]">生成后的图片批次会进入这里；商品素材仍在上方图片区管理。</p>
         </div>
-      ) : (
-        <div className={cn(
-          "grid min-h-[150px] place-items-center border border-dashed border-[var(--border)] bg-[var(--field)] px-4 py-6 text-center",
-          compact ? "rounded-[8px]" : "rounded-[14px]"
-        )}>
-          <div className="max-w-[340px]">
-            <ImageIcon className="mx-auto text-[var(--accent)]" size={26} />
-            <div className="mt-2 text-sm font-black text-[var(--text)]">还没有视觉资产</div>
-            <p className="m-0 mt-1 text-xs font-bold leading-5 text-[var(--muted)]">先保存商品并添加参考图，再用图片优化动作生成可复用素材。</p>
-          </div>
-        </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -6448,15 +6310,13 @@ function ProductCreationOperationWorkspace({
 function ProductComposerReferenceTray({
   tVideo,
   className,
-  estimate,
   product,
   pendingFiles,
   draftImages,
   pendingImages,
-  onImportAssets,
-  onGenerateReferenceImages,
-  onToast,
+  onSelectReferenceImage,
   onPreviewReferenceImage,
+  onPendingSelect,
   onPendingPreview,
   onDeleteReferenceImage,
   onReorderReferenceImage,
@@ -6465,15 +6325,13 @@ function ProductComposerReferenceTray({
 }: {
   tVideo: VideoStudioTranslator;
   className?: string;
-  estimate?: BillingActionEstimate;
   product?: ProductDetail;
   pendingFiles: File[];
   draftImages: ReferenceImageStatus[];
   pendingImages: ReferenceImageStatus[];
-  onImportAssets: (sku: string) => Promise<void>;
-  onGenerateReferenceImages: (sku: string, prompt?: string) => Promise<void>;
-  onToast: ConsoleToastFn;
+  onSelectReferenceImage: (index: number) => void;
   onPreviewReferenceImage: (index: number) => void;
+  onPendingSelect: (index: number) => void;
   onPendingPreview: (index: number) => void;
   onDeleteReferenceImage: (index: number) => void;
   onReorderReferenceImage: (fromIndex: number, toIndex: number) => void;
@@ -6523,6 +6381,7 @@ function ProductComposerReferenceTray({
       onDrop={handleReferenceDrop}
     >
       <div className="product-reference-actions flex h-9 min-w-0 flex-nowrap items-center gap-2">
+        <span className="product-reference-title shrink-0 whitespace-nowrap text-xs font-black text-[var(--text)]">{tVideo("reference.title")}</span>
         <label
           className={cn(
             "reference-add-button inline-flex h-9 min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border px-3 text-xs font-black transition",
@@ -6545,24 +6404,6 @@ function ProductComposerReferenceTray({
             }}
           />
         </label>
-        <Button
-          className={cn("reference-generate-action h-9 min-h-9 justify-center rounded-[8px] px-3 text-xs", !product && "opacity-55")}
-          size="sm"
-          variant="soft"
-          aria-disabled={!product}
-          title={product ? tVideo("reference.generate") : tVideo("reference.generateDisabledTitle")}
-          onClick={() => {
-            if (!product) {
-              onToast(tVideo("reference.generateDisabledToast"));
-              return;
-            }
-            void onGenerateReferenceImages(product.sku);
-          }}
-        >
-          <Sparkles size={13} />
-          {tVideo("reference.generate")}
-          <ActionButtonCost tVideo={tVideo} estimate={estimate} />
-        </Button>
         {referenceCount === 0 ? (
           <span className="text-xs font-bold text-[var(--muted)]">{tVideo("reference.addHint")}</span>
         ) : null}
@@ -6578,7 +6419,7 @@ function ProductComposerReferenceTray({
               index={index}
               dragging={draggedReferenceIndex === index}
               dragOver={dragOverReferenceIndex === index && draggedReferenceIndex !== index}
-              onImportAssets={onImportAssets}
+              onSelect={() => onSelectReferenceImage(index)}
               onPreview={() => onPreviewReferenceImage(index)}
               onDelete={onDeleteReferenceImage}
               onReorder={onReorderReferenceImage}
@@ -6608,7 +6449,7 @@ function ProductComposerReferenceTray({
               <div
                 key={`${fileName}-${index}`}
                 className={cn(
-                  "relative grid h-[74px] w-[176px] shrink-0 cursor-grab grid-cols-[72px_minmax(0,1fr)] items-center gap-2 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--field)] pr-8 transition active:cursor-grabbing",
+                  "relative grid h-[74px] w-[176px] shrink-0 cursor-grab grid-cols-[72px_minmax(0,1fr)_28px] items-center gap-2 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-1 transition active:cursor-grabbing",
                   dragging && "opacity-55",
                   over && "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
                 )}
@@ -6641,26 +6482,24 @@ function ProductComposerReferenceTray({
                   setDragOverReferenceIndex(undefined);
                 }}
               >
-                <button
-                  className="h-[72px] w-[72px] overflow-hidden bg-[var(--panel2)]"
-                  type="button"
+                <ReferenceImageThumbnail
+                  image={image}
                   title={tVideo("reference.previewPending")}
-                  onClick={() => onPendingPreview(index)}
-                >
-                  <img className="h-[72px] w-[72px] object-cover transition hover:scale-[1.03]" src={image.previewUrl ?? ""} alt={`${fileName} preview`} />
-                </button>
+                  alt={`${fileName} preview`}
+                  className="h-[64px] w-[64px]"
+                  onSelect={() => onPendingSelect(index)}
+                  onPreview={() => onPendingPreview(index)}
+                />
                 <div className="min-w-0">
                   <div className="truncate text-xs font-black text-[var(--text)]">{tVideo("reference.pending", { index: index + 1 })}</div>
                   <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{fileName}</div>
                 </div>
-                <button
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[var(--muted)] transition hover:bg-red-50 hover:text-[var(--danger)]"
-                  type="button"
+                <ReferenceImageRemoveButton
+                  className="right-2 top-1/2 -translate-y-1/2"
                   title={tVideo("reference.removePending")}
-                  onClick={() => onClearPendingFile(index)}
-                >
-                  <X size={13} />
-                </button>
+                  ariaLabel={`${tVideo("reference.removePending")} ${fileName}`}
+                  onRemove={() => onClearPendingFile(index)}
+                />
               </div>
             );
           })}
@@ -6680,15 +6519,18 @@ function StoryboardComposerPanel({
   imageModelOptions,
   selectedImageModelConfigId,
   onImageModelConfigChange,
+  videoModelOptions,
+  selectedVideoModelConfigId,
+  onVideoModelConfigChange,
   imagePrompt,
   onImagePromptChange,
-  referenceImageCount,
-  imageTargetLabel,
+  imagePromptReferences,
+  imagePromptReferenceIndex,
   selectedImagePromptReference,
-  onImagePromptTargetClear,
-  activeModelSchemeId,
-  modelSchemeOptions,
-  onModelSchemeChange,
+  onImagePromptReferenceSelect,
+  onImagePromptReferencePreview,
+  onImagePromptReferenceRemove,
+  onImagePromptReferenceFilesChange,
   template,
   templateOptions,
   onTemplateChange,
@@ -6705,9 +6547,7 @@ function StoryboardComposerPanel({
   versionCount,
   versionCountOptions,
   onVersionCountChange,
-  schemeSummary,
   storyboardDraft,
-  storyboardDraftIsGuidance,
   storyboardHistory,
   onStoryboardDraftChange,
   onApplyStoryboardHistory,
@@ -6727,15 +6567,18 @@ function StoryboardComposerPanel({
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
   onImageModelConfigChange: (configId: ModelConfigChoice) => void;
+  videoModelOptions: ProviderConfigItem[];
+  selectedVideoModelConfigId: ModelConfigChoice;
+  onVideoModelConfigChange: (configId: ModelConfigChoice) => void;
   imagePrompt: string;
   onImagePromptChange: (prompt: string) => void;
-  referenceImageCount: number;
-  imageTargetLabel: string;
+  imagePromptReferences: ReferenceImageStatus[];
+  imagePromptReferenceIndex?: number;
   selectedImagePromptReference?: ReferenceImageStatus;
-  onImagePromptTargetClear: () => void;
-  activeModelSchemeId: ModelSchemeChoice;
-  modelSchemeOptions: ModelSchemeOption[];
-  onModelSchemeChange: (schemeId: ModelSchemeChoice) => void;
+  onImagePromptReferenceSelect: (index: number) => void;
+  onImagePromptReferencePreview: (index: number) => void;
+  onImagePromptReferenceRemove: (index: number) => void;
+  onImagePromptReferenceFilesChange: (files: FileList | File[] | null) => void;
   template: TemplateName;
   templateOptions: TemplateName[];
   onTemplateChange: (template: TemplateName) => void;
@@ -6752,9 +6595,7 @@ function StoryboardComposerPanel({
   versionCount: number;
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
-  schemeSummary: string;
   storyboardDraft: string;
-  storyboardDraftIsGuidance: boolean;
   storyboardHistory: StoryboardHistoryRecord[];
   onStoryboardDraftChange: (draft: string) => void;
   onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
@@ -6768,17 +6609,22 @@ function StoryboardComposerPanel({
   const [historyOpen, setHistoryOpen] = useState(false);
   const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
   const promptTitle = mode === "image" ? "图片提示词" : tVideo("storyboard.title");
-  const promptIsGuidance = mode === "video" && storyboardDraftIsGuidance;
   const promptOptimizeActionLoading = mode === "image" ? isGeneratingImagePrompt : isGeneratingStoryboard;
   const promptOptimizeActionDisabled = promptOptimizeActionLoading || !productReady;
   const promptOptimizeActionLabel = promptOptimizeActionLoading
     ? tVideo("storyboard.generating")
     : mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate");
   const promptPlaceholder = mode === "image"
-    ? referenceImageCount > 0
-      ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。"
-      : "例如：生成白底主图，突出材质、尺寸和使用场景。"
+    ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。"
     : "";
+  const activeModelConfigId = mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId;
+  const activeModelConfigChange = mode === "image" ? onImageModelConfigChange : onVideoModelConfigChange;
+  const activeModelOptions = mode === "image" ? imageModelOptions : videoModelOptions;
+  const activeModelEffectiveConfigId = effectiveModelConfigChoice(activeModelConfigId, activeModelOptions);
+  const activeModelLabel = localizedModelConfigChoiceLabel(activeModelEffectiveConfigId, activeModelOptions, tVideo);
+  const activeModelIcon = mode === "image"
+    ? <ImageIcon size={12} className="shrink-0" aria-hidden="true" />
+    : <Clapperboard size={12} className="shrink-0" aria-hidden="true" />;
 
   function onPromptDraftChange(value: string) {
     if (mode === "image") {
@@ -6791,6 +6637,12 @@ function StoryboardComposerPanel({
   function appendImagePromptPreset(preset: string) {
     const trimmedPrompt = imagePrompt.trim();
     onImagePromptChange(trimmedPrompt ? `${trimmedPrompt}，${preset}` : preset);
+  }
+
+  function handleImagePromptReferenceDrop(event: DragEvent<HTMLElement>) {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    onImagePromptReferenceFilesChange(event.dataTransfer.files);
   }
 
   return (
@@ -6829,25 +6681,81 @@ function StoryboardComposerPanel({
         }}
       >
         <Textarea
-          className={cn(
-            "h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-12 text-sm leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors",
-            promptIsGuidance ? "font-semibold text-[#9a8776]" : "font-bold text-[var(--text)]"
-          )}
+          className="h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-12 pt-[96px] text-sm font-bold leading-7 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors"
           value={mode === "image" ? imagePrompt : storyboardDraft}
           onChange={(event) => onPromptDraftChange(event.target.value)}
           placeholder={promptPlaceholder}
         />
-        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_150px] items-center gap-1">
+        <div
+          className="image-prompt-media-strip absolute left-3 right-3 top-3 z-10 flex h-[74px] min-w-0 items-start gap-2 overflow-x-auto pb-1"
+          onDragOver={(event) => {
+            if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }}
+          onDrop={handleImagePromptReferenceDrop}
+        >
+          <label className="image-prompt-add-tile grid h-[70px] w-[184px] shrink-0 cursor-pointer place-items-center rounded-[8px] border border-dashed border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_4%,var(--card))] px-2 text-center text-[var(--accent)] transition hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--card))]">
+            <span className="grid gap-0.5">
+              <span className="whitespace-nowrap text-[10px] font-black leading-3 text-[var(--muted)]">本次参考图</span>
+              <span className="inline-flex items-center justify-center gap-1 whitespace-nowrap text-[12px] font-black leading-4">
+                <Plus size={13} />
+                添加图片
+              </span>
+              <span className="whitespace-nowrap text-[10px] font-bold leading-3 text-[var(--muted)]">点击 / 拖拽 / 粘贴</span>
+              <span className="whitespace-nowrap text-[10px] font-bold leading-3 text-[var(--muted)]">点上方商品图加入</span>
+            </span>
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(event) => {
+                onImagePromptReferenceFilesChange(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+          {imagePromptReferences.map((image, index) => (
+            <div key={`${image.original}-${index}`} className="image-prompt-reference-item relative h-[70px] w-[70px] shrink-0">
+              <ReferenceImageThumbnail
+                image={image}
+                title={`选择本次参考图 ${index + 1}`}
+                alt={image.original}
+                className="image-prompt-reference-item"
+                selected={imagePromptReferenceIndex === index}
+                onSelect={() => onImagePromptReferenceSelect(index)}
+                onPreview={() => onImagePromptReferencePreview(index)}
+              />
+              <ReferenceImageRemoveButton
+                title="移出本次参考图"
+                ariaLabel={`移出本次参考图 ${index + 1}`}
+                onRemove={() => onImagePromptReferenceRemove(index)}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_150px] items-center gap-1.5">
           <div className="prompt-composer-mode-slot shrink-0">
             <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           </div>
-          <div className="prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1 overflow-visible">
+          <div className="prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible">
+            <div className="active-model-control w-auto min-w-0 max-w-none shrink-0" title={activeModelLabel}>
+              <CompactChoiceDropdown
+                label={activeModelIcon}
+                value={activeModelEffectiveConfigId}
+                options={configuredModelOptions(activeModelOptions)}
+                formatOption={(option) => localizedModelConfigChoiceLabel(option, activeModelOptions, tVideo)}
+                onChange={activeModelConfigChange}
+                layout="pill"
+                density="micro"
+                menuPlacement="top"
+                menuWidth="content"
+              />
+            </div>
             {mode === "video" ? (
               <ProductCreativeSettingsTray
                 tVideo={tVideo}
-                activeModelSchemeId={activeModelSchemeId}
-                modelSchemeOptions={modelSchemeOptions}
-                onModelSchemeChange={onModelSchemeChange}
                 template={template}
                 templateOptions={templateOptions}
                 onTemplateChange={onTemplateChange}
@@ -6864,56 +6772,14 @@ function StoryboardComposerPanel({
                 versionCount={versionCount}
                 versionCountOptions={versionCountOptions}
                 onVersionCountChange={onVersionCountChange}
-                schemeSummary={schemeSummary}
               />
             ) : (
               <>
-                {selectedImagePromptReference ? (
-                  <div className="image-prompt-target-chip flex min-w-[160px] max-w-[210px] items-center gap-2 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_7%,var(--panel))] px-2 py-1 text-[11px] font-black text-[var(--text)]">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-[var(--panel2)]">
-                      {selectedImagePromptReference?.previewUrl ? (
-                        <img className="h-full w-full object-cover" src={selectedImagePromptReference.previewUrl} alt="selected reference" />
-                      ) : (
-                        <ImageIcon size={13} className="text-[var(--muted)]" />
-                      )}
-                    </span>
-                    <span className="grid min-w-0">
-                      <span className="truncate">优化目标</span>
-                      <span className="truncate text-[10px] font-bold text-[var(--muted)]">{selectedImagePromptReference.original}</span>
-                    </span>
-                    <button
-                      type="button"
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--muted)] transition hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-                      title="清除目标图"
-                      aria-label="清除目标图"
-                      onClick={onImagePromptTargetClear}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="image-prompt-target-chip flex min-h-7 max-w-[150px] shrink-0 items-center rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-bold text-[var(--muted)]" title={imageTargetLabel}>
-                    <span className="truncate">{imageTargetLabel}</span>
-                  </div>
-                )}
-                <div className="image-model-control min-w-[112px] max-w-[160px] shrink-0" title={imageModelLabel}>
-                  <CompactChoiceDropdown
-                    label={<ImageIcon size={12} className="shrink-0" aria-hidden="true" />}
-                    value={selectedImageModelConfigId}
-                    options={configuredModelOptions(imageModelOptions)}
-                    formatOption={(option) => localizedModelConfigChoiceLabel(option, imageModelOptions, tVideo)}
-                    onChange={onImageModelConfigChange}
-                    layout="pill"
-                    density="micro"
-                    menuPlacement="top"
-                    menuWidth="content"
-                  />
-                </div>
                 {imagePromptPresets.map((preset) => (
                   <button
                     key={preset}
                     type="button"
-                    className="h-7 shrink-0 rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="h-7 shrink-0 whitespace-nowrap rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-1.5 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                     onClick={() => appendImagePromptPreset(preset)}
                   >
                     {preset}
@@ -7880,12 +7746,107 @@ function FactList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function ReferenceImageThumbnail({
+  image,
+  title,
+  alt,
+  selected = false,
+  className,
+  onSelect,
+  onPreview
+}: {
+  image: ReferenceImageStatus;
+  title: string;
+  alt: string;
+  selected?: boolean;
+  className?: string;
+  onSelect: () => void;
+  onPreview: () => void;
+}) {
+  const canOpen = Boolean(image.previewUrl);
+  const singleClickTimerRef = useRef<number | undefined>(undefined);
+
+  function handleClick() {
+    if (!canOpen) return;
+    if (singleClickTimerRef.current !== undefined) {
+      window.clearTimeout(singleClickTimerRef.current);
+    }
+    singleClickTimerRef.current = window.setTimeout(onSelect, 180);
+  }
+
+  function handleDoubleClick() {
+    if (!canOpen) return;
+    if (singleClickTimerRef.current !== undefined) {
+      window.clearTimeout(singleClickTimerRef.current);
+      singleClickTimerRef.current = undefined;
+    }
+    onPreview();
+  }
+
+  return (
+    <div className={cn("image-reference-thumbnail image-prompt-reference-item relative h-[70px] w-[70px] shrink-0", className)}>
+      <button
+        type="button"
+        className={cn(
+          "image-prompt-reference-thumb grid h-full w-full place-items-center overflow-hidden rounded-[8px] border bg-[var(--field)] transition hover:border-[var(--accent)]",
+          selected
+            ? "border-[var(--accent)] shadow-[0_0_0_2px_rgba(10,163,148,.16)]"
+            : "border-[var(--border)]",
+          !canOpen && "cursor-default hover:border-[var(--border)]"
+        )}
+        title={title}
+        aria-label={title}
+        aria-pressed={selected}
+        disabled={!canOpen}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        {image.previewUrl ? (
+          <img className="h-full w-full object-cover transition hover:scale-[1.03]" src={image.previewUrl} alt={alt} />
+        ) : (
+          <ImageIcon size={18} className="text-[var(--muted)]" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function ReferenceImageRemoveButton({
+  className,
+  title,
+  ariaLabel,
+  onRemove
+}: {
+  className?: string;
+  title: string;
+  ariaLabel: string;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "image-prompt-reference-remove absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-[color-mix(in_srgb,var(--card)_88%,transparent)] text-[var(--muted)] shadow-[0_4px_12px_rgba(96,64,43,.16)] transition hover:bg-red-50 hover:text-[var(--danger)]",
+        className
+      )}
+      title={title}
+      aria-label={ariaLabel}
+      onClick={(event) => {
+        event.stopPropagation();
+        onRemove();
+      }}
+    >
+      <X size={11} strokeWidth={2.4} />
+    </button>
+  );
+}
+
 function ReferenceImageFigure({
   tVideo,
   image,
   sku,
   index,
-  onImportAssets,
+  onSelect,
   onPreview,
   onDelete,
   dragging,
@@ -7897,7 +7858,7 @@ function ReferenceImageFigure({
   image: ReferenceImageStatus;
   sku: string;
   index: number;
-  onImportAssets: (sku: string) => Promise<void>;
+  onSelect: () => void;
   onPreview: () => void;
   onDelete: (index: number) => void;
   dragging: boolean;
@@ -7905,11 +7866,10 @@ function ReferenceImageFigure({
   onReorder: (fromIndex: number, toIndex: number) => void;
   onDragStateChange: (dragIndex?: number | null, overIndex?: number | null) => void;
 }) {
-  const canPreview = Boolean(image.previewUrl);
   return (
     <figure
       className={cn(
-        "group relative m-0 grid h-[74px] w-[176px] shrink-0 cursor-grab grid-cols-[64px_minmax(0,1fr)] items-center gap-2 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-1.5 pr-7 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] active:cursor-grabbing",
+        "group relative m-0 grid h-[74px] w-[176px] shrink-0 cursor-grab grid-cols-[64px_minmax(0,1fr)_28px] items-center gap-2 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--field)] p-1.5 transition hover:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] active:cursor-grabbing",
         dragging && "opacity-55",
         dragOver && "border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--field))] shadow-[0_0_0_3px_rgba(10,163,148,.12)]"
       )}
@@ -7938,40 +7898,24 @@ function ReferenceImageFigure({
       }}
       onDragEnd={() => onDragStateChange(null, null)}
     >
-      <button
-        type="button"
-        className="overflow-hidden rounded-[7px] border border-[var(--border)] bg-[var(--panel2)]"
-        disabled={!canPreview}
-        title={canPreview ? tVideo("reference.selectPromptTarget") : referenceStatusLabel(image.status, tVideo)}
-        onClick={onPreview}
-      >
-        {image.previewUrl ? (
-          <img className="h-[60px] w-[64px] object-cover transition group-hover:scale-[1.03]" src={image.previewUrl} alt={`${sku} reference ${index + 1}`} />
-        ) : (
-          <span className="grid h-[60px] w-[64px] place-items-center px-1 text-center text-[10px] font-bold leading-4 text-[var(--muted)]">
-            {referenceStatusLabel(image.status, tVideo)}
-          </span>
-        )}
-      </button>
+      <ReferenceImageThumbnail
+        image={image}
+        title={image.previewUrl ? tVideo("reference.preview") : referenceStatusLabel(image.status, tVideo)}
+        alt={`${sku} reference ${index + 1}`}
+        className="h-[60px] w-[64px]"
+        onSelect={onSelect}
+        onPreview={onPreview}
+      />
       <figcaption className="min-w-0">
         <div className="truncate text-xs font-black text-[var(--text)]">{tVideo("reference.item", { index: index + 1 })}</div>
         <div className="truncate text-[11px] font-semibold text-[var(--muted)]">{image.original}</div>
       </figcaption>
-      <div className="reference-image-actions pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--field)]/95 p-1 opacity-0 shadow-[0_12px_28px_rgba(96,64,43,.14)] transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-        {image.status === "outside-project-root" ? (
-          <Button className="h-8 w-8 p-0" size="icon" title={tVideo("reference.importAsset")} onClick={() => void onImportAssets(sku)}>
-            <Download size={12} />
-          </Button>
-        ) : null}
-        {canPreview ? (
-          <Button className="h-8 w-8 p-0" size="icon" title={tVideo("reference.selectPromptTarget")} onClick={onPreview}>
-            <ImageIcon size={12} />
-          </Button>
-        ) : null}
-        <Button className="h-8 w-8 p-0" size="icon" variant="danger" title={tVideo("reference.delete")} onClick={() => onDelete(index)}>
-          <X size={12} />
-        </Button>
-      </div>
+      <ReferenceImageRemoveButton
+        className="right-2 top-1/2 -translate-y-1/2"
+        title={tVideo("reference.delete")}
+        ariaLabel={`${tVideo("reference.delete")} ${tVideo("reference.item", { index: index + 1 })}`}
+        onRemove={() => onDelete(index)}
+      />
     </figure>
   );
 }
@@ -10016,54 +9960,12 @@ function compactTemplateLabel(value: string | undefined, tVideo: VideoStudioTran
 }
 
 function localizedModelConfigChoiceLabel(value: ModelConfigChoice, models: ProviderConfigItem[], tVideo: VideoStudioTranslator): string {
-  if (value === "auto") {
-    return tVideo("models.auto");
-  }
-  const model = models.find((item) => item.configId === value);
+  const effectiveValue = effectiveModelConfigChoice(value, models);
+  const model = models.find((item) => item.configId === effectiveValue);
   if (!model) {
-    return tVideo("models.deleted");
+    return tVideo(value && value !== "auto" ? "models.deleted" : "models.unselected");
   }
   return modelLabelForId(model.id, model.model);
-}
-
-function localizedModelSchemeChoiceLabel(value: ModelSchemeChoice, options: ModelSchemeOption[], tVideo: VideoStudioTranslator): string {
-  const option = options.find((item) => item.id === value) ?? options[0];
-  if (!option) return tVideo("models.unselected");
-  if (option.bundleId === platformQualityBundleId) return tVideo("models.platformQuality");
-  if (option.bundleId === platformLowCostBundleId) return tVideo("models.platformLowCost");
-  if (option.apiOwner === "platform") return tVideo("models.platformCustom", { label: stripModelSchemeOwnerPrefix(option.label) });
-  if (option.apiOwner === "byok") return tVideo("models.byokCustom", { label: stripModelSchemeOwnerPrefix(option.label) });
-  return option.label;
-}
-
-function localizedCompactModelSchemeChoiceLabel(value: ModelSchemeChoice, options: ModelSchemeOption[], tVideo: VideoStudioTranslator): string {
-  return stripModelSchemeOwnerPrefix(localizedModelSchemeChoiceLabel(value, options, tVideo));
-}
-
-function stripModelSchemeOwnerPrefix(label: string): string {
-  return label.replace(/^(平台|Platform|自带|Your key)\s*·\s*/, "");
-}
-
-function localizedModelSchemeSummary(input: {
-  schemeId: ModelSchemeChoice;
-  options: ModelSchemeOption[];
-  textModels: ProviderConfigItem[];
-  imageModels: ProviderConfigItem[];
-  videoModels: ProviderConfigItem[];
-  selectedTextModelConfigId: ModelConfigChoice;
-  selectedImageModelConfigId: ModelConfigChoice;
-  selectedVideoModelConfigId: ModelConfigChoice;
-  tVideo: VideoStudioTranslator;
-}): string {
-  const label = localizedModelSchemeChoiceLabel(input.schemeId, input.options, input.tVideo);
-  return [
-    input.tVideo("models.current", { label }),
-    [
-      input.tVideo("models.textModel", { model: localizedModelConfigChoiceLabel(input.selectedTextModelConfigId, input.textModels, input.tVideo) }),
-      input.tVideo("models.imageModel", { model: localizedModelConfigChoiceLabel(input.selectedImageModelConfigId, input.imageModels, input.tVideo) }),
-      input.tVideo("models.videoModel", { model: localizedModelConfigChoiceLabel(input.selectedVideoModelConfigId, input.videoModels, input.tVideo) })
-    ].join(" · ")
-  ].join(" | ");
 }
 
 function localizedProductAutoSaveStatusLabel(status: ProductAutoSaveStatus, tVideo: VideoStudioTranslator): string {
@@ -10503,6 +10405,10 @@ function indexAfterMove(index: number, fromIndex: number, toIndex: number): numb
   if (fromIndex < toIndex && index > fromIndex && index <= toIndex) return index - 1;
   if (fromIndex > toIndex && index >= toIndex && index < fromIndex) return index + 1;
   return index;
+}
+
+function referenceImageKey(image: ReferenceImageStatus): string {
+  return image.resolvedPath || image.original;
 }
 
 function unique(values: Array<string | undefined | null>) {

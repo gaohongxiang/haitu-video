@@ -469,7 +469,7 @@
       "points": [
         "No need to apply for multiple model provider accounts first",
         "Fits cross-border sellers that are testing AI creative workflows",
-        "Haitu maintains default model configuration and bundles",
+        "Haitu maintains default model configuration by capability",
         "Teams can still switch to their own models later"
       ]
     },
@@ -1638,7 +1638,7 @@
           "body": "Teams can test the product creative workflow with hosted model configurations before applying for multiple provider accounts.",
           "bullets": [
             "Hosted keys",
-            "Model bundle selection",
+            "Model selection by capability",
             "Unified billing entry",
             "Fast testing"
           ]

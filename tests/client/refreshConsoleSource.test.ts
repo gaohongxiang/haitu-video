@@ -72,6 +72,7 @@ describe("console refresh source", () => {
     expect(apiClientSource).toContain("AbortSignal.timeout(consoleSnapshotRequestTimeoutMs)");
     expect(apiClientSource).toContain("控制台初始化接口失败 ${path}");
     expect(apiClientSource).toContain("getJsonWithSignal<T[\"providerConfigResponse\"]>(\"/api/provider-config\", signal)");
-    expect(apiClientSource).toContain("getJsonWithSignal<T[\"modelBundlesResponse\"]>(\"/api/model-bundles\", signal)");
+    expect(apiClientSource).toContain("getJsonWithSignal<T[\"modelServicePreferenceResponse\"]>(\"/api/model-service-preference\", signal)");
+    expect(apiClientSource).not.toContain("/api/model-bundles");
   });
 });

@@ -27,6 +27,9 @@ describe("product AI generation service source boundaries", () => {
 
     expect(serviceSource).toContain("export async function buildAiStoryboardDraft(");
     expect(serviceSource).toContain("export async function generateProductReferenceImages(");
+    expect(serviceSource).toContain("referenceImages?: string[];");
+    expect(serviceSource).toContain("const selectedReferenceImages = sanitizeReferenceImages(input.input.referenceImages);");
+    expect(serviceSource).toContain("referenceImages: selectedReferenceImages");
     expect(serviceSource).toContain('from "./productAiGenerationContent.js"');
     expect(serviceSource).toContain("buildProductReferenceImagePrompt(");
     expect(serviceSource).toContain("buildChineseStoryboardFallback(");

@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 
 import { parseProductFacts } from "../core/productFacts.js";
+import { resolveReferenceImages } from "../core/productAssetResolver.js";
 import type { ScriptTemplate } from "../core/scriptGenerator.js";
 import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import {
@@ -21,7 +22,6 @@ import {
 import { createImageModelProvider, createTextModelProvider } from "./modelProviderService.js";
 import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
-import { ModelBundleStore } from "./modelBundleStore.js";
 import { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import { findProductFileBySku } from "./productFileStore.js";
 import {
@@ -35,6 +35,7 @@ export interface GenerateProductReferenceImagesRequest {
   count?: number;
   prompt?: string;
   imageModelConfigId?: string;
+  referenceImages?: string[];
 }
 
 export interface StoryboardDraftRequest {
@@ -60,7 +61,6 @@ export async function buildAiImagePromptDraft(input: {
   rootDir: string;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   walletStore: WalletStore;
   billingPolicyStore: BillingPolicyStore;
@@ -77,7 +77,6 @@ export async function buildAiImagePromptDraft(input: {
   const textModel = await createTextModelProvider({
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
     textModelConfigId: input.input.textModelConfigId,
     fetchImpl: input.fetchImpl
@@ -141,7 +140,6 @@ export async function buildAiStoryboardDraft(input: {
   rootDir: string;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   walletStore: WalletStore;
   billingPolicyStore: BillingPolicyStore;
@@ -160,7 +158,6 @@ export async function buildAiStoryboardDraft(input: {
   const textModel = await createTextModelProvider({
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
     textModelConfigId: input.input.textModelConfigId,
     fetchImpl: input.fetchImpl
@@ -253,7 +250,6 @@ export async function generateProductReferenceImages(input: {
   sku: string;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   walletStore: WalletStore;
   billingPolicyStore: BillingPolicyStore;
@@ -268,6 +264,7 @@ export async function generateProductReferenceImages(input: {
   const productFilePath = await findProductFileBySku(input.fixturesDir, input.sku);
   const rawProduct = JSON.parse(await readFile(productFilePath, "utf8")) as Record<string, unknown>;
   const product = parseProductFacts(rawProduct);
+  const selectedReferenceImages = sanitizeReferenceImages(input.input.referenceImages);
   const count = clampInteger(
     Number(input.input.count ?? Math.max(1, Math.min(3, 3 - product.reference_images.length))),
     1,
@@ -276,7 +273,6 @@ export async function generateProductReferenceImages(input: {
   const imageModel = await createImageModelProvider({
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
     imageModelConfigId: input.input.imageModelConfigId,
     fetchImpl: input.fetchImpl
@@ -291,9 +287,14 @@ export async function generateProductReferenceImages(input: {
     units: count,
     reserveDescription: "AI 图片生成预扣",
     chargeDescription: "AI 图片生成扣费",
-    action: () => imageModel.provider.generateImages({
+    action: async () => imageModel.provider.generateImages({
       count,
-      prompt: buildProductReferenceImagePrompt(product, input.input.prompt)
+      prompt: buildProductReferenceImagePrompt(product, input.input.prompt),
+      referenceImages: await imageGenerationReferences({
+        productFilePath,
+        referenceImages: selectedReferenceImages,
+        fetchImpl: input.fetchImpl
+      })
     }),
     actualUnits: (result) => result.length
   });
@@ -336,4 +337,78 @@ export async function generateProductReferenceImages(input: {
       sku: input.sku
     })
   };
+}
+
+function sanitizeReferenceImages(referenceImages: unknown): string[] {
+  if (!Array.isArray(referenceImages)) {
+    return [];
+  }
+  return referenceImages
+    .map((reference) => typeof reference === "string" ? reference.trim() : "")
+    .filter(Boolean);
+}
+
+async function imageGenerationReferences(input: {
+  productFilePath: string;
+  referenceImages: string[];
+  fetchImpl?: typeof fetch;
+}) {
+  const resolvedReferences = resolveReferenceImages(input.referenceImages, {
+    productFilePath: input.productFilePath
+  });
+  return Promise.all(resolvedReferences.map((reference) => imageGenerationReference(reference, input.fetchImpl)));
+}
+
+async function imageGenerationReference(reference: string, fetchImpl?: typeof fetch) {
+  if (reference.startsWith("http://") || reference.startsWith("https://")) {
+    const fetchReference = fetchImpl ?? fetch;
+    const response = await fetchReference(reference);
+    if (!response.ok) {
+      throw new Error("参考图地址无法访问。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
+    }
+    const mimeType = normalizeReferenceMimeType(response.headers.get("content-type") ?? undefined);
+    return {
+      bytes: Buffer.from(await response.arrayBuffer()),
+      fileName: imageReferenceFileName(reference, mimeType),
+      mimeType
+    };
+  }
+  return {
+    bytes: await readFile(reference),
+    fileName: imageReferenceFileName(reference),
+    mimeType: mimeTypeFromReferencePath(reference)
+  };
+}
+
+function imageReferenceFileName(reference: string, mimeType?: string): string {
+  const name = basename(reference.split("?")[0] ?? reference);
+  if (name.includes(".")) {
+    return name;
+  }
+  if (mimeType === "image/jpeg") {
+    return `${name || "reference"}.jpg`;
+  }
+  if (mimeType === "image/webp") {
+    return `${name || "reference"}.webp`;
+  }
+  return `${name || "reference"}.png`;
+}
+
+function mimeTypeFromReferencePath(reference: string): string {
+  const lower = reference.split("?")[0]?.toLowerCase() ?? "";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (lower.endsWith(".webp")) {
+    return "image/webp";
+  }
+  return "image/png";
+}
+
+function normalizeReferenceMimeType(value: string | undefined): string {
+  const mimeType = value?.split(";")[0]?.trim().toLowerCase();
+  if (mimeType === "image/jpeg" || mimeType === "image/webp" || mimeType === "image/png") {
+    return mimeType;
+  }
+  return "image/png";
 }

@@ -524,7 +524,7 @@ describe("console API", () => {
     const favicon = await faviconResponse.text();
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
     const consoleApiClientSource = await readFile(join(process.cwd(), "src", "client", "consoleApiClient.ts"), "utf8");
-    const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
+    const modelServiceSelectionSource = await readFile(join(process.cwd(), "src", "client", "modelServiceSelection.ts"), "utf8");
     const stylesSource = await readFile(join(process.cwd(), "src", "client", "styles.css"), "utf8");
     const staticConsoleHtml = await readFile(join(process.cwd(), "src", "server", "static", "console.html"), "utf8");
     const staticConsoleJs = await readFile(join(process.cwd(), "src", "server", "static", "console.js"), "utf8");
@@ -924,11 +924,12 @@ describe("console API", () => {
     const creationWorkspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
     const creationComposerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     const productCreativeWorkbenchSource = sourceBetween(appSource, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
-    const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
-    const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
+    const modelConfigChoiceSource = modelServiceSelectionSource.slice(modelServiceSelectionSource.indexOf("export function configuredModelOptions"), modelServiceSelectionSource.indexOf("export function modelConfigChoiceLabel"));
+    const modelConfigChoiceLabelSource = modelServiceSelectionSource.slice(modelServiceSelectionSource.indexOf("export function modelConfigChoiceLabel"), modelServiceSelectionSource.indexOf("export function platformConfiguredModels"));
     const productLibraryColumnSource = appSource.slice(appSource.indexOf("function ProductCreationProductLibrary"), appSource.indexOf("function ProductCreationOperationWorkspace"));
     const storyboardPanelSource = appSource.slice(appSource.indexOf("function StoryboardComposerPanel"), appSource.indexOf("function VideoHistoryPanel"));
     const settingsTraySource = sourceBetween(appSource, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
+    const modeSwitchSource = sourceBetween(appSource, "function ProductCreativeModeSwitch", "function ProductCreativeToolbarChoice");
     const productDetailsSource = sourceBetween(creationComposerSource, "product-creative-product-details", "<ProductComposerReferenceTray");
     const referenceTraySource = sourceBetween(appSource, "function ProductComposerReferenceTray", "function StoryboardComposerPanel");
     const videoHistorySource = appSource.slice(appSource.indexOf("function VideoHistoryPanel"), appSource.indexOf("function ProductLibraryHome"));
@@ -976,7 +977,7 @@ describe("console API", () => {
     expect(creationWorkspaceSource).toContain("mergeLedgerJobs");
     expect(creationWorkspaceSource).not.toContain("<ProductStudio");
     expect(creationWorkspaceSource).not.toContain("ensureVideoProductSelection");
-    expect(modelServiceBundlesSource).toContain('export type ModelConfigChoice = "auto" | string;');
+    expect(modelServiceSelectionSource).toContain('export type ModelConfigChoice = "auto" | string;');
     expect(appSource).toContain('useState<ModelConfigChoice>("auto")');
     expect(appSource).toContain("selectedTextModelConfigId");
     expect(appSource).toContain("selectedImageModelConfigId");
@@ -985,9 +986,9 @@ describe("console API", () => {
     expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
-    expect(appSource).toContain('setSelectedTextModelConfigId("auto")');
-    expect(appSource).toContain('setSelectedImageModelConfigId("auto")');
-    expect(appSource).toContain('setSelectedVideoModelConfigId("auto")');
+    expect(appSource).toContain("setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? \"auto\")");
+    expect(appSource).toContain("setSelectedImageModelConfigId(modelServicePreferenceResponse.preference.imageModelConfigId ?? \"auto\")");
+    expect(appSource).toContain("setSelectedVideoModelConfigId(modelServicePreferenceResponse.preference.videoModelConfigId ?? \"auto\")");
     expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(appSource).toContain("type StoryboardDraftSource");
     expect(productWorkflowSource).toContain('export type StoryboardDraftSource = "default" | "ai" | "manual";');
@@ -996,9 +997,12 @@ describe("console API", () => {
     expect(appSource).toContain('setStoryboardDraftSource("manual")');
     expect(storyboardDraftsSource).toContain("export function defaultStoryboardDraftForTemplate");
     expect(appSource).not.toContain("function defaultStoryboardDraftForTemplate");
-    expect(appSource).toContain("localizedDefaultStoryboardDraft(template, duration, appLocale)");
-    expect(appSource).toContain("Preserve the storyboard once the user edits it manually.");
-    expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
+    expect(appSource).toContain('const [studioStoryboardDraft, setStudioStoryboardDraft] = useState("");');
+    expect(appSource).toContain("function injectTemplateStoryboardDraft(nextTemplate: TemplateName)");
+    expect(appSource).toContain("injectTemplateStoryboardDraft(nextTemplate);");
+    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
+    expect(appSource).not.toContain("Preserve the storyboard once the user edits it manually.");
+    expect(appSource).not.toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
     expect(creationComposerSource).toContain("video-workspace-shell");
     expect(creationComposerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
     expect(creationComposerSource).toContain("transition-[grid-template-columns] duration-200");
@@ -1045,12 +1049,12 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("product-creative-workbench");
     expect(creationComposerSource).toContain("product-creative-controls");
     expect(creationComposerSource).toContain("prompt-inline-settings");
-    expect(creationComposerSource).toContain("model-scheme-control");
+    expect(appSource).toContain("active-model-control");
     expect(creationComposerSource).toContain('layout="pill"');
     expect(creationComposerSource).toContain("ProductCreativeToolbarChoice");
     expect(creationComposerSource).not.toContain("model-scheme-chip-row");
     expect(creationComposerSource).not.toContain("ModelSchemeChip");
-    expect(creationComposerSource).toContain("{schemeSummary}");
+    expect(creationComposerSource).not.toContain("{schemeSummary}");
     expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(creationComposerSource).not.toContain("model-scheme-summary min-w-0 truncate");
     expect(creationComposerSource).toContain('label={tVideo("controls.resolution")}');
@@ -1100,8 +1104,10 @@ describe("console API", () => {
     expect(referenceTraySource).toContain("product-reference-inline grid self-start content-start gap-2 rounded-[8px] px-3 py-2");
     expect(referenceTraySource).toContain('referenceCount > 0 ? "grid-rows-[36px_minmax(104px,auto)]" : "grid-rows-[36px]"');
     expect(referenceTraySource).toContain("product-reference-actions flex h-9 min-w-0 flex-nowrap items-center gap-2");
+    expect(referenceTraySource).toContain('tVideo("reference.title")');
     expect(referenceTraySource).toContain("reference-add-button inline-flex h-9 min-h-9");
-    expect(referenceTraySource).toContain("reference-generate-action h-9 min-h-9");
+    expect(referenceTraySource).not.toContain("reference-generate-action");
+    expect(referenceTraySource).not.toContain('tVideo("reference.generate")');
     expect(referenceTraySource).toContain("reference-image-list flex h-[104px] min-h-[104px]");
     expect(productDetailsSource).not.toContain("<details");
     expect(productDetailsSource).not.toContain("<summary");
@@ -1169,23 +1175,29 @@ describe("console API", () => {
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
     expect(appSource).not.toContain("const videoModelConfigs");
     expect(appSource).not.toContain("defaultVideoModelChoice");
-    expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
+    expect(modelConfigChoiceSource).toContain("return models.map((model) => model.configId)");
+    expect(modelConfigChoiceSource).not.toContain('return ["auto", ...models.map((model) => model.configId)');
+    expect(modelServiceSelectionSource).toContain("effectiveModelConfigChoice");
+    expect(modelServiceSelectionSource).toContain('value !== "auto" && options.includes(value)');
     expect(creationComposerSource).toContain("videoModelOptions");
     expect(creationComposerSource).toContain("imageModelOptions");
-    expect(creationComposerSource).toContain("localizedModelSchemeSummary");
-    expect(creationComposerSource).toContain("schemeSummary");
-    expect(creationComposerSource).toContain("activeModelSchemeId");
-    expect(creationComposerSource).toContain("localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)");
-    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
+    expect(creationComposerSource).not.toContain("localizedModelSchemeSummary");
+    expect(creationComposerSource).not.toContain("schemeSummary");
+    expect(creationComposerSource).not.toContain("activeModelSchemeId");
+    expect(creationComposerSource).not.toContain("localizedModelSchemeChoiceLabel");
+    expect(appSource).toContain('mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId');
+    expect(appSource).toContain('mode === "image" ? imageModelOptions : videoModelOptions');
+    expect(appSource).toContain('mode === "image" ? onImageModelConfigChange : onVideoModelConfigChange');
+    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(effectiveModel.id, effectiveModel.model);");
     expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
-    expect(creationComposerSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(creationComposerSource).not.toContain('label={tVideo("controls.modelScheme")}');
     expect(creationComposerSource).not.toContain('label="文本模型"');
     expect(creationComposerSource).not.toContain('label="图片模型"');
     expect(creationComposerSource).not.toContain('label="视频模型"');
     expect(appSource).toContain("const defaultVideoDurationSeconds = 10");
     expect(appSource).not.toContain("seed" + "nice");
     expect(creationComposerSource).toContain("selectedVideoModelConfigId");
-    expect(creationComposerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(creationComposerSource).toContain("providerModelConfigId: effectiveSelectedVideoModelConfigId");
     expect(creationComposerSource).not.toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
@@ -1255,12 +1267,12 @@ describe("console API", () => {
     expect(appSource).not.toContain("async function mediaReferenceToFile(");
     expect(creationComposerSource).toContain("onProductFactsPaste={handleProductFactsPaste}");
     expect(creationComposerSource).toContain("storyboard-side-panel");
-    expect(storyboardPanelSource).toContain("storyboardDraftIsGuidance");
+    expect(storyboardPanelSource).not.toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("productReady: boolean");
     expect(storyboardPanelSource).toContain("promptOptimizeActionDisabled");
     expect(storyboardPanelSource).toContain("promptOptimizeActionLoading");
     expect(storyboardPanelSource).toContain("bg-[var(--card)]");
-    expect(storyboardPanelSource).toContain("text-[#9a8776]");
+    expect(storyboardPanelSource).not.toContain("text-[#9a8776]");
     expect(storyboardPanelSource).toContain("text-[var(--text)]");
     expect(creationComposerSource).toContain("product-facts-editor");
     expect(creationComposerSource).toContain("product-creative-product-details");
@@ -1306,8 +1318,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("onDeleteReferenceImage");
     expect(creationComposerSource).toContain("onReorderReferenceImage");
     expect(appSource).toContain("/reference-images/order");
-    expect(creationComposerSource).toContain("aria-disabled={!product}");
-    expect(creationComposerSource).toContain('tVideo("reference.generateDisabledToast")');
+    expect(creationComposerSource).not.toContain("aria-disabled={!product}");
+    expect(creationComposerSource).not.toContain('tVideo("reference.generateDisabledToast")');
     expect(creationComposerSource).toContain('tVideo("facts.organize")');
     expect(creationComposerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
     expect(creationComposerSource).toContain('{isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}');
@@ -1338,11 +1350,12 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
-    expect(storyboardPanelSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1 overflow-visible");
+    expect(modeSwitchSource).toContain("product-creative-mode-switch flex h-7 shrink-0 items-center gap-1.5");
+    expect(storyboardPanelSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible");
     expect(storyboardPanelSource).toContain("w-[150px]");
     expect(storyboardPanelSource).toContain('Badge className="min-h-5 shrink-0 px-1.5 text-[10px]"');
-    expect(creationComposerSource).toContain("hidePillLabel");
-    expect(creationComposerSource).toContain("formatActiveLabel={(option) => localizedCompactModelSchemeChoiceLabel(option, modelSchemeOptions, tVideo)}");
+    expect(storyboardPanelSource).toContain("active-model-control");
+    expect(creationComposerSource).not.toContain("localizedCompactModelSchemeChoiceLabel");
     expect(creationComposerSource).toContain("formatActiveLabel={(option) => compactTemplateLabel(option, tVideo)}");
     expect(creationComposerSource).toContain("formatActiveLabel={(option) => compactFinalLanguageLabel(option, tVideo)}");
     expect(creationComposerSource).toContain('`${option} 个`');
@@ -1354,14 +1367,14 @@ describe("console API", () => {
     expect(creationComposerSource).toContain('label={tVideo("controls.template")}');
     expect(creationComposerSource).toContain('label={tVideo("controls.duration")}');
     expect(creationComposerSource).toContain('label={tVideo("controls.finalLanguage")}');
-    expect(creationComposerSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(creationComposerSource).not.toContain('label={tVideo("controls.modelScheme")}');
     expect(creationComposerSource).not.toContain('label="生成模型"');
     expect(creationComposerSource).toContain("CompactChoiceDropdown");
     expect(appSource).toContain('from "./productComposerText.js"');
     expect(creationComposerSource).toContain("handleGenerateVideo");
     expect(creationComposerSource).toContain("await onGenerateVideo(productActionSummary(savedProduct), {");
     expect(creationComposerSource).toContain('provider: "volcengine-seedance"');
-    expect(creationComposerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(creationComposerSource).toContain("providerModelConfigId: effectiveSelectedVideoModelConfigId");
     expect(creationComposerSource).not.toContain("provider: videoModelConfig.provider");
     expect(creationComposerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(creationComposerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
@@ -1401,20 +1414,32 @@ describe("console API", () => {
     expect(productLibraryColumnSource).toContain('tVideo("productLibrary.clearSearch")');
     expect(productLibraryColumnSource).not.toContain("手动填写或粘贴商品资料");
     expect(productLibraryColumnSource).not.toContain("+ 新建商品");
+    const referenceThumbnailSource = appSource.slice(appSource.indexOf("function ReferenceImageThumbnail"), appSource.indexOf("function ReferenceImageFigure"));
     const referenceFigureSource = appSource.slice(appSource.indexOf("function ReferenceImageFigure"), appSource.indexOf("function ReferenceImagePreviewDialog"));
     const referencePreviewSource = appSource.slice(appSource.indexOf("function ReferenceImagePreviewDialog"), appSource.indexOf("function ProductEntryModeButton"));
-    expect(referenceFigureSource).toContain("reference-image-actions");
+    expect(referenceThumbnailSource).toContain("image-reference-thumbnail");
+    expect(referenceThumbnailSource).toContain("image-prompt-reference-thumb");
+    expect(referenceThumbnailSource).toContain("singleClickTimerRef");
+    expect(referenceThumbnailSource).toContain("onClick={handleClick}");
+    expect(referenceThumbnailSource).toContain("onDoubleClick={handleDoubleClick}");
+    expect(referenceThumbnailSource).toContain("window.setTimeout(onSelect");
+    expect(referenceThumbnailSource).toContain("window.clearTimeout(singleClickTimerRef.current)");
+    expect(referenceThumbnailSource).toContain("image-prompt-reference-remove");
+    expect(referenceThumbnailSource).toContain("function ReferenceImageRemoveButton");
+    expect(referenceThumbnailSource).toContain("<X size={11} strokeWidth={2.4} />");
+    expect(referenceFigureSource).not.toContain("reference-image-actions");
     expect(referenceFigureSource).toContain("draggable");
     expect(referenceFigureSource).toContain('tVideo("reference.reorderTitle")');
     expect(referenceFigureSource).toContain("onReorder");
-    expect(referenceFigureSource).toContain("group-hover:opacity-100");
     expect(referenceFigureSource).toContain("grid h-[74px] w-[176px] shrink-0");
-    expect(referenceFigureSource).toContain("grid-cols-[64px_minmax(0,1fr)]");
-    expect(referenceFigureSource).toContain('title={canPreview ? tVideo("reference.selectPromptTarget") : referenceStatusLabel(image.status, tVideo)}');
+    expect(referenceFigureSource).toContain("grid-cols-[64px_minmax(0,1fr)_28px]");
+    expect(referenceFigureSource).toContain("<ReferenceImageThumbnail");
+    expect(referenceFigureSource).toContain("onSelect={onSelect}");
+    expect(referenceFigureSource).toContain("onPreview={onPreview}");
+    expect(referenceFigureSource).toContain("<ReferenceImageRemoveButton");
+    expect(referenceFigureSource).toContain("className=\"right-2 top-1/2 -translate-y-1/2\"");
+    expect(referenceFigureSource).not.toContain('title={tVideo("reference.selectPromptTarget")}');
     expect(referenceFigureSource).not.toContain("grid-cols-[72px_minmax(0,1fr)_auto]");
-    expect(referenceFigureSource).toContain("absolute right-1 top-1/2");
-    expect(referenceFigureSource).toContain("pointer-events-none");
-    expect(referenceFigureSource).toContain("group-hover:pointer-events-auto");
     expect(referenceFigureSource).toContain('title={tVideo("reference.delete")}');
     expect(referenceFigureSource).not.toContain("canDelete");
     expect(appSource).not.toContain("canDelete={images.length > 0}");
@@ -1432,12 +1457,12 @@ describe("console API", () => {
     expect(storyboardPanelSource).toContain("pb-12");
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown relative min-h-0");
     expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
-    expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1 overflow-visible");
+    expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1.5 overflow-visible");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
-    expect(settingsTraySource).toContain('menuPlacement="top"');
-    expect(settingsTraySource).toContain('menuWidth="content"');
+    expect(storyboardPanelSource).toContain('menuPlacement="top"');
+    expect(storyboardPanelSource).toContain('menuWidth="content"');
     expect(storyboardPanelSource).toContain("absolute bottom-20 left-3 right-3");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
@@ -1545,7 +1570,7 @@ describe("console API", () => {
     expect(appSource).toContain("setTemplate(record.style)");
     expect(appSource).toContain("setDuration(record.duration)");
     expect(appSource).toContain('setStudioScriptDraft("");');
-    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(template, duration, appLocale))");
+    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
     expect(appSource).not.toContain("setStudioScriptDraft(defaultStudioScriptDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("setStudioStoryboardDraft(defaultStudioStoryboardDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
@@ -1743,6 +1768,8 @@ describe("console API", () => {
     expect(sharedModelConfigSource).toContain('tSettings("emptyServices")');
     expect(sharedModelConfigSource).toContain("{configuredServices.map((service, index) => (");
     expect(sharedModelConfigSource).toContain("{service.serviceLabel}");
+    expect(sharedModelConfigSource).toContain('if (!canManageServices && apiOwner === "platform")');
+    expect(sharedModelConfigSource).toContain("platformModelNames.map");
     ["Key 来源", "Key 预览", "Token 单价", "估算秒价", "接口地址"].forEach((label) => {
       expect(apiManagementSource).not.toContain(label);
     });
@@ -1752,7 +1779,7 @@ describe("console API", () => {
     expect(appSource).not.toContain('aria-label="视频风格后台"');
     expect(appSource).not.toContain("风格后台");
     expect(appSource).toContain('tVideo("reference.add")');
-    expect(appSource).toContain('tVideo("reference.generate")');
+    expect(appSource).not.toContain('tVideo("reference.generate")');
     expect(appSource).not.toContain("/api/internal-validation/export.csv");
     expect(appSource).not.toContain("导出审核表");
     expect(appSource).toContain("finalVideoUrl");
@@ -1768,7 +1795,7 @@ describe("console API", () => {
     expect(appSource).not.toContain("剩余测试额度不足");
     expect(consoleApiClientSource).toContain("/api/provider-config");
     expect(consoleApiClientSource).toContain("/api/wallet");
-    expect(consoleApiClientSource).toContain("/api/model-bundles");
+    expect(consoleApiClientSource).not.toContain("/api/model-bundles");
     expect(consoleApiClientSource).toContain("/api/model-service-preference");
     expect(apiManagementSource).not.toContain("钱包余额");
     expect(apiManagementSource).not.toContain("充值 ¥50");
@@ -1822,26 +1849,27 @@ describe("console API", () => {
     expect(apiManagementSource).toContain("onServiceModeChange");
     expect(appSource).not.toContain("saveByokModelBundle");
     expect(appSource).not.toContain("savePlatformModelBundle");
-    expect(appSource).toContain("setSelectedTextModelConfigId(\"auto\")");
     expect(appSource).toContain("const apiOwner = modelServicePreference.serviceMode");
-    expect(appSource).toContain("const selectedSchemeOwner = effectiveSelectedModelSchemeId ? modelSchemeOwner(effectiveSelectedModelSchemeId, modelSchemeOptions) ?? apiOwner : apiOwner");
-    expect(appSource).toContain('const textModelOptions = selectedSchemeOwner === "platform" ? platformTextModelOptions : byokTextModelOptions');
-    expect(appSource).toContain("const activeModelSchemeId = modelSchemeOptionExists(selectedModelSchemeId, modelSchemeOptions)");
-    expect(appSource).toContain("const schemeSummary = localizedModelSchemeSummary({");
-    const ownerModeSource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelServiceOwnerPanel"), apiManagementSource.indexOf("function ModelBundleSummary"));
-    const bundleSummarySource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelBundleSummary"), apiManagementSource.indexOf("function ByokBundleManager"));
-    expect(ownerModeSource).toContain("if (apiOwner === \"platform\")");
+    expect(appSource).toContain('const textModelOptions = apiOwner === "platform" ? platformTextModelOptions : byokTextModelOptions');
+    expect(appSource).toContain('const imageModelOptions = apiOwner === "platform" ? platformImageModelOptions : byokImageModelOptions');
+    expect(appSource).toContain('const videoModelOptions = apiOwner === "platform" ? platformVideoModelOptions : byokVideoModelOptions');
+    expect(appSource).not.toContain("selectedSchemeOwner");
+    expect(appSource).not.toContain("activeModelSchemeId");
+    expect(appSource).not.toContain("schemeSummary");
+    const ownerModeSource = apiManagementSource.slice(apiManagementSource.indexOf("function ModelServiceOwnerPanel"), apiManagementSource.indexOf("function ModelConfigCard"));
+    expect(ownerModeSource).toContain("ownerModelsForGroup(group.models, apiOwner)");
     expect(ownerModeSource).not.toContain("平台模型组合");
     expect(ownerModeSource).not.toContain("自带 API 服务");
     expect(ownerModeSource).not.toContain("平台密钥只在后台保存，并加密写入数据库");
     expect(ownerModeSource).not.toContain("平台可用服务");
     expect(ownerModeSource).not.toContain("configuredOwnerModels");
-    expect(ownerModeSource).toContain("<ModelBundleSummary");
     expect(ownerModeSource).toContain("<SharedModelServiceGroup");
-    expect(bundleSummarySource).not.toContain("平台预设组合");
-    expect(bundleSummarySource).not.toContain("后台发布平台组合后，这里会显示可用方案。");
-    expect(bundleSummarySource).not.toContain("还没有模型组合");
-    expect(bundleSummarySource).not.toContain("保存成组合");
+    expect(apiManagementSource).not.toContain("ModelBundleSummary");
+    expect(apiManagementSource).not.toContain("ByokBundleManager");
+    expect(apiManagementSource).not.toContain("平台预设组合");
+    expect(apiManagementSource).not.toContain("后台发布平台组合后，这里会显示可用方案。");
+    expect(apiManagementSource).not.toContain("还没有模型组合");
+    expect(apiManagementSource).not.toContain("保存成组合");
     expect(ownerModeSource).not.toContain("模型自选组合");
     expect(ownerModeSource).not.toContain("保存当前组合");
     expect(apiManagementSource).not.toContain("模型自选组合");
@@ -1891,33 +1919,66 @@ describe("console API", () => {
     expect(appSource).toContain("selectedImageModelConfigId");
     expect(appSource).toContain("selectedVideoModelConfigId");
     expect(appSource).toContain("localizedModelConfigChoiceLabel");
-    expect(modelServiceBundlesSource).toContain("export function modelConfigChoiceLabel");
-    expect(modelServiceBundlesSource).toContain('return appText("videoStudio.models.auto", locale);');
-    const buildModelSchemeOptionsSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function buildModelSchemeOptions"), modelServiceBundlesSource.indexOf("export function sortSelectableModelBundles"));
-    expect(buildModelSchemeOptionsSource).not.toContain("自动推荐");
-    expect(appSource).toContain("textModelConfigId: selectedTextModelConfigId");
-    expect(appSource).toContain("imageModelConfigId: selectedImageModelConfigId");
-    expect(appSource).toContain("async function generateProductReferenceImages(sku: string, prompt?: string)");
-    expect(appSource).toContain("prompt: prompt?.trim() || undefined");
-    expect(appSource).toContain("await onGenerateReferenceImages(savedProduct.sku, imagePrompt);");
+    expect(modelServiceSelectionSource).toContain("export function modelConfigChoiceLabel");
+    expect(modelServiceSelectionSource).not.toContain('appText("videoStudio.models.auto"');
+    expect(appSource).not.toContain('return tVideo("models.auto")');
+    expect(modelServiceSelectionSource).toContain("modelsForOwnerAndCapability");
+    expect(modelServiceSelectionSource).not.toContain("buildModelSchemeOptions");
+    expect(appSource).toContain("textModelConfigId: effectiveSelectedTextModelConfigId");
+    expect(appSource).toContain("imageModelConfigId: effectiveSelectedImageModelConfigId");
+    expect(appSource).toContain("async function generateProductReferenceImages(sku: string, options: ProductImageGenerationOptions = {})");
+    expect(appSource).toContain("referenceImages: options.referenceImages ?? []");
+    expect(appSource).toContain("prompt: options.prompt?.trim() || undefined");
+    expect(appSource).toContain("await onGenerateReferenceImages(savedProduct.sku, {");
+    expect(appSource).toContain("prompt: imagePrompt,");
+    expect(appSource).toContain("referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []");
     expect(appSource).toContain('const [imagePrompt, setImagePrompt] = useState("");');
     expect(appSource).toContain("StoryboardComposerPanel");
     expect(appSource).not.toContain("ProductImagePromptPanel");
     expect(appSource).not.toContain("product-image-prompt-body");
     expect(appSource).toContain("图片提示词");
     expect(appSource).toContain("ProductCreativeModeSwitch");
-    expect(appSource).toContain("image-prompt-target-chip");
-    expect(appSource).toContain("selectedImagePromptReference={selectedImagePromptReference}");
-    expect(appSource).toContain("onImagePromptTargetClear={() => setImagePromptReferenceIndex(undefined)}");
-    expect(appSource).toContain("image-model-control");
+    expect(appSource).toContain("const [imagePromptReferences, setImagePromptReferences] = useState<ReferenceImageStatus[]>([]);");
+    expect(appSource).toContain("selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : imagePromptReferences[imagePromptReferenceIndex]");
+    expect(appSource).toContain("imagePromptReferences={imagePromptReferences}");
+    expect(appSource).toContain("imagePromptReferenceIndex={imagePromptReferenceIndex}");
+    expect(appSource).toContain("const [previewImagePromptReferenceIndex, setPreviewImagePromptReferenceIndex] = useState<number | undefined>();");
+    expect(appSource).toContain("function handleSelectReferenceImage(index: number)");
+    expect(appSource).toContain("function handlePreviewReferenceImage(index: number)");
+    expect(appSource).toContain("setPreviewReferenceImageIndex(index);");
+    expect(appSource).toContain("function handleSelectImagePromptReference(index: number)");
+    expect(appSource).toContain("function handlePreviewImagePromptReference(index: number)");
+    expect(appSource).toContain("setPreviewImagePromptReferenceIndex(index);");
+    expect(appSource).toContain("onImagePromptReferenceSelect={handleSelectImagePromptReference}");
+    expect(appSource).toContain("onImagePromptReferencePreview={handlePreviewImagePromptReference}");
+    expect(appSource).toContain("async function handleImagePromptReferenceFiles(files: FileList | File[] | null)");
+    expect(appSource).toContain("onImagePromptReferenceRemove={handleRemoveImagePromptReference}");
+    expect(appSource).toContain("onImagePromptReferenceFilesChange={handleImagePromptReferenceFiles}");
+    expect(appSource).toContain("const pasteInsidePrompt = event.target instanceof Node");
+    expect(appSource).not.toContain('const pasteInsidePrompt = mode === "image"');
+    expect(appSource).toContain("void handleImagePromptReferenceFiles(files);");
+    expect(appSource).toContain("onSelectReferenceImage={handleSelectReferenceImage}");
+    expect(appSource).toContain("onPreviewReferenceImage={handlePreviewReferenceImage}");
+    expect(appSource).toContain("onPendingSelect={handleSelectReferenceImage}");
+    expect(appSource).toContain("onPendingPreview={handlePreviewReferenceImage}");
+    expect(appSource).toContain("images={imagePromptReferences}");
+    expect(appSource).toContain("index={previewImagePromptReferenceIndex}");
+    expect(appSource).not.toContain("imagePromptReferences={previewableReferenceImages}");
+    expect(appSource).toContain("image-prompt-media-strip");
+    expect(appSource).toContain("<ReferenceImageThumbnail");
+    expect(appSource).toContain("image-prompt-reference-thumb");
+    expect(appSource).toContain("image-prompt-add-tile");
+    expect(appSource).not.toContain("image-prompt-target-chip");
+    expect(appSource).not.toContain("清除目标图");
+    expect(appSource).toContain("active-model-control");
     expect(appSource).toContain("selectedImageModelConfigId={selectedImageModelConfigId}");
     expect(appSource).toContain("onImageModelConfigChange={onImageModelConfigChange}");
     expect(appSource).toContain('const generateImageButtonLabel = "生成图片";');
-    expect(appSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(appSource).toContain("providerModelConfigId: effectiveSelectedVideoModelConfigId");
     expect(appSource).toContain("textModelOptions");
     expect(appSource).toContain("imageModelOptions");
     expect(appSource).toContain("videoModelOptions");
-    expect(appSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(appSource).not.toContain('label={tVideo("controls.modelScheme")}');
     expect(apiManagementSource).toContain('title: tSettings("groups.text.title")');
     expect(apiManagementSource).toContain('title: tSettings("groups.image.title")');
     expect(apiManagementSource).toContain('title: tSettings("groups.video.title")');
@@ -2044,16 +2105,15 @@ describe("console API", () => {
     process.env.HAITU_PLATFORM_DEFAULT_IMAGE_MODEL = "gpt-image-2";
     process.env.HAITU_PLATFORM_DEFAULT_VIDEO_MODEL = "seedance-2.0-fast";
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-platform-bundle-env-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-platform-env-"));
       tempDirs.push(root);
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
 
-      const [providerConfig, bundlesResponse, preferenceResponse] = await Promise.all([
+      const [providerConfig, preferenceResponse] = await Promise.all([
         server.fetchJson("/api/provider-config"),
-        server.fetchJson("/api/model-bundles"),
         server.fetchJson("/api/model-service-preference")
       ]);
-      const serialized = JSON.stringify({ providerConfig, bundlesResponse, preferenceResponse });
+      const serialized = JSON.stringify({ providerConfig, preferenceResponse });
       const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
       const rows = database.sqlite.prepare(`
         SELECT api_owner, encrypted_key, key_preview
@@ -2068,11 +2128,9 @@ describe("console API", () => {
       expect(providerConfig.textModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
       expect(providerConfig.imageModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
       expect(providerConfig.videoModels.filter((model: { apiOwner: string }) => model.apiOwner === "platform")).toEqual([]);
-      expect(bundlesResponse.bundles.filter((bundle: { apiOwner: string }) => bundle.apiOwner === "platform")).toEqual([]);
-      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-custom-bundle");
-      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-default-bundle");
-      expect(bundlesResponse.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-fast-bundle");
-      expect(preferenceResponse.preference.platformBundleId).toBeUndefined();
+      expect(preferenceResponse.preference).toEqual(expect.objectContaining({
+        serviceMode: "byok"
+      }));
       expect(rows).toEqual([]);
     } finally {
       restoreEnv("HAITU_PLATFORM_OPENAI_API_KEY", previousOpenAiPlatformKey);
@@ -2084,11 +2142,11 @@ describe("console API", () => {
     }
   });
 
-  it("removes legacy fixed platform custom bundles across saved workspaces", async () => {
+  it("does not create combination storage when platform model configs change", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-platform-legacy-bundle-cleanup-"));
+      const root = await mkdtemp(join(tmpdir(), "haitu-platform-model-cleanup-"));
       tempDirs.push(root);
       const dataDir = testDataDir(root);
       const database = openDatabase({ dataDir, env: process.env });
@@ -2096,35 +2154,6 @@ describe("console API", () => {
       database.sqlite.prepare(`
         INSERT INTO workspaces (id, name, created_at, updated_at)
         VALUES ('workspace-extra-cleanup', 'Extra Workspace', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
-      `).run();
-      database.sqlite.prepare(`
-        INSERT INTO model_bundles (
-          id,
-          workspace_id,
-          bundle_id,
-          api_owner,
-          label,
-          text_model_config_id,
-          image_model_config_id,
-          video_model_config_id,
-          enabled,
-          priority,
-          created_at,
-          updated_at
-        ) VALUES (
-          'legacy-platform-custom-row',
-          'workspace-extra-cleanup',
-          'platform-custom-bundle',
-          'platform',
-          '自定义',
-          NULL,
-          NULL,
-          NULL,
-          1,
-          80,
-          '2026-01-01T00:00:00.000Z',
-          '2026-01-01T00:00:00.000Z'
-        )
       `).run();
       closeDatabase(database);
 
@@ -2139,18 +2168,13 @@ describe("console API", () => {
       });
 
       const verifiedDatabase = openDatabase({ dataDir, env: process.env });
-      const bundleIds = verifiedDatabase.sqlite.prepare(`
-        SELECT bundle_id
-        FROM model_bundles
-        WHERE workspace_id = 'workspace-extra-cleanup'
-        ORDER BY bundle_id
-      `).all() as Array<{ bundle_id: string }>;
+      const tableNames = verifiedDatabase.sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .pluck()
+        .all() as string[];
       closeDatabase(verifiedDatabase);
 
-      expect(bundleIds.map((row) => row.bundle_id)).toEqual([
-        "platform-low-cost-bundle",
-        "platform-quality-bundle"
-      ]);
+      expect(tableNames).not.toContain("model_bundles");
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
@@ -2197,7 +2221,7 @@ describe("console API", () => {
     }
   });
 
-  it("lets users switch to platform mode even before choosing a platform bundle", async () => {
+  it("lets users switch to platform mode without choosing a model combination", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-toggle-"));
     tempDirs.push(root);
     const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
@@ -2206,20 +2230,24 @@ describe("console API", () => {
       method: "PUT",
       body: JSON.stringify({
         serviceMode: "platform",
-        platformBundleId: ""
+        textModelConfigId: "auto",
+        imageModelConfigId: "auto",
+        videoModelConfigId: "auto"
       })
     });
 
     expect(savedPreference.preference).toEqual(expect.objectContaining({
-      serviceMode: "platform"
+      serviceMode: "platform",
+      textModelConfigId: "auto",
+      imageModelConfigId: "auto",
+      videoModelConfigId: "auto"
     }));
-    expect(savedPreference.preference.platformBundleId).toBeUndefined();
   });
 
-  it("clears a stale platform bundle selection when switching to platform mode without a bundle", async () => {
+  it("overwrites stale platform model config selections by capability", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
-    const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-stale-bundle-"));
+    const root = await mkdtemp(join(tmpdir(), "haitu-platform-mode-stale-config-"));
     tempDirs.push(root);
     try {
       const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
@@ -2251,42 +2279,32 @@ describe("console API", () => {
       const platformText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
       const platformImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
       const platformVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "platform");
-      await server.fetchJson("/api/model-bundles", {
-        method: "PUT",
-        body: JSON.stringify({
-          bundleId: "platform-stale-bundle",
-          apiOwner: "platform",
-          label: "旧平台组合",
-          textModelConfigId: platformText.configId,
-          imageModelConfigId: platformImage.configId,
-          videoModelConfigId: platformVideo.configId,
-          enabled: true,
-          priority: 1
-        })
-      });
       await server.fetchJson("/api/model-service-preference", {
         method: "PUT",
         body: JSON.stringify({
           serviceMode: "platform",
-          platformBundleId: "platform-stale-bundle"
+          textModelConfigId: platformText.configId,
+          imageModelConfigId: platformImage.configId,
+          videoModelConfigId: platformVideo.configId
         })
-      });
-      await server.fetchJson("/api/model-bundles/platform-stale-bundle", {
-        method: "DELETE"
       });
 
       const savedPreference = await server.fetchJson("/api/model-service-preference", {
         method: "PUT",
         body: JSON.stringify({
           serviceMode: "platform",
-          platformBundleId: ""
+          textModelConfigId: "auto",
+          imageModelConfigId: "auto",
+          videoModelConfigId: "auto"
         })
       });
 
       expect(savedPreference.preference).toEqual(expect.objectContaining({
-        serviceMode: "platform"
+        serviceMode: "platform",
+        textModelConfigId: "auto",
+        imageModelConfigId: "auto",
+        videoModelConfigId: "auto"
       }));
-      expect(savedPreference.preference.platformBundleId).toBeUndefined();
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
@@ -3751,14 +3769,14 @@ describe("console API", () => {
     ]);
   });
 
-  it("saves model bundles that combine text, image, and video model configs", async () => {
-    const root = await mkdtemp(join(tmpdir(), "haitu-model-bundles-"));
+  it("persists type-based model preferences without model bundles", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-preferences-"));
     tempDirs.push(root);
     const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
     await server.fetchJson("/api/model-configs/openai-compatible-text", {
       method: "PUT",
       body: JSON.stringify({
-        apiKey: "text-bundle-key",
+        apiKey: "text-preference-key",
         name: "DeepSeek 文本",
         vendor: "deepseek",
         model: "deepseek-v4-pro",
@@ -3768,7 +3786,7 @@ describe("console API", () => {
     await server.fetchJson("/api/model-configs/openai-compatible-image", {
       method: "PUT",
       body: JSON.stringify({
-        apiKey: "image-bundle-key",
+        apiKey: "image-preference-key",
         name: "GPT Image",
         vendor: "openai",
         model: "gpt-image-2",
@@ -3778,7 +3796,7 @@ describe("console API", () => {
     await server.fetchJson("/api/model-configs/volcengine-seedance", {
       method: "PUT",
       body: JSON.stringify({
-        apiKey: "video-bundle-key",
+        apiKey: "video-preference-key",
         name: "Seedance Fast",
         vendor: "volcengine",
         model: "doubao-seedance-2-0-fast-260128",
@@ -3790,40 +3808,37 @@ describe("console API", () => {
     const imageConfigId = providerConfig.imageModels[0].configId;
     const videoConfigId = providerConfig.videoModels[0].configId;
 
-    const saved = await server.fetchJson("/api/model-bundles", {
+    const saved = await server.fetchJson("/api/model-service-preference", {
       method: "PUT",
       body: JSON.stringify({
-        label: "高质量组合",
-        description: "DeepSeek + GPT Image + Seedance Fast",
-        textModelConfigId: textConfigId,
-        imageModelConfigId: imageConfigId,
-        videoModelConfigId: videoConfigId,
-        enabled: true,
-        priority: 9
-      })
-    });
-    const listed = await server.fetchJson("/api/model-bundles");
-
-    expect(saved.bundle).toEqual(expect.objectContaining({
-      label: "高质量组合",
-      textModelConfigId: textConfigId,
-      imageModelConfigId: imageConfigId,
-      videoModelConfigId: videoConfigId,
-      enabled: true,
-      priority: 9
-    }));
-    expect(listed.bundles).toEqual([
-      expect.objectContaining({
-        label: "高质量组合",
+        serviceMode: "byok",
         textModelConfigId: textConfigId,
         imageModelConfigId: imageConfigId,
         videoModelConfigId: videoConfigId
       })
-    ]);
+    });
+    const listed = await server.fetchJson("/api/model-service-preference");
+    const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
+    const tableNames = database.sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .pluck()
+      .all() as string[];
+    closeDatabase(database);
+
+    expect(saved.preference).toEqual(expect.objectContaining({
+      serviceMode: "byok",
+      textModelConfigId: textConfigId,
+      imageModelConfigId: imageConfigId,
+      videoModelConfigId: videoConfigId
+    }));
+    expect(listed.preference).toEqual(saved.preference);
+    expect(saved.preference.platformBundleId).toBeUndefined();
+    expect(saved.preference.byokBundleId).toBeUndefined();
+    expect(tableNames).not.toContain("model_bundles");
   });
 
-  it("saves incomplete model bundles as drafts but rejects enabling or selecting them", async () => {
-    const root = await mkdtemp(join(tmpdir(), "haitu-model-bundle-drafts-"));
+  it("allows partial type preferences and leaves missing capabilities on automatic selection", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-preference-partial-"));
     tempDirs.push(root);
     const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
     await server.fetchJson("/api/model-configs/openai-compatible-text", {
@@ -3839,48 +3854,25 @@ describe("console API", () => {
     const providerConfig = await server.fetchJson("/api/provider-config");
     const textConfigId = providerConfig.textModels[0].configId;
 
-    const draft = await server.fetchJson("/api/model-bundles", {
-      method: "PUT",
-      body: JSON.stringify({
-        label: "只选了文本的草稿",
-        apiOwner: "byok",
-        textModelConfigId: textConfigId,
-        enabled: false
-      })
-    });
-    await expect(server.fetchJson("/api/model-bundles", {
-      method: "PUT",
-      body: JSON.stringify({
-        bundleId: draft.bundle.bundleId,
-        label: "只选了文本的草稿",
-        apiOwner: "byok",
-        textModelConfigId: textConfigId,
-        enabled: true
-      })
-    })).rejects.toThrow("启用模型组合必须同时选择文本、图片和视频模型。");
-    await expect(server.fetchJson("/api/model-service-preference", {
+    const saved = await server.fetchJson("/api/model-service-preference", {
       method: "PUT",
       body: JSON.stringify({
         serviceMode: "byok",
-        byokBundleId: draft.bundle.bundleId
+        textModelConfigId: textConfigId
       })
-    })).rejects.toThrow("选择的自带 API 组合尚未配置完整。");
+    });
 
-    const listed = await server.fetchJson("/api/model-bundles");
-    expect(draft.bundle).toEqual(expect.objectContaining({
-      label: "只选了文本的草稿",
-      textModelConfigId: textConfigId,
-      enabled: false
+    const listed = await server.fetchJson("/api/model-service-preference");
+    expect(saved.preference).toEqual(expect.objectContaining({
+      serviceMode: "byok",
+      textModelConfigId: textConfigId
     }));
-    expect(listed.bundles).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        bundleId: draft.bundle.bundleId,
-        enabled: false
-      })
-    ]));
+    expect(saved.preference.imageModelConfigId).toBeUndefined();
+    expect(saved.preference.videoModelConfigId).toBeUndefined();
+    expect(listed.preference).toEqual(saved.preference);
   });
 
-  it("persists model service mode and uses the selected platform bundle for AI calls", async () => {
+  it("persists model service mode and uses the selected platform text model for AI calls", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
@@ -3893,11 +3885,11 @@ describe("console API", () => {
               message: {
                 content: JSON.stringify({
                   sku: "PLATFORM-MODE-001",
-                  title_ja: "平台组合 テスト商品",
+                  title_ja: "平台模型 テスト商品",
                   category: "テスト",
                   materials: ["PP"],
                   dimensions: "約10cm",
-                  verified_selling_points: ["平台组合"],
+                  verified_selling_points: ["平台模型"],
                   usage_scenes: ["デスク"],
                   forbidden_claims: [],
                   reference_images: []
@@ -3961,53 +3953,38 @@ describe("console API", () => {
         apiOwner: "platform",
         model: "deepseek-v4-pro"
       }));
-      const savedBundle = await server.fetchJson("/api/model-bundles", {
-        method: "PUT",
-        body: JSON.stringify({
-          label: "平台推荐组合",
-          description: "平台文本 + 平台图片 + 平台视频",
-          apiOwner: "platform",
-          textModelConfigId: platformText.configId,
-          imageModelConfigId: platformImage.configId,
-          videoModelConfigId: platformVideo.configId,
-          enabled: true,
-          priority: 100
-        })
-      });
       const savedPreference = await server.fetchJson("/api/model-service-preference", {
         method: "PUT",
         body: JSON.stringify({
           serviceMode: "platform",
-          platformBundleId: savedBundle.bundle.bundleId
+          textModelConfigId: platformText.configId,
+          imageModelConfigId: platformImage.configId,
+          videoModelConfigId: platformVideo.configId
         })
       });
-      await creditTestWallet(server, 2, "platform bundle balance");
+      await creditTestWallet(server, 2, "platform model balance");
 
       const preview = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
         body: JSON.stringify({
-          text: "商品名：平台组合 テスト商品"
+          text: "商品名：平台模型 テスト商品"
         })
       });
       const listedPreference = await server.fetchJson("/api/model-service-preference");
-      const listedBundles = await server.fetchJson("/api/model-bundles");
       const wallet = await server.fetchJson("/api/wallet");
 
       expect(savedPreference.preference).toEqual(expect.objectContaining({
         serviceMode: "platform",
-        platformBundleId: savedBundle.bundle.bundleId
+        textModelConfigId: platformText.configId,
+        imageModelConfigId: platformImage.configId,
+        videoModelConfigId: platformVideo.configId
       }));
       expect(listedPreference.preference).toEqual(expect.objectContaining({
         serviceMode: "platform",
-        platformBundleId: savedBundle.bundle.bundleId
+        textModelConfigId: platformText.configId,
+        imageModelConfigId: platformImage.configId,
+        videoModelConfigId: platformVideo.configId
       }));
-      expect(listedBundles.bundles).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          label: "平台推荐组合",
-          apiOwner: "platform",
-          textModelConfigId: platformText.configId
-        })
-      ]));
       expect(preview.product.sku).toBe("PLATFORM-MODE-001");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://platform-text.example.test/v1/chat/completions");
       expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
@@ -4023,7 +4000,7 @@ describe("console API", () => {
     }
   });
 
-  it("uses the selected BYOK bundle when the service mode is own API", async () => {
+  it("uses the selected BYOK text model when the service mode is own API", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.TEXT_MODEL_API_KEY;
@@ -4094,26 +4071,16 @@ describe("console API", () => {
       const byokText = providerConfig.textModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
       const byokImage = providerConfig.imageModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
       const byokVideo = providerConfig.videoModels.find((model: { apiOwner: string }) => model.apiOwner === "byok");
-      const savedBundle = await server.fetchJson("/api/model-bundles", {
-        method: "PUT",
-        body: JSON.stringify({
-          label: "自带 API 组合",
-          apiOwner: "byok",
-          textModelConfigId: byokText.configId,
-          imageModelConfigId: byokImage.configId,
-          videoModelConfigId: byokVideo.configId,
-          enabled: true,
-          priority: 50
-        })
-      });
       await server.fetchJson("/api/model-service-preference", {
         method: "PUT",
         body: JSON.stringify({
           serviceMode: "byok",
-          byokBundleId: savedBundle.bundle.bundleId
+          textModelConfigId: byokText.configId,
+          imageModelConfigId: byokImage.configId,
+          videoModelConfigId: byokVideo.configId
         })
       });
-      await creditTestWallet(server, 1, "byok bundle balance");
+      await creditTestWallet(server, 1, "byok model balance");
 
       const preview = await server.fetchJson("/api/products/import-ai-preview", {
         method: "POST",
@@ -4370,7 +4337,7 @@ describe("console API", () => {
     }
   });
 
-  it("lets admins configure platform text image and video models into an encrypted platform bundle", async () => {
+  it("lets admins configure platform text image and video models without platform bundles", async () => {
     const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
     process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
     try {
@@ -4407,8 +4374,7 @@ describe("console API", () => {
       });
 
       const providerConfig = await server.fetchJson("/api/provider-config");
-      const bundles = await server.fetchJson("/api/model-bundles");
-      const serialized = JSON.stringify({ providerConfig, bundles });
+      const serialized = JSON.stringify({ providerConfig });
       const database = openDatabase({ dataDir: join(root, "data"), env: process.env });
       const rows = database.sqlite.prepare(`
         SELECT api_owner, encrypted_key, key_preview
@@ -4442,19 +4408,6 @@ describe("console API", () => {
           configured: true
         })
       ]));
-      expect(bundles.bundles).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          bundleId: "platform-quality-bundle",
-          apiOwner: "platform",
-          enabled: true
-        }),
-        expect.objectContaining({
-          bundleId: "platform-low-cost-bundle",
-          apiOwner: "platform",
-          enabled: true
-        })
-      ]));
-      expect(bundles.bundles.map((bundle: { bundleId: string }) => bundle.bundleId)).not.toContain("platform-custom-bundle");
       expect(rows).toHaveLength(3);
       expect(rows.some((row) => row.encrypted_key.includes("platform-text-secret-123456"))).toBe(false);
       expect(rows.some((row) => row.encrypted_key.includes("platform-image-secret-abcdef"))).toBe(false);
@@ -5607,7 +5560,7 @@ describe("console API", () => {
 
   it("renders video creation as one composer with inline product packing, controls, storyboard, and video history", async () => {
     const appSource = await readFile(join(process.cwd(), "src", "client", "App.tsx"), "utf8");
-    const modelServiceBundlesSource = await readFile(join(process.cwd(), "src", "client", "modelServiceBundles.ts"), "utf8");
+    const modelServiceSelectionSource = await readFile(join(process.cwd(), "src", "client", "modelServiceSelection.ts"), "utf8");
     const storyboardDraftsSource = await readFile(join(process.cwd(), "src", "client", "storyboardDrafts.ts"), "utf8");
 
     const renderCreativeWorkspaceSource = sourceBetween(appSource, "function renderCreativeWorkspace", "function renderActiveSection");
@@ -5620,8 +5573,8 @@ describe("console API", () => {
     expect(videoCase).not.toContain("<ProductLibraryDialogMount");
 
     const workspaceSource = appSource.slice(appSource.indexOf("function ProductCreationWorkspace"), appSource.indexOf("function ProductLibraryHome"));
-    const modelConfigChoiceSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function configuredModelOptions"), modelServiceBundlesSource.indexOf("export function bundleModelLabel"));
-    const modelConfigChoiceLabelSource = modelServiceBundlesSource.slice(modelServiceBundlesSource.indexOf("export function modelConfigChoiceLabel"), modelServiceBundlesSource.indexOf("export function platformConfiguredModels"));
+    const modelConfigChoiceSource = modelServiceSelectionSource.slice(modelServiceSelectionSource.indexOf("export function configuredModelOptions"), modelServiceSelectionSource.indexOf("export function modelConfigChoiceLabel"));
+    const modelConfigChoiceLabelSource = modelServiceSelectionSource.slice(modelServiceSelectionSource.indexOf("export function modelConfigChoiceLabel"), modelServiceSelectionSource.indexOf("export function platformConfiguredModels"));
     const defaultStoryboardSource = storyboardDraftsSource.slice(storyboardDraftsSource.indexOf("export function defaultStoryboardDraft"), storyboardDraftsSource.indexOf("export function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
     expect(workspaceSource).toContain("selectedProductStoryboardHistory");
@@ -5629,7 +5582,7 @@ describe("console API", () => {
     expect(workspaceSource).not.toContain("<VideoCreationEmptyShell");
     expect(workspaceSource).not.toContain("ensureVideoProductSelection");
     expect(workspaceSource).not.toContain("ProductStudioPipeline");
-    expect(modelServiceBundlesSource).toContain('export type ModelConfigChoice = "auto" | string;');
+    expect(modelServiceSelectionSource).toContain('export type ModelConfigChoice = "auto" | string;');
     expect(appSource).toContain('useState<ModelConfigChoice>("auto")');
     expect(appSource).toContain("selectedTextModelConfigId");
     expect(appSource).toContain("selectedImageModelConfigId");
@@ -5638,9 +5591,9 @@ describe("console API", () => {
     expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
-    expect(appSource).toContain('setSelectedTextModelConfigId("auto")');
-    expect(appSource).toContain('setSelectedImageModelConfigId("auto")');
-    expect(appSource).toContain('setSelectedVideoModelConfigId("auto")');
+    expect(appSource).toContain("setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? \"auto\")");
+    expect(appSource).toContain("setSelectedImageModelConfigId(modelServicePreferenceResponse.preference.imageModelConfigId ?? \"auto\")");
+    expect(appSource).toContain("setSelectedVideoModelConfigId(modelServicePreferenceResponse.preference.videoModelConfigId ?? \"auto\")");
     expect(appSource).not.toContain("setTemplate(nextSettings.enabledTemplates.includes(nextSettings.defaultTemplate)");
     expect(defaultStoryboardSource).toContain("scene");
     expect(defaultStoryboardSource).toContain("pain-point");
@@ -5651,7 +5604,7 @@ describe("console API", () => {
     expect(defaultStoryboardSource).toContain("`0-${firstEnd}s`");
     expect(appSource).toContain('from "./storyboardDrafts.js"');
     expect(appSource).not.toContain("function defaultStoryboardDraft(");
-    expect(appSource).toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
+    expect(appSource).not.toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
 
     const composerSource = appSource.slice(appSource.indexOf("function ProductCreationComposer"), appSource.indexOf("function ProductLibraryHome"));
     const productCreativeWorkbenchSource = sourceBetween(appSource, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
@@ -5702,12 +5655,12 @@ describe("console API", () => {
     expect(composerSource).toContain("product-creative-workbench");
     expect(composerSource).toContain("product-creative-controls");
     expect(composerSource).toContain("prompt-inline-settings");
-    expect(composerSource).toContain("model-scheme-control");
+    expect(appSource).toContain("active-model-control");
     expect(composerSource).toContain('layout="pill"');
     expect(composerSource).toContain("ProductCreativeToolbarChoice");
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain("ModelSchemeChip");
-    expect(composerSource).toContain("{schemeSummary}");
+    expect(composerSource).not.toContain("{schemeSummary}");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 whitespace-normal break-words");
     expect(composerSource).not.toContain("model-scheme-summary min-w-0 truncate");
     expect(composerSource).toContain('label={tVideo("controls.resolution")}');
@@ -5763,23 +5716,29 @@ describe("console API", () => {
     expect(appSource).not.toContain("const videoModelOptions: VideoModelChoice[]");
     expect(appSource).not.toContain("const videoModelConfigs");
     expect(appSource).not.toContain("defaultVideoModelChoice");
-    expect(modelConfigChoiceSource).toContain('return ["auto", ...models.map((model) => model.configId)');
+    expect(modelConfigChoiceSource).toContain("return models.map((model) => model.configId)");
+    expect(modelConfigChoiceSource).not.toContain('return ["auto", ...models.map((model) => model.configId)');
+    expect(modelServiceSelectionSource).toContain("effectiveModelConfigChoice");
+    expect(modelServiceSelectionSource).toContain('value !== "auto" && options.includes(value)');
     expect(composerSource).toContain("videoModelOptions");
     expect(composerSource).toContain("imageModelOptions");
-    expect(composerSource).toContain("localizedModelSchemeSummary");
-    expect(composerSource).toContain("schemeSummary");
-    expect(composerSource).toContain("activeModelSchemeId");
-    expect(composerSource).toContain("localizedModelSchemeChoiceLabel(activeModelSchemeId, modelSchemeOptions, tVideo)");
-    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(model.id, model.model);");
+    expect(composerSource).not.toContain("localizedModelSchemeSummary");
+    expect(composerSource).not.toContain("schemeSummary");
+    expect(composerSource).not.toContain("activeModelSchemeId");
+    expect(composerSource).not.toContain("localizedModelSchemeChoiceLabel");
+    expect(appSource).toContain('mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId');
+    expect(appSource).toContain('mode === "image" ? imageModelOptions : videoModelOptions');
+    expect(appSource).toContain('mode === "image" ? onImageModelConfigChange : onVideoModelConfigChange');
+    expect(modelConfigChoiceLabelSource).toContain("return modelLabelForId(effectiveModel.id, effectiveModel.model);");
     expect(modelConfigChoiceLabelSource).not.toContain("return `${model.label} · ${displayModel}`;");
-    expect(composerSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(composerSource).not.toContain('label={tVideo("controls.modelScheme")}');
     expect(composerSource).not.toContain('label="文本模型"');
     expect(composerSource).not.toContain('label="图片模型"');
     expect(composerSource).not.toContain('label="视频模型"');
     expect(appSource).toContain("const defaultVideoDurationSeconds = 10");
     expect(appSource).not.toContain("seed" + "nice");
     expect(composerSource).toContain("selectedVideoModelConfigId");
-    expect(composerSource).toContain("providerModelConfigId: selectedVideoModelConfigId");
+    expect(composerSource).toContain("providerModelConfigId: effectiveSelectedVideoModelConfigId");
     expect(composerSource).not.toContain("provider: videoModelConfig.provider");
     expect(composerSource).not.toContain("providerModel: videoModelConfig.model");
     expect(composerSource).not.toContain("confirmPaid: videoModelConfig.confirmPaid");
@@ -5790,9 +5749,9 @@ describe("console API", () => {
     expect(composerSource).not.toContain("product-creation-canvas overflow-visible rounded-[20px] bg-white");
     expect(composerSource).toContain("product-reference-inline");
     expect(composerSource).toContain("storyboard-side-panel");
-    expect(composerSource).toContain("storyboardDraftIsGuidance");
+    expect(composerSource).not.toContain("storyboardDraftIsGuidance");
     expect(composerSource).toContain("bg-[var(--card)]");
-    expect(composerSource).toContain("text-[#9a8776]");
+    expect(composerSource).not.toContain("text-[#9a8776]");
     expect(composerSource).toContain("text-[var(--text)]");
     expect(composerSource).toContain("product-facts-editor");
     expect(composerSource).toContain("product-creative-product-details");
@@ -5840,8 +5799,12 @@ describe("console API", () => {
     expect(composerSource).toContain('tVideo("reference.add")');
     expect(composerSource).toContain("onPreviewReferenceImage");
     expect(composerSource).toContain("onDeleteReferenceImage");
-    expect(composerSource).toContain("aria-disabled={!product}");
-    expect(composerSource).toContain('tVideo("reference.generateDisabledToast")');
+    expect(composerSource).not.toContain("aria-disabled={!product}");
+    expect(composerSource).not.toContain('tVideo("reference.generateDisabledToast")');
+    expect(composerSource).toContain("const selectedCreationReferenceImages = imagePromptReferences.map((image) => image.original).filter(Boolean);");
+    expect(composerSource).toContain("const activeCreationReferenceCount = selectedCreationReferenceImages.length > 0 ? selectedCreationReferenceImages.length : previewableReferenceImages.length;");
+    expect(composerSource).toContain("function selectedCreationReferenceImagesForProduct(product: ProductDetail)");
+    expect(composerSource).toContain("referenceImages: selectedCreationReferenceImagesForProduct(savedProduct)");
     expect(composerSource).toContain('tVideo("facts.organize")');
     expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
     expect(composerSource).toContain('{isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}');
@@ -5866,13 +5829,13 @@ describe("console API", () => {
     expect(composerSource).toContain("prompt-composer-mode-slot");
     expect(composerSource).toContain("prompt-composer-settings-slot");
     expect(composerSource).toContain("prompt-composer-history-slot");
-    expect(composerSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1 overflow-visible");
+    expect(composerSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible");
     expect(composerSource).toContain("placeholder={promptPlaceholder}");
     expect(composerSource).not.toContain("整理资料并生成视频");
     expect(composerSource).toContain('label={tVideo("controls.template")}');
     expect(composerSource).toContain('label={tVideo("controls.duration")}');
     expect(composerSource).toContain('label={tVideo("controls.finalLanguage")}');
-    expect(composerSource).toContain('label={tVideo("controls.modelScheme")}');
+    expect(composerSource).not.toContain('label={tVideo("controls.modelScheme")}');
     expect(composerSource).not.toContain('label="生成模型"');
     expect(composerSource).toContain('tVideo("generate.button")');
     expect(composerSource).toContain("CompactChoiceDropdown");
@@ -7821,6 +7784,68 @@ describe("console API", () => {
       expect(body.model).toBe("gpt-image-2");
       expect(body.prompt).toContain("接触冷感アームカバー");
       expect(body.n).toBe(1);
+    } finally {
+      restoreEnv("IMAGE_MODEL_API_KEY", previousImageKey);
+      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
+    }
+  });
+
+  it("passes selected reference images into product image generation", async () => {
+    const previousImageKey = process.env.IMAGE_MODEL_API_KEY;
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    delete process.env.IMAGE_MODEL_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-generate-selected-reference-images-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const productPath = testProductPath(fixturesDir, "wallet");
+      await writeProduct(productPath, {
+        sku: "IMG-002",
+        title_ja: "接触冷感アームカバー",
+        reference_images: ["main.jpg", "detail.jpg"]
+      });
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-reference"));
+      await writeFile(productAssetPath(productPath, "detail.jpg"), Buffer.from("detail-reference"));
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({
+          data: [
+            {
+              b64_json: Buffer.from("generated-from-selected-reference").toString("base64")
+            }
+          ]
+        })
+      ) as unknown as typeof fetch;
+      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
+      await server.fetchJson("/api/model-configs/openai-compatible-image", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "selected-image-secret-0002",
+          name: "手动选择图片",
+          vendor: "openai",
+          priority: 100,
+          baseUrl: "https://api.openai.com",
+          model: "gpt-image-2"
+        })
+      });
+
+      await topUpWalletForAiUsage(server);
+      await server.fetchJson("/api/products/IMG-002/reference-images/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          count: 1,
+          prompt: "优化这张细节图",
+          referenceImages: ["detail.jpg"]
+        })
+      });
+
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[0]).toBe("https://api.openai.com/v1/images/edits");
+      const body = vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body;
+      expect(body).toBeInstanceOf(FormData);
+      const formData = body as FormData;
+      expect(formData.get("prompt")).toContain("优化这张细节图");
+      expect(formData.getAll("image")).toHaveLength(1);
+      expect((formData.get("image") as File).name).toBe("detail.jpg");
     } finally {
       restoreEnv("IMAGE_MODEL_API_KEY", previousImageKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);

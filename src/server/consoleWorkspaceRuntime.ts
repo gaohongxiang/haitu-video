@@ -9,7 +9,6 @@ import { LocalVideoJobQueue, type LocalVideoJobQueueOptions } from "./consoleVid
 import type { DatabaseHandle } from "./db/client.js";
 import { resolveDatabaseSecretKey } from "./db/crypto.js";
 import { SqliteModelConfigStore } from "./db/sqliteModelConfigStore.js";
-import { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import { selectedVideoModelConfig } from "./modelConfigSelection.js";
 import { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
@@ -31,7 +30,6 @@ export interface ConsoleRequestContext {
   outputsDir: string;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore: ModelConfigStore;
-  modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
   billingPolicyStore: BillingPolicyStore;
   modelPricingCatalog: readonly ModelPricingEntry[];
@@ -74,11 +72,6 @@ export async function createConsoleRequestContext(input: {
     publicAssetTokenStore: input.publicAssetTokenStore,
     fetchImpl: input.fetchImpl
   });
-  const modelBundleStore = new ModelBundleStore({
-    handle: input.databaseHandle,
-    workspaceId: resolved.workspaceId,
-    now: input.now
-  });
   const modelServicePreferenceStore = new ModelServicePreferenceStore({
     handle: input.databaseHandle,
     workspaceId: resolved.workspaceId,
@@ -110,7 +103,6 @@ export async function createConsoleRequestContext(input: {
     outputsDir: workspacePaths.jobsDir,
     modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore,
     modelServicePreferenceStore,
     billingPolicyStore,
     modelPricingCatalog,
@@ -131,7 +123,6 @@ export async function createConsoleRequestContext(input: {
       workspaceVideoJobQueues: input.workspaceVideoJobQueues,
       rootDir: input.rootDir,
       settingsStore: input.settingsStore,
-      modelBundleStore,
       modelServicePreferenceStore,
       billingPolicyStore,
       modelPricingCatalog,
@@ -153,7 +144,6 @@ function videoJobQueueForWorkspace(input: {
   workspaceVideoJobQueues: Map<string, LocalVideoJobQueue>;
   rootDir: string;
   settingsStore: ConsoleSettingsStore;
-  modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
   billingPolicyStore: BillingPolicyStore;
   modelPricingCatalog: readonly ModelPricingEntry[];
@@ -179,7 +169,6 @@ function videoJobQueueForWorkspace(input: {
     runMakeVideoPipeline: createConfiguredMakeVideoPipeline({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
       billingPolicyStore: input.billingPolicyStore,
       modelPricingCatalog: input.modelPricingCatalog,
@@ -199,7 +188,6 @@ function videoJobQueueForWorkspace(input: {
 export function createConfiguredMakeVideoPipeline(input: {
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   billingPolicyStore?: BillingPolicyStore;
   modelPricingCatalog?: readonly ModelPricingEntry[];
@@ -210,7 +198,6 @@ export function createConfiguredMakeVideoPipeline(input: {
     const config = await selectedVideoModelConfig({
       modelConfigStore: input.modelConfigStore,
       platformModelConfigStore: input.platformModelConfigStore,
-      modelBundleStore: input.modelBundleStore,
       modelServicePreferenceStore: input.modelServicePreferenceStore,
       provider: pipelineInput.providerName,
       providerModelConfigId: pipelineInput.providerModelConfigId

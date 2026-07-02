@@ -81,6 +81,99 @@ describe("ModelPricingCatalogStore", () => {
     }
   });
 
+  it("prefers the built-in official catalog over stale database-published versions", async () => {
+    const { handle, close } = await openTestDatabase("haitu-pricing-catalog-stale-");
+    try {
+      const store = new ModelPricingCatalogStore({
+        handle,
+        now: () => new Date("2026-06-20T00:00:00.000Z")
+      });
+      const staleCatalog = store.getActiveCatalog().catalog.map((entry) => (
+        entry.model === "gpt-image-2"
+          ? { ...entry, model: "gpt-4o-mini", resourceKey: "gpt4oMini" }
+          : entry
+      ));
+
+      const draft = store.saveDraft({
+        version: "2026-06-01",
+        catalog: staleCatalog,
+        createdBy: "admin@example.com"
+      });
+      store.publishDraft({
+        draftId: draft.id,
+        publishedBy: "admin@example.com"
+      });
+      const active = store.getActiveCatalog();
+
+      expect(active.source).toBe("built_in");
+      expect(active.version).toBe(officialModelPricingUpdatedAt);
+      expect(active.catalog.some((entry) => entry.model === "gpt-4o-mini")).toBe(false);
+      expect(active.catalog.filter((entry) => entry.providerId === "openai").map((entry) => entry.model)).toEqual([
+        "gpt-5.5",
+        "gpt-image-2"
+      ]);
+    } finally {
+      close();
+    }
+  });
+
+  it("uses database-published catalogs only as price overrides for official models", async () => {
+    const { handle, close } = await openTestDatabase("haitu-pricing-catalog-overrides-");
+    try {
+      const store = new ModelPricingCatalogStore({
+        handle,
+        now: () => new Date("2026-06-29T00:00:00.000Z")
+      });
+      const officialCatalog = store.getActiveCatalog().catalog;
+      const staleOpenAiTextModel = {
+        ...officialCatalog.find((entry) => entry.model === "gpt-5.5")!,
+        model: "gpt-5-mini",
+        resourceKey: "gpt5Mini"
+      };
+      const staleOpenAiImageModel = {
+        ...officialCatalog.find((entry) => entry.model === "gpt-image-2")!,
+        model: "gpt-4o-mini",
+        resourceKey: "gpt4oMini"
+      };
+      const draft = store.saveDraft({
+        version: "2026-06-29",
+        catalog: [
+          ...officialCatalog.map((entry) => (
+            entry.model === "gpt-image-2"
+              ? withImagePrice(entry, 0.31)
+              : entry
+          )),
+          staleOpenAiTextModel,
+          staleOpenAiImageModel
+        ],
+        createdBy: "admin@example.com"
+      });
+
+      const published = store.publishDraft({
+        draftId: draft.id,
+        publishedBy: "admin@example.com"
+      });
+      const active = store.getActiveCatalog();
+
+      expect(published.source).toBe("database");
+      expect(active.source).toBe("database");
+      expect(active.version).toBe("2026-06-29");
+      expect(active.catalog.filter((entry) => entry.providerId === "openai").map((entry) => entry.model)).toEqual([
+        "gpt-5.5",
+        "gpt-image-2"
+      ]);
+      expect(active.catalog.some((entry) => entry.model === "gpt-5-mini")).toBe(false);
+      expect(active.catalog.some((entry) => entry.model === "gpt-4o-mini")).toBe(false);
+      expect(active.catalog.find((entry) => entry.model === "gpt-image-2")).toEqual(expect.objectContaining({
+        imagePriceCnyPerImage: 0.31,
+        inputPriceCnyPerMillion: 58,
+        outputPriceCnyPerMillion: 217.5
+      }));
+    } finally {
+      close();
+    }
+  });
+
   it("rejects invalid catalogs before saving drafts", async () => {
     const { handle, close } = await openTestDatabase("haitu-pricing-catalog-invalid-");
     try {
@@ -127,6 +220,19 @@ function withVideoResolutionPrice(entry: ModelPricingEntry, resolution: "1080p",
             ...entry.settlement.videoTokenPriceCnyPerMillionByResolution,
             [resolution]: price
           }
+        }
+      : entry.settlement
+  };
+}
+
+function withImagePrice(entry: ModelPricingEntry, price: number): ModelPricingEntry {
+  return {
+    ...entry,
+    imagePriceCnyPerImage: price,
+    settlement: entry.settlement?.kind === "image"
+      ? {
+          ...entry.settlement,
+          imagePriceCnyPerImage: price
         }
       : entry.settlement
   };

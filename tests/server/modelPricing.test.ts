@@ -61,10 +61,10 @@ describe("model pricing", () => {
       outputTokens: 1000,
       totalTokens: 2000
     })).toBe(0.01);
-    expect(estimateTextUpstreamCostCny("gpt-5", {
+    expect(estimateTextUpstreamCostCny("gpt-5.5", {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000
-    })).toBe(81.56);
+    })).toBe(253.75);
     expect(estimateTextUpstreamCostCny("doubao-seed-2-0-pro-260215", {
       inputTokens: 1000,
       outputTokens: 1000

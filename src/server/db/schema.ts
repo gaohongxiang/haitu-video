@@ -272,31 +272,12 @@ export const consoleSettings = sqliteTable("console_settings", {
   updatedAt: text("updated_at").notNull()
 });
 
-export const modelBundles = sqliteTable("model_bundles", {
-  id: text("id").primaryKey(),
-  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
-  bundleId: text("bundle_id").notNull(),
-  apiOwner: text("api_owner").notNull().default("byok"),
-  label: text("label").notNull(),
-  description: text("description"),
-  textModelConfigId: text("text_model_config_id"),
-  imageModelConfigId: text("image_model_config_id"),
-  videoModelConfigId: text("video_model_config_id"),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  priority: integer("priority").notNull().default(0),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
-}, (table) => ({
-  workspaceBundleUnique: uniqueIndex("model_bundles_workspace_bundle_unique").on(table.workspaceId, table.bundleId),
-  workspaceIndex: index("model_bundles_workspace_id_idx").on(table.workspaceId),
-  enabledIndex: index("model_bundles_enabled_idx").on(table.workspaceId, table.enabled, table.priority)
-}));
-
 export const modelServicePreferences = sqliteTable("model_service_preferences", {
   workspaceId: text("workspace_id").primaryKey().references(() => workspaces.id, { onDelete: "cascade" }),
   serviceMode: text("service_mode").notNull().default("byok"),
-  platformBundleId: text("platform_bundle_id"),
-  byokBundleId: text("byok_bundle_id"),
+  textModelConfigId: text("text_model_config_id"),
+  imageModelConfigId: text("image_model_config_id"),
+  videoModelConfigId: text("video_model_config_id"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull()
 });
@@ -333,7 +314,6 @@ export const schema = {
   billingPriceRules,
   productAssets,
   products,
-  modelBundles,
   modelCredentials,
   modelPricingCatalogDrafts,
   modelPricingCatalogVersions,

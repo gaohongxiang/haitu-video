@@ -17,7 +17,6 @@ import {
   type ModelConfigRequest,
   type ProviderConfigTestRequest
 } from "./modelConfigService.js";
-import { ensurePlatformBundlesForAllWorkspaces } from "./consoleLifecycleService.js";
 
 export async function handleModelConfigRoutes(input: {
   request: Request;
@@ -78,10 +77,6 @@ export async function handleModelConfigRoutes(input: {
     const provider = parseModelProviderId(decodeURIComponent(platformModelConfigMatch[1] ?? ""));
     const providerInput = (await request.json()) as ModelConfigRequest;
     const saved = await requestContext.platformModelConfigStore.set(provider, platformModelConfigInput(provider, providerInput));
-    await ensurePlatformBundlesForAllWorkspaces({
-      databaseHandle: requestContext.databaseHandle,
-      platformModelConfigStore: requestContext.platformModelConfigStore,
-    });
     await auditLog.append({
       action: "platform_model_config.saved",
       target: provider,
@@ -99,10 +94,6 @@ export async function handleModelConfigRoutes(input: {
     const provider = parseModelProviderId(decodeURIComponent(platformModelConfigMatch[1] ?? ""));
     const configId = url.searchParams.get("configId") ?? undefined;
     const deleted = await requestContext.platformModelConfigStore.delete(provider, configId);
-    await ensurePlatformBundlesForAllWorkspaces({
-      databaseHandle: requestContext.databaseHandle,
-      platformModelConfigStore: requestContext.platformModelConfigStore,
-    });
     await auditLog.append({
       action: "platform_model_config.deleted",
       target: provider,

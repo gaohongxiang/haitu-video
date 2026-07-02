@@ -30,6 +30,7 @@ export function createQueuedVideoJobRecord(input: {
     cta: request.cta ?? settings.defaultCta,
     scriptLines: sanitizeLines(request.scriptLines),
     storyboardLines: sanitizeLines(request.storyboardLines),
+    referenceImages: sanitizeReferenceImages(request.referenceImages),
     confirmPaid: request.confirmPaid ?? provider !== "mock",
     apiBillingMode: request.apiBillingMode,
     platformFeeCny: request.platformFeeCny,
@@ -48,4 +49,11 @@ export function createQueuedVideoJobRecord(input: {
 function sanitizeLines(lines?: string[]): string[] | undefined {
   const cleaned = (lines ?? []).map((line) => line.trim()).filter(Boolean);
   return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function sanitizeReferenceImages(lines?: string[]): string[] | undefined {
+  if (!Array.isArray(lines)) {
+    return undefined;
+  }
+  return lines.map((line) => line.trim()).filter(Boolean);
 }

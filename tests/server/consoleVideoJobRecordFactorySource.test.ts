@@ -31,6 +31,8 @@ describe("console video job record factory source boundaries", () => {
     expect(factorySource).toContain("request.provider ?? settings.defaultProvider");
     expect(factorySource).toContain("request.duration ?? settings.defaultDurationSeconds");
     expect(factorySource).toContain("request.template ?? settings.defaultTemplate");
+    expect(factorySource).toContain("referenceImages: sanitizeReferenceImages(request.referenceImages)");
+    expect(factorySource).toContain("function sanitizeReferenceImages(lines?: string[]): string[] | undefined");
     expect(factorySource).toContain("normalizeFinalVideoLanguage(");
     expect(factorySource).toContain("confirmPaid: request.confirmPaid ?? provider !== \"mock\"");
     expect(factorySource).toContain("function sanitizeLines(");

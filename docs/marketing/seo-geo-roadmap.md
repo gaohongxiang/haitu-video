@@ -659,7 +659,7 @@ Category pages:
 - header 使用真实 logo。
 - 语言切换按钮和下拉菜单。
 - `hreflang` 和 `x-default`。
-- SEO footer 内链。
+- 官网 footer 已改为精选导航，只展示核心功能、核心平台、核心工作流和信任页；长尾类目、对比和场景页不再全量堆到首页底部，避免视觉混乱。
 - `/terms`、`/privacy`、`/refund`、`/contact` 公开访问。
 - `/robots.txt` 公开访问。
 - `/sitemap.xml` 公开访问。
@@ -672,13 +672,13 @@ Category pages:
 - `/llms.txt` 已公开输出站点摘要、全量中英文公开页面索引、`Standard AI Answers`、计费退款摘要、数据语言边界、爬取边界和联系方式；页面索引由 `marketingPages × marketingLocales` 自动生成，新增公开页时会同步进入 AI 友好索引。
 - 营销页已接入 `geo-answer-block`，首页、核心功能页、模型页、平台页、工具页、场景页、类目页和对比页都有中英文页面级 GEO 事实块；政策页保留默认事实块即可。
 - 首页、核心功能页、模型页、平台页、工具页、场景页、类目页和对比页都有 4-6 条中英文 GEO FAQ，覆盖“是什么、适合谁、输入输出、平台场景、类目素材、模型方式、语言边界、余额扣费、审核边界、工具差异、人工制作差异”等 AI 常问问题。
-- 首批 use-case 场景页已上线到本地双语 SEO 体系，包含跨境电商、TikTok Shop 商品视频、Amazon 商品图优化、服饰商品视频、家居商品图片转视频、美妆个护短视频；这些页面已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- 第二批功能页已上线到本地双语 SEO 体系，包含商品图背景清洁化、商品参考图管理、商品视频分镜生成器、商品图片/脚本/视频一体化工作流；这些页面已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- 第三批功能页已上线到本地双语 SEO 体系，包含商品素材审核工作流、电商商品视频本地化工作流、模型成本和余额消耗控制；这些页面已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- Lazada / Etsy 平台页已上线到本地双语 SEO 体系，进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- 首批类目页已上线到本地双语 SEO 体系，包含服饰、家居、美妆个护、电子配件、宠物用品、厨房用品；这些页面已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- 第二批类目页已上线到本地双语 SEO 体系，包含饰品珠宝、母婴、运动户外、汽车配件；这些页面已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
-- 首批对比页已上线到本地双语 SEO 体系，包含 AI 商品视频生成器 vs 普通视频生成器、Haitu vs Canva 商品视频工作流、Haitu vs 人工商品视频制作流程；这些页面保持中立表达，不诋毁竞品，已进入 sitemap、footer、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引。
+- 首批 use-case 场景页已上线到本地双语 SEO 体系，包含跨境电商、TikTok Shop 商品视频、Amazon 商品图优化、服饰商品视频、家居商品图片转视频、美妆个护短视频；这些页面已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，其中高价值工作流页进入精选 footer。
+- 第二批功能页已上线到本地双语 SEO 体系，包含商品图背景清洁化、商品参考图管理、商品视频分镜生成器、商品图片/脚本/视频一体化工作流；这些页面已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，其中核心工作流页进入精选 footer。
+- 第三批功能页已上线到本地双语 SEO 体系，包含商品素材审核工作流、电商商品视频本地化工作流、模型成本和余额消耗控制；这些页面已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，不强制进入首页 footer。
+- Lazada / Etsy 平台页已上线到本地双语 SEO 体系，进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引；首页 footer 只保留 TikTok Shop、Amazon、Shopee、Shopify 等优先平台入口。
+- 首批类目页已上线到本地双语 SEO 体系，包含服饰、家居、美妆个护、电子配件、宠物用品、厨房用品；这些页面已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，不在首页 footer 全量展示。
+- 第二批类目页已上线到本地双语 SEO 体系，包含饰品珠宝、母婴、运动户外、汽车配件；这些页面已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，不在首页 footer 全量展示。
+- 首批对比页已上线到本地双语 SEO 体系，包含 AI 商品视频生成器 vs 普通视频生成器、Haitu vs Canva 商品视频工作流、Haitu vs 人工商品视频制作流程；这些页面保持中立表达，不诋毁竞品，已进入 sitemap、`hreflang`、JSON-LD FAQ 和 `/llms.txt` 全量公开页面索引，不在首页 footer 全量展示。
 - JSON-LD 已包含 `Organization` 和 `ContactPoint`，客服邮箱为 `support@haitu.online`。
 - JSON-LD 已包含 `WebSite`，并按语言输出站点名：中文 `Haitu 嗨兔`，英文 `Haitu`。
 - JSON-LD 已按页面类型区分：获客页使用 `SoftwareApplication`，服务条款/隐私/退款使用 `WebPage`，联系方式使用 `ContactPage`，避免把政策页错误标记成软件应用页面。

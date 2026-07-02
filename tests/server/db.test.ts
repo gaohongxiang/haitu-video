@@ -180,7 +180,7 @@ describe("SQLite database infrastructure", () => {
     }
   });
 
-  it("stores model service mode separately from credentials and marks bundle ownership", async () => {
+  it("stores model service mode with capability-level model choices and no bundles", async () => {
     const dataDir = await makeTempDir();
     const handle = openDatabase({ dataDir, env: {} });
 
@@ -189,19 +189,23 @@ describe("SQLite database infrastructure", () => {
       const preferenceColumns = handle.sqlite
         .prepare("PRAGMA table_info(model_service_preferences)")
         .all() as Array<{ name: string }>;
-      const bundleColumns = handle.sqlite
-        .prepare("PRAGMA table_info(model_bundles)")
-        .all() as Array<{ name: string }>;
+      const tableNames = handle.sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .pluck()
+        .all() as string[];
 
       expect(preferenceColumns.map((column) => column.name)).toEqual(expect.arrayContaining([
         "workspace_id",
         "service_mode",
-        "platform_bundle_id",
-        "byok_bundle_id",
+        "text_model_config_id",
+        "image_model_config_id",
+        "video_model_config_id",
         "created_at",
         "updated_at"
       ]));
-      expect(bundleColumns.map((column) => column.name)).toContain("api_owner");
+      expect(preferenceColumns.map((column) => column.name)).not.toContain("platform_bundle_id");
+      expect(preferenceColumns.map((column) => column.name)).not.toContain("byok_bundle_id");
+      expect(tableNames).not.toContain("model_bundles");
     } finally {
       closeDatabase(handle);
     }

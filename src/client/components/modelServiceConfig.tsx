@@ -324,6 +324,36 @@ export function SharedModelServiceGroup({
   const configuredModels = models.filter((model) => model.configured);
   const configuredServices = groupConfiguredModelServices(providerId, configuredModels);
   const configuredCount = configuredServices.length;
+  const platformModelNames = Array.from(
+    new Set(configuredModels.map((model) => modelLabelForId(providerId, model.model)))
+  );
+  if (!canManageServices && apiOwner === "platform") {
+    return (
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--card2)] px-3 py-3 text-[12px]">
+        {platformModelNames.length > 0 ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <h3 className="m-0 mr-2 shrink-0 text-[15px] font-black leading-7 text-[var(--text)]">{title}</h3>
+            {platformModelNames.map((modelName) => (
+              <span
+                key={modelName}
+                className="inline-flex min-h-7 max-w-full items-center rounded-[7px] border border-[var(--border)] bg-[var(--card)] px-2.5 text-[12px] font-black leading-5 text-[var(--text)]"
+                title={modelName}
+              >
+                {modelName}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h3 className="m-0 shrink-0 text-[15px] font-black leading-7 text-[var(--text)]">{title}</h3>
+            <span className="text-[12px] font-semibold leading-5 text-[var(--muted)]">
+              {emptyText ?? tSettings("emptyServices")}
+            </span>
+          </div>
+        )}
+      </section>
+    );
+  }
   return (
     <section className="grid gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--card2)] p-3 text-[12px]">
       <div className="flex flex-wrap items-start justify-between gap-2">

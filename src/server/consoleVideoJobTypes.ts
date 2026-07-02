@@ -18,6 +18,7 @@ export interface VideoJobRequest {
   cta?: string;
   scriptLines?: string[];
   storyboardLines?: string[];
+  referenceImages?: string[];
   confirmPaid?: boolean;
   apiBillingMode?: "platform" | "byok";
   platformFeeCny?: number;
@@ -45,6 +46,7 @@ export interface VideoJobRecord {
   cta?: string;
   scriptLines?: string[];
   storyboardLines?: string[];
+  referenceImages?: string[];
   confirmPaid: boolean;
   apiBillingMode?: "platform" | "byok";
   platformFeeCny?: number;

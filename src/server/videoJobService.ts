@@ -9,7 +9,6 @@ import { normalizeVideoAspectRatio } from "../providers/videoGeometry.js";
 import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { LocalVideoJobQueue } from "./consoleVideoJobQueue.js";
-import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import { resolveVideoRequestModel } from "./modelConfigSelection.js";
@@ -33,6 +32,7 @@ export interface MakeVideoRequest {
   cta?: string;
   scriptLines?: string[];
   storyboardLines?: string[];
+  referenceImages?: string[];
   confirmPaid?: boolean;
   reuseManifest?: string;
 }
@@ -48,7 +48,6 @@ interface EnqueueVideoJobOptions {
   settingsStore: ConsoleSettingsStore;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore: ModelConfigStore;
-  modelBundleStore: ModelBundleStore;
   modelServicePreferenceStore: ModelServicePreferenceStore;
   walletStore: WalletStore;
   videoJobQueue: LocalVideoJobQueue;
@@ -93,7 +92,6 @@ export async function enqueueVideoJob(
   const videoModel = await resolveVideoRequestModel({
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore,
     provider: providerName,
     body
@@ -129,6 +127,7 @@ export async function enqueueVideoJob(
     cta: body.cta,
     scriptLines: sanitizeLines(body.scriptLines),
     storyboardLines: sanitizeLines(body.storyboardLines),
+    referenceImages: sanitizeReferenceImages(body.referenceImages),
     confirmPaid: body.confirmPaid ?? providerName !== "mock",
     ...billing,
     reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
@@ -175,6 +174,13 @@ function sanitizePathSegment(value: string): string {
 function sanitizeLines(lines?: string[]): string[] | undefined {
   const cleaned = (lines ?? []).map((line) => line.trim()).filter(Boolean);
   return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function sanitizeReferenceImages(lines?: string[]): string[] | undefined {
+  if (!Array.isArray(lines)) {
+    return undefined;
+  }
+  return lines.map((line) => line.trim()).filter(Boolean);
 }
 
 function clampInteger(value: number, min: number, max: number): number {

@@ -63,7 +63,6 @@ export async function handleVideoRoutes(input: {
         billingPolicyStore: requestContext.billingPolicyStore,
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore
       })
     });
@@ -76,7 +75,6 @@ export async function handleVideoRoutes(input: {
       settingsStore,
       modelConfigStore: requestContext.modelConfigStore,
       platformModelConfigStore: requestContext.platformModelConfigStore,
-      modelBundleStore: requestContext.modelBundleStore,
       modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
       fetchImpl,
       runMakeVideoPipeline,
@@ -95,7 +93,6 @@ export async function handleVideoRoutes(input: {
         settingsStore,
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
         videoJobQueue: requestContext.videoJobQueue,
@@ -113,7 +110,6 @@ export async function handleVideoRoutes(input: {
         settingsStore,
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         walletStore: requestContext.walletStore,
         videoJobQueue: requestContext.videoJobQueue,
@@ -169,7 +165,6 @@ export async function handleVideoRoutes(input: {
       walletStore: requestContext.walletStore,
       modelConfigStore: requestContext.modelConfigStore,
       platformModelConfigStore: requestContext.platformModelConfigStore,
-      modelBundleStore: requestContext.modelBundleStore,
       modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
       billingPolicyStore: requestContext.billingPolicyStore,
       modelPricingCatalog: requestContext.modelPricingCatalog
@@ -220,7 +215,6 @@ export async function handleVideoRoutes(input: {
       usage: await listProviderTasks(url, {
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         fetchImpl
       })
@@ -234,8 +228,7 @@ export async function handleVideoRoutes(input: {
         task: await getProviderTask(taskId, {
           modelConfigStore: requestContext.modelConfigStore,
           platformModelConfigStore: requestContext.platformModelConfigStore,
-          modelBundleStore: requestContext.modelBundleStore,
-          modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
+            modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
           fetchImpl
         })
       });
@@ -244,7 +237,6 @@ export async function handleVideoRoutes(input: {
       await cancelQueuedProviderTask(taskId, {
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         fetchImpl
       });

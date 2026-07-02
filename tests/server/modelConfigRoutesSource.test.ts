@@ -44,6 +44,6 @@ describe("model config routes source boundaries", () => {
     expect(routesSource).toContain("modelConfigMatch");
     expect(routesSource).toContain("parseModelProviderId");
     expect(routesSource).toContain("buildProviderConfig");
-    expect(routesSource).toContain("ensurePlatformBundles");
+    expect(routesSource).not.toContain("ensurePlatformBundles");
   });
 });

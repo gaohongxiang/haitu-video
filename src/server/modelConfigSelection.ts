@@ -1,13 +1,13 @@
 import type { VideoProviderName } from "../providers/providerFactory.js";
 import type { ModelProviderId } from "../providers/modelCatalog.js";
-import type { ModelBundle, ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore, ModelStoredConfig } from "./modelConfigStore.js";
-import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
+import type { ModelServicePreference, ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
+
+export type ModelCapability = "text" | "image" | "video";
 
 interface ModelSelectionStores {
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
 }
 
@@ -20,13 +20,11 @@ export async function selectedVideoModelConfig(input: ModelSelectionStores & {
   }
   const requestedConfigId = normalizeText(input.providerModelConfigId);
   const config = await selectModelConfig({
-    providerId: "volcengine-seedance",
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
-    bundleConfigSelector: (bundle) => bundle.videoModelConfigId,
-    configId: requestedConfigId
+    capability: "video",
+    requestedConfigId
   });
   if (requestedConfigId && requestedConfigId !== "auto" && !config) {
     throw new Error("所选视频模型配置不存在或已被删除。");
@@ -38,7 +36,8 @@ export async function assertVideoModelConfigured(
   modelConfigStore: ModelConfigStore,
   platformModelConfigStore: ModelConfigStore | undefined,
   provider: VideoProviderName | undefined,
-  providerModelConfigId?: string
+  providerModelConfigId?: string,
+  modelServicePreferenceStore?: ModelServicePreferenceStore
 ): Promise<void> {
   if (!provider || provider === "mock") {
     return;
@@ -46,6 +45,7 @@ export async function assertVideoModelConfigured(
   const config = await selectedVideoModelConfig({
     modelConfigStore,
     platformModelConfigStore,
+    modelServicePreferenceStore,
     provider,
     providerModelConfigId
   });
@@ -73,7 +73,6 @@ export async function resolveVideoRequestModel(input: ModelSelectionStores & {
   const config = await selectedVideoModelConfig({
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
     provider: input.provider,
     providerModelConfigId: input.body.providerModelConfigId
@@ -89,62 +88,54 @@ export async function resolveVideoRequestModel(input: ModelSelectionStores & {
 }
 
 export async function selectModelConfig(input: ModelSelectionStores & {
-  providerId: ModelProviderId;
-  bundleConfigSelector?: (bundle: ModelBundle) => string | undefined;
-  configId?: string;
+  capability: ModelCapability;
+  requestedConfigId?: string;
 }): Promise<ModelStoredConfig | undefined> {
-  if (input.configId && input.configId !== "auto") {
-    return await input.modelConfigStore.getConfigById(input.providerId, input.configId)
-      ?? await input.platformModelConfigStore?.getConfigById(input.providerId, input.configId);
+  const providerId = providerIdForCapability(input.capability);
+  const requestedConfigId = normalizeText(input.requestedConfigId);
+  if (requestedConfigId && requestedConfigId !== "auto") {
+    return await input.modelConfigStore.getConfigById(providerId, requestedConfigId)
+      ?? await input.platformModelConfigStore?.getConfigById(providerId, requestedConfigId);
   }
-  const bundleConfigId = selectedBundleConfigId({
-    modelBundleStore: input.modelBundleStore,
-    modelServicePreferenceStore: input.modelServicePreferenceStore,
-    selector: input.bundleConfigSelector
-  });
-  if (bundleConfigId) {
-    return await input.modelConfigStore.getConfigById(input.providerId, bundleConfigId)
-      ?? await input.platformModelConfigStore?.getConfigById(input.providerId, bundleConfigId);
+  const preference = input.modelServicePreferenceStore?.get();
+  const preferenceConfigId = preferenceConfigIdForCapability(preference, input.capability);
+  if (preferenceConfigId && preferenceConfigId !== "auto") {
+    return await input.modelConfigStore.getConfigById(providerId, preferenceConfigId)
+      ?? await input.platformModelConfigStore?.getConfigById(providerId, preferenceConfigId);
   }
-  return await input.modelConfigStore.getConfig(input.providerId)
-    ?? await input.platformModelConfigStore?.getConfig(input.providerId);
+  if (preference?.serviceMode === "platform") {
+    return await input.platformModelConfigStore?.getConfig(providerId);
+  }
+  return await input.modelConfigStore.getConfig(providerId);
 }
 
-function selectedBundleConfigId(input: {
-  modelBundleStore?: ModelBundleStore;
-  modelServicePreferenceStore?: ModelServicePreferenceStore;
-  selector?: (bundle: ModelBundle) => string | undefined;
-}): string | undefined {
-  if (!input.modelBundleStore || !input.modelServicePreferenceStore || !input.selector) {
+export function providerIdForCapability(capability: ModelCapability): ModelProviderId {
+  if (capability === "text") {
+    return "openai-compatible-text";
+  }
+  if (capability === "image") {
+    return "openai-compatible-image";
+  }
+  return "volcengine-seedance";
+}
+
+export function preferenceConfigIdForCapability(
+  preference: ModelServicePreference | undefined,
+  capability: ModelCapability
+): string | undefined {
+  if (!preference) {
     return undefined;
   }
-  const preference = input.modelServicePreferenceStore.get();
-  const selectedBundleId = preference.serviceMode === "platform" ? preference.platformBundleId : preference.byokBundleId;
-  const bundles = input.modelBundleStore.list();
-  const selectedBundle = selectedBundleId
-    ? bundles.find((bundle) => bundle.bundleId === selectedBundleId)
-    : bundles.find((bundle) => bundle.apiOwner === preference.serviceMode && isSelectableBundle(bundle));
-  if (!selectedBundle || selectedBundle.apiOwner !== preference.serviceMode) {
-    return undefined;
+  if (capability === "text") {
+    return normalizeText(preference.textModelConfigId);
   }
-  const configId = normalizeText(input.selector(selectedBundle));
-  if (!configId || configId === "auto") {
-    throw new Error("当前模型组合未配置完整，请先补全后再创作。");
+  if (capability === "image") {
+    return normalizeText(preference.imageModelConfigId);
   }
-  return configId;
+  return normalizeText(preference.videoModelConfigId);
 }
 
 function normalizeText(value: unknown): string | undefined {
   const text = typeof value === "string" ? value.trim() : "";
   return text || undefined;
-}
-
-function isSelectableBundle(bundle: ModelBundle): boolean {
-  return bundle.enabled
-    && Boolean(normalizeText(bundle.textModelConfigId))
-    && normalizeText(bundle.textModelConfigId) !== "auto"
-    && Boolean(normalizeText(bundle.imageModelConfigId))
-    && normalizeText(bundle.imageModelConfigId) !== "auto"
-    && Boolean(normalizeText(bundle.videoModelConfigId))
-    && normalizeText(bundle.videoModelConfigId) !== "auto";
 }

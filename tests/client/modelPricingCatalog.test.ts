@@ -4,7 +4,8 @@ import {
   localizedModelPricingEntry,
   localizedModelPricingProvider,
   modelPricingCatalog,
-  modelPricingProviders
+  modelPricingProviders,
+  pricingEntriesForProvider
 } from "../../src/client/modelPricingCatalog.js";
 
 describe("model pricing catalog", () => {
@@ -17,11 +18,7 @@ describe("model pricing catalog", () => {
     const openaiEntries = modelPricingCatalog.filter((entry) => entry.providerId === "openai");
     expect(openaiEntries.map((entry) => entry.model)).toEqual([
       "gpt-5.5",
-      "gpt-image-2",
-      "gpt-5",
-      "gpt-5-mini",
-      "gpt-4.1",
-      "gpt-4o-mini"
+      "gpt-image-2"
     ]);
     expect(openaiEntries).toContainEqual(expect.objectContaining({
       providerId: "openai",
@@ -36,15 +33,6 @@ describe("model pricing catalog", () => {
         expect.objectContaining({ label: "100k 输入 + 20k 输出", value: "US$1.10" })
       ]),
       billingNote: expect.stringContaining("默认按即时标准价估算")
-    }));
-    expect(openaiEntries).toContainEqual(expect.objectContaining({
-      providerId: "openai",
-      model: "gpt-5",
-      kind: "text",
-      input: "US$1.25",
-      cachedInput: "US$0.125",
-      output: "US$10.00",
-      unit: "/ 1M tokens"
     }));
     expect(openaiEntries).toContainEqual(expect.objectContaining({
       providerId: "openai",
@@ -95,6 +83,23 @@ describe("model pricing catalog", () => {
         "是否包含输入视频"
       ])
     }));
+  });
+
+  it("groups provider pricing without encoding provider-specific model eligibility", () => {
+    const customCatalog = [
+      ...modelPricingCatalog,
+      {
+        ...modelPricingCatalog.find((entry) => entry.model === "gpt-5.5")!,
+        model: "future-openai-model",
+        resourceKey: "futureOpenAiModel"
+      }
+    ];
+
+    expect(pricingEntriesForProvider("openai", customCatalog).map((entry) => entry.model)).toEqual([
+      "gpt-5.5",
+      "gpt-image-2",
+      "future-openai-model"
+    ]);
   });
 
   it("documents official Seedance video cost formula and typical examples", () => {

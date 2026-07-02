@@ -82,7 +82,7 @@ export async function getAdminSiteSettings(input: {
         id: "model-services",
         label: "模型服务",
         status: "configured",
-        description: "平台模型 API 配置、默认模型和 bundle 策略。"
+        description: "平台模型 API 配置和默认模型策略。"
       },
       {
         id: "billing",

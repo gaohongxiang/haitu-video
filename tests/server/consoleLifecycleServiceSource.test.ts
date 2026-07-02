@@ -7,7 +7,7 @@ const runtimePath = "src/server/consoleServerRuntime.ts";
 const servicePath = "src/server/consoleLifecycleService.ts";
 
 describe("console lifecycle service source boundaries", () => {
-  it("keeps database bootstrap and all-workspace platform provisioning out of the HTTP server module", async () => {
+  it("keeps database bootstrap and retention cleanup out of the HTTP server module", async () => {
     const consoleServerSource = await readFile(consoleServerPath, "utf8");
     const runtimeSource = await readFile(runtimePath, "utf8");
 
@@ -29,17 +29,17 @@ describe("console lifecycle service source boundaries", () => {
     expect(consoleServerSource).not.toContain("ensureDefaultWorkspace(handle)");
   });
 
-  it("centralizes database bootstrap, workspace listing, and platform bundle provisioning", async () => {
+  it("centralizes database bootstrap, workspace listing, and retention cleanup", async () => {
     const serviceSource = await readFile(servicePath, "utf8");
 
     expect(serviceSource).toContain("export function createConsoleDatabaseHandle(");
     expect(serviceSource).toContain("export function listWorkspaceIds(");
-    expect(serviceSource).toContain("export async function ensurePlatformBundlesForAllWorkspaces(");
+    expect(serviceSource).not.toContain("export async function ensurePlatformBundlesForAllWorkspaces(");
     expect(serviceSource).toContain("export function startVideoRetentionCleanup(");
     expect(serviceSource).toContain("openDatabase");
     expect(serviceSource).toContain("runMigrations");
     expect(serviceSource).toContain("ensureDefaultWorkspace");
-    expect(serviceSource).toContain("ensurePlatformBundles");
+    expect(serviceSource).not.toContain("ensurePlatformBundles");
     expect(serviceSource).not.toContain("ensurePlatformModelProvisioning");
     expect(serviceSource).toContain("cleanupExpiredVideos");
     expect(serviceSource).toContain('action: "video_retention.cleanup_failed"');

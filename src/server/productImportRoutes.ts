@@ -41,7 +41,6 @@ export async function handleProductImportRoutes(input: {
       createTextModelProvider: ({ textModelConfigId }) => createTextModelProvider({
         modelConfigStore: requestContext.modelConfigStore,
         platformModelConfigStore: requestContext.platformModelConfigStore,
-        modelBundleStore: requestContext.modelBundleStore,
         modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
         textModelConfigId,
         fetchImpl

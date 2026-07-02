@@ -1,35 +1,18 @@
-import { KeyRound, Pencil, Plus, Save, Trash2 } from "lucide-react";
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { KeyRound } from "lucide-react";
+import { FormEvent, ReactNode, useState } from "react";
 
 import { i18n } from "../../i18n/client.js";
 import {
-  bundleIdForPreference,
-  bundleModelLabel,
-  byokConfiguredModels,
-  isCompleteModelBundle,
-  isPlatformPresetBundle,
-  localizedModelSchemeBundleLabel,
-  nextModelBundleLabel,
   ownerModelsForGroup,
-  platformConfiguredModels,
-  sortByokModelBundlesForDisplay,
-  sortPlatformModelBundlesForDisplay,
-  type ModelBundleItem,
-  type ModelBundleSaveInput,
   type ModelServicePreference
-} from "../modelServiceBundles.js";
-import type { AppLocale } from "../../i18n/config.js";
+} from "../modelServiceSelection.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
-import { Button } from "./ui/button.js";
 import { Card, CardHeader } from "./ui/card.js";
-import { Input } from "./ui/field.js";
-import { CompactChoiceDropdown } from "./compactChoiceDropdown.js";
 import {
   draftFromProviderConfig,
   modelConfigPresets,
   resetModelConfigDraft,
-  EnabledSwitchButton,
   SharedModelConfigDialog,
   SharedModelServiceGroup,
   type ModelConfigDraft,
@@ -42,27 +25,6 @@ import {
 } from "./modelServiceConfig.js";
 
 const tSettings = (key: string, options?: Record<string, unknown>) => i18n.t(`app:settings.${key}`, options);
-const currentAppLocale = (): AppLocale => i18n.language === "en" ? "en" : "zh";
-const bundleTitleInputClass = "h-7 min-h-0 min-w-0 border-0 bg-transparent p-0 text-[14px] font-black text-[var(--text)] shadow-none outline-none focus-visible:ring-0";
-const bundleGridClass = "grid gap-2 min-[760px]:grid-cols-2 min-[1180px]:grid-cols-3";
-const bundleCardClass = "byok-bundle-card flex min-h-[190px] flex-col gap-3 rounded-lg border bg-[var(--card2)] p-3";
-const bundleHeaderClass = "flex h-8 min-w-0 items-center justify-between gap-2";
-const bundleModelRowsClass = "grid min-w-0 content-start gap-2";
-const bundleModelRowClass = "grid min-h-11 min-w-0 grid-cols-[44px_minmax(0,1fr)] items-center gap-2 rounded-[13px] border border-[var(--border-strong)] bg-[var(--field)] px-3 text-[13px] shadow-[0_8px_18px_rgba(96,64,43,.05)]";
-type BundleModelSelectionDraft = Partial<Pick<ModelBundleItem, "textModelConfigId" | "imageModelConfigId" | "videoModelConfigId">>;
-
-function bundleTitleInputWidth(value: string) {
-  const visualWidth = Array.from(value || tSettings("bundles.new")).reduce((total, char) => total + (char.charCodeAt(0) > 127 ? 2 : 1), 0);
-  return `${Math.min(Math.max(visualWidth + 1, 6), 20)}ch`;
-}
-
-function isCompleteBundleDraft(draft: BundleModelSelectionDraft): boolean {
-  return Boolean(draft.textModelConfigId && draft.imageModelConfigId && draft.videoModelConfigId);
-}
-
-function hasAnyBundleDraftModel(draft: BundleModelSelectionDraft): boolean {
-  return Boolean(draft.textModelConfigId || draft.imageModelConfigId || draft.videoModelConfigId);
-}
 
 function PanelTitle({ children, icon, right }: { children: ReactNode; icon?: ReactNode; right?: ReactNode }) {
   return <CardHeader heading={children} icon={icon} right={right} />;
@@ -70,7 +32,6 @@ function PanelTitle({ children, icon, right }: { children: ReactNode; icon?: Rea
 
 export function ApiModelConfigPanel({
   config,
-  modelBundles,
   servicePreference,
   drafts,
   testStatuses,
@@ -83,13 +44,9 @@ export function ApiModelConfigPanel({
   onClear,
   onToggleEnabled,
   onServicePreferenceChange,
-  onApplyBundleSelection,
-  onSaveBundle,
-  onDeleteBundle,
   isBusy
 }: {
   config: ProviderConfigLedger;
-  modelBundles: ModelBundleItem[];
   servicePreference: ModelServicePreference;
   drafts: Record<ModelConfigProviderId, ModelConfigDraft>;
   testStatuses: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
@@ -102,9 +59,6 @@ export function ApiModelConfigPanel({
   onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
   onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onServicePreferenceChange: (patch: Partial<ModelServicePreference>) => Promise<void>;
-  onApplyBundleSelection: (bundle: ModelBundleItem) => void;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
   isBusy: boolean;
 }) {
   const [editingProviderId, setEditingProviderId] = useState<ModelConfigProviderId | undefined>();
@@ -137,10 +91,6 @@ export function ApiModelConfigPanel({
   const editingGroup = groups.find((group) => group.providerId === editingProviderId);
   const allModels = [...config.textModels, ...config.imageModels, ...config.videoModels];
   const configuredCount = allModels.filter((model) => model.configured).length;
-  const platformBundles = modelBundles.filter((bundle) => bundle.apiOwner === "platform");
-  const byokBundles = modelBundles.filter((bundle) => bundle.apiOwner === "byok");
-  const platformBundleIdForMode = bundleIdForPreference(platformBundles, servicePreference.platformBundleId) ?? "";
-  const byokBundleIdForMode = bundleIdForPreference(byokBundles, servicePreference.byokBundleId) ?? "";
   const activeMode = servicePreference.serviceMode;
   return (
     <Card id="API Key" className="grid gap-4 bg-[var(--card)]">
@@ -149,21 +99,14 @@ export function ApiModelConfigPanel({
       </PanelTitle>
       <ApiServiceModeCards
         serviceMode={activeMode}
-        platformReady={platformBundles.length > 0 || allModels.some((model) => model.apiOwner === "platform" && model.configured)}
-        byokReady={byokBundles.length > 0 || allModels.some((model) => model.apiOwner !== "platform" && model.configured)}
-        onServiceModeChange={(serviceMode) => void onServicePreferenceChange(
-          serviceMode === "platform"
-            ? { serviceMode, platformBundleId: platformBundleIdForMode }
-            : { serviceMode, byokBundleId: byokBundleIdForMode }
-        )}
+        platformReady={allModels.some((model) => model.apiOwner === "platform" && model.configured)}
+        byokReady={allModels.some((model) => model.apiOwner !== "platform" && model.configured)}
+        onServiceModeChange={(serviceMode) => void onServicePreferenceChange({ serviceMode })}
         isBusy={isBusy}
       />
       <ModelServiceOwnerPanel
         apiOwner={activeMode}
-        bundles={activeMode === "platform" ? platformBundles : byokBundles}
-        config={config}
         groups={groups}
-        preference={servicePreference}
         canManageServices={activeMode === "byok"}
         drafts={drafts}
         onDraftChange={onDraftChange}
@@ -178,8 +121,6 @@ export function ApiModelConfigPanel({
           onDraftChange(providerId, draftFromProviderConfig(providerId, model, models));
           setEditingProviderId(providerId);
         }}
-        onSaveBundle={onSaveBundle}
-        onDeleteBundle={onDeleteBundle}
         isBusy={isBusy}
       />
       {editingGroup ? (
@@ -272,27 +213,16 @@ function ApiServiceModeCards({
 
 function ModelServiceOwnerPanel({
   apiOwner,
-  bundles,
-  config,
   groups,
-  preference,
   canManageServices,
-  drafts,
-  onDraftChange,
-  onApplyPreset,
   onClear,
   onToggleEnabled,
   onAdd,
   onEdit,
-  onSaveBundle,
-  onDeleteBundle,
   isBusy
 }: {
   apiOwner: ModelServicePreference["serviceMode"];
-  bundles: ModelBundleItem[];
-  config: ProviderConfigLedger;
   groups: ModelServiceGroup[];
-  preference: ModelServicePreference;
   canManageServices: boolean;
   drafts: Record<ModelConfigProviderId, ModelConfigDraft>;
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
@@ -301,27 +231,12 @@ function ModelServiceOwnerPanel({
   onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onAdd: (providerId: ModelConfigProviderId) => void;
   onEdit: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
   isBusy: boolean;
 }) {
   const ownerGroups = groups.map((group) => ({
     ...group,
     models: ownerModelsForGroup(group.models, apiOwner)
   }));
-  if (apiOwner === "platform") {
-    return (
-      <ModelBundleSummary
-        bundles={bundles}
-        config={config}
-        preference={preference}
-        onSaveBundle={onSaveBundle}
-        onDeleteBundle={onDeleteBundle}
-        isBusy={isBusy}
-      />
-    );
-  }
-
   return (
     <section className="grid gap-3">
       {ownerGroups.map((group) => (
@@ -332,8 +247,8 @@ function ModelServiceOwnerPanel({
           description={group.description}
           providerId={group.providerId}
           models={group.models}
-          apiOwner="byok"
-          keyBadgeLabel={tSettings("byokKey")}
+          apiOwner={apiOwner}
+          keyBadgeLabel={apiOwner === "platform" ? tSettings("serviceMode.platform.badge") : tSettings("byokKey")}
           onClear={canManageServices ? onClear : undefined}
           onAdd={canManageServices ? () => onAdd(group.providerId) : undefined}
           onEdit={canManageServices ? (model) => onEdit(group.providerId, model, group.models) : undefined}
@@ -342,601 +257,6 @@ function ModelServiceOwnerPanel({
           isBusy={isBusy}
         />
       ))}
-      <ByokBundleManager
-        bundles={bundles}
-        config={config}
-        preference={preference}
-        onSaveBundle={onSaveBundle}
-        onDeleteBundle={onDeleteBundle}
-        isBusy={isBusy}
-      />
     </section>
-  );
-}
-
-function ModelBundleSummary({
-  bundles,
-  config,
-  preference,
-  onSaveBundle,
-  onDeleteBundle,
-  isBusy = false
-}: {
-  bundles: ModelBundleItem[];
-  config: ProviderConfigLedger;
-  preference: ModelServicePreference;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
-  isBusy?: boolean;
-}) {
-  const allModels = [...config.textModels, ...config.imageModels, ...config.videoModels];
-  const presetBundles = sortPlatformModelBundlesForDisplay(bundles.filter(isPlatformPresetBundle));
-  const customBundles = sortByokModelBundlesForDisplay(bundles.filter((bundle) => !isPlatformPresetBundle(bundle)));
-  return (
-    <section className="grid gap-3">
-      <div className={bundleGridClass}>
-        {presetBundles.length === 0 ? (
-          <div className={cn(bundleCardClass, "justify-center border-dashed text-center text-[12px] font-semibold leading-5 text-[var(--muted)]")}>
-            {tSettings("bundles.empty")}
-          </div>
-        ) : null}
-        {presetBundles.map((bundle) => {
-          return (
-            <div key={bundle.bundleId} className={cn(bundleCardClass, "border-[var(--border)]")}>
-              <BundleCardHeader bundle={bundle} />
-              <div className={bundleModelRowsClass}>
-                <BundleModelRow kindLabel={tSettings("groups.text.badge")} modelLabel={bundleModelLabel(allModels, bundle.textModelConfigId, currentAppLocale())} />
-                <BundleModelRow kindLabel={tSettings("groups.image.badge")} modelLabel={bundleModelLabel(allModels, bundle.imageModelConfigId, currentAppLocale())} />
-                <BundleModelRow kindLabel={tSettings("groups.video.badge")} modelLabel={bundleModelLabel(allModels, bundle.videoModelConfigId, currentAppLocale())} />
-              </div>
-            </div>
-          );
-        })}
-        <PlatformBundleManager
-          bundles={customBundles}
-          config={config}
-          preference={preference}
-          onSaveBundle={onSaveBundle}
-          onDeleteBundle={onDeleteBundle}
-          isBusy={isBusy}
-        />
-      </div>
-    </section>
-  );
-}
-
-function PlatformBundleManager({
-  bundles,
-  config,
-  preference,
-  onSaveBundle,
-  onDeleteBundle,
-  isBusy = false
-}: {
-  bundles: ModelBundleItem[];
-  config: ProviderConfigLedger;
-  preference: ModelServicePreference;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
-  isBusy?: boolean;
-}) {
-  const customTextModels = platformConfiguredModels(config.textModels);
-  const customImageModels = platformConfiguredModels(config.imageModels);
-  const customVideoModels = platformConfiguredModels(config.videoModels);
-  const sortedBundles = sortByokModelBundlesForDisplay(bundles);
-  const defaultDraftLabel = nextModelBundleLabel(bundles, currentAppLocale());
-  const [platformBundleDraftLabel, setPlatformBundleDraftLabel] = useState(defaultDraftLabel);
-  const [draftLabelEdited, setDraftLabelEdited] = useState(false);
-  const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
-  const [showDraft, setShowDraft] = useState(false);
-  const draftComplete = isCompleteBundleDraft(draft);
-  const canCreateBundle = Boolean(platformBundleDraftLabel.trim() && hasAnyBundleDraftModel(draft));
-  const canAddBundle = customTextModels.length > 0 || customImageModels.length > 0 || customVideoModels.length > 0;
-
-  useEffect(() => {
-    if (!draftLabelEdited) {
-      setPlatformBundleDraftLabel(defaultDraftLabel);
-    }
-  }, [defaultDraftLabel, draftLabelEdited]);
-
-  async function saveNewBundle() {
-    if (!canCreateBundle) return;
-    const saved = await onSaveBundle({
-      bundleId: `platform-custom-bundle-${Date.now()}`,
-      apiOwner: "platform",
-      label: platformBundleDraftLabel.trim(),
-      textModelConfigId: draft.textModelConfigId,
-      imageModelConfigId: draft.imageModelConfigId,
-      videoModelConfigId: draft.videoModelConfigId,
-      enabled: true,
-      statusText: tSettings("bundles.platformSaved")
-    });
-    if (saved) {
-      setPlatformBundleDraftLabel(nextModelBundleLabel([...bundles, saved], currentAppLocale()));
-      setDraftLabelEdited(false);
-      setDraft({});
-      setShowDraft(false);
-    }
-  }
-
-  return (
-    <>
-      {sortedBundles.map((bundle) => (
-        <EditableBundleCard
-          key={bundle.bundleId}
-          bundle={bundle}
-          textModels={customTextModels}
-          imageModels={customImageModels}
-          videoModels={customVideoModels}
-          selected={preference.platformBundleId === bundle.bundleId}
-          isBusy={isBusy}
-          saveStatusText={tSettings("bundles.platformSaved")}
-          enabledStatusText={tSettings("bundles.platformEnabled")}
-          disabledStatusText={tSettings("bundles.platformDisabled")}
-          onSaveBundle={onSaveBundle}
-          onDeleteBundle={onDeleteBundle}
-        />
-      ))}
-      {showDraft ? (
-        <BundleDraftCard
-          label={platformBundleDraftLabel}
-          draft={draft}
-          textModels={customTextModels}
-          imageModels={customImageModels}
-          videoModels={customVideoModels}
-          canCreateBundle={canCreateBundle}
-          complete={draftComplete}
-          isBusy={isBusy}
-          onLabelChange={(label) => {
-            setPlatformBundleDraftLabel(label);
-            setDraftLabelEdited(true);
-          }}
-          onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-          onCancel={() => {
-            setShowDraft(false);
-            setDraft({});
-            setDraftLabelEdited(false);
-            setPlatformBundleDraftLabel(defaultDraftLabel);
-          }}
-          onSave={() => void saveNewBundle()}
-        />
-      ) : canAddBundle ? (
-        <AddBundleCard isBusy={isBusy} onAdd={() => setShowDraft(true)} />
-      ) : null}
-    </>
-  );
-}
-
-function ByokBundleManager({
-  bundles,
-  config,
-  preference,
-  onSaveBundle,
-  onDeleteBundle,
-  isBusy = false
-}: {
-  bundles: ModelBundleItem[];
-  config: ProviderConfigLedger;
-  preference: ModelServicePreference;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
-  isBusy?: boolean;
-}) {
-  const textModels = byokConfiguredModels(config.textModels);
-  const imageModels = byokConfiguredModels(config.imageModels);
-  const videoModels = byokConfiguredModels(config.videoModels);
-  const sortedBundles = sortByokModelBundlesForDisplay(bundles);
-  const defaultDraftLabel = nextModelBundleLabel(bundles, currentAppLocale());
-  const [byokBundleDraftLabel, setByokBundleDraftLabel] = useState(defaultDraftLabel);
-  const [draftLabelEdited, setDraftLabelEdited] = useState(false);
-  const [draft, setDraft] = useState<BundleModelSelectionDraft>({});
-  const [showDraft, setShowDraft] = useState(false);
-  const draftComplete = isCompleteBundleDraft(draft);
-  const canCreateBundle = Boolean(byokBundleDraftLabel.trim() && hasAnyBundleDraftModel(draft));
-
-  useEffect(() => {
-    if (!draftLabelEdited) {
-      setByokBundleDraftLabel(defaultDraftLabel);
-    }
-  }, [defaultDraftLabel, draftLabelEdited]);
-
-  async function saveNewBundle() {
-    if (!canCreateBundle) return;
-    const saved = await onSaveBundle({
-      apiOwner: "byok",
-      label: byokBundleDraftLabel.trim(),
-      textModelConfigId: draft.textModelConfigId,
-      imageModelConfigId: draft.imageModelConfigId,
-      videoModelConfigId: draft.videoModelConfigId,
-      enabled: true,
-      statusText: tSettings("bundles.byokSaved")
-    });
-    if (saved) {
-      setByokBundleDraftLabel(nextModelBundleLabel([...bundles, saved], currentAppLocale()));
-      setDraftLabelEdited(false);
-      setDraft({});
-      setShowDraft(false);
-    }
-  }
-
-  return (
-    <section className="grid gap-2">
-      <div className={bundleGridClass}>
-        {sortedBundles.map((bundle) => (
-          <EditableBundleCard
-            key={bundle.bundleId}
-            bundle={bundle}
-            textModels={textModels}
-            imageModels={imageModels}
-            videoModels={videoModels}
-            selected={preference.byokBundleId === bundle.bundleId}
-            isBusy={isBusy}
-            saveStatusText={tSettings("bundles.byokSaved")}
-            enabledStatusText={tSettings("bundles.byokEnabled")}
-            disabledStatusText={tSettings("bundles.byokDisabled")}
-            onSaveBundle={onSaveBundle}
-            onDeleteBundle={onDeleteBundle}
-          />
-        ))}
-        {showDraft ? (
-          <BundleDraftCard
-            label={byokBundleDraftLabel}
-            draft={draft}
-            textModels={textModels}
-            imageModels={imageModels}
-            videoModels={videoModels}
-            canCreateBundle={canCreateBundle}
-            complete={draftComplete}
-            isBusy={isBusy}
-            onLabelChange={(label) => {
-              setByokBundleDraftLabel(label);
-              setDraftLabelEdited(true);
-            }}
-            onDraftChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-            onCancel={() => {
-              setShowDraft(false);
-              setDraft({});
-              setDraftLabelEdited(false);
-              setByokBundleDraftLabel(defaultDraftLabel);
-            }}
-            onSave={() => void saveNewBundle()}
-          />
-        ) : (
-          <AddBundleCard isBusy={isBusy} onAdd={() => setShowDraft(true)} />
-        )}
-      </div>
-    </section>
-  );
-}
-
-function EditableBundleCard({
-  bundle,
-  textModels,
-  imageModels,
-  videoModels,
-  selected,
-  isBusy,
-  saveStatusText,
-  enabledStatusText,
-  disabledStatusText,
-  onSaveBundle,
-  onDeleteBundle
-}: {
-  bundle: ModelBundleItem;
-  textModels: ProviderConfigItem[];
-  imageModels: ProviderConfigItem[];
-  videoModels: ProviderConfigItem[];
-  selected: boolean;
-  isBusy?: boolean;
-  saveStatusText: string;
-  enabledStatusText: string;
-  disabledStatusText: string;
-  onSaveBundle: (bundle: ModelBundleSaveInput) => Promise<ModelBundleItem | undefined>;
-  onDeleteBundle: (bundleId: string) => Promise<void>;
-}) {
-  const [label, setLabel] = useState(bundle.label);
-  const [textModelConfigId, setTextModelConfigId] = useState(bundle.textModelConfigId);
-  const [imageModelConfigId, setImageModelConfigId] = useState(bundle.imageModelConfigId);
-  const [videoModelConfigId, setVideoModelConfigId] = useState(bundle.videoModelConfigId);
-  const complete = Boolean(textModelConfigId && imageModelConfigId && videoModelConfigId);
-  const saveCurrentBundle = (enabled = bundle.enabled, statusText = saveStatusText) => onSaveBundle({
-    ...bundle,
-    label: label.trim(),
-    textModelConfigId,
-    imageModelConfigId,
-    videoModelConfigId,
-    enabled,
-    statusText,
-    activate: false
-  });
-  const toggleBundleEnabled = () => {
-    const nextEnabled = !bundle.enabled;
-    return saveCurrentBundle(nextEnabled, nextEnabled ? enabledStatusText : disabledStatusText);
-  };
-
-  useEffect(() => {
-    setLabel(bundle.label);
-    setTextModelConfigId(bundle.textModelConfigId);
-    setImageModelConfigId(bundle.imageModelConfigId);
-    setVideoModelConfigId(bundle.videoModelConfigId);
-  }, [bundle.bundleId, bundle.label, bundle.textModelConfigId, bundle.imageModelConfigId, bundle.videoModelConfigId]);
-
-  return (
-    <div className={cn(
-      bundleCardClass,
-      selected ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]" : "border-[var(--border)]"
-    )}>
-      <div className={bundleHeaderClass}>
-        <BundleTitleActions
-          label={label}
-          originalLabel={bundle.label}
-          isBusy={isBusy}
-          canSave={Boolean(label.trim())}
-          onLabelChange={setLabel}
-          onSave={() => void saveCurrentBundle()}
-          onDelete={() => void onDeleteBundle(bundle.bundleId)}
-        />
-        <BundleStatusToggle
-          enabled={bundle.enabled}
-          isBusy={isBusy}
-          onToggle={() => void toggleBundleEnabled()}
-        />
-      </div>
-      <div className={bundleModelRowsClass}>
-        <CustomBundleModelSelect
-          label={tSettings("groups.text.badge")}
-          value={textModelConfigId}
-          models={textModels}
-          disabled={isBusy}
-          onChange={setTextModelConfigId}
-        />
-        <CustomBundleModelSelect
-          label={tSettings("groups.image.badge")}
-          value={imageModelConfigId}
-          models={imageModels}
-          disabled={isBusy}
-          onChange={setImageModelConfigId}
-        />
-        <CustomBundleModelSelect
-          label={tSettings("groups.video.badge")}
-          value={videoModelConfigId}
-          models={videoModels}
-          disabled={isBusy}
-          onChange={setVideoModelConfigId}
-        />
-      </div>
-    </div>
-  );
-}
-
-function BundleTitleActions({
-  label,
-  originalLabel,
-  isBusy,
-  canSave,
-  onLabelChange,
-  onSave,
-  onDelete
-}: {
-  label: string;
-  originalLabel: string;
-  isBusy?: boolean;
-  canSave: boolean;
-  onLabelChange: (value: string) => void;
-  onSave: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
-      <BundleTitleField value={label} onChange={onLabelChange} disabled={isBusy} />
-      <Button
-        className="h-7 w-7 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-        size="icon"
-        variant="ghost"
-        type="button"
-        aria-label={tSettings("actions.save")}
-        title={tSettings("actions.save")}
-        disabled={isBusy || !canSave}
-        onClick={onSave}
-      >
-        <Save size={14} />
-      </Button>
-      <Button
-        className="h-7 w-7 text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-        size="icon"
-        variant="ghost"
-        type="button"
-        aria-label={tSettings("actions.deleteBundle", { label: originalLabel })}
-        title={tSettings("actions.delete")}
-        disabled={isBusy}
-        onClick={onDelete}
-      >
-        <Trash2 size={14} />
-      </Button>
-    </div>
-  );
-}
-
-function BundleStatusToggle({
-  enabled,
-  isBusy,
-  onToggle
-}: {
-  enabled: boolean;
-  isBusy?: boolean;
-  onToggle: () => void;
-}) {
-  const label = enabled ? tSettings("bundles.enable") : tSettings("bundles.disabled");
-  return (
-    <EnabledSwitchButton
-      enabled={enabled}
-      label={label}
-      disabled={isBusy}
-      onClick={onToggle}
-    />
-  );
-}
-
-function BundleDraftCard({
-  label,
-  draft,
-  textModels,
-  imageModels,
-  videoModels,
-  canCreateBundle,
-  complete,
-  isBusy,
-  onLabelChange,
-  onDraftChange,
-  onCancel,
-  onSave
-}: {
-  label: string;
-  draft: BundleModelSelectionDraft;
-  textModels: ProviderConfigItem[];
-  imageModels: ProviderConfigItem[];
-  videoModels: ProviderConfigItem[];
-  canCreateBundle: boolean;
-  complete: boolean;
-  isBusy?: boolean;
-  onLabelChange: (label: string) => void;
-  onDraftChange: (patch: BundleModelSelectionDraft) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <div className={cn(bundleCardClass, "border-dashed border-[var(--border)]")}>
-      <div className={bundleHeaderClass}>
-        <BundleTitleField value={label} onChange={onLabelChange} disabled={isBusy} />
-        <Badge tone={complete ? "ok" : canCreateBundle ? "warn" : "neutral"}>{complete ? tSettings("bundles.ready") : canCreateBundle ? tSettings("bundles.draft") : tSettings("bundles.incomplete")}</Badge>
-      </div>
-      <div className={bundleModelRowsClass}>
-        <CustomBundleModelSelect
-          label={tSettings("groups.text.badge")}
-          value={draft.textModelConfigId}
-          models={textModels}
-          disabled={isBusy}
-          onChange={(textModelConfigId) => onDraftChange({ textModelConfigId })}
-        />
-        <CustomBundleModelSelect
-          label={tSettings("groups.image.badge")}
-          value={draft.imageModelConfigId}
-          models={imageModels}
-          disabled={isBusy}
-          onChange={(imageModelConfigId) => onDraftChange({ imageModelConfigId })}
-        />
-        <CustomBundleModelSelect
-          label={tSettings("groups.video.badge")}
-          value={draft.videoModelConfigId}
-          models={videoModels}
-          disabled={isBusy}
-          onChange={(videoModelConfigId) => onDraftChange({ videoModelConfigId })}
-        />
-      </div>
-      <div className="mt-auto flex flex-wrap items-center justify-end gap-2">
-        <Button className="w-fit" size="sm" variant="ghost" type="button" disabled={isBusy} onClick={onCancel}>
-          {tSettings("actions.cancel")}
-        </Button>
-        <Button className="w-fit" size="sm" type="button" disabled={isBusy || !canCreateBundle} onClick={onSave}>
-          <Plus size={13} />
-          {tSettings("bundles.save")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AddBundleCard({ isBusy, onAdd }: { isBusy?: boolean; onAdd: () => void }) {
-  return (
-    <button
-      className={cn(
-        bundleCardClass,
-        "items-center justify-center border-dashed border-[var(--border)] text-[13px] font-black text-[var(--muted)] transition hover:border-[var(--border-strong)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
-      )}
-      type="button"
-      disabled={isBusy}
-      onClick={onAdd}
-    >
-      <span className="flex items-center gap-2">
-        <Plus size={15} />
-        {tSettings("bundles.new")}
-      </span>
-    </button>
-  );
-}
-
-function BundleTitleField({
-  value,
-  onChange,
-  disabled
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="flex min-w-0 items-center gap-1">
-      <Input
-        className={bundleTitleInputClass}
-        style={{ width: bundleTitleInputWidth(value) }}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        disabled={disabled}
-      />
-      <span className="grid h-7 w-7 shrink-0 place-items-center text-[var(--muted)]">
-        <Pencil size={13} />
-      </span>
-    </label>
-  );
-}
-
-function BundleModelRow({ kindLabel, modelLabel }: { kindLabel: string; modelLabel: string }) {
-  return (
-    <div className={bundleModelRowClass}>
-      <span className="font-black text-[var(--muted)]">{kindLabel}</span>
-      <span className="min-w-0 truncate font-black text-[var(--text)]">{modelLabel}</span>
-    </div>
-  );
-}
-
-function BundleCardHeader({ bundle }: { bundle: ModelBundleItem }) {
-  const complete = isCompleteModelBundle(bundle);
-  return (
-    <div className={bundleHeaderClass}>
-      <div className="min-w-0 truncate text-[14px] font-black text-[var(--text)]">{localizedModelSchemeBundleLabel(bundle, currentAppLocale())}</div>
-      <Badge className="shrink-0" tone={bundle.enabled ? complete ? "ok" : "warn" : "neutral"}>
-        {bundle.enabled ? complete ? tSettings("bundles.enable") : tSettings("bundles.incomplete") : tSettings("bundles.disabled")}
-      </Badge>
-    </div>
-  );
-}
-
-function CustomBundleModelSelect({
-  label,
-  value,
-  models,
-  disabled,
-  onChange
-}: {
-  label: string;
-  value?: string;
-  models: ProviderConfigItem[];
-  disabled?: boolean;
-  onChange: (configId: string) => void;
-}) {
-  const selectedValue = value && models.some((model) => model.configId === value)
-    ? value
-    : "";
-  const options = ["", ...models.map((model) => model.configId).filter((configId): configId is string => Boolean(configId))];
-  return (
-    <CompactChoiceDropdown
-      label={label}
-      value={selectedValue}
-      options={options}
-      formatOption={(configId) => configId ? bundleModelLabel(models, configId, currentAppLocale()) : tSettings("common.notSelected")}
-      onChange={onChange}
-      disabled={disabled || models.length === 0}
-      layout="inline"
-    />
   );
 }

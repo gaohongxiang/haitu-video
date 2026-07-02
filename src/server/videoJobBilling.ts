@@ -3,7 +3,6 @@ import type { VideoProviderName } from "../providers/providerFactory.js";
 import type { VideoAspectRatio, VideoResolution } from "../providers/types.js";
 import type { ModelPricingEntry } from "../modelPricing/officialModelPricingCatalog.js";
 import type { BillingPolicyStore } from "./billingPolicyStore.js";
-import type { ModelBundleStore } from "./modelBundleStore.js";
 import type { ModelConfigStore, ModelStoredConfig } from "./modelConfigStore.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import type { VideoJobRecord, VideoJobRequest } from "./consoleVideoJobTypes.js";
@@ -77,7 +76,6 @@ export async function reserveRetryVideoJobBilling(input: {
   walletStore: WalletStore;
   modelConfigStore: ModelConfigStore;
   platformModelConfigStore?: ModelConfigStore;
-  modelBundleStore?: ModelBundleStore;
   modelServicePreferenceStore?: ModelServicePreferenceStore;
   billingPolicyStore: BillingPolicyStore;
   modelPricingCatalog?: readonly ModelPricingEntry[];
@@ -89,7 +87,6 @@ export async function reserveRetryVideoJobBilling(input: {
   const videoModel = await resolveVideoRequestModel({
     modelConfigStore: input.modelConfigStore,
     platformModelConfigStore: input.platformModelConfigStore,
-    modelBundleStore: input.modelBundleStore,
     modelServicePreferenceStore: input.modelServicePreferenceStore,
     provider: input.record.provider,
     body: {

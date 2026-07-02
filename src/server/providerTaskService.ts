@@ -1,7 +1,6 @@
 import { type ListUsageTasksRequest, VolcengineUsageClient } from "../providers/volcengine/usageClient.js";
 import { selectedVideoModelConfig } from "./modelConfigSelection.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
-import { ModelBundleStore } from "./modelBundleStore.js";
 import { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import { queryValue } from "./consoleAssetService.js";
 
@@ -10,7 +9,6 @@ export async function getProviderTask(
   options: {
     modelConfigStore: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
-    modelBundleStore?: ModelBundleStore;
     modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
@@ -18,7 +16,6 @@ export async function getProviderTask(
   const config = await selectedVideoModelConfig({
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore,
     provider: "volcengine-seedance"
   });
@@ -34,7 +31,6 @@ export async function listProviderTasks(
   options: {
     modelConfigStore: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
-    modelBundleStore?: ModelBundleStore;
     modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
@@ -42,7 +38,6 @@ export async function listProviderTasks(
   const config = await selectedVideoModelConfig({
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore,
     provider: "volcengine-seedance"
   });
@@ -58,7 +53,6 @@ export async function cancelQueuedProviderTask(
   options: {
     modelConfigStore: ModelConfigStore;
     platformModelConfigStore?: ModelConfigStore;
-    modelBundleStore?: ModelBundleStore;
     modelServicePreferenceStore?: ModelServicePreferenceStore;
     fetchImpl?: typeof fetch;
   }
@@ -66,7 +60,6 @@ export async function cancelQueuedProviderTask(
   const config = await selectedVideoModelConfig({
     modelConfigStore: options.modelConfigStore,
     platformModelConfigStore: options.platformModelConfigStore,
-    modelBundleStore: options.modelBundleStore,
     modelServicePreferenceStore: options.modelServicePreferenceStore,
     provider: "volcengine-seedance"
   });

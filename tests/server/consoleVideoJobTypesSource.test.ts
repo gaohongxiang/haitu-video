@@ -37,6 +37,7 @@ describe("console video job type source boundaries", () => {
     expect(typesSource).toContain("export interface VideoJobRecord");
     expect(typesSource).toContain("export interface VideoJobErrorDetails");
     expect(typesSource).toContain("providerModelConfigId?: string");
+    expect(typesSource).toContain("referenceImages?: string[]");
     expect(typesSource).toContain("status: \"queued\" | \"running\" | \"completed\" | \"failed\" | \"canceled\"");
     expect(typesSource).toContain("recoverableRawManifestPath?: string");
   });

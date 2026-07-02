@@ -87,6 +87,31 @@ describe("marketing SEO renderer", () => {
     expect(html).not.toContain("余额用于 AI 图片生成");
   });
 
+  it("keeps the homepage footer curated while long-tail SEO pages stay outside the visual link grid", () => {
+    const html = renderMarketingPage({
+      origin: "https://haitu.example",
+      locale: "zh",
+      pageSlug: ""
+    });
+    const footer = extractSeoFooter(html);
+
+    expect(footer).toContain("跨境电商 AI 商品图片优化与商品视频创作平台");
+    expect(footer).toContain('href="/features/product-image-optimization"');
+    expect(footer).toContain('href="/features/ai-product-video-generator"');
+    expect(footer).toContain('href="/features/bring-your-own-model"');
+    expect(footer).toContain('href="/platforms/tiktok-shop"');
+    expect(footer).toContain('href="/platforms/amazon"');
+    expect(footer).toContain('href="/use-cases/cross-border-ecommerce"');
+    expect(footer).toContain('href="/terms"');
+    expect(footer).toContain('href="/privacy"');
+    expect(footer).toContain('href="/refund"');
+    expect(footer).toContain('href="/contact"');
+    expect(footer).not.toContain('href="/categories/baby-products-video"');
+    expect(footer).not.toContain('href="/categories/car-accessories-product-video"');
+    expect(footer).not.toContain('href="/compare/haitu-vs-manual-product-video-production"');
+    expect((footer.match(/<a /g) ?? []).length).toBeLessThanOrEqual(24);
+  });
+
   it("uses the production public origin and PNG social preview for local SEO requests", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "");
 
@@ -543,7 +568,8 @@ describe("marketing SEO renderer", () => {
     expect(apparel).toContain("<title>服饰商品短视频生成 - Haitu</title>");
     expect(apparel).toContain("Haitu 如何帮助服饰卖家生成商品短视频？");
     expect(apparel).toContain("款式、版型、材质、颜色、尺码、细节图和穿搭场景");
-    expect(apparel).toContain('href="/categories/home-goods-product-video"');
+    expect(apparel).toContain('href="/features/ai-product-video-generator"');
+    expect(apparel).not.toContain('href="/categories/home-goods-product-video"');
     expect(electronics).toContain("<title>Electronics Accessory Product Video Workflow - Haitu</title>");
     expect(electronics).toContain("How does Haitu support electronics accessory product videos?");
     expect(electronics).toContain("specifications, compatibility, ports, materials, usage scenes, and safety notes");
@@ -867,6 +893,14 @@ function getHeadMetaContent(html: string, attribute: "name" | "property", key: s
   expect(match?.[1], `${key} meta content`).toBeDefined();
 
   return unescapeAttribute(match?.[1] ?? "");
+}
+
+function extractSeoFooter(html: string): string {
+  const match = html.match(/<footer class="seo-footer"[\s\S]*?<\/footer>/);
+
+  expect(match?.[0], "seo footer").toBeDefined();
+
+  return match?.[0] ?? "";
 }
 
 function marketingRendererTestPath(locale: "zh" | "en", slug: string): string {

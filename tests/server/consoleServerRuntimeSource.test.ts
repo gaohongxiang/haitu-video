@@ -35,7 +35,7 @@ describe("console server runtime source boundaries", () => {
     expect(consoleServerSource).not.toContain("startVideoRetentionCleanup(");
   });
 
-  it("centralizes default workspace stores, queues, and lifecycle startup", async () => {
+  it("centralizes default workspace stores, queues, and lifecycle startup without model bundles", async () => {
     const runtimeSource = await readFile(runtimePath, "utf8");
 
     expect(runtimeSource).toContain("export function createConsoleServerRuntime(");
@@ -48,12 +48,12 @@ describe("console server runtime source boundaries", () => {
     expect(runtimeSource).toContain("new PublicAssetTokenStore(");
     expect(runtimeSource).toContain("new BetterAuthConsoleAuthStore(");
     expect(runtimeSource).toContain("new LocalVideoJobQueue(");
-    expect(runtimeSource).toContain("new ModelBundleStore(");
+    expect(runtimeSource).not.toContain("new ModelBundleStore(");
     expect(runtimeSource).toContain("new ModelServicePreferenceStore(");
     expect(runtimeSource).toContain("createModelConfigStore(");
     expect(runtimeSource).toContain("createConfiguredMakeVideoPipeline(");
     expect(runtimeSource).toContain("createReferenceImageUrlResolver(");
-    expect(runtimeSource).toContain("ensurePlatformBundlesForAllWorkspaces(");
+    expect(runtimeSource).not.toContain("ensurePlatformBundlesForAllWorkspaces(");
     expect(runtimeSource).toContain("startVideoRetentionCleanup(");
   });
 });

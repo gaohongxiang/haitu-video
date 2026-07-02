@@ -17,15 +17,9 @@ import {
 import { resolveRechargePaymentAmount } from "./rechargePaymentAmount.js";
 import { WalletRechargeOrderStore } from "./walletRechargeOrderStore.js";
 import {
-  assertModelBundleConfigsExist,
-  assertModelServicePreferenceBundlesExist
-} from "./modelBundleValidationService.js";
-import type { ModelBundleInput } from "./modelBundleStore.js";
-import {
   normalizeServiceMode,
   type ModelServicePreference
 } from "./modelServicePreferenceStore.js";
-import { ensurePlatformBundles } from "./platformModelProvisioning.js";
 
 interface WalletRechargeOrderRequest {
   amountCny?: number;
@@ -172,12 +166,6 @@ export async function handleWalletModelRoutes(input: {
       wallet: requestContext.walletStore.getSummary()
     });
   }
-  if (request.method === "GET" && url.pathname === "/api/model-bundles") {
-    await ensureMissingPlatformBundles(requestContext);
-    return jsonResponse({
-      bundles: requestContext.modelBundleStore.list()
-    });
-  }
   if (request.method === "GET" && url.pathname === "/api/model-service-preference") {
     return jsonResponse({
       preference: requestContext.modelServicePreferenceStore.get()
@@ -185,62 +173,25 @@ export async function handleWalletModelRoutes(input: {
   }
   if (request.method === "PUT" && url.pathname === "/api/model-service-preference") {
     const input = (await request.json()) as Partial<ModelServicePreference>;
-    await assertModelServicePreferenceBundlesExist(input, requestContext.modelBundleStore);
     const preference = requestContext.modelServicePreferenceStore.set({
       serviceMode: normalizeServiceMode(input.serviceMode),
-      platformBundleId: input.platformBundleId,
-      byokBundleId: input.byokBundleId
+      textModelConfigId: input.textModelConfigId,
+      imageModelConfigId: input.imageModelConfigId,
+      videoModelConfigId: input.videoModelConfigId
     });
     await auditLog.append({
       action: "model_service_preference.saved",
       metadata: {
         workspaceId: requestContext.workspaceId,
         serviceMode: preference.serviceMode,
-        platformBundleId: preference.platformBundleId,
-        byokBundleId: preference.byokBundleId
+        textModelConfigId: preference.textModelConfigId,
+        imageModelConfigId: preference.imageModelConfigId,
+        videoModelConfigId: preference.videoModelConfigId
       }
     });
     return jsonResponse({ preference });
   }
-  if (request.method === "PUT" && url.pathname === "/api/model-bundles") {
-    const input = (await request.json()) as ModelBundleInput;
-    await assertModelBundleConfigsExist(input, {
-      modelConfigStore: requestContext.modelConfigStore,
-      platformModelConfigStore: requestContext.platformModelConfigStore
-    });
-    const bundle = requestContext.modelBundleStore.set(input);
-    await auditLog.append({
-      action: "model_bundle.saved",
-      target: bundle.bundleId,
-      metadata: {
-        label: bundle.label
-      }
-    });
-    return jsonResponse({ bundle });
-  }
-  const modelBundleMatch = url.pathname.match(/^\/api\/model-bundles\/([^/]+)$/);
-  if (modelBundleMatch && request.method === "DELETE") {
-    const bundleId = decodeURIComponent(modelBundleMatch[1] ?? "");
-    requestContext.modelBundleStore.delete(bundleId);
-    await auditLog.append({
-      action: "model_bundle.deleted",
-      target: bundleId
-    });
-    return jsonResponse({ ok: true });
-  }
   return undefined;
-}
-
-async function ensureMissingPlatformBundles(requestContext: ConsoleRequestContext): Promise<void> {
-  const existingPlatformBundle = requestContext.modelBundleStore.list().some((bundle) => bundle.apiOwner === "platform");
-  if (existingPlatformBundle) {
-    return;
-  }
-  await ensurePlatformBundles({
-    platformModelConfigStore: requestContext.platformModelConfigStore,
-    modelBundleStore: requestContext.modelBundleStore,
-    modelServicePreferenceStore: requestContext.modelServicePreferenceStore
-  });
 }
 
 function normalizeRechargeOrderAmountCny(value: unknown): number | undefined {

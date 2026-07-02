@@ -37,8 +37,8 @@ describe("shared official model pricing catalog", () => {
       officialModelPricingCatalog.some((pricingEntry) => pricingEntry.catalog?.modelId === entry.modelId)
     )).toBe(true);
     expect(officialModelPricingCatalog.every((entry) => entry.catalog && entry.settlement)).toBe(true);
-    expect(modelPricingEntryForModel("gpt-5")).toBe(officialModelPricingCatalog.find((entry) => entry.model === "gpt-5"));
-    expect(modelIdsFromInput(["gpt-5"], "openai-compatible-text")).toEqual(["gpt-5"]);
+    expect(modelPricingEntryForModel("gpt-5.5")).toBe(officialModelPricingCatalog.find((entry) => entry.model === "gpt-5.5"));
+    expect(modelIdsFromInput(["gpt-5.5"], "openai-compatible-text")).toEqual(["gpt-5.5"]);
 
     const seedanceQuality = modelPricingEntryForModel("doubao-seedance-2.0");
     expect(seedanceQuality?.videoTokenPriceCnyPerMillionByResolution).toEqual({
@@ -72,20 +72,20 @@ describe("shared official model pricing catalog", () => {
     }));
     expect(modelPricingSnapshotForUsage({
       kind: "text",
-      model: "gpt-5",
+      model: "gpt-5.5",
       textUsage: {
         inputTokens: 1_000_000,
         outputTokens: 1_000_000
       }
     })).toEqual(expect.objectContaining({
-      model: "gpt-5",
-      inputPriceCnyPerMillion: 9.0625,
-      outputPriceCnyPerMillion: 72.5
+      model: "gpt-5.5",
+      inputPriceCnyPerMillion: 36.25,
+      outputPriceCnyPerMillion: 217.5
     }));
-    expect(estimateTextUpstreamCostCny("gpt-5", {
+    expect(estimateTextUpstreamCostCny("gpt-5.5", {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000
-    })).toBe(81.56);
+    })).toBe(253.75);
     expect(estimateVideoUpstreamCostCny({
       model: "doubao-seedance-2-0-260128",
       resolution: "1080p",

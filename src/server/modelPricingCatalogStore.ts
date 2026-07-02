@@ -4,7 +4,8 @@ import {
   modelPricingEntryForModel,
   officialModelPricingCatalog,
   officialModelPricingUpdatedAt,
-  type ModelPricingEntry
+  type ModelPricingEntry,
+  type ModelPricingSettlementRule
 } from "../modelPricing/officialModelPricingCatalog.js";
 import type { DatabaseHandle } from "./db/client.js";
 
@@ -83,19 +84,12 @@ export class ModelPricingCatalogStore {
       LIMIT 1
     `).get() as CatalogVersionRow | undefined;
     if (!row) {
-      return {
-        version: officialModelPricingUpdatedAt,
-        source: "built_in",
-        catalog: cloneCatalog(officialModelPricingCatalog)
-      };
+      return builtInActiveCatalog();
     }
-    return {
-      id: row.id,
-      version: row.version,
-      source: "database",
-      catalog: parseCatalog(row.catalog_json),
-      publishedAt: row.published_at
-    };
+    if (!isDatabaseCatalogNewerThanBuiltIn(row.version)) {
+      return builtInActiveCatalog();
+    }
+    return activeCatalogFromPublishedVersion(row);
   }
 
   getEntryForModel(model: string | undefined): ModelPricingEntry | undefined {
@@ -113,7 +107,9 @@ export class ModelPricingCatalogStore {
   }
 
   saveDraft(input: SaveDraftInput): ModelPricingCatalogDraft {
-    const catalog = cloneCatalog(input.catalog);
+    const submittedCatalog = cloneCatalog(input.catalog);
+    validateCatalog(submittedCatalog);
+    const catalog = applyDatabasePriceOverrides(officialModelPricingCatalog, submittedCatalog);
     validateCatalog(catalog);
     const now = this.now().toISOString();
     const active = this.getActiveCatalog();
@@ -217,13 +213,7 @@ export class ModelPricingCatalogStore {
       this.handle.sqlite.prepare("DELETE FROM model_pricing_catalog_drafts WHERE id = ?").run(draft.id);
     });
     publish();
-    return {
-      id: versionId,
-      version: draft.version,
-      source: "database",
-      catalog: draft.catalog,
-      publishedAt: now
-    };
+    return this.getActiveCatalog();
   }
 
   private findDraftRow(draftId: string): CatalogDraftRow | undefined {
@@ -232,6 +222,111 @@ export class ModelPricingCatalogStore {
       FROM model_pricing_catalog_drafts
       WHERE id = ?
     `).get(draftId) as CatalogDraftRow | undefined;
+  }
+}
+
+function builtInActiveCatalog(): ActiveModelPricingCatalog {
+  return {
+    version: officialModelPricingUpdatedAt,
+    source: "built_in",
+    catalog: cloneCatalog(officialModelPricingCatalog)
+  };
+}
+
+function isDatabaseCatalogNewerThanBuiltIn(version: string): boolean {
+  return version.trim() > officialModelPricingUpdatedAt;
+}
+
+function activeCatalogFromPublishedVersion(row: CatalogVersionRow): ActiveModelPricingCatalog {
+  return {
+    id: row.id,
+    version: row.version,
+    source: "database",
+    catalog: applyDatabasePriceOverrides(officialModelPricingCatalog, parseCatalog(row.catalog_json)),
+    publishedAt: row.published_at
+  };
+}
+
+function applyDatabasePriceOverrides(
+  officialCatalog: readonly ModelPricingEntry[],
+  databaseCatalog: readonly ModelPricingEntry[]
+): ModelPricingEntry[] {
+  const databaseEntriesByModel = new Map(
+    databaseCatalog.map((entry) => [normalizeModel(entry.model), entry])
+  );
+  return officialCatalog.map((officialEntry) => {
+    const databaseEntry = databaseEntriesByModel.get(normalizeModel(officialEntry.model));
+    if (!databaseEntry || databaseEntry.kind !== officialEntry.kind) {
+      return cloneEntry(officialEntry);
+    }
+    return mergePriceOverride(officialEntry, databaseEntry);
+  });
+}
+
+function mergePriceOverride(officialEntry: ModelPricingEntry, databaseEntry: ModelPricingEntry): ModelPricingEntry {
+  const entry = cloneEntry(officialEntry);
+  copyOptionalNumber(databaseEntry, entry, "inputPriceCnyPerMillion");
+  copyOptionalNumber(databaseEntry, entry, "outputPriceCnyPerMillion");
+  copyOptionalNumber(databaseEntry, entry, "cachedInputPriceCnyPerMillion");
+  copyOptionalNumber(databaseEntry, entry, "fallbackPriceCnyPerCall");
+  copyOptionalNumber(databaseEntry, entry, "imagePriceCnyPerImage");
+  copyOptionalNumber(databaseEntry, entry, "videoTokenPriceCnyPerMillion");
+  if (databaseEntry.videoTokenPriceCnyPerMillionByResolution) {
+    entry.videoTokenPriceCnyPerMillionByResolution = {
+      ...databaseEntry.videoTokenPriceCnyPerMillionByResolution
+    };
+  }
+  entry.settlement = mergeSettlementPriceOverride(entry.settlement, databaseEntry.settlement);
+  return entry;
+}
+
+function mergeSettlementPriceOverride(
+  officialSettlement: ModelPricingSettlementRule | undefined,
+  databaseSettlement: ModelPricingSettlementRule | undefined
+): ModelPricingSettlementRule | undefined {
+  if (!officialSettlement || !databaseSettlement || officialSettlement.kind !== databaseSettlement.kind) {
+    return officialSettlement ? cloneValue(officialSettlement) : undefined;
+  }
+  if (officialSettlement.kind === "text" && databaseSettlement.kind === "text") {
+    return {
+      ...cloneValue(officialSettlement),
+      inputPriceCnyPerMillion: databaseSettlement.inputPriceCnyPerMillion ?? officialSettlement.inputPriceCnyPerMillion,
+      outputPriceCnyPerMillion: databaseSettlement.outputPriceCnyPerMillion ?? officialSettlement.outputPriceCnyPerMillion,
+      cachedInputPriceCnyPerMillion: databaseSettlement.cachedInputPriceCnyPerMillion ?? officialSettlement.cachedInputPriceCnyPerMillion,
+      fallbackPriceCnyPerCall: databaseSettlement.fallbackPriceCnyPerCall ?? officialSettlement.fallbackPriceCnyPerCall
+    };
+  }
+  if (officialSettlement.kind === "image" && databaseSettlement.kind === "image") {
+    return {
+      ...cloneValue(officialSettlement),
+      imagePriceCnyPerImage: databaseSettlement.imagePriceCnyPerImage ?? officialSettlement.imagePriceCnyPerImage,
+      inputPriceCnyPerMillion: databaseSettlement.inputPriceCnyPerMillion ?? officialSettlement.inputPriceCnyPerMillion,
+      outputPriceCnyPerMillion: databaseSettlement.outputPriceCnyPerMillion ?? officialSettlement.outputPriceCnyPerMillion,
+      cachedInputPriceCnyPerMillion: databaseSettlement.cachedInputPriceCnyPerMillion ?? officialSettlement.cachedInputPriceCnyPerMillion
+    };
+  }
+  if (officialSettlement.kind === "video" && databaseSettlement.kind === "video") {
+    return {
+      ...cloneValue(officialSettlement),
+      videoTokenPriceCnyPerMillion: databaseSettlement.videoTokenPriceCnyPerMillion ?? officialSettlement.videoTokenPriceCnyPerMillion,
+      videoTokenPriceCnyPerMillionByResolution: databaseSettlement.videoTokenPriceCnyPerMillionByResolution
+        ? { ...databaseSettlement.videoTokenPriceCnyPerMillionByResolution }
+        : officialSettlement.videoTokenPriceCnyPerMillionByResolution
+          ? { ...officialSettlement.videoTokenPriceCnyPerMillionByResolution }
+          : undefined
+    };
+  }
+  return cloneValue(officialSettlement);
+}
+
+function copyOptionalNumber<K extends keyof ModelPricingEntry>(
+  source: ModelPricingEntry,
+  target: ModelPricingEntry,
+  key: K
+): void {
+  const value = source[key];
+  if (typeof value === "number") {
+    target[key] = value as ModelPricingEntry[K];
   }
 }
 
@@ -313,6 +408,14 @@ function parseCatalog(raw: string): ModelPricingEntry[] {
 
 function cloneCatalog(catalog: readonly ModelPricingEntry[]): ModelPricingEntry[] {
   return JSON.parse(JSON.stringify(catalog)) as ModelPricingEntry[];
+}
+
+function cloneEntry(entry: ModelPricingEntry): ModelPricingEntry {
+  return cloneValue(entry);
+}
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function collectEntryPrices(entry: ModelPricingEntry): number[] {

@@ -5,23 +5,26 @@ export type ModelServiceMode = "platform" | "byok";
 export interface ModelServicePreference {
   workspaceId: string;
   serviceMode: ModelServiceMode;
-  platformBundleId?: string;
-  byokBundleId?: string;
+  textModelConfigId?: string;
+  imageModelConfigId?: string;
+  videoModelConfigId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ModelServicePreferenceInput {
   serviceMode?: ModelServiceMode;
-  platformBundleId?: string | null;
-  byokBundleId?: string | null;
+  textModelConfigId?: string | null;
+  imageModelConfigId?: string | null;
+  videoModelConfigId?: string | null;
 }
 
 interface ModelServicePreferenceRow {
   workspace_id: string;
   service_mode: string;
-  platform_bundle_id: string | null;
-  byok_bundle_id: string | null;
+  text_model_config_id: string | null;
+  image_model_config_id: string | null;
+  video_model_config_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,38 +61,45 @@ export class ModelServicePreferenceStore {
     const previous = this.get();
     const now = this.nowIso();
     const serviceMode = normalizeServiceMode(input.serviceMode ?? previous.serviceMode);
-    const platformBundleId = Object.hasOwn(input, "platformBundleId")
-      ? normalizeText(input.platformBundleId)
-      : previous.platformBundleId;
-    const byokBundleId = Object.hasOwn(input, "byokBundleId")
-      ? normalizeText(input.byokBundleId)
-      : previous.byokBundleId;
+    const textModelConfigId = Object.hasOwn(input, "textModelConfigId")
+      ? normalizeText(input.textModelConfigId)
+      : previous.textModelConfigId;
+    const imageModelConfigId = Object.hasOwn(input, "imageModelConfigId")
+      ? normalizeText(input.imageModelConfigId)
+      : previous.imageModelConfigId;
+    const videoModelConfigId = Object.hasOwn(input, "videoModelConfigId")
+      ? normalizeText(input.videoModelConfigId)
+      : previous.videoModelConfigId;
     this.input.handle.sqlite.prepare(`
       INSERT INTO model_service_preferences (
         workspace_id,
         service_mode,
-        platform_bundle_id,
-        byok_bundle_id,
+        text_model_config_id,
+        image_model_config_id,
+        video_model_config_id,
         created_at,
         updated_at
       ) VALUES (
         @workspaceId,
         @serviceMode,
-        @platformBundleId,
-        @byokBundleId,
+        @textModelConfigId,
+        @imageModelConfigId,
+        @videoModelConfigId,
         @createdAt,
         @updatedAt
       )
       ON CONFLICT(workspace_id) DO UPDATE SET
         service_mode = excluded.service_mode,
-        platform_bundle_id = excluded.platform_bundle_id,
-        byok_bundle_id = excluded.byok_bundle_id,
+        text_model_config_id = excluded.text_model_config_id,
+        image_model_config_id = excluded.image_model_config_id,
+        video_model_config_id = excluded.video_model_config_id,
         updated_at = excluded.updated_at
     `).run({
       workspaceId: this.input.workspaceId,
       serviceMode,
-      platformBundleId: platformBundleId ?? null,
-      byokBundleId: byokBundleId ?? null,
+      textModelConfigId: textModelConfigId ?? null,
+      imageModelConfigId: imageModelConfigId ?? null,
+      videoModelConfigId: videoModelConfigId ?? null,
       createdAt: previous.createdAt,
       updatedAt: now
     });
@@ -109,8 +119,9 @@ function preferenceFromRow(row: ModelServicePreferenceRow): ModelServicePreferen
   return {
     workspaceId: row.workspace_id,
     serviceMode: normalizeServiceMode(row.service_mode),
-    platformBundleId: row.platform_bundle_id ?? undefined,
-    byokBundleId: row.byok_bundle_id ?? undefined,
+    textModelConfigId: row.text_model_config_id ?? undefined,
+    imageModelConfigId: row.image_model_config_id ?? undefined,
+    videoModelConfigId: row.video_model_config_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
