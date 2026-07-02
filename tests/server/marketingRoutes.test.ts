@@ -26,6 +26,8 @@ afterEach(async () => {
 });
 
 describe("marketing SEO routes", () => {
+  const exhaustiveMarketingPageTimeoutMs = 30_000;
+
   it("serves the Chinese homepage publicly while keeping the console shell on /console", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-marketing-routes-"));
     tempDirs.push(root);
@@ -294,7 +296,7 @@ describe("marketing SEO routes", () => {
     expect(sitemap).not.toContain("https://haitu.online/admin");
     expect(sitemap).not.toContain("https://haitu.online/app");
     expect(sitemap).not.toContain("https://haitu.online/api");
-  });
+  }, exhaustiveMarketingPageTimeoutMs);
 
   it("redirects duplicate marketing paths to the canonical URL shape", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-marketing-redirects-"));

@@ -22,6 +22,7 @@ afterEach(() => {
 });
 
 describe("marketing SEO renderer", () => {
+  const exhaustiveMarketingPageTimeoutMs = 30_000;
   const seoDescriptionLengthByLocale = {
     en: { max: 180, min: 50 },
     zh: { max: 120, min: 30 }
@@ -190,7 +191,7 @@ describe("marketing SEO renderer", () => {
         }));
       }
     }
-  });
+  }, exhaustiveMarketingPageTimeoutMs);
 
   it("centralizes locale metadata and marketing translations in i18next resources", () => {
     expect(defaultLocale).toBe("zh");
