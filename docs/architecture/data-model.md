@@ -16,7 +16,7 @@ Schema 定义在 `src/server/db/schema.ts`，迁移文件在 `src/server/db/migr
 
 - `products`：工作区作用域的商品索引。长期商品事实仍保存在 `product_json_path` 指向的 JSON 文件中。
 - `product_assets`：参考图或其他商品资产，包含存储供应商和路径。
-- `storyboards`：商品的脚本/分镜草稿。
+- `storyboards`：商品的视频提示词历史草稿。
 
 ## 视频任务和输出
 
@@ -29,8 +29,7 @@ Schema 定义在 `src/server/db/schema.ts`，迁移文件在 `src/server/db/migr
 
 - `model_credentials`：加密后的模型供应商 key 和供应商元数据，通过 `api_owner` 支持平台模型和 BYOK。
 - `model_variants`：某个凭证下已启用的具体模型版本，模型版本必须来自统一模型目录。
-- `model_bundles`：面向用户的文本/图片/视频模型配置组合。
-- `model_service_preferences`：工作区的平台模型或 BYOK 偏好，以及默认模型组合选择。
+- `model_service_preferences`：工作区的平台模型或 BYOK 偏好，以及文本、图片、视频能力各自默认使用的模型配置。
 
 ## 钱包、支付和计费
 

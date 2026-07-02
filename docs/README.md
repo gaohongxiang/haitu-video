@@ -12,9 +12,9 @@
 ## 产品模块
 
 - [营销 SEO / GEO](modules/marketing-seo.md)：公开站内容模型、搜索引擎和 AI 答案引擎规则。
-- [商品创作工作台](modules/product-studio.md)：商品库、商品事实、参考图、脚本分镜和创作流程。
+- [商品创作工作台](modules/product-studio.md)：商品库、商品事实、参考图、图片提示词、视频提示词和创作流程。
 - [视频生成](modules/video-generation.md)：视频任务、模型供应商抽象、Seedance、质检和发布素材。
-- [模型服务](modules/model-service.md)：平台模型、BYOK、凭证、启用模型版本、模型组合和选择逻辑。
+- [模型服务](modules/model-service.md)：平台模型、BYOK、凭证、启用模型版本和按能力选择逻辑。
 - [模型目录与使用计费](modules/model-pricing-billing.md)：统一模型目录、官方成本、服务费、费用预估、冻结扣费和价格快照。
 - [钱包、充值和支付](modules/wallet-payments.md)：钱包流水、充值订单、支付渠道、webhook 和人工调整。
 - [管理后台](modules/admin.md)：项目方后台、用户、计费控制、平台模型和系统状态。

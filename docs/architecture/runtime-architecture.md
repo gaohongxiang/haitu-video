@@ -28,19 +28,19 @@ Haitu 当前是单 Node.js 服务：公开站服务端渲染，控制台由 Vite
 - auth store：基于 Better Auth 的登录和会话处理。
 - audit log：系统数据目录里的 JSONL 审计日志。
 - public asset token store：本地资产临时公开 URL 的内存映射。
-- 默认模型配置 store 和平台模型组合。
+- 默认模型配置 store 和模型服务偏好 store。
 - 每个工作区的本地视频任务队列。
 - 视频保留期清理定时器。
 
 ## 工作区上下文
 
-业务 API 在认证后调用 `createConsoleRequestContext`。上下文会解析当前工作区，派生工作区路径，创建工作区作用域的模型配置、模型组合、模型偏好和钱包 store，并选择或创建该工作区的 `LocalVideoJobQueue`。
+业务 API 在认证后调用 `createConsoleRequestContext`。上下文会解析当前工作区，派生工作区路径，创建工作区作用域的模型配置、模型服务偏好和钱包 store，并选择或创建该工作区的 `LocalVideoJobQueue`。
 
 工作区隔离依靠以下边界：
 
 - 数据库行携带 `workspace_id`；
 - 文件路径位于 `workspaces/<workspaceId>/` 下；
-- 模型凭证和模型组合按工作区隔离；
+- 模型凭证、启用模型版本和模型服务偏好按工作区隔离；
 - 钱包流水按工作区隔离；
 - 请求上下文把所有商品/视频 API 都绑定到解析出的工作区。
 
