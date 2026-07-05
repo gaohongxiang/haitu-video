@@ -1028,6 +1028,8 @@
     "costHints": {
       "loading": "Estimating",
       "estimated": "Est. charge ¥{{amount}}",
+      "failed": "Estimate failed",
+      "unavailable": "Configure to estimate",
       "detail": "{{mode}} · upstream ¥{{upstream}} · service fee ¥{{serviceFee}}",
       "platformMode": "Platform hosted API",
       "byokMode": "Your API key"

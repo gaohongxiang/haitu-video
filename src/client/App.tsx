@@ -522,6 +522,8 @@ interface BillingEstimatesResponse {
   };
 }
 
+type BillingEstimatesStatus = "idle" | "loading" | "ready" | "error";
+
 interface Filters {
   productSku: string;
   provider: string;
@@ -984,6 +986,7 @@ export function App() {
   const [preflight, setPreflight] = useState<Preflight | undefined>();
   const [preflightSignature, setPreflightSignature] = useState("");
   const [billingEstimates, setBillingEstimates] = useState<BillingEstimatesResponse | undefined>();
+  const [billingEstimatesStatus, setBillingEstimatesStatus] = useState<BillingEstimatesStatus>("idle");
   const [statusText, setStatusText] = useState(() => tAppGlobal("status.idle"));
   const [consoleToast, setConsoleToast] = useState<ConsoleToastState | undefined>();
   const consoleToastCloseRef = useRef<() => void>(() => undefined);
@@ -1130,6 +1133,7 @@ export function App() {
   const textModelConfigured = textModelOptions.length > 0;
   const imageModelConfigured = imageModelOptions.length > 0;
   const videoModelConfigured = videoModelOptions.length > 0;
+  const canEstimateBilling = textModelConfigured || imageModelConfigured || videoModelConfigured;
   const currentSignature = JSON.stringify({ productPath, provider: "volcengine-seedance", providerModelConfigId: effectiveSelectedVideoModelConfigId, duration, resolution: selectedVideoResolution, aspectRatio: selectedVideoAspectRatio, template, finalLanguage, cta, studioScriptDraft, studioStoryboardDraft });
   const freshPreflight = preflight && currentSignature === preflightSignature ? preflight : undefined;
   const safeVersionCount = Math.max(1, Math.min(5, Math.floor(versionCount || 1)));
@@ -1231,14 +1235,14 @@ export function App() {
     if (
       !consoleReady ||
       !activeSectionIsCreativeWorkspace ||
-      !textModelConfigured ||
-      !imageModelConfigured ||
-      (creativeWorkspaceMode === "video" && !videoModelConfigured)
+      !canEstimateBilling
     ) {
       setBillingEstimates(undefined);
+      setBillingEstimatesStatus("idle");
       return;
     }
     let cancelled = false;
+    setBillingEstimatesStatus("loading");
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -1254,10 +1258,12 @@ export function App() {
           });
           if (!cancelled) {
             setBillingEstimates(response);
+            setBillingEstimatesStatus("ready");
           }
         } catch {
           if (!cancelled) {
             setBillingEstimates(undefined);
+            setBillingEstimatesStatus("error");
           }
         }
       })();
@@ -1268,8 +1274,8 @@ export function App() {
     };
   }, [
     activeSectionIsCreativeWorkspace,
+    canEstimateBilling,
     consoleReady,
-    creativeWorkspaceMode,
     duration,
     referenceImageEstimateCount,
     safeVersionCount,
@@ -3195,6 +3201,7 @@ export function App() {
           importNotes={importNotes}
           productAutoSaveStatus={productAutoSaveStatus}
           billingEstimates={billingEstimates}
+          billingEstimatesStatus={billingEstimatesStatus}
           onOrganizeProductPackage={organizeProductPackage}
           onFlushProductFactsAutoSave={flushProductFactsAutoSave}
           onSelectProduct={openProductStudio}
@@ -4395,6 +4402,7 @@ function ProductCreationWorkspace({
   importNotes,
   productAutoSaveStatus,
   billingEstimates,
+  billingEstimatesStatus,
   onOrganizeProductPackage,
   onFlushProductFactsAutoSave,
   onSelectProduct,
@@ -4461,6 +4469,7 @@ function ProductCreationWorkspace({
   importNotes: string[];
   productAutoSaveStatus: ProductAutoSaveStatus;
   billingEstimates?: BillingEstimatesResponse;
+  billingEstimatesStatus: BillingEstimatesStatus;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -4547,6 +4556,7 @@ function ProductCreationWorkspace({
       importNotes={importNotes}
       productAutoSaveStatus={productAutoSaveStatus}
       billingEstimates={billingEstimates}
+      billingEstimatesStatus={billingEstimatesStatus}
       onOrganizeProductPackage={onOrganizeProductPackage}
       onFlushProductFactsAutoSave={onFlushProductFactsAutoSave}
       onSelectProduct={onSelectProduct}
@@ -4615,6 +4625,7 @@ function ProductCreationComposer({
   importNotes,
   productAutoSaveStatus,
   billingEstimates,
+  billingEstimatesStatus,
   onOrganizeProductPackage,
   onFlushProductFactsAutoSave,
   onSelectProduct,
@@ -4679,6 +4690,7 @@ function ProductCreationComposer({
   importNotes: string[];
   productAutoSaveStatus: ProductAutoSaveStatus;
   billingEstimates?: BillingEstimatesResponse;
+  billingEstimatesStatus: BillingEstimatesStatus;
   onOrganizeProductPackage: () => Promise<ProductDetail | undefined>;
   onFlushProductFactsAutoSave: () => Promise<ProductDetail | undefined>;
   onSelectProduct: (product: ProductSummary) => Promise<void>;
@@ -5332,8 +5344,11 @@ function ProductCreationComposer({
           isSubmittingVideo={isSubmittingVideo}
           isSubmittingImage={isSubmittingImage}
           videoEstimate={billingEstimates?.estimates.video}
+          videoEstimateStatus={videoModelOptions.length > 0 ? billingEstimatesStatus : "idle"}
           imageEstimate={billingEstimates?.estimates.referenceImages}
+          imageEstimateStatus={imageModelOptions.length > 0 ? billingEstimatesStatus : "idle"}
           organizeProductEstimate={billingEstimates?.estimates.organizeProduct}
+          organizeProductEstimateStatus={textModelOptions.length > 0 ? billingEstimatesStatus : "idle"}
           onSelectReferenceImage={handleSelectReferenceImage}
           onPreviewReferenceImage={handlePreviewReferenceImage}
           onPendingSelect={handleSelectReferenceImage}
@@ -5480,8 +5495,11 @@ function ProductCreativeWorkbench({
   isSubmittingVideo,
   isSubmittingImage,
   videoEstimate,
+  videoEstimateStatus,
   imageEstimate,
+  imageEstimateStatus,
   organizeProductEstimate,
+  organizeProductEstimateStatus,
   onSelectReferenceImage,
   onPreviewReferenceImage,
   onPendingSelect,
@@ -5566,8 +5584,11 @@ function ProductCreativeWorkbench({
   isSubmittingVideo: boolean;
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
+  videoEstimateStatus: BillingEstimatesStatus;
   imageEstimate?: BillingActionEstimate;
+  imageEstimateStatus: BillingEstimatesStatus;
   organizeProductEstimate?: BillingActionEstimate;
+  organizeProductEstimateStatus: BillingEstimatesStatus;
   onSelectReferenceImage: (index: number) => void;
   onPreviewReferenceImage: (index: number) => void;
   onPendingSelect: (index: number) => void;
@@ -5602,7 +5623,7 @@ function ProductCreativeWorkbench({
                 <Button className="product-facts-action h-9 min-h-9 justify-center rounded-[8px] px-3 text-xs disabled:opacity-100" size="sm" variant="soft" disabled={packingDisabled} onClick={onOrganizeProductPackage}>
                   {isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />}
                   {isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}
-                  <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} />
+                  <ActionButtonCost tVideo={tVideo} estimate={organizeProductEstimate} status={organizeProductEstimateStatus} />
                 </Button>
               </div>
             </div>
@@ -5693,7 +5714,9 @@ function ProductCreativeWorkbench({
           isSubmittingVideo={isSubmittingVideo}
           isSubmittingImage={isSubmittingImage}
           videoEstimate={videoEstimate}
+          videoEstimateStatus={videoEstimateStatus}
           imageEstimate={imageEstimate}
+          imageEstimateStatus={imageEstimateStatus}
           workspacePrimaryActionDisabled={workspace.primaryAction.disabled}
           workspacePrimaryActionReason={workspace.primaryAction.reason}
           onGenerateVideo={onGenerateVideo}
@@ -6008,7 +6031,9 @@ function ProductModeOutputPanel({
   isSubmittingVideo,
   isSubmittingImage,
   videoEstimate,
+  videoEstimateStatus,
   imageEstimate,
+  imageEstimateStatus,
   workspacePrimaryActionDisabled,
   workspacePrimaryActionReason,
   onGenerateVideo,
@@ -6065,7 +6090,9 @@ function ProductModeOutputPanel({
   isSubmittingVideo: boolean;
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
+  videoEstimateStatus: BillingEstimatesStatus;
   imageEstimate?: BillingActionEstimate;
+  imageEstimateStatus: BillingEstimatesStatus;
   workspacePrimaryActionDisabled: boolean;
   workspacePrimaryActionReason?: string;
   onGenerateVideo: () => Promise<void>;
@@ -6124,7 +6151,9 @@ function ProductModeOutputPanel({
       isSubmittingVideo={isSubmittingVideo}
       isSubmittingImage={isSubmittingImage}
       videoEstimate={videoEstimate}
+      videoEstimateStatus={videoEstimateStatus}
       imageEstimate={imageEstimate}
+      imageEstimateStatus={imageEstimateStatus}
       workspacePrimaryActionDisabled={workspacePrimaryActionDisabled}
       workspacePrimaryActionReason={workspacePrimaryActionReason}
       onGenerateVideo={onGenerateVideo}
@@ -6632,7 +6661,9 @@ function StoryboardComposerPanel({
   isSubmittingVideo,
   isSubmittingImage,
   videoEstimate,
+  videoEstimateStatus,
   imageEstimate,
+  imageEstimateStatus,
   workspacePrimaryActionDisabled,
   workspacePrimaryActionReason,
   onGenerateVideo,
@@ -6689,7 +6720,9 @@ function StoryboardComposerPanel({
   isSubmittingVideo: boolean;
   isSubmittingImage: boolean;
   videoEstimate?: BillingActionEstimate;
+  videoEstimateStatus: BillingEstimatesStatus;
   imageEstimate?: BillingActionEstimate;
+  imageEstimateStatus: BillingEstimatesStatus;
   workspacePrimaryActionDisabled: boolean;
   workspacePrimaryActionReason?: string;
   onGenerateVideo: () => Promise<void>;
@@ -6725,6 +6758,7 @@ function StoryboardComposerPanel({
     ? <RefreshCcw className="h-4 w-4 animate-spin" />
     : mode === "video" ? <Play size={14} /> : <ImageIcon size={14} />;
   const primaryActionEstimate = mode === "video" ? videoEstimate : imageEstimate;
+  const primaryActionEstimateStatus = mode === "video" ? videoEstimateStatus : imageEstimateStatus;
 
   function onPromptDraftChange(value: string) {
     if (mode === "image") {
@@ -6893,7 +6927,7 @@ function StoryboardComposerPanel({
             >
               {primaryActionIcon}
               <span className="truncate">{primaryActionLabel}</span>
-              <ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} />
+              <ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} status={primaryActionEstimateStatus} />
             </Button>
           </div>
         </div>
@@ -10323,15 +10357,20 @@ function videoAspectRatioLabel(value: VideoAspectRatio, tVideo: VideoStudioTrans
 
 function ActionButtonCost({
   tVideo,
-  estimate
+  estimate,
+  status = "loading"
 }: {
   tVideo: VideoStudioTranslator;
   estimate?: BillingActionEstimate;
+  status?: BillingEstimatesStatus;
 }) {
   if (!estimate) {
+    const fallbackLabel = status === "error"
+      ? tVideo("costHints.failed")
+      : status === "idle" ? tVideo("costHints.unavailable") : tVideo("costHints.loading");
     return (
       <span className="action-button-cost ml-1.5 inline-flex min-h-5 shrink-0 items-center whitespace-nowrap text-[11px] font-black leading-5 opacity-80">
-        {tVideo("costHints.loading")}
+        {fallbackLabel}
       </span>
     );
   }

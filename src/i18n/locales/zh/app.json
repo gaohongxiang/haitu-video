@@ -1028,6 +1028,8 @@
     "costHints": {
       "loading": "预估中",
       "estimated": "预估扣费 ¥{{amount}}",
+      "failed": "预估失败",
+      "unavailable": "配置后预估",
       "detail": "{{mode}} · 上游成本 ¥{{upstream}} · 平台服务费 ¥{{serviceFee}}",
       "platformMode": "平台托管 API",
       "byokMode": "自带 API"

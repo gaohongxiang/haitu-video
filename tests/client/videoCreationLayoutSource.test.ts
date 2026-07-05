@@ -742,16 +742,27 @@ describe("video creation layout source", () => {
     const actionButtonCostSource = source.slice(source.indexOf("function ActionButtonCost"), source.indexOf("function versionLabel"));
 
     expect(appSource).toContain('postJson<BillingEstimatesResponse>("/api/billing-estimates"');
+    expect(appSource).toContain('const [billingEstimatesStatus, setBillingEstimatesStatus] = useState<BillingEstimatesStatus>("idle");');
+    expect(appSource).toContain("const canEstimateBilling = textModelConfigured || imageModelConfigured || videoModelConfigured;");
+    expect(appSource).not.toContain("!textModelConfigured ||\n      !imageModelConfigured ||");
+    expect(appSource).toContain('setBillingEstimatesStatus("loading");');
+    expect(appSource).toContain('setBillingEstimatesStatus("ready");');
+    expect(appSource).toContain('setBillingEstimatesStatus("error");');
     expect(appSource).toContain("videoResolution: selectedVideoResolution");
     expect(appSource).toContain("videoAspectRatio: selectedVideoAspectRatio");
     expect(workspaceSource).toContain("billingEstimates={billingEstimates}");
+    expect(workspaceSource).toContain("billingEstimatesStatus={billingEstimatesStatus}");
     expect(composerSource).toContain("billingEstimates?: BillingEstimatesResponse");
+    expect(composerSource).toContain("billingEstimatesStatus: BillingEstimatesStatus");
     expect(composerSource).toContain('organizeProductEstimate={billingEstimates?.estimates.organizeProduct}');
+    expect(composerSource).toContain('organizeProductEstimateStatus={textModelOptions.length > 0 ? billingEstimatesStatus : "idle"}');
     expect(composerSource).not.toContain('referenceImagesEstimate={billingEstimates?.estimates.referenceImages}');
     expect(composerSource).not.toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
     expect(composerSource).not.toContain("estimate={storyboardEstimate}");
     expect(composerSource).toContain('videoEstimate={billingEstimates?.estimates.video}');
+    expect(composerSource).toContain('videoEstimateStatus={videoModelOptions.length > 0 ? billingEstimatesStatus : "idle"}');
     expect(composerSource).toContain('imageEstimate={billingEstimates?.estimates.referenceImages}');
+    expect(composerSource).toContain('imageEstimateStatus={imageModelOptions.length > 0 ? billingEstimatesStatus : "idle"}');
     expect(referenceTraySource).not.toContain("estimate?: BillingActionEstimate");
     expect(referenceTraySource).not.toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
     expect(storyboardPanelSource).not.toContain("estimate?: BillingActionEstimate");
@@ -775,10 +786,12 @@ describe("video creation layout source", () => {
     expect(storyboardFooterSource).toContain("primaryActionEstimate");
     expect(storyboardFooterSource).toContain("primaryActionLabel");
     expect(storyboardFooterSource).not.toContain("primaryActionAmountCny");
-    expect(storyboardFooterSource).toContain("<ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} />");
+    expect(storyboardFooterSource).toContain("<ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} status={primaryActionEstimateStatus} />");
     expect(source).toContain("function ActionButtonCost");
     expect(source).not.toContain("const primaryActionAmountCny = mode === \"video\" ? videoEstimate?.upstreamEstimatedCostCny : undefined;");
     expect(actionButtonCostSource).toContain('tVideo("costHints.estimated", {');
+    expect(actionButtonCostSource).toContain('tVideo("costHints.failed")');
+    expect(actionButtonCostSource).toContain('tVideo("costHints.unavailable")');
     expect(actionButtonCostSource).toContain("estimate.walletEstimatedChargeCny");
     expect(actionButtonCostSource).not.toContain("amountCny?: number");
     expect(actionButtonCostSource).not.toContain('kind === "video"');
@@ -789,8 +802,12 @@ describe("video creation layout source", () => {
     expect(source).not.toContain('tVideo("costHints.estimatedCharge"');
     expect(zhAppText).toContain('"expectedCost": "预计扣余额"');
     expect(zhAppText).toContain('"estimated": "预估扣费 ¥{{amount}}"');
+    expect(zhAppText).toContain('"failed": "预估失败"');
+    expect(zhAppText).toContain('"unavailable": "配置后预估"');
     expect(enAppText).toContain('"expectedCost": "Est. Wallet Charge"');
     expect(enAppText).toContain('"estimated": "Est. charge ¥{{amount}}"');
+    expect(enAppText).toContain('"failed": "Estimate failed"');
+    expect(enAppText).toContain('"unavailable": "Configure to estimate"');
     expect(source).not.toContain("生成预检");
   });
 
