@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const appPath = "src/client/App.tsx";
 const compactChoiceDropdownPath = "src/client/components/compactChoiceDropdown.tsx";
+const zhAppTextPath = "src/i18n/locales/zh/app.json";
+const enAppTextPath = "src/i18n/locales/en/app.json";
 
 function sourceBetween(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -380,7 +382,7 @@ describe("video creation layout source", () => {
     expect(promptPanelSource).toContain("primaryActionTitle");
     expect(promptPanelSource).toContain("primaryActionLabel");
     expect(promptPanelSource).toContain("primaryActionEstimate");
-    expect(promptPanelSource).toContain("primaryActionAmountCny");
+    expect(promptPanelSource).not.toContain("primaryActionAmountCny");
     expect(promptPanelSource).toContain('mode === "video" ? onGenerateVideo() : onGenerateProductImages()');
     expect(promptPanelSource).not.toContain("prompt-composer-history-slot");
     expect(promptPanelSource).toContain("<CompactChoiceDropdown");
@@ -728,6 +730,8 @@ describe("video creation layout source", () => {
 
   it("surfaces concise per-action estimates inside stable video creation action buttons", async () => {
     const source = await readFile(appPath, "utf8");
+    const zhAppText = await readFile(zhAppTextPath, "utf8");
+    const enAppText = await readFile(enAppTextPath, "utf8");
     const appSource = source.slice(source.indexOf("export function App()"), source.indexOf("function AppLanguageSwitcher"));
     const workspaceSource = source.slice(source.indexOf("function ProductCreationWorkspace"), source.indexOf("function ProductLibraryHome"));
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductCreationProductLibrary"));
@@ -769,20 +773,24 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
     expect(storyboardFooterSource).toContain("prompt-composer-primary-action-slot");
     expect(storyboardFooterSource).toContain("primaryActionEstimate");
-    expect(storyboardFooterSource).toContain("primaryActionAmountCny");
     expect(storyboardFooterSource).toContain("primaryActionLabel");
-    expect(storyboardFooterSource).toContain("<ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} amountCny={primaryActionAmountCny} />");
+    expect(storyboardFooterSource).not.toContain("primaryActionAmountCny");
+    expect(storyboardFooterSource).toContain("<ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} />");
     expect(source).toContain("function ActionButtonCost");
-    expect(source).toContain("const primaryActionAmountCny = mode === \"video\" ? videoEstimate?.upstreamEstimatedCostCny : undefined;");
+    expect(source).not.toContain("const primaryActionAmountCny = mode === \"video\" ? videoEstimate?.upstreamEstimatedCostCny : undefined;");
     expect(actionButtonCostSource).toContain('tVideo("costHints.estimated", {');
-    expect(actionButtonCostSource).toContain("amountCny?: number");
+    expect(actionButtonCostSource).toContain("estimate.walletEstimatedChargeCny");
+    expect(actionButtonCostSource).not.toContain("amountCny?: number");
     expect(actionButtonCostSource).not.toContain('kind === "video"');
     expect(source).not.toContain("costHints.videoEstimated");
     expect(source).not.toContain("costHints.videoDetail");
     expect(source).not.toContain("本次视频预估");
     expect(source).not.toContain("function ActionCostHint");
     expect(source).not.toContain('tVideo("costHints.estimatedCharge"');
-    expect(source).not.toContain("预计扣余额");
+    expect(zhAppText).toContain('"expectedCost": "预计扣余额"');
+    expect(zhAppText).toContain('"estimated": "预估扣费 ¥{{amount}}"');
+    expect(enAppText).toContain('"expectedCost": "Est. Wallet Charge"');
+    expect(enAppText).toContain('"estimated": "Est. charge ¥{{amount}}"');
     expect(source).not.toContain("生成预检");
   });
 

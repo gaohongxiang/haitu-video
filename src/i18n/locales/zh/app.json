@@ -284,8 +284,8 @@
     "ready": "已预检",
     "stale": "需重预检",
     "emptyTitle": "先生成预检",
-    "emptyDescription": "这里会展示预计 token、人民币成本、参考图状态、脚本要点和 Seedance prompt。",
-    "expectedCost": "预估",
+    "emptyDescription": "这里会展示预计 token、预计扣余额、参考图状态、脚本要点和 Seedance prompt。",
+    "expectedCost": "预计扣余额",
     "costRange": "区间 ¥{{low}} - ¥{{high}}",
     "expectedTokens": "期望 Token",
     "upstreamCost": "上游成本",
@@ -1027,7 +1027,7 @@
     },
     "costHints": {
       "loading": "预估中",
-      "estimated": "预估 ¥{{amount}}",
+      "estimated": "预估扣费 ¥{{amount}}",
       "detail": "{{mode}} · 上游成本 ¥{{upstream}} · 平台服务费 ¥{{serviceFee}}",
       "platformMode": "平台托管 API",
       "byokMode": "自带 API"

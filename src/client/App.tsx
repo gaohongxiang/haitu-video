@@ -6725,7 +6725,6 @@ function StoryboardComposerPanel({
     ? <RefreshCcw className="h-4 w-4 animate-spin" />
     : mode === "video" ? <Play size={14} /> : <ImageIcon size={14} />;
   const primaryActionEstimate = mode === "video" ? videoEstimate : imageEstimate;
-  const primaryActionAmountCny = mode === "video" ? videoEstimate?.upstreamEstimatedCostCny : undefined;
 
   function onPromptDraftChange(value: string) {
     if (mode === "image") {
@@ -6894,7 +6893,7 @@ function StoryboardComposerPanel({
             >
               {primaryActionIcon}
               <span className="truncate">{primaryActionLabel}</span>
-              <ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} amountCny={primaryActionAmountCny} />
+              <ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} />
             </Button>
           </div>
         </div>
@@ -10324,12 +10323,10 @@ function videoAspectRatioLabel(value: VideoAspectRatio, tVideo: VideoStudioTrans
 
 function ActionButtonCost({
   tVideo,
-  estimate,
-  amountCny
+  estimate
 }: {
   tVideo: VideoStudioTranslator;
   estimate?: BillingActionEstimate;
-  amountCny?: number;
 }) {
   if (!estimate) {
     return (
@@ -10344,7 +10341,7 @@ function ActionButtonCost({
     mode: estimate.apiBillingMode === "platform" ? tVideo("costHints.platformMode") : tVideo("costHints.byokMode")
   });
   const label = tVideo("costHints.estimated", {
-    amount: money(amountCny ?? estimate.walletEstimatedChargeCny)
+    amount: money(estimate.walletEstimatedChargeCny)
   });
   return (
     <span

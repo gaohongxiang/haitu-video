@@ -284,8 +284,8 @@
     "ready": "Preflight ready",
     "stale": "Refresh needed",
     "emptyTitle": "Generate preflight first",
-    "emptyDescription": "Estimated tokens, CNY cost, reference image state, script notes, and the Seedance prompt will appear here.",
-    "expectedCost": "Estimate",
+    "emptyDescription": "Estimated tokens, estimated wallet charge, reference image state, script notes, and the Seedance prompt will appear here.",
+    "expectedCost": "Est. Wallet Charge",
     "costRange": "Range ¥{{low}} - ¥{{high}}",
     "expectedTokens": "Expected Tokens",
     "upstreamCost": "Upstream Cost",
@@ -1027,7 +1027,7 @@
     },
     "costHints": {
       "loading": "Estimating",
-      "estimated": "Est. ¥{{amount}}",
+      "estimated": "Est. charge ¥{{amount}}",
       "detail": "{{mode}} · upstream ¥{{upstream}} · service fee ¥{{serviceFee}}",
       "platformMode": "Platform hosted API",
       "byokMode": "Your API key"
