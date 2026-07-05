@@ -39,6 +39,7 @@ export interface ProviderConfigItem {
   credentialId?: string;
   label: string;
   providerLabel?: string;
+  vendor?: string;
   apiOwner?: ApiOwner;
   configured: boolean;
   keySource?: string;
@@ -130,11 +131,14 @@ export function resetModelConfigDraft(providerId: ModelConfigProviderId): ModelC
 }
 
 export function draftFromProviderConfig(providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[] = [model]): ModelConfigDraft {
-  const vendor = model.providerLabel || defaultModelConfigPreset(providerId).vendor;
+  const vendor = serviceVendorForModelConfig(model) || defaultModelConfigPreset(providerId).vendor;
   const vendorPreset = modelConfigPresets[providerId].find((preset) => preset.vendor === vendor) ?? defaultModelConfigPreset(providerId);
-  const relatedModels = model.credentialId
-    ? models.filter((item) => item.credentialId && item.credentialId === model.credentialId)
-    : [model];
+  const serviceModels = "models" in model && Array.isArray(model.models) ? model.models : undefined;
+  const relatedModels = serviceModels && serviceModels.length > 0
+    ? serviceModels
+    : model.credentialId
+      ? models.filter((item) => item.credentialId && item.credentialId === model.credentialId)
+      : [model];
   return {
     ...vendorPreset,
     configId: model.configId,
@@ -193,7 +197,7 @@ export function updateProviderConfigStatus<T extends ProviderConfigLedger>(
 export function groupConfiguredModelServices(providerId: ModelConfigProviderId, models: ProviderConfigItem[]): ProviderConfigServiceItem[] {
   const groups = new Map<string, ProviderConfigItem[]>();
   for (const model of models) {
-    const groupId = model.credentialId || model.configId || `${model.id}-${model.providerLabel || model.baseUrl}`;
+    const groupId = serviceGroupId(model);
     groups.set(groupId, [...(groups.get(groupId) ?? []), model]);
   }
   return Array.from(groups.values()).map((group) => {
@@ -207,13 +211,28 @@ export function groupConfiguredModelServices(providerId: ModelConfigProviderId, 
   });
 }
 
+function serviceGroupId(model: ProviderConfigItem): string {
+  const provider = model.id;
+  const owner = model.apiOwner ?? "byok";
+  const vendor = serviceVendorForModelConfig(model).toLowerCase();
+  const baseUrl = model.baseUrl.trim().replace(/\/+$/, "").toLowerCase();
+  if (vendor || baseUrl) {
+    return [owner, provider, vendor, baseUrl].join("\u0000");
+  }
+  return model.credentialId || model.configId || provider;
+}
+
 function serviceLabelForModelConfig(providerId: ModelConfigProviderId, model: ProviderConfigItem): string {
-  const vendor = model.providerLabel?.trim();
+  const vendor = serviceVendorForModelConfig(model);
   if (vendor) {
     return vendor;
   }
   const draft = defaultModelConfigPreset(providerId);
   return draft.vendor || model.label || "-";
+}
+
+function serviceVendorForModelConfig(model: ProviderConfigItem): string {
+  return (model.providerLabel || model.vendor || model.label || "").trim();
 }
 
 export function endpointPrefixPreview(baseUrl: string, providerId: ModelConfigProviderId, model?: string): string {
@@ -231,6 +250,16 @@ export function endpointPrefixPreview(baseUrl: string, providerId: ModelConfigPr
     return prefix;
   }
   return `${prefix}/${shouldPreviewResponsesEndpoint(prefix, model) ? "responses" : "chat/completions"}`;
+}
+
+export function modelConfigDeleteQuery(configIds?: string[]): string {
+  const ids = Array.from(new Set((configIds ?? []).filter(Boolean)));
+  if (ids.length === 0) {
+    return "";
+  }
+  const params = new URLSearchParams();
+  ids.forEach((configId) => params.append("configId", configId));
+  return `?${params.toString()}`;
 }
 
 function shouldPreviewResponsesEndpoint(prefix: string, model?: string): boolean {
@@ -318,7 +347,7 @@ export function SharedModelServiceGroup({
   emptyText?: string;
   onAdd?: () => void;
   onEdit?: (model: ProviderConfigItem) => void;
-  onClear?: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onClear?: (providerId: ModelConfigProviderId, configIds?: string[]) => Promise<void>;
   onToggleEnabled?: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
 }) {
   const configuredModels = models.filter((model) => model.configured);
@@ -415,7 +444,7 @@ export function SharedModelServiceGroup({
                   </Button>
                 ) : null}
                 {onClear ? (
-                  <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="danger" type="button" disabled={isBusy || !service.configured} onClick={() => void onClear(providerId, service.configId)}>
+                  <Button className="min-h-7 px-2 text-[12px]" size="sm" variant="danger" type="button" disabled={isBusy || !service.configured} onClick={() => void onClear(providerId, service.models.map((model) => model.configId).filter((configId): configId is string => Boolean(configId)))}>
                     {tSettings("actions.delete")}
                   </Button>
                 ) : null}

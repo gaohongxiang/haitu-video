@@ -44,6 +44,40 @@ interface StripePaymentIntentEventObject {
   };
 }
 
+interface StripePaymentIntentDetailsResponse {
+  id?: string;
+  latest_charge?: string | StripeChargeDetails | null;
+  error?: { message?: string };
+}
+
+interface StripeChargeDetails {
+  id?: string;
+  payment_method?: string | null;
+  payment_method_details?: StripePaymentMethodDetails | null;
+}
+
+interface StripePaymentMethodDetails {
+  type?: string;
+  card?: {
+    brand?: string;
+    last4?: string;
+    wallet?: {
+      type?: string;
+    } | null;
+  };
+}
+
+interface StripeResolvedPaymentMethod {
+  provider: "stripe";
+  type: string;
+  label: string;
+  stripeChargeId?: string;
+  stripePaymentMethodId?: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  cardWallet?: string;
+}
+
 export function stripePaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env): StripePaymentConfig {
   const secretKey = normalizeEnvText(env.STRIPE_SECRET_KEY);
   const webhookSecret = normalizeEnvText(env.STRIPE_WEBHOOK_SECRET);
@@ -56,7 +90,7 @@ export function stripePaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env)
   return {
     secretKey,
     webhookSecret,
-    currency: normalizeCurrency(env.STRIPE_CURRENCY ?? "hkd"),
+    currency: normalizeCurrency(normalizeEnvText(env.STRIPE_CURRENCY) || "cny"),
     appUrl: normalizeAppUrl(env.HAITU_PUBLIC_BASE_URL ?? env.BETTER_AUTH_URL)
   };
 }
@@ -64,7 +98,9 @@ export function stripePaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env)
 export async function createStripeCheckoutRechargeSession(input: {
   order: WalletRechargeOrder;
   config: StripePaymentConfig;
+  checkoutExpiresInSeconds: number;
   fetchImpl?: typeof fetch;
+  now?: () => Date;
 }): Promise<StripeCheckoutSession> {
   const fetcher = input.fetchImpl ?? fetch;
   const successUrl = `${input.config.appUrl}/console?section=wallet&payment=stripe-success&orderId=${encodeURIComponent(input.order.id)}`;
@@ -85,7 +121,8 @@ export async function createStripeCheckoutRechargeSession(input: {
   params.set("line_items[0][price_data][currency]", input.order.paymentCurrency);
   params.set("line_items[0][price_data][unit_amount]", String(input.order.paymentAmountCents));
   params.set("line_items[0][price_data][product_data][name]", "嗨兔 AI 余额充值");
-  params.set("line_items[0][price_data][product_data][description]", `到账余额 ${input.order.creditCny.toFixed(2)}`);
+  params.set("line_items[0][price_data][product_data][description]", `到账金额 ${input.order.creditCny.toFixed(2)}`);
+  params.set("expires_at", String(Math.floor((input.now ?? (() => new Date()))().getTime() / 1000) + input.checkoutExpiresInSeconds));
   let response: Response;
   try {
     response = await fetcher(`${stripeApiBaseUrl}/checkout/sessions`, {
@@ -106,6 +143,9 @@ export async function createStripeCheckoutRechargeSession(input: {
   }
   if (!body.id || !body.url) {
     throw new Error("Stripe 未返回可用的支付链接。");
+  }
+  if (!body.expires_at) {
+    throw new Error("Stripe 未返回订单过期时间。");
   }
   return {
     id: body.id,
@@ -152,11 +192,18 @@ export function constructStripeWebhookEvent(input: {
   };
 }
 
-export function handleStripeWebhookEvent(input: {
+export async function handleStripeWebhookEvent(input: {
   event: StripeEvent;
+  config: StripePaymentConfig;
   handle: DatabaseHandle;
+  fetchImpl?: typeof fetch;
   now?: () => Date;
-}): { received: true; duplicate?: true } {
+}): Promise<{ received: true; duplicate?: true }> {
+  const paymentMethod = await resolveStripePaymentMethodForEvent({
+    event: input.event,
+    config: input.config,
+    fetchImpl: input.fetchImpl
+  });
   const orderStore = new WalletRechargeOrderStore({
     handle: input.handle,
     now: input.now
@@ -180,6 +227,7 @@ export function handleStripeWebhookEvent(input: {
         event: input.event,
         orderStore,
         handle: input.handle,
+        paymentMethod,
         now: input.now
       });
     } else if (input.event.type === "checkout.session.async_payment_succeeded") {
@@ -187,6 +235,7 @@ export function handleStripeWebhookEvent(input: {
         event: input.event,
         orderStore,
         handle: input.handle,
+        paymentMethod,
         now: input.now
       });
     } else if (input.event.type === "checkout.session.async_payment_failed") {
@@ -214,6 +263,7 @@ function handleCheckoutCompleted(input: {
   event: StripeEvent;
   orderStore: WalletRechargeOrderStore;
   handle: DatabaseHandle;
+  paymentMethod?: StripeResolvedPaymentMethod;
   now?: () => Date;
 }): void {
   const session = stripeCheckoutSessionObject(input.event);
@@ -246,24 +296,41 @@ function handleCheckoutCompleted(input: {
     workspaceId: order.workspaceId,
     now: input.now
   });
+  const paymentMetadata = {
+    paymentMethodProvider: input.paymentMethod?.provider,
+    paymentMethodType: input.paymentMethod?.type,
+    paymentMethodLabel: input.paymentMethod?.label,
+    stripePaymentMethodId: input.paymentMethod?.stripePaymentMethodId,
+    cardBrand: input.paymentMethod?.cardBrand,
+    cardLast4: input.paymentMethod?.cardLast4,
+    cardWallet: input.paymentMethod?.cardWallet
+  };
   walletStore.topUp({
     amountCny: order.creditCny,
-    description: "Stripe 充值到账",
+    description: stripeRechargeDescription(input.paymentMethod),
     metadata: {
       provider: "stripe",
       rechargeOrderId: order.id,
       stripeSessionId: session.id,
       stripePaymentIntentId: session.payment_intent ?? undefined,
+      stripeChargeId: input.paymentMethod?.stripeChargeId,
       walletCurrency: order.walletCurrency,
       creditCents: order.creditCents,
       paymentCurrency: order.paymentCurrency,
       paymentAmountCents: order.paymentAmountCents,
-      fxRateSnapshot: order.fxRateSnapshot
+      fxRateSnapshot: order.fxRateSnapshot,
+      ...paymentMetadata
     }
   });
   input.orderStore.markPaid({
     orderId: order.id,
-    providerPaymentIntentId: session.payment_intent ?? undefined
+    providerPaymentIntentId: session.payment_intent ?? undefined,
+    metadata: {
+      stripeSessionId: session.id,
+      stripePaymentIntentId: session.payment_intent ?? undefined,
+      stripeChargeId: input.paymentMethod?.stripeChargeId,
+      ...paymentMetadata
+    }
   });
 }
 
@@ -277,6 +344,146 @@ function stripePaymentIntentObject(event: StripeEvent): StripePaymentIntentEvent
   return value && typeof value === "object" ? value as StripePaymentIntentEventObject : {};
 }
 
+async function resolveStripePaymentMethodForEvent(input: {
+  event: StripeEvent;
+  config: StripePaymentConfig;
+  fetchImpl?: typeof fetch;
+}): Promise<StripeResolvedPaymentMethod | undefined> {
+  if (input.event.type !== "checkout.session.completed" && input.event.type !== "checkout.session.async_payment_succeeded") {
+    return undefined;
+  }
+  const session = stripeCheckoutSessionObject(input.event);
+  if (input.event.type === "checkout.session.completed" && session.payment_status && session.payment_status !== "paid") {
+    return undefined;
+  }
+  const paymentIntentId = normalizeOptionalText(session.payment_intent);
+  if (!paymentIntentId) {
+    return undefined;
+  }
+  try {
+    const intent = await retrieveStripePaymentIntentDetails({
+      paymentIntentId,
+      config: input.config,
+      fetchImpl: input.fetchImpl
+    });
+    return stripePaymentMethodFromIntent(intent);
+  } catch {
+    return undefined;
+  }
+}
+
+async function retrieveStripePaymentIntentDetails(input: {
+  paymentIntentId: string;
+  config: StripePaymentConfig;
+  fetchImpl?: typeof fetch;
+}): Promise<StripePaymentIntentDetailsResponse> {
+  const fetcher = input.fetchImpl ?? fetch;
+  const params = new URLSearchParams();
+  params.append("expand[]", "latest_charge");
+  const response = await fetcher(`${stripeApiBaseUrl}/payment_intents/${encodeURIComponent(input.paymentIntentId)}?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${input.config.secretKey}`
+    }
+  });
+  const body = await response.json().catch(() => ({})) as StripePaymentIntentDetailsResponse;
+  if (!response.ok) {
+    throw new Error(body.error?.message ?? "查询 Stripe 支付方式失败。");
+  }
+  return body;
+}
+
+function stripePaymentMethodFromIntent(intent: StripePaymentIntentDetailsResponse): StripeResolvedPaymentMethod | undefined {
+  const charge = isPlainObject(intent.latest_charge) ? intent.latest_charge as StripeChargeDetails : undefined;
+  const details = charge?.payment_method_details ?? undefined;
+  const type = normalizeOptionalText(details?.type);
+  if (!type) {
+    return undefined;
+  }
+  const cardBrand = normalizeOptionalText(details?.card?.brand);
+  const cardLast4 = normalizeOptionalText(details?.card?.last4);
+  const cardWallet = normalizeOptionalText(details?.card?.wallet?.type);
+  return {
+    provider: "stripe",
+    type,
+    label: stripePaymentMethodLabel({
+      type,
+      cardBrand,
+      cardLast4,
+      cardWallet
+    }),
+    stripeChargeId: normalizeOptionalText(charge?.id),
+    stripePaymentMethodId: normalizeOptionalText(charge?.payment_method),
+    cardBrand,
+    cardLast4,
+    cardWallet
+  };
+}
+
+function stripeRechargeDescription(paymentMethod: StripeResolvedPaymentMethod | undefined): string {
+  return paymentMethod?.label ? `Stripe ${paymentMethod.label} 充值到账` : "Stripe 充值到账";
+}
+
+function stripePaymentMethodLabel(input: {
+  type: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  cardWallet?: string;
+}): string {
+  if (input.type === "card") {
+    const parts = [
+      stripeWalletLabel(input.cardWallet),
+      stripeCardBrandLabel(input.cardBrand) ?? "银行卡",
+      input.cardLast4 ? `尾号 ${input.cardLast4}` : undefined
+    ].filter(Boolean);
+    return parts.join(" ");
+  }
+  return stripePaymentTypeLabel(input.type);
+}
+
+function stripePaymentTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    alipay: "支付宝",
+    wechat_pay: "微信支付",
+    link: "Link",
+    paypal: "PayPal",
+    cashapp: "Cash App Pay",
+    customer_balance: "余额支付",
+    us_bank_account: "银行账户",
+    card: "银行卡"
+  };
+  return labels[type] ?? type;
+}
+
+function stripeCardBrandLabel(brand: string | undefined): string | undefined {
+  if (!brand) {
+    return undefined;
+  }
+  const labels: Record<string, string> = {
+    visa: "Visa",
+    mastercard: "Mastercard",
+    amex: "American Express",
+    discover: "Discover",
+    diners: "Diners Club",
+    jcb: "JCB",
+    unionpay: "UnionPay"
+  };
+  return labels[brand.toLowerCase()] ?? brand;
+}
+
+function stripeWalletLabel(wallet: string | undefined): string | undefined {
+  if (!wallet) {
+    return undefined;
+  }
+  const labels: Record<string, string> = {
+    apple_pay: "Apple Pay",
+    google_pay: "Google Pay",
+    samsung_pay: "Samsung Pay",
+    link: "Link"
+  };
+  return labels[wallet.toLowerCase()] ?? wallet;
+}
+
 function normalizeAppUrl(value: unknown): string {
   const text = normalizeEnvText(value);
   if (!text) {
@@ -287,6 +494,15 @@ function normalizeAppUrl(value: unknown): string {
 
 function normalizeEnvText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  const text = normalizeEnvText(value);
+  return text || undefined;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function errorMessage(error: unknown): string {

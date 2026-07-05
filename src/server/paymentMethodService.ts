@@ -4,10 +4,16 @@ import type {
   PaymentMethodSettings
 } from "./consoleSettings.js";
 import { defaultPaymentMethods } from "./consoleSettings.js";
+import {
+  quoteRechargePaymentAmount,
+  type RechargePaymentAmount
+} from "./rechargePaymentAmount.js";
 
 export interface PaymentMethodView extends PaymentMethodSettings {
   configured: boolean;
   available: boolean;
+  paymentCurrency: string;
+  quote?: RechargePaymentAmount;
   unavailableReason?: string;
 }
 
@@ -21,6 +27,10 @@ export interface PaymentMethodUpdateRequest {
 export async function listUserPaymentMethods(input: {
   settingsStore: ConsoleSettingsStore;
   env?: NodeJS.ProcessEnv;
+  amountCny?: number;
+  quoteMethodId?: string;
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
 }): Promise<{ methods: PaymentMethodView[] }> {
   const methods = await listPaymentMethods(input);
   return {
@@ -86,23 +96,83 @@ export async function assertPaymentMethodCanCreateRechargeOrder(input: {
 async function listPaymentMethods(input: {
   settingsStore: ConsoleSettingsStore;
   env?: NodeJS.ProcessEnv;
+  amountCny?: number;
+  quoteMethodId?: string;
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
 }): Promise<PaymentMethodView[]> {
   const settings = await input.settingsStore.read();
   const byId = new Map(settings.paymentMethods.map((method) => [method.id, method]));
-  return defaultPaymentMethods.map((fallback) => paymentMethodView(byId.get(fallback.id) ?? fallback, input.env ?? process.env));
+  const quoteMethodId = input.quoteMethodId === undefined ? undefined : normalizePaymentMethodId(input.quoteMethodId);
+  return Promise.all(defaultPaymentMethods.map((fallback) => paymentMethodView({
+    method: byId.get(fallback.id) ?? fallback,
+    env: input.env ?? process.env,
+    amountCny: quoteMethodId === undefined || quoteMethodId === fallback.id ? input.amountCny : undefined,
+    fetchImpl: input.fetchImpl,
+    now: input.now
+  })));
 }
 
-function paymentMethodView(method: PaymentMethodSettings, env: NodeJS.ProcessEnv): PaymentMethodView {
+async function paymentMethodView(input: {
+  method: PaymentMethodSettings;
+  env: NodeJS.ProcessEnv;
+  amountCny?: number;
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
+}): Promise<PaymentMethodView> {
+  const { method, env } = input;
   const configured = paymentMethodConfigured(method.id, env);
+  const paymentCurrency = paymentCurrencyForMethod(method.id, env);
+  const quote = method.enabled && configured && input.amountCny !== undefined
+    ? await paymentQuoteForMethod({
+        amountCny: input.amountCny,
+        paymentCurrency,
+        env,
+        fetchImpl: input.fetchImpl,
+        now: input.now
+      })
+    : undefined;
+  const unavailable = unavailableReason(method, configured, paymentCurrency, quote);
   return {
     ...method,
+    paymentCurrency,
+    quote: quote?.quote,
     configured,
-    available: method.enabled && configured,
-    unavailableReason: unavailableReason(method, configured)
+    available: method.enabled && configured && !unavailable,
+    unavailableReason: unavailable
   };
 }
 
-function unavailableReason(method: PaymentMethodSettings, configured: boolean): string | undefined {
+async function paymentQuoteForMethod(input: {
+  amountCny: number;
+  paymentCurrency: string;
+  env: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
+}): Promise<{ quote?: RechargePaymentAmount; error?: string }> {
+  try {
+    return {
+      quote: await quoteRechargePaymentAmount({
+        creditCny: input.amountCny,
+        paymentCurrency: input.paymentCurrency,
+        env: input.env,
+        fetchImpl: input.fetchImpl,
+        now: input.now
+      })
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function unavailableReason(
+  method: PaymentMethodSettings,
+  configured: boolean,
+  paymentCurrency: string,
+  quote?: { quote?: RechargePaymentAmount; error?: string }
+): string | undefined {
   if (!method.enabled) {
     return "后台已停用";
   }
@@ -110,6 +180,12 @@ function unavailableReason(method: PaymentMethodSettings, configured: boolean): 
     return method.id === "stripe"
       ? "缺少 STRIPE_SECRET_KEY 或 STRIPE_WEBHOOK_SECRET"
       : "缺少 INFINI_PUBLIC_KEY、INFINI_PRIVATE_KEY 或 INFINI_WEBHOOK_SECRET";
+  }
+  if (quote?.error) {
+    return quote.error;
+  }
+  if (paymentCurrency !== "cny" && quote && !quote.quote) {
+    return `无法换算 ${paymentCurrency.toUpperCase()} 支付金额`;
   }
   return undefined;
 }
@@ -121,6 +197,12 @@ function paymentMethodConfigured(id: PaymentMethodId, env: NodeJS.ProcessEnv): b
   const publicKey = env.INFINI_PUBLIC_KEY?.trim() || env.INFINI_KEY_ID?.trim();
   const privateKey = env.INFINI_PRIVATE_KEY?.trim() || env.INFINI_SECRET_KEY?.trim();
   return Boolean(publicKey && privateKey && env.INFINI_WEBHOOK_SECRET?.trim());
+}
+
+function paymentCurrencyForMethod(id: PaymentMethodId, env: NodeJS.ProcessEnv): string {
+  const value = id === "stripe" ? env.STRIPE_CURRENCY : env.INFINI_CURRENCY;
+  const currency = value?.trim().toLowerCase();
+  return currency || (id === "infini" ? "usd" : "cny");
 }
 
 function normalizePaymentMethodId(value: unknown): PaymentMethodId {

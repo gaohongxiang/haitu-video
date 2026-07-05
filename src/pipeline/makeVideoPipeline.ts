@@ -91,7 +91,7 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
   const product = parseProductFacts(rawProduct);
   const productWithResolvedAssets = {
     ...product,
-    reference_images: resolveReferenceImages(input.referenceImages === undefined ? product.reference_images : input.referenceImages, {
+    reference_images: resolveReferenceImages(input.referenceImages ?? [], {
       productFilePath: input.productPath
     })
   };

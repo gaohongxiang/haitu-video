@@ -81,6 +81,7 @@ export function createConsoleRequestHandler(input: {
         request,
         url,
         databaseHandle: runtime.databaseHandle,
+        fetchImpl: input.fetchImpl,
         now: input.now
       });
       if (paymentWebhookRouteResponse) {

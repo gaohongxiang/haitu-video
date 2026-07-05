@@ -31,12 +31,10 @@ describe("product AI generation service source boundaries", () => {
     expect(serviceSource).toContain("const selectedReferenceImages = sanitizeReferenceImages(input.input.referenceImages);");
     expect(serviceSource).toContain("referenceImages: selectedReferenceImages");
     expect(serviceSource).toContain('from "./productAiGenerationContent.js"');
-    expect(serviceSource).toContain("buildProductReferenceImagePrompt(");
-    expect(serviceSource).toContain("buildChineseStoryboardFallback(");
-    expect(serviceSource).toContain("hasJapaneseOutsideAllowedProductNames(");
+    expect(serviceSource).toContain("compileProductPrompt({");
+    expect(serviceSource).toContain("compileProductPrompt({");
     expect(serviceSource).not.toContain("function buildProductReferenceImagePrompt(");
-    expect(serviceSource).not.toContain("function buildChineseStoryboardFallback(");
-    expect(serviceSource).not.toContain("function hasJapaneseOutsideAllowedProductNames(");
+    expect(serviceSource).not.toContain("function compileProductPrompt(");
     expect(serviceSource).toContain("runMeteredAiAction");
     expect(serviceSource).toContain("modelPricingCatalog?: readonly ModelPricingEntry[]");
     expect(serviceSource).toContain("modelPricingCatalogVersion?: string");
@@ -44,5 +42,26 @@ describe("product AI generation service source boundaries", () => {
     expect(serviceSource).toContain("modelPricingCatalogVersion: input.modelPricingCatalogVersion");
     expect(productRoutesSource).toContain("modelPricingCatalog: requestContext.modelPricingCatalog");
     expect(productRoutesSource).toContain("modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion");
+  });
+
+  it("uses the product prompt compiler as the deterministic model prompt preview layer", async () => {
+    const serviceSource = await readFile(servicePath, "utf8");
+    const productRoutesSource = await readFile(productRoutesPath, "utf8");
+
+    expect(serviceSource).toContain('from "../core/productPromptCompiler.js"');
+    expect(serviceSource).toContain("compileProductPrompt({");
+    expect(serviceSource).toContain('mode: "image"');
+    expect(serviceSource).toContain('mode: "video"');
+    expect(serviceSource).toContain('providerId: "openai-compatible-image"');
+    expect(serviceSource).toContain('providerId: "volcengine-seedance"');
+    expect(serviceSource).toContain("userPrompt: input.input.prompt");
+    expect(serviceSource).not.toContain("userPrompt: input.input.prompt || template");
+    expect(serviceSource).toContain("creativeStyle?: ProductPromptCreativeStyle");
+    expect(serviceSource).toContain("creativeStyle: input.input.creativeStyle");
+    expect(serviceSource).toContain("imageModelConfigId: input.input.imageModelConfigId");
+    expect(serviceSource).toContain("providerModelConfigId: input.input.videoModelConfigId");
+    expect(serviceSource).toContain("requestedConfigId: imageModelConfigId");
+    expect(productRoutesSource).toContain("input: (await request.json()) as StoryboardDraftRequest");
+    expect(productRoutesSource).toContain("input: (await request.json()) as ImagePromptDraftRequest");
   });
 });

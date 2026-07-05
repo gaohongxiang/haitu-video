@@ -267,4 +267,59 @@ describe("SqliteModelConfigStore", () => {
       closeDatabase(handle);
     }
   });
+
+  it("merges legacy split credentials when saving one service identity", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-model-config-merge-legacy-"));
+    tempDirs.push(root);
+    const handle = openDatabase({ dataDir: join(root, "data"), env: process.env });
+    runMigrations(handle);
+    ensureDefaultWorkspace(handle);
+    try {
+      const store = new SqliteModelConfigStore({
+        handle,
+        secretKey: "test-secret-key-with-more-than-32-bytes",
+        workspaceId: "default"
+      });
+
+      await store.set("volcengine-seedance", {
+        apiOwner: "platform",
+        apiKey: "video-fast-secret-fedcba",
+        vendor: "volcengine",
+        baseUrl: "https://ark.cn-beijing.volces.com/fast",
+        model: ["seedance-2.0-fast"]
+      });
+      await store.set("volcengine-seedance", {
+        apiOwner: "platform",
+        apiKey: "video-quality-secret-fedcba",
+        vendor: "volcengine",
+        baseUrl: "https://ark.cn-beijing.volces.com/quality",
+        model: ["seedance-2.0"]
+      });
+      handle.sqlite.prepare(`
+        UPDATE model_credentials
+        SET base_url = 'https://ark.cn-beijing.volces.com'
+        WHERE workspace_id = 'default' AND provider_id = 'volcengine-seedance'
+      `).run();
+      const legacyConfigs = await store.listConfigs("volcengine-seedance");
+      expect(new Set(legacyConfigs.map((config) => config.credentialId)).size).toBe(2);
+
+      await store.set("volcengine-seedance", {
+        apiOwner: "platform",
+        configId: legacyConfigs[0]?.configId,
+        vendor: "volcengine",
+        baseUrl: "https://ark.cn-beijing.volces.com",
+        model: ["seedance-2.0-fast", "seedance-2.0"],
+        enabled: true
+      });
+
+      const merged = await store.listConfigs("volcengine-seedance");
+      expect(merged.map((config) => config.model)).toEqual([
+        "doubao-seedance-2-0-fast-260128",
+        "doubao-seedance-2-0-260128"
+      ]);
+      expect(new Set(merged.map((config) => config.credentialId)).size).toBe(1);
+    } finally {
+      closeDatabase(handle);
+    }
+  });
 });

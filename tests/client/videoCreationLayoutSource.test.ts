@@ -100,7 +100,7 @@ describe("video creation layout source", () => {
   it("uses a minimal single-composer workspace instead of an architecture dashboard", async () => {
     const source = await readFile(appPath, "utf8");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
     const productDetailsSource = sourceBetween(workbenchSource, "product-creative-product-details", "<ProductComposerReferenceTray");
     const referenceTraySource = sourceBetween(source, "function ProductComposerReferenceTray", "function StoryboardComposerPanel");
 
@@ -149,36 +149,38 @@ describe("video creation layout source", () => {
     expect(workbenchSource).not.toContain("输出资产");
     expect(workbenchSource).toContain("ProductComposerReferenceTray");
     expect(workbenchSource).toContain("ProductModeOutputPanel");
-    expect(workbenchSource).toContain("ProductModeActionBar");
     expect(workbenchSource).toContain("ProductModeAssetPanel");
     expect(workbenchSource.indexOf("product-creative-product-details")).toBeLessThan(workbenchSource.indexOf("ProductComposerReferenceTray"));
     expect(workbenchSource.indexOf("ProductComposerReferenceTray")).toBeLessThan(workbenchSource.indexOf("ProductModeOutputPanel"));
-    expect(workbenchSource.indexOf("ProductModeActionBar")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
-    expect(workbenchSource.indexOf("product-creative-compose-panel")).toBeLessThan(workbenchSource.indexOf("<ProductModeActionBar"));
+    expect(workbenchSource).not.toContain("<ProductModeActionBar");
+    expect(workbenchSource).toContain("generateVideoButtonLabel={generateVideoButtonLabel}");
+    expect(workbenchSource).toContain("generateImageButtonLabel={generateImageButtonLabel}");
+    expect(workbenchSource.indexOf("product-creative-compose-panel")).toBeLessThan(workbenchSource.indexOf("ProductModeAssetPanel"));
     expect(workbenchSource.indexOf("ProductModeAssetPanel")).toBeGreaterThan(workbenchSource.indexOf("product-creative-compose-panel"));
   });
 
-  it("keeps mode-specific generation actions and asset ledgers behind mode components", async () => {
+  it("keeps mode-specific generation actions in the prompt footer and asset ledgers behind mode components", async () => {
     const source = await readFile(appPath, "utf8");
     const composerBodySource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
-    const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
+    const promptPanelSource = sourceBetween(source, "function StoryboardComposerPanel", "function VideoHistoryPanel");
     const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
 
     expect(composerBodySource).toContain("<ProductCreativeWorkbench");
-    expect(workbenchSource).toContain("<ProductModeActionBar");
+    expect(workbenchSource).not.toContain("<ProductModeActionBar");
     expect(workbenchSource).toContain("<ProductModeAssetPanel");
     expect(composerBodySource).not.toContain("<VideoHistoryPanel");
     expect(composerBodySource).not.toContain("<ProductImageHistoryPanel");
 
-    expect(actionBarSource).toContain('mode === "video"');
-    expect(actionBarSource).toContain("generateVideoSummary");
-    expect(actionBarSource).toContain("imageGenerateSummary");
-    expect(actionBarSource).toContain("onGenerateVideo");
-    expect(actionBarSource).toContain("onGenerateProductImages");
-    expect(actionBarSource).toContain("product-creative-action-panel");
-    expect(actionBarSource).toContain("product-creative-action-summary");
-    expect(actionBarSource).not.toContain("min-[900px]:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_minmax(220px,320px)]");
+    expect(promptPanelSource).toContain('mode === "video"');
+    expect(promptPanelSource).toContain("prompt-composer-primary-action-slot");
+    expect(promptPanelSource).toContain("onGenerateVideo");
+    expect(promptPanelSource).toContain("onGenerateProductImages");
+    expect(promptPanelSource).toContain("primaryActionDisabled");
+    expect(promptPanelSource).toContain("primaryActionLabel");
+    expect(promptPanelSource).not.toContain("generateVideoSummary");
+    expect(promptPanelSource).not.toContain("imageGenerateSummary");
+    expect(promptPanelSource).not.toContain("product-creative-action-summary");
 
     expect(assetPanelSource).toContain('mode === "video"');
     expect(assetPanelSource).toContain("<VideoHistoryPanel");
@@ -186,14 +188,29 @@ describe("video creation layout source", () => {
     expect(assetPanelSource).not.toContain("<ProductImageAssetPanel");
   });
 
+  it("separates prompt references, text, and action controls so preview text cannot overlap the footer", async () => {
+    const source = await readFile(appPath, "utf8");
+    const promptPanelSource = sourceBetween(source, "function StoryboardComposerPanel", "function VideoHistoryPanel");
+
+    expect(promptPanelSource).toContain("storyboard-prompt-shell grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]");
+    expect(promptPanelSource).toContain("rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)]");
+    expect(promptPanelSource).toContain("storyboard-prompt-media-row flex min-h-[82px] border-b border-[var(--border)]");
+    expect(promptPanelSource).toContain("storyboard-prompt-textarea h-full min-h-[220px] resize-none border-0 bg-transparent");
+    expect(promptPanelSource).toContain("prompt-composer-footer grid min-h-12");
+    expect(promptPanelSource).not.toContain("Textarea\n          className=\"h-full min-h-[230px] resize-none");
+    expect(promptPanelSource).not.toContain("pt-[96px]");
+    expect(promptPanelSource).not.toContain("prompt-composer-footer absolute");
+    expect(promptPanelSource).not.toContain("image-prompt-media-strip absolute");
+  });
+
   it("routes image creation through a compact product-aware prompt box", async () => {
     const source = await readFile(appPath, "utf8");
     const appSource = sourceBetween(source, "export function App()", "function AppLanguageSwitcher");
     const composerSource = sourceBetween(source, "function ProductCreationComposer", "function ProductCreativeWorkbench");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
+    const settingsTraySource = sourceBetween(source, "function ProductCreativeSettingsTray", "function ProductCreativeToolbarChoice");
     const outputPanelSource = sourceBetween(source, "function ProductModeOutputPanel", "function ProductImageHistoryPanel");
     const promptPanelSource = sourceBetween(source, "function StoryboardComposerPanel", "function VideoHistoryPanel");
-    const actionBarSource = sourceBetween(source, "function ProductModeActionBar", "function ProductModeAssetPanel");
 
     expect(appSource).toContain("async function generateProductReferenceImages(sku: string, options: ProductImageGenerationOptions = {})");
     expect(appSource).toContain("referenceImages: options.referenceImages ?? []");
@@ -203,11 +220,8 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("const [imagePromptReferences, setImagePromptReferences] = useState<ReferenceImageStatus[]>([]);");
     expect(composerSource).toContain("const [imagePromptReferenceIndex, setImagePromptReferenceIndex] = useState<number | undefined>();");
     expect(composerSource).toContain("const selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : imagePromptReferences[imagePromptReferenceIndex];");
-    expect(composerSource).toContain("const selectedCreationReferenceImages = imagePromptReferences.map((image) => image.original).filter(Boolean);");
-    expect(composerSource).toContain("const activeCreationReferenceCount = selectedCreationReferenceImages.length > 0 ? selectedCreationReferenceImages.length : previewableReferenceImages.length;");
     expect(composerSource).toContain("const selectedImagePromptReferenceNumber = selectedImagePromptReference");
     expect(composerSource).toContain("imagePromptReferences.indexOf(selectedImagePromptReference)");
-    expect(composerSource).toContain("const imageTargetLabel = selectedImagePromptReference");
     expect(composerSource).toContain("const reference = previewableReferenceImages[index];");
     expect(composerSource).toContain("async function handleImagePromptReferenceFiles(files: FileList | File[] | null)");
     expect(composerSource).toContain("const uploadedReferences = uploadedProduct?.reference_image_statuses?.slice(productBeforeUploadCount) ?? [];");
@@ -223,10 +237,28 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain('const pasteInsidePrompt = mode === "image"');
     expect(composerSource).toContain("void handleImagePromptReferenceFiles(files);");
     expect(composerSource).toContain('const generateImageButtonLabel = "生成图片";');
-    expect(composerSource).toContain("imagePromptReadyLabel");
+    expect(composerSource).not.toContain("imagePromptReadyLabel");
+    expect(composerSource).not.toContain("imageGenerateSummary");
+    expect(composerSource).not.toContain("generateVideoSummary");
     expect(composerSource).toContain("await onGenerateReferenceImages(savedProduct.sku, {");
     expect(composerSource).toContain("prompt: imagePrompt,");
-    expect(composerSource).toContain("referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []");
+    expect(composerSource).toContain("const compiledVideoPrompt = compileProductPrompt({");
+    expect(composerSource).toContain("storyboardLines: splitDraftLines(compiledVideoPrompt.prompt)");
+    expect(composerSource).toContain("const selectedReferenceImages = selectedCreationReferenceImagesForProduct(savedProduct) ?? [];");
+    expect(composerSource).toContain("referenceImages: selectedReferenceImages,");
+    expect(composerSource).toContain('onToast(tVideo("storyboard.previewNeedsFacts"))');
+    expect(composerSource).toContain('onToast(errorMessage(error))');
+    expect(composerSource).toContain("function previewProductForPromptCompiler");
+    expect(composerSource).toContain("compileProductPrompt({");
+    expect(composerSource).toContain("userPrompt: storyboardDraft,");
+    expect(composerSource).toContain("creativeStyle: template");
+    expect(composerSource).toContain("const templateOptions = creativeStyleOptions(template, enabledTemplateOptions);");
+    expect(promptPanelSource).toContain("<ProductCreativeSettingsTray");
+    expect(settingsTraySource).toContain('label={tVideo("controls.creativeStyle")}');
+    expect(composerSource).not.toContain("userPrompt: storyboardDraft || template");
+    expect(composerSource).not.toContain("const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(composerSource).not.toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(composerSource).not.toContain("const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true })");
     expect(composerSource).toContain("imagePrompt={imagePrompt}");
     expect(composerSource).toContain("onImagePromptChange={setImagePrompt}");
     expect(composerSource).not.toContain("imageTargetLabel={imageTargetLabel}");
@@ -303,9 +335,11 @@ describe("video creation layout source", () => {
     expect(promptPanelSource).toContain("onImagePromptReferenceFilesChange: (files: FileList | File[] | null) => void;");
     expect(promptPanelSource).toContain('value={mode === "image" ? imagePrompt : storyboardDraft}');
     expect(promptPanelSource).toContain("onPromptDraftChange(event.target.value)");
-    expect(promptPanelSource).toContain("h-full min-h-[230px] resize-none");
-    expect(promptPanelSource).toContain("pb-12 pt-[96px]");
-    expect(promptPanelSource).not.toContain('mode === "image" && "pt-[96px]"');
+    expect(promptPanelSource).toContain("storyboard-prompt-shell grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]");
+    expect(promptPanelSource).toContain("rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)]");
+    expect(promptPanelSource).toContain("storyboard-prompt-media-row flex min-h-[82px] border-b border-[var(--border)]");
+    expect(promptPanelSource).toContain("storyboard-prompt-textarea h-full min-h-[220px] resize-none border-0 bg-transparent");
+    expect(promptPanelSource).not.toContain("pb-12 pt-[96px]");
     expect(promptPanelSource).not.toContain("product-image-prompt-body");
     expect(promptPanelSource).toContain("image-prompt-media-strip");
     expect(promptPanelSource).toContain("本次参考图");
@@ -336,7 +370,19 @@ describe("video creation layout source", () => {
     expect(promptPanelSource).toContain("<ProductCreativeModeSwitch");
     expect(promptPanelSource).toContain("onGenerateImagePromptDraft");
     expect(promptPanelSource).toContain('mode === "image" ? onGenerateImagePromptDraft() : onGenerateStoryboardDraft()');
-    expect(promptPanelSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
+    expect(promptPanelSource).toContain('tVideo("storyboard.generate")');
+    expect(promptPanelSource).not.toContain('"预览模型提示词"');
+    expect(promptPanelSource).not.toContain("handleOrganizeProductPackage");
+    expect(promptPanelSource).not.toContain("storyboard-title-history");
+    expect(promptPanelSource).toContain("prompt-composer-primary-action-slot");
+    expect(promptPanelSource).toContain("primaryActionIcon");
+    expect(promptPanelSource).toContain("primaryActionDisabled");
+    expect(promptPanelSource).toContain("primaryActionTitle");
+    expect(promptPanelSource).toContain("primaryActionLabel");
+    expect(promptPanelSource).toContain("primaryActionEstimate");
+    expect(promptPanelSource).toContain("primaryActionAmountCny");
+    expect(promptPanelSource).toContain('mode === "video" ? onGenerateVideo() : onGenerateProductImages()');
+    expect(promptPanelSource).not.toContain("prompt-composer-history-slot");
     expect(promptPanelSource).toContain("<CompactChoiceDropdown");
     expect(promptPanelSource).toContain('mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId');
     expect(promptPanelSource).toContain('mode === "image" ? imageModelOptions : videoModelOptions');
@@ -346,14 +392,14 @@ describe("video creation layout source", () => {
     expect(promptPanelSource).toContain("formatOption={(option) => localizedModelConfigChoiceLabel(option, activeModelOptions, tVideo)}");
     expect(promptPanelSource).toContain("onChange={activeModelConfigChange}");
     expect(promptPanelSource).not.toContain("<Badge className=\"max-w-[180px] truncate\">{imageModelLabel}</Badge>");
-    expect(actionBarSource).toContain("generateImageButtonLabel: string;");
-    expect(actionBarSource).toContain('isSubmittingImage ? tVideo("generate.submitting") : generateImageButtonLabel');
-    expect(actionBarSource).toContain("title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : generateImageButtonLabel}");
+    expect(promptPanelSource).toContain("generateImageButtonLabel: string;");
+    expect(promptPanelSource).toContain("mode === \"video\" ? generateVideoButtonLabel : generateImageButtonLabel");
+    expect(promptPanelSource).toContain("title={primaryActionTitle}");
   });
 
   it("fits mode asset history inside the output column instead of reusing a full-width page section", async () => {
     const source = await readFile(appPath, "utf8");
-    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductModeActionBar");
+    const workbenchSource = sourceBetween(source, "function ProductCreativeWorkbench", "function ProductCreativeSettingsTray");
     const assetPanelSource = sourceBetween(source, "function ProductModeAssetPanel", "function ProductModeOutputPanel");
     const imageHistorySource = sourceBetween(source, "function ProductImageHistoryPanel", "function ProductCreationProductLibrary");
     const videoHistorySource = sourceBetween(source, "function VideoHistoryPanel", "function ProductLibraryHome");
@@ -395,6 +441,7 @@ describe("video creation layout source", () => {
     const source = await readFile(appPath, "utf8");
     const dropdownSource = await readFile("src/client/components/compactChoiceDropdown.tsx", "utf8");
     const composerSource = source.slice(source.indexOf("function ProductCreationComposer"), source.indexOf("function ProductComposerReferenceTray"));
+    const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
 
     expect(composerSource).toContain("video-workspace-shell");
     expect(composerSource).toContain("h-[100dvh] max-h-[100dvh] min-h-0 grid-rows-[minmax(0,1fr)]");
@@ -472,13 +519,13 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("selectedVideoAspectRatio");
     expect(composerSource).toContain("onVideoAspectRatioChange");
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
-    expect(source).toContain('finalLanguageLabel(finalLanguage, tVideo)');
+    expect(source).toContain("compactFinalLanguageLabel(option, tVideo)");
     expect(composerSource).toContain('density="micro"');
-    expect(composerSource).toContain("video-generate-summary");
-    expect(composerSource).toContain("{generateVideoSummary}");
-    expect(composerSource).toContain("tracking-0");
-    expect(composerSource).toContain("whitespace-normal");
-    expect(composerSource).toContain("break-words");
+    expect(storyboardPanelSource).toContain("prompt-composer-primary-action-slot");
+    expect(storyboardPanelSource).toContain("primaryActionLabel");
+    expect(composerSource).not.toContain("video-generate-summary");
+    expect(composerSource).not.toContain("{generateVideoSummary}");
+    expect(composerSource).not.toContain("product-creative-action-summary");
     expect(composerSource).not.toContain("video-generate-summary min-w-0 truncate");
     expect(composerSource).not.toContain("generateVideoSummaryItems.map");
     expect(composerSource).not.toContain("video-generate-summary-item");
@@ -509,11 +556,11 @@ describe("video creation layout source", () => {
     expect(composerSource).not.toContain("video-parameter-row grid");
     expect(composerSource).not.toContain("<ProductCreationProductPicker");
 
-    const generateBarIndex = composerSource.indexOf("video-generate-bar");
-    const historyPanelIndex = composerSource.indexOf("<VideoHistoryPanel");
-    expect(generateBarIndex).toBeGreaterThan(-1);
-    expect(historyPanelIndex).toBeGreaterThan(-1);
-    expect(generateBarIndex).toBeLessThan(historyPanelIndex);
+    const promptPanelIndex = source.indexOf("<ProductModeOutputPanel");
+    const assetPanelIndex = source.indexOf("<ProductModeAssetPanel");
+    expect(promptPanelIndex).toBeGreaterThan(-1);
+    expect(assetPanelIndex).toBeGreaterThan(-1);
+    expect(promptPanelIndex).toBeLessThan(assetPanelIndex);
   });
 
   it("localizes video workspace UI without translating product data fields", async () => {
@@ -532,8 +579,9 @@ describe("video creation layout source", () => {
     const helperSource = source.slice(source.indexOf("function localizedVideoLabel"), source.indexOf("function jobStatusTone"));
 
     expect(appSource).toContain('const [studioStoryboardDraft, setStudioStoryboardDraft] = useState("");');
-    expect(appSource).toContain("injectTemplateStoryboardDraft(nextTemplate);");
-    expect(appSource).toContain("function injectTemplateStoryboardDraft(nextTemplate: TemplateName)");
+    expect(appSource).not.toContain("injectTemplateStoryboardDraft(nextTemplate);");
+    expect(appSource).not.toContain("function injectTemplateStoryboardDraft(nextTemplate: TemplateName)");
+    expect(appSource).not.toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
     expect(appSource).not.toContain("localizedDefaultStoryboardDraft(defaultVideoTemplate, defaultVideoDurationSeconds, appLocale)");
     expect(appSource).not.toContain("if (storyboardDraftTouched) return;");
     expect(appSource).not.toContain("[template, duration, appLocale, storyboardDraftTouched]");
@@ -546,7 +594,7 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain('onToast(tVideo("generate.packageReadyToast"), "ok")');
     expect(composerSource).toContain('onToast(tVideo("generate.queuedToast"), "ok")');
     expect(composerSource).toContain('onToast(tVideo("generate.imageOnlyToast"))');
-    expect(composerSource).toContain('{isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}');
+    expect(storyboardPanelSource).toContain("primaryActionLabel");
     expect(librarySource).toContain("product.title_ja");
     expect(librarySource).toContain('const title = active && draftProductTitle ? draftProductTitle : product.title_ja;');
     expect(librarySource).toContain('title={title}');
@@ -583,17 +631,18 @@ describe("video creation layout source", () => {
     expect(referencePreviewSource).toContain('aria-label={tVideo("reference.previewDialogTitle")}');
     expect(referencePreviewSource).toContain('{image.original}');
     expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.placeholder")');
     expect(storyboardPanelSource).not.toContain("<Badge>{localizedTemplateLabel(template, tVideo)}</Badge>");
     expect(storyboardPanelSource).not.toContain("<Badge>{formatDuration(duration)}</Badge>");
-    expect(storyboardPanelSource).toContain("historyPreview(record.script, appLocale)");
+    expect(storyboardPanelSource).not.toContain("historyPreview(record.script, appLocale)");
     expect(historyPanelSource).toContain('tVideo("history.title")');
     expect(historyPanelSource).toContain("<VideoHashtagChips tVideo={tVideo}");
     expect(historyPanelSource).toContain("videoDownloadProductContext(product, draft, importText)");
     expect(helperSource).toContain('return tVideo("labels.video", { index: index + 1 });');
     expect(helperSource).toContain('onToast(tVideo("history.tagsCopiedToast"), "ok")');
-    expect(helperSource).toContain('function localizedDefaultStoryboardDraft(template: TemplateName, durationSeconds: number, locale: AppLocale): string');
-    expect(helperSource).toContain('i18n.t(`app:videoStudio.storyboard.defaultDrafts.${templateKey}`, { lng: locale, returnObjects: true })');
-    expect(helperSource).toContain('function storyboardTemplateResourceKey(template: TemplateName): string');
+    expect(helperSource).not.toContain('function localizedDefaultStoryboardDraft(template: TemplateName');
+    expect(helperSource).not.toContain('i18n.t(`app:videoStudio.storyboard.defaultDrafts.${templateKey}`');
+    expect(helperSource).not.toContain('function storyboardTemplateResourceKey(template: TemplateName): string');
 
     expect(composerSource).not.toContain('label="模型方案"');
     expect(composerSource).not.toContain('label="视频风格"');
@@ -621,16 +670,17 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource).toContain("prompt-composer-footer");
     expect(storyboardPanelSource).toContain("<ProductCreativeModeSwitch");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
-    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
-    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_150px]");
-    expect(storyboardPanelSource).toContain("h-7 min-h-7");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer grid min-h-12");
+    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_minmax(176px,240px)]");
+    expect(storyboardPanelSource).toContain("h-10 min-h-10");
     expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
-    expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
-    expect(modeSwitchSource).toContain("product-creative-mode-switch flex h-7 shrink-0 items-center gap-1.5");
+    expect(storyboardPanelSource).toContain("prompt-composer-primary-action-slot");
+    expect(storyboardPanelSource).not.toContain("storyboard-title-history");
+    expect(modeSwitchSource).toContain("product-creative-mode-switch flex h-10 shrink-0 items-center gap-1.5");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible");
-    expect(storyboardPanelSource).toContain("w-[150px]");
-    expect(storyboardPanelSource).toContain('Badge className="min-h-5 shrink-0 px-1.5 text-[10px]"');
+    expect(storyboardPanelSource).toContain("min-w-[176px] max-w-[240px]");
+    expect(storyboardPanelSource).not.toContain('Badge className="min-h-5 shrink-0 px-1.5 text-[10px]"');
     expect(storyboardPanelSource).toContain("whitespace-nowrap");
     expect(storyboardPanelSource).toContain("active-model-control w-auto min-w-0 max-w-none");
     expect(storyboardPanelSource).not.toContain("active-model-control min-w-[196px] max-w-[260px]");
@@ -648,7 +698,7 @@ describe("video creation layout source", () => {
     expect(settingsTraySource).not.toContain("model-scheme-control");
     expect(settingsTraySource).not.toContain("hidePillLabel");
     expect(settingsTraySource).not.toContain("localizedModelSchemeChoiceLabel");
-    expect(settingsTraySource).toContain("formatActiveLabel={(option) => compactTemplateLabel(option, tVideo)}");
+    expect(settingsTraySource).toContain("formatActiveLabel={(option) => localizedTemplateLabel(option, tVideo)}");
     expect(settingsTraySource).toContain("formatActiveLabel={(option) => compactFinalLanguageLabel(option, tVideo)}");
     expect(settingsTraySource).toContain('`${option} 个`');
     expect(settingsTraySource).toContain("overflow-visible");
@@ -658,7 +708,8 @@ describe("video creation layout source", () => {
     expect(storyboardPanelSource.indexOf("<ProductCreativeModeSwitch")).toBeLessThan(storyboardPanelSource.indexOf("active-model-control"));
     expect(storyboardPanelSource.indexOf("active-model-control")).toBeLessThan(storyboardPanelSource.indexOf("<ProductCreativeSettingsTray"));
     expect(storyboardPanelSource.indexOf("prompt-composer-mode-slot")).toBeLessThan(storyboardPanelSource.indexOf("prompt-composer-settings-slot"));
-    expect(storyboardPanelSource.indexOf("prompt-composer-settings-slot")).toBeLessThan(storyboardPanelSource.indexOf("prompt-composer-history-slot"));
+    expect(storyboardPanelSource.indexOf("prompt-composer-settings-slot")).toBeLessThan(storyboardPanelSource.indexOf("prompt-composer-primary-action-slot"));
+    expect(storyboardPanelSource).not.toContain("storyboard-title-history");
     expect(composerSource).not.toContain("model-scheme-chip-row");
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.text"), value: localizedModelConfigChoiceLabel(selectedTextModelConfigId, textModelOptions, tVideo) }');
     expect(composerSource).not.toContain('{ label: tVideo("modelChips.image"), value: localizedModelConfigChoiceLabel(selectedImageModelConfigId, imageModelOptions, tVideo) }');
@@ -683,7 +734,7 @@ describe("video creation layout source", () => {
     const referenceTraySource = source.slice(source.indexOf("function ProductComposerReferenceTray"), source.indexOf("function StoryboardComposerPanel"));
     const storyboardPanelSource = source.slice(source.indexOf("function StoryboardComposerPanel"), source.indexOf("function VideoHistoryPanel"));
     const productDetailsSource = sourceBetween(source, "product-creative-product-details", "<ProductComposerReferenceTray");
-    const storyboardFooterSource = sourceBetween(storyboardPanelSource, "prompt-composer-footer", '{mode === "video" && historyOpen ?');
+    const storyboardFooterSource = storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"));
     const actionButtonCostSource = source.slice(source.indexOf("function ActionButtonCost"), source.indexOf("function versionLabel"));
 
     expect(appSource).toContain('postJson<BillingEstimatesResponse>("/api/billing-estimates"');
@@ -693,27 +744,36 @@ describe("video creation layout source", () => {
     expect(composerSource).toContain("billingEstimates?: BillingEstimatesResponse");
     expect(composerSource).toContain('organizeProductEstimate={billingEstimates?.estimates.organizeProduct}');
     expect(composerSource).not.toContain('referenceImagesEstimate={billingEstimates?.estimates.referenceImages}');
-    expect(composerSource).toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
-    expect(composerSource).toContain("estimate={storyboardEstimate}");
+    expect(composerSource).not.toContain('storyboardEstimate={billingEstimates?.estimates.storyboard}');
+    expect(composerSource).not.toContain("estimate={storyboardEstimate}");
     expect(composerSource).toContain('videoEstimate={billingEstimates?.estimates.video}');
     expect(composerSource).toContain('imageEstimate={billingEstimates?.estimates.referenceImages}');
     expect(referenceTraySource).not.toContain("estimate?: BillingActionEstimate");
     expect(referenceTraySource).not.toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
-    expect(storyboardPanelSource).toContain("estimate?: BillingActionEstimate");
-    expect(storyboardPanelSource).toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
+    expect(storyboardPanelSource).not.toContain("estimate?: BillingActionEstimate");
+    expect(storyboardPanelSource).not.toContain('<ActionButtonCost tVideo={tVideo} estimate={estimate} />');
     expect(productDetailsSource).toContain("product-facts-header");
     expect(productDetailsSource).toContain("product-facts-action");
     expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
-    expect(storyboardPanelSource).toContain("promptOptimizeActionLabel");
-    expect(storyboardPanelSource).toContain("promptOptimizeActionDisabled");
+    expect(storyboardPanelSource).not.toContain("storyboard-title-history");
+    expect(storyboardPanelSource).toContain("promptPreviewActionLabel");
+    expect(storyboardPanelSource).toContain("promptPreviewActionDisabled");
+    expect(storyboardPanelSource).toContain('variant="ghost"');
+    expect(storyboardPanelSource).toContain("max-w-[112px]");
+    expect(storyboardPanelSource).not.toContain("w-[168px]");
+    expect(storyboardPanelSource).not.toContain('"预览模型提示词"');
+    expect(storyboardPanelSource).not.toContain("storyboard-title-history");
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
-    expect(storyboardFooterSource).not.toContain('tVideo("storyboard.generate")');
-    expect(storyboardFooterSource).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
+    expect(storyboardFooterSource).toContain("prompt-composer-primary-action-slot");
+    expect(storyboardFooterSource).toContain("primaryActionEstimate");
+    expect(storyboardFooterSource).toContain("primaryActionAmountCny");
+    expect(storyboardFooterSource).toContain("primaryActionLabel");
+    expect(storyboardFooterSource).toContain("<ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} amountCny={primaryActionAmountCny} />");
     expect(source).toContain("function ActionButtonCost");
-    expect(source).toContain('amountCny={videoEstimate?.upstreamEstimatedCostCny}');
+    expect(source).toContain("const primaryActionAmountCny = mode === \"video\" ? videoEstimate?.upstreamEstimatedCostCny : undefined;");
     expect(actionButtonCostSource).toContain('tVideo("costHints.estimated", {');
     expect(actionButtonCostSource).toContain("amountCny?: number");
     expect(actionButtonCostSource).not.toContain('kind === "video"');

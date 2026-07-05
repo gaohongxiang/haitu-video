@@ -25,11 +25,18 @@ export function consoleErrorResponse(error: unknown, message: string): Response 
     message.includes("请选择要调整余额") ||
     message.includes("请填写余额调整原因") ||
     message.includes("工作区不存在") ||
-    message.includes("调整后余额不能小于冻结金额")
+    message.includes("调整后余额不能小于冻结金额") ||
+    message.includes("无法换算") ||
+    message.includes("无法获取 CNY 到") ||
+    message.includes("请配置 HAITU_RECHARGE_")
   ) {
     return jsonResponse({ error: message }, 422);
   }
-  if (message.includes("Stripe 支付订单请求失败") || message.includes("Infini 支付订单请求失败")) {
+  if (
+    message.includes("Stripe 支付订单请求失败") ||
+    message.includes("Infini 支付订单请求失败") ||
+    message.includes("创建 Infini 支付订单失败")
+  ) {
     return jsonResponse({ error: message }, 502);
   }
   if (

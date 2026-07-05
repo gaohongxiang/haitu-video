@@ -60,6 +60,7 @@ export interface ConsoleSnapshotTypes {
   settingsResponse: unknown;
   videoJobsResponse: unknown;
   walletResponse: unknown;
+  walletRechargeOrdersResponse: unknown;
   paymentMethodsResponse: unknown;
   modelPricingCatalogResponse: unknown;
   modelServicePreferenceResponse: unknown;
@@ -81,6 +82,7 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     settingsResponse,
     videoJobsResponse,
     walletResponse,
+    walletRechargeOrdersResponse,
     paymentMethodsResponse,
     modelPricingCatalogResponse,
     modelServicePreferenceResponse
@@ -97,6 +99,7 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     getJsonWithSignal<T["settingsResponse"]>("/api/settings", signal),
     getJsonWithSignal<T["videoJobsResponse"]>("/api/video-jobs", signal),
     getJsonWithSignal<T["walletResponse"]>("/api/wallet", signal),
+    getJsonWithSignal<T["walletRechargeOrdersResponse"]>("/api/wallet/recharge-orders", signal),
     getJsonWithSignal<T["paymentMethodsResponse"]>("/api/payment-methods", signal),
     getJsonWithSignal<T["modelPricingCatalogResponse"]>("/api/model-pricing-catalog", signal),
     getJsonWithSignal<T["modelServicePreferenceResponse"]>("/api/model-service-preference", signal)
@@ -114,6 +117,7 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
     settingsResponse,
     videoJobsResponse,
     walletResponse,
+    walletRechargeOrdersResponse,
     paymentMethodsResponse,
     modelPricingCatalogResponse,
     modelServicePreferenceResponse

@@ -15,9 +15,10 @@ export async function handlePaymentWebhookRoutes(input: {
   request: Request;
   url: URL;
   databaseHandle: DatabaseHandle;
+  fetchImpl?: typeof fetch;
   now?: () => Date;
 }): Promise<Response | undefined> {
-  const { request, url, databaseHandle, now } = input;
+  const { request, url, databaseHandle, fetchImpl, now } = input;
   if (request.method !== "POST") {
     return undefined;
   }
@@ -30,9 +31,11 @@ export async function handlePaymentWebhookRoutes(input: {
       webhookSecret: config.webhookSecret,
       now
     });
-    return jsonResponse(handleStripeWebhookEvent({
+    return jsonResponse(await handleStripeWebhookEvent({
       event,
+      config,
       handle: databaseHandle,
+      fetchImpl,
       now
     }));
   }

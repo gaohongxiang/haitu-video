@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   internalProductIdFromTitle,
+  productDraftToPreviewProduct,
   productDraftToFacts,
   productDraftToProductDetail,
   productFactsToDraft,
@@ -71,6 +72,36 @@ describe("product draft/facts conversion helpers", () => {
       forbidden_claims: "医療用",
       reference_images: "a.jpg\nb.png",
       source_text: "source"
+    });
+  });
+
+  it("builds a preview-only product from partial organized facts and raw source text", () => {
+    const product = productDraftToPreviewProduct({
+      sku: "",
+      title_ja: "UVカット 日よけ帽子",
+      category: "",
+      materials: "",
+      dimensions: "",
+      verified_selling_points: "",
+      usage_scenes: "",
+      forbidden_claims: "",
+      reference_images: "hat.jpg",
+      source_text: "タイトル: UVカット 日よけ帽子\n通気性抜群 メッシュ編みデザイン 薄手 軽量"
+    }, { now: 1_720_000_000_000 });
+
+    expect(product).toMatchObject({
+      sku: "ITEM-uv-ly5nl9ts",
+      title_ja: "UVカット 日よけ帽子",
+      category: "not specified in source facts",
+      materials: ["not specified in source facts"],
+      dimensions: "not specified in source facts",
+      verified_selling_points: ["タイトル: UVカット 日よけ帽子", "通気性抜群 メッシュ編みデザイン 薄手 軽量"],
+      usage_scenes: ["not specified in source facts; follow the user's requested scene"],
+      forbidden_claims: [],
+      reference_images: ["hat.jpg"],
+      source_text: "タイトル: UVカット 日よけ帽子\n通気性抜群 メッシュ編みデザイン 薄手 軽量",
+      path: "",
+      referenceImageCount: 1
     });
   });
 

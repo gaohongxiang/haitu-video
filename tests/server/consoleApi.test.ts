@@ -26,6 +26,8 @@ function sourceBetween(source: string, start: string, end: string): string {
 
 beforeEach(() => {
   vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1");
+  vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "env");
+  vi.stubEnv("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS", "3600");
 });
 
 afterEach(async () => {
@@ -968,7 +970,7 @@ describe("console API", () => {
     expect(renderCreativeWorkspaceSource).toContain("setPendingImageFiles={setPendingImageFiles}");
     expect(renderCreativeWorkspaceSource).toContain("ledgerJobs={ledger?.jobs ?? []}");
     expect(creationWorkspaceSource).toContain("<ProductCreationComposer");
-    expect(creationWorkspaceSource).toContain("selectedProductStoryboardHistory");
+    expect(creationWorkspaceSource).not.toContain("selectedProductStoryboardHistory");
     expect(creationWorkspaceSource).toContain("ledgerJobs: LedgerJob[];");
     expect(creationWorkspaceSource).toContain("pendingImageFiles: File[];");
     expect(creationWorkspaceSource).toContain("setPendingImageFiles: Dispatch<SetStateAction<File[]>>;");
@@ -983,7 +985,7 @@ describe("console API", () => {
     expect(appSource).toContain("selectedImageModelConfigId");
     expect(appSource).toContain("selectedVideoModelConfigId");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
-    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
+    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "auto";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
     expect(appSource).toContain("setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? \"auto\")");
@@ -994,13 +996,14 @@ describe("console API", () => {
     expect(productWorkflowSource).toContain('export type StoryboardDraftSource = "default" | "ai" | "manual";');
     expect(appSource).toContain('useState<StoryboardDraftSource>("default")');
     expect(appSource).toContain('setStoryboardDraftSource("ai")');
-    expect(appSource).toContain('setStoryboardDraftSource("manual")');
+    expect(appSource).toContain('onStoryboardDraftChange={(nextDraft, source = "manual") => {');
+    expect(appSource).toContain("setStoryboardDraftSource(source)");
     expect(storyboardDraftsSource).toContain("export function defaultStoryboardDraftForTemplate");
     expect(appSource).not.toContain("function defaultStoryboardDraftForTemplate");
     expect(appSource).toContain('const [studioStoryboardDraft, setStudioStoryboardDraft] = useState("");');
-    expect(appSource).toContain("function injectTemplateStoryboardDraft(nextTemplate: TemplateName)");
-    expect(appSource).toContain("injectTemplateStoryboardDraft(nextTemplate);");
-    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
+    expect(appSource).not.toContain("function injectTemplateStoryboardDraft(nextTemplate: TemplateName)");
+    expect(appSource).not.toContain("injectTemplateStoryboardDraft(nextTemplate);");
+    expect(appSource).not.toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
     expect(appSource).not.toContain("Preserve the storyboard once the user edits it manually.");
     expect(appSource).not.toContain("storyboardDraftIsGuidance={!storyboardDraftTouched}");
     expect(creationComposerSource).toContain("video-workspace-shell");
@@ -1069,11 +1072,12 @@ describe("console API", () => {
     expect(appSource).toContain('if (value === "en") return t("languages.en");');
     expect(queueProductVideoJobsSource).toContain("resolution: videoGenerationOptions.resolution ?? selectedVideoResolution");
     expect(creationComposerSource).toContain('density="micro"');
-    expect(creationComposerSource).toContain("video-generate-summary");
-    expect(creationComposerSource).toContain("{generateVideoSummary}");
-    expect(creationComposerSource).toContain("tracking-0");
-    expect(creationComposerSource).toContain("whitespace-normal");
-    expect(creationComposerSource).toContain("break-words");
+    expect(creationComposerSource).toContain("prompt-composer-primary-action-slot");
+    expect(creationComposerSource).toContain("primaryActionDisabled");
+    expect(creationComposerSource).toContain("primaryActionLabel");
+    expect(creationComposerSource).not.toContain("video-generate-summary");
+    expect(creationComposerSource).not.toContain("{generateVideoSummary}");
+    expect(creationComposerSource).not.toContain("product-creative-action-summary");
     expect(creationComposerSource).not.toContain("video-generate-summary min-w-0 truncate");
     expect(creationComposerSource).not.toContain("generateVideoSummaryItems.map");
     expect(creationComposerSource).not.toContain("video-generate-summary-item");
@@ -1081,10 +1085,10 @@ describe("console API", () => {
     expect(creationComposerSource).not.toContain("generation-status-message");
     expect(creationComposerSource).not.toContain("video-generate-status-center");
     expect(creationComposerSource).not.toContain("subtitle={generateVideoSummary}");
-    expect(creationComposerSource).toContain("video-generate-bar");
+    expect(creationComposerSource).not.toContain("video-generate-bar");
     expect(creationComposerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
     expect(creationComposerSource).not.toContain("footer={");
-    expect(creationComposerSource.indexOf("video-generate-bar")).toBeLessThan(creationComposerSource.indexOf("<VideoHistoryPanel"));
+    expect(creationComposerSource.indexOf("product-creative-compose-panel")).toBeLessThan(creationComposerSource.indexOf("product-creative-history"));
     expect(productCreativeWorkbenchSource).not.toContain("max-w-[960px]");
     expect(productCreativeWorkbenchSource).not.toContain("mx-auto");
     expect(creationComposerSource).toContain("product-creative-product-details");
@@ -1136,11 +1140,13 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("const generateVideoDisabled = packingDisabled || !generationReadiness.ready");
     expect(creationComposerSource).toContain("const storyboardProductReady = Boolean(selectedProduct || importText.trim())");
     expect(creationComposerSource).toContain("async function handleGenerateStoryboardDraft()");
-    expect(creationComposerSource).toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true })");
-    expect(creationComposerSource).toContain("if (!productForStoryboard) return;");
-    expect(creationComposerSource).toContain("await onGenerateStoryboardDraft(productForStoryboard)");
-    expect(creationComposerSource).toContain('const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm"');
-    expect(creationComposerSource).toContain('const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"');
+    expect(creationComposerSource).toContain("function previewProductForPromptCompiler");
+    expect(creationComposerSource).not.toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(creationComposerSource).not.toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true })");
+    expect(creationComposerSource).toContain("compileProductPrompt({");
+    expect(creationComposerSource).toContain("userPrompt: storyboardDraft,");
+    expect(creationComposerSource).toContain('onToast(tVideo("storyboard.previewNeedsFacts"))');
+    expect(creationComposerSource).toContain('onToast(errorMessage(error))');
     expect(creationComposerSource).not.toContain("generationReadinessMessageClass");
     expect(creationComposerSource).not.toContain("generation-status-message video-generate-status-center flex min-h-12 w-full items-center justify-center text-center");
     expect(creationComposerSource).not.toContain("min-h-12 w-full max-w-[360px]");
@@ -1149,19 +1155,20 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("if (!generationReadiness.ready) {");
     expect(creationComposerSource).toContain("onToast(generationReadiness.label);");
     expect(creationComposerSource).toContain("if (packingDisabled) return;");
-    expect(creationComposerSource).toContain("disabled={generateVideoDisabled}");
-    expect(creationComposerSource).toContain("aria-disabled={generateVideoDisabled}");
-    expect(creationComposerSource).toContain('variant={generateVideoDisabled ? "default" : "primary"}');
-    expect(creationComposerSource).toContain("className={cn(actionButtonClass, generateVideoDisabled && actionDisabledClass)}");
+    expect(creationComposerSource).toContain('const primaryActionDisabled = mode === "video" ? generateVideoDisabled : imageGenerateDisabled');
+    expect(creationComposerSource).toContain('const primaryActionTitle = mode === "video"');
+    expect(creationComposerSource).toContain("disabled={primaryActionDisabled}");
+    expect(creationComposerSource).toContain("aria-disabled={primaryActionDisabled}");
+    expect(creationComposerSource).toContain('variant={primaryActionDisabled ? "default" : "primary"}');
+    expect(creationComposerSource).toContain('primaryActionDisabled && "border-[var(--border-strong)] bg-[var(--panel2)]');
     expect(creationComposerSource).toContain("onGenerateVideo={handleGenerateVideo}");
     expect(creationComposerSource).not.toContain('className="min-h-12 w-full justify-center rounded-[14px] text-sm disabled:opacity-100"');
-    expect(creationComposerSource).toContain("title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}");
+    expect(creationComposerSource).toContain("title={primaryActionTitle}");
     expect(creationComposerSource).not.toContain("generation-status-message");
-    expect(creationComposerSource).toContain("text-[var(--danger)]");
     expect(creationComposerSource).not.toContain('generationReadiness.ready ? "text-[var(--muted)]" : "text-[var(--danger)]"');
-    expect(creationComposerSource).toContain("generationReadiness.ready ? generateVideoSummary : generationReadiness.label");
-    expect(creationComposerSource).toContain("localizedProductFactsStatusLabel({");
-    expect(creationComposerSource).toContain("localizedStoryboardStatusLabel(storyboardDraftSource, tVideo)");
+    expect(creationComposerSource).toContain("generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label");
+    expect(creationComposerSource).not.toContain("localizedProductFactsStatusLabel({");
+    expect(creationComposerSource).not.toContain("localizedStoryboardStatusLabel(storyboardDraftSource, tVideo)");
     expect(productWorkflowSource).toContain('return appText("videoStudio.facts.raw", locale)');
     expect(productWorkflowSource).toContain('return appText("videoStudio.facts.savedPackage", locale)');
     expect(productWorkflowSource).not.toContain('return "资料待补"');
@@ -1269,8 +1276,8 @@ describe("console API", () => {
     expect(creationComposerSource).toContain("storyboard-side-panel");
     expect(storyboardPanelSource).not.toContain("storyboardDraftIsGuidance");
     expect(storyboardPanelSource).toContain("productReady: boolean");
-    expect(storyboardPanelSource).toContain("promptOptimizeActionDisabled");
-    expect(storyboardPanelSource).toContain("promptOptimizeActionLoading");
+    expect(storyboardPanelSource).toContain("promptPreviewActionDisabled");
+    expect(storyboardPanelSource).toContain("promptPreviewActionLoading");
     expect(storyboardPanelSource).toContain("bg-[var(--card)]");
     expect(storyboardPanelSource).not.toContain("text-[#9a8776]");
     expect(storyboardPanelSource).toContain("text-[var(--text)]");
@@ -1334,37 +1341,44 @@ describe("console API", () => {
     expect(appSource).toContain("onFlushProductFactsAutoSave={flushProductFactsAutoSave}");
     expect(creationComposerSource).toContain("onFlushProductFactsAutoSave");
     expect(creationComposerSource).toContain("await onFlushProductFactsAutoSave()");
-    expect(storyboardPanelSource).toContain('promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
-    expect(storyboardPanelSource).toContain("promptOptimizeActionLabel");
-    expect(storyboardPanelSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
+    expect(creationComposerSource).toContain("const compiledVideoPrompt = compileProductPrompt({");
+    expect(creationComposerSource).toContain("storyboardLines: splitDraftLines(compiledVideoPrompt.prompt)");
+    expect(creationComposerSource).toContain("const selectedReferenceImages = selectedCreationReferenceImagesForProduct(savedProduct) ?? [];");
+    expect(creationComposerSource).toContain("referenceImages: selectedReferenceImages,");
+    expect(storyboardPanelSource).toContain('promptPreviewActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Eye size={13} />');
+    expect(storyboardPanelSource).toContain("promptPreviewActionLabel");
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.generate")');
+    expect(storyboardPanelSource).not.toContain('"预览模型提示词"');
     expect(productDetailsSource).toContain("product-facts-header");
     expect(productDetailsSource).toContain("product-facts-action");
     expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(storyboardPanelSource).toContain("storyboard-title-row");
     expect(storyboardPanelSource).toContain("storyboard-title-action");
-    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
-    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_150px]");
-    expect(storyboardPanelSource).toContain("h-7 min-h-7");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer grid min-h-12");
+    expect(storyboardPanelSource).toContain("grid-cols-[auto_minmax(0,1fr)_minmax(176px,240px)]");
+    expect(storyboardPanelSource).toContain("h-10 min-h-10");
     expect(storyboardPanelSource).toContain("whitespace-nowrap");
     expect(storyboardPanelSource).toContain("prompt-composer-mode-slot");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot");
-    expect(storyboardPanelSource).toContain("prompt-composer-history-slot");
-    expect(modeSwitchSource).toContain("product-creative-mode-switch flex h-7 shrink-0 items-center gap-1.5");
+    expect(storyboardPanelSource).toContain("prompt-composer-primary-action-slot");
+    expect(storyboardPanelSource).not.toContain("storyboard-title-history");
+    expect(modeSwitchSource).toContain("product-creative-mode-switch flex h-10 shrink-0 items-center gap-1.5");
     expect(storyboardPanelSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible");
-    expect(storyboardPanelSource).toContain("w-[150px]");
-    expect(storyboardPanelSource).toContain('Badge className="min-h-5 shrink-0 px-1.5 text-[10px]"');
+    expect(storyboardPanelSource).toContain("min-w-[176px] max-w-[240px]");
+    expect(storyboardPanelSource).not.toContain('Badge className="min-h-5 shrink-0 px-1.5 text-[10px]"');
     expect(storyboardPanelSource).toContain("active-model-control");
     expect(creationComposerSource).not.toContain("localizedCompactModelSchemeChoiceLabel");
-    expect(creationComposerSource).toContain("formatActiveLabel={(option) => compactTemplateLabel(option, tVideo)}");
+    expect(creationComposerSource).toContain("formatActiveLabel={(option) => localizedTemplateLabel(option, tVideo)}");
     expect(creationComposerSource).toContain("formatActiveLabel={(option) => compactFinalLanguageLabel(option, tVideo)}");
     expect(creationComposerSource).toContain('`${option} 个`');
     expect(storyboardPanelSource.indexOf("storyboard-title-action")).toBeLessThan(storyboardPanelSource.indexOf("storyboard-history-dropdown"));
-    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain('tVideo("storyboard.generate")');
-    expect(storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"), storyboardPanelSource.indexOf('{mode === "video" && historyOpen ?'))).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
+    const storyboardFooterSource = storyboardPanelSource.slice(storyboardPanelSource.indexOf("prompt-composer-footer"));
+    expect(storyboardFooterSource).not.toContain('tVideo("storyboard.generate")');
+    expect(storyboardFooterSource).not.toContain("<ActionButtonCost tVideo={tVideo} estimate={estimate} />");
     expect(creationComposerSource).toContain("placeholder={promptPlaceholder}");
     expect(creationComposerSource).not.toContain("整理资料并生成视频");
-    expect(creationComposerSource).toContain('label={tVideo("controls.template")}');
+    expect(creationComposerSource).toContain('label={tVideo("controls.creativeStyle")}');
     expect(creationComposerSource).toContain('label={tVideo("controls.duration")}');
     expect(creationComposerSource).toContain('label={tVideo("controls.finalLanguage")}');
     expect(creationComposerSource).not.toContain('label={tVideo("controls.modelScheme")}');
@@ -1449,31 +1463,33 @@ describe("console API", () => {
     expect(referencePreviewSource).toContain("ArrowLeft");
     expect(referencePreviewSource).toContain("ArrowRight");
     expect(storyboardPanelSource).toContain('tVideo("storyboard.title")');
+    expect(storyboardPanelSource).toContain('tVideo("storyboard.placeholder")');
     expect(storyboardPanelSource).not.toContain("<Badge>{localizedTemplateLabel(template, tVideo)}</Badge>");
     expect(storyboardPanelSource).not.toContain("<Badge>{formatDuration(duration)}</Badge>");
     expect(storyboardPanelSource).not.toContain('label="视频分镜"');
     expect(storyboardPanelSource).toContain("grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)]");
-    expect(storyboardPanelSource).toContain("h-full min-h-[230px] resize-none");
-    expect(storyboardPanelSource).toContain("pb-12");
-    expect(storyboardPanelSource).toContain("storyboard-history-dropdown relative min-h-0");
-    expect(storyboardPanelSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
+    expect(storyboardPanelSource).toContain("storyboard-prompt-shell grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]");
+    expect(storyboardPanelSource).toContain("storyboard-prompt-media-row flex min-h-[82px]");
+    expect(storyboardPanelSource).toContain("storyboard-prompt-textarea h-full min-h-[220px] resize-none");
+    expect(storyboardPanelSource).toContain("storyboard-history-dropdown relative");
+    expect(storyboardPanelSource).toContain("prompt-composer-footer grid min-h-12");
+    expect(storyboardPanelSource).not.toContain("pb-12 pt-[96px]");
     expect(storyboardPanelSource).toContain("flex-nowrap items-center gap-1.5 overflow-visible");
     expect(storyboardPanelSource).toContain("<ProductCreativeSettingsTray");
     expect(settingsTraySource).toContain("prompt-inline-settings");
     expect(settingsTraySource).toContain("overflow-visible");
     expect(storyboardPanelSource).toContain('menuPlacement="top"');
     expect(storyboardPanelSource).toContain('menuWidth="content"');
-    expect(storyboardPanelSource).toContain("absolute bottom-20 left-3 right-3");
+    expect(storyboardPanelSource).not.toContain("absolute bottom-20 left-3 right-3");
     expect(storyboardPanelSource).not.toContain("{hint ? (");
     expect(storyboardPanelSource).not.toContain("min-h-5 truncate text-xs font-bold text-[var(--accent)]");
     expect(storyboardPanelSource).toContain('tVideo("storyboard.generate")');
-    expect(storyboardPanelSource).toContain('tVideo("storyboard.history")');
+    expect(storyboardPanelSource).not.toContain('tVideo("storyboard.history")');
     expect(storyboardPanelSource).toContain("storyboard-history-dropdown");
-    expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory");
-    expect(storyboardPanelSource).toContain("onApplyStoryboardHistory(record)");
-    expect(storyboardPanelSource).toContain("onDeleteStoryboardHistory(record.id)");
-    expect(storyboardPanelSource).toContain('tVideo("storyboard.deleteRecord")');
-    expect(storyboardPanelSource).toContain("event.stopPropagation()");
+    expect(storyboardPanelSource).not.toContain("onDeleteStoryboardHistory");
+    expect(storyboardPanelSource).not.toContain("onApplyStoryboardHistory(record)");
+    expect(storyboardPanelSource).not.toContain("onDeleteStoryboardHistory(record.id)");
+    expect(storyboardPanelSource).not.toContain('tVideo("storyboard.deleteRecord")');
     expect(storyboardPanelSource).not.toContain("回填");
     expect(storyboardPanelSource).not.toContain("补充要点");
     expect(storyboardPanelSource).not.toContain("可补充镜头重点、禁用表达、旁白方向。");
@@ -1551,7 +1567,7 @@ describe("console API", () => {
     expect(queueProductVideoJobsSource).toContain("ensureVideoModelConfigured()");
     expect(queueProductVideoJobsSource).toContain("mergeVideoJobs(response.jobs, current)");
     expect(queueProductVideoJobsSource).not.toContain("scriptLines: splitDraftLines(studioScriptDraft)");
-    expect(queueProductVideoJobsSource).toContain("storyboardLines: splitDraftLines(studioStoryboardDraft)");
+    expect(queueProductVideoJobsSource).toContain("storyboardLines: videoGenerationOptions.storyboardLines ?? splitDraftLines(studioStoryboardDraft)");
     expect(queueProductVideoJobsSource).toContain("throw new Error");
     expect(queueProductVideoJobsSource).not.toContain('setActiveSection("video")');
     expect(queueProductVideoJobsSource).not.toContain("个验证版本");
@@ -1565,12 +1581,12 @@ describe("console API", () => {
     expect(appSource).toContain("clientLocaleStorageKey");
     expect(appSource).not.toContain('window.localStorage.setItem("haitu.storyboardHistory.v1"');
     expect(appSource).not.toContain("haitu.productStudio.productSku.v1");
-    expect(appSource).toContain("const selectedProductStoryboardHistory = selectedProduct");
+    expect(appSource).not.toContain("const selectedProductStoryboardHistory = selectedProduct");
     expect(appSource).not.toContain("record.productSku === selectedProduct.sku");
     expect(appSource).toContain("setTemplate(record.style)");
     expect(appSource).toContain("setDuration(record.duration)");
     expect(appSource).toContain('setStudioScriptDraft("");');
-    expect(appSource).toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
+    expect(appSource).not.toContain("setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale))");
     expect(appSource).not.toContain("setStudioScriptDraft(defaultStudioScriptDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("setStudioStoryboardDraft(defaultStudioStoryboardDraft(selectedProduct, duration, template));");
     expect(appSource).not.toContain("ProductFactSummaryStrip");
@@ -1718,10 +1734,14 @@ describe("console API", () => {
     expect(appSource).not.toContain('className="grid grid-cols-2 rounded-[10px] border border-[var(--border)] bg-[var(--field)] p-1 text-xs font-black"');
     expect(appSource).not.toContain("继续支付");
     expect(appSource).toContain('tPayment("pay")');
+    expect(appSource).toContain('tPayment("processing")');
+    expect(appSource).toContain("animate-spin");
     expect(appSource).toContain("fixed right-5 top-[86px] z-[100]");
     expect(appSource).not.toContain("fixed right-5 top-[86px] z-[70]");
     expect(appSource).toContain("recharge-transaction-type-badge");
-    expect(appSource).toContain("md:grid-cols-[56px_minmax(0,1fr)_104px_128px_72px]");
+    expect(appSource).toContain("wallet-consumption-transaction-table");
+    expect(appSource).toContain("w-full min-w-[820px] table-fixed");
+    expect(appSource).toContain("<colgroup>");
     expect(appSource).not.toContain("disabled={cryptoMethods.length === 0}");
     expect(appSource).not.toContain("disabled={rmbMethods.length === 0}");
     expect(appSource).toContain("Stripe");
@@ -1829,11 +1849,48 @@ describe("console API", () => {
     expect(appSource).not.toContain('tWallet("customRecharge.pay")');
     expect(appSource).not.toContain('tWallet("customRecharge.hint")');
     expect(appSource).toContain("wallet-tab-strip");
-    expect(appSource).toContain("wallet-transaction-row");
+    expect(appSource).toContain("wallet-recharge-order-table");
+    expect(appSource).toContain("wallet-recharge-order-row");
+    expect(appSource).toContain('tWallet("orderTable.order")');
+    expect(appSource).toContain('tWallet("orderTable.topUpAmount")');
+    expect(appSource).not.toContain('tWallet("orderTable.paid")');
+    expect(appSource).toContain('tWallet("orderTable.paymentMethod")');
+    expect(appSource).toContain('tWallet("orderTable.status")');
+    expect(appSource).toContain('tWallet("orderTable.createdAt")');
+    expect(appSource).toContain('tWallet("orderTable.action")');
     expect(appSource).toContain("wallet-transaction-empty");
-    expect(appSource).toContain("walletRechargeTransactions");
-    expect(appSource).toContain("showTypeBadge={false}");
+    expect(appSource).toContain("walletRechargeOrders");
+    expect(appSource).toContain("WalletRechargeOrderTable");
+    expect(appSource).toContain("walletRechargeOrderDisplayCode");
+    expect(appSource).toContain("walletRechargeOrderCreditAmountText");
+    expect(appSource).toContain("walletRechargeOrderSettlementAmountText");
+    expect(appSource).not.toContain("walletRechargeOrderPaymentAmountText");
+    expect(appSource).toContain("wallet-recharge-order-settlement");
+    expect(appSource).toContain("walletRechargeOrderPaymentMethodView");
+    expect(appSource).toContain("walletRechargeOrderEffectiveStatus");
+    expect(appSource).toContain("walletRechargeOrderExpiresInText");
+    expect(appSource).toContain("window.setInterval(() => setNowTick(Date.now()), 1000)");
+    expect(appSource).not.toContain("setNowTick(Date.now()), 30_000");
+    expect(appSource).toContain('className="h-8 min-h-8 whitespace-nowrap px-2.5 text-[12px]"');
+    expect(appSource).toContain("wallet-recharge-order-countdown");
+    expect(appSource).not.toContain("grid justify-items-start gap-1");
+    expect(appSource).toContain("rechargeTransactionsByOrderId");
+    expect(appSource).toContain("cryptoCurrency");
+    expect(appSource).toContain("cryptoNetwork");
+    expect(appSource).toContain("cardLast4");
+    expect(appSource).toContain('title={order.id}');
+    expect(appSource).not.toContain(">{order.id}</div>");
+    expect(appSource).not.toContain("showTypeBadge={false}");
     expect(appSource).toContain("walletConsumptionTransactions");
+    expect(appSource).toContain("wallet-consumption-transaction-table");
+    expect(appSource).toContain("wallet-consumption-transaction-row");
+    expect(appSource).toContain("WalletConsumptionTransactionTable");
+    expect(appSource).toContain('tWallet("transactionTable.type")');
+    expect(appSource).toContain('tWallet("transactionTable.description")');
+    expect(appSource).toContain('tWallet("transactionTable.amount")');
+    expect(appSource).toContain('tWallet("transactionTable.balance")');
+    expect(appSource).toContain('tWallet("transactionTable.createdAt")');
+    expect(appSource).toContain('tWallet("transactionTable.action")');
     expect(appSource).not.toContain("min-[900px]:grid-cols-[minmax(340px,1fr)_minmax(360px,520px)]");
     expect(appSource).not.toContain("shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_18%,transparent)]");
     expect(appSource).not.toContain('className="mt-4 flex flex-wrap gap-2 rounded-lg border');
@@ -1897,7 +1954,9 @@ describe("console API", () => {
     expect(sharedModelConfigSource).toContain('aria-label={showApiKey ? tSettings("serviceDialog.hideApiKey") : tSettings("serviceDialog.showApiKey")}');
     expect(sharedModelConfigSource).toContain('{showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}');
     expect(apiManagementSource).toContain("draftFromProviderConfig(providerId, model, models)");
-    expect(sharedModelConfigSource).toContain("const relatedModels = model.credentialId");
+    expect(sharedModelConfigSource).toContain('const serviceModels = "models" in model && Array.isArray(model.models) ? model.models : undefined;');
+    expect(sharedModelConfigSource).toContain("const relatedModels = serviceModels && serviceModels.length > 0");
+    expect(sharedModelConfigSource).toContain("? serviceModels");
     expect(sharedModelConfigSource).toContain("item.credentialId === model.credentialId");
     expect(sharedModelConfigSource).toContain('tSettings("serviceDialog.nameLabel")');
     expect(appSource).toContain('tLedger(`audit.actions.${action}`)');
@@ -2601,6 +2660,7 @@ describe("console API", () => {
       expect(params.get("currency")).toBe("hkd");
       expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5500");
       expect(params.get("line_items[0][price_data][currency]")).toBe("hkd");
+      expect(params.get("expires_at")).toBe("1783077630");
       expect(params.has("automatic_payment_methods[enabled]")).toBe(false);
       expect(params.get("metadata[walletCreditCents]")).toBe("5000");
       expect(params.get("success_url")).toContain("payment=stripe-success");
@@ -2614,7 +2674,12 @@ describe("console API", () => {
         expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
 
     const created = await server.fetchJson("/api/wallet/recharge-orders", {
       method: "POST",
@@ -2651,7 +2716,12 @@ describe("console API", () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-recharge-amount-validation-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async () => jsonResponse({ id: "should-not-create" })) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T09:00:30.000Z")
+    });
 
     for (const amountCny of [49, 1001, 88.5]) {
       const response = await server.fetch("/api/wallet/recharge-orders", {
@@ -2675,6 +2745,7 @@ describe("console API", () => {
     vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_secret");
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_webhook_secret");
     vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("INFINI_CURRENCY", "hkd");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-admin-"));
     tempDirs.push(root);
@@ -2684,7 +2755,12 @@ describe("console API", () => {
         url: "https://checkout.stripe.com/c/pay/cs_test_disabled_should_not_call"
       })
     ) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T09:00:30.000Z")
+    });
 
     const initialUserMethods = await server.fetchJson("/api/payment-methods");
     const initialAdminMethods = await server.fetchJson("/api/admin/payment-methods");
@@ -2776,6 +2852,150 @@ describe("console API", () => {
     });
   });
 
+  it("quotes non-CNY recharge payment methods with live exchange rates", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_live_fx");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_live_fx");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_payment_method_live_fx_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_live_fx_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_live_fx_webhook_secret");
+    vi.stubEnv("INFINI_CURRENCY", "usd");
+    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
+    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-live-fx-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toBe("https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD");
+      return jsonResponse([{
+        date: "2026-07-03",
+        base: "CNY",
+        quote: "USD",
+        rate: 0.14737
+      }]);
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
+
+    const methods = await server.fetchJson("/api/payment-methods?amountCny=50");
+
+    expect(methods.methods).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "infini",
+        configured: true,
+        available: true,
+        paymentCurrency: "usd",
+        quote: expect.objectContaining({
+          walletCurrency: "cny",
+          creditCny: 50,
+          creditCents: 5000,
+          paymentCurrency: "usd",
+          paymentAmount: 7.37,
+          paymentAmountCents: 737,
+          fxRateSnapshot: expect.objectContaining({
+            from: "cny",
+            to: "usd",
+            rate: 0.14737,
+            source: "frankfurter",
+            sourceLabel: "Frankfurter",
+            asOfDate: "2026-07-03",
+            fetchedAt: "2026-07-03T10:20:30.000Z"
+          })
+        })
+      })
+    ]));
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("quotes only the requested recharge payment method when methodId is provided", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_scoped_quote");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_scoped_quote");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_payment_method_scoped_quote_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_scoped_quote_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_scoped_quote_webhook_secret");
+    vi.stubEnv("STRIPE_CURRENCY", "cny");
+    vi.stubEnv("INFINI_CURRENCY", "usd");
+    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
+    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-scoped-quote-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
+
+    const methods = await server.fetchJson("/api/payment-methods?amountCny=50&methodId=stripe");
+
+    expect(methods.methods).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "stripe",
+        available: true,
+        paymentCurrency: "cny",
+        quote: expect.objectContaining({
+          paymentAmount: 50,
+          paymentCurrency: "cny",
+          fxRateSnapshot: expect.objectContaining({
+            source: "identity",
+            rate: 1
+          })
+        })
+      })
+    ]));
+    const infiniMethod = methods.methods.find((method: { id: string }) => method.id === "infini");
+    expect(infiniMethod).toEqual(expect.objectContaining({
+      id: "infini",
+      available: true,
+      paymentCurrency: "usd"
+    }));
+    expect(infiniMethod).not.toHaveProperty("quote");
+    expect(infiniMethod).not.toHaveProperty("unavailableReason");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("marks non-CNY recharge payment methods unavailable when env-rate mode has no exchange rate", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_fx");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_fx");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_payment_method_fx_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_fx_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_fx_webhook_secret");
+    vi.stubEnv("INFINI_CURRENCY", "usd");
+    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-fx-missing-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const methods = await server.fetchJson("/api/payment-methods?amountCny=50");
+    const blocked = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({
+        amountCny: 50,
+        paymentMethodId: "infini"
+      })
+    });
+
+    expect(methods.methods).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "infini",
+        configured: true,
+        available: false,
+        unavailableReason: "请配置 HAITU_RECHARGE_USD_PER_CNY，用于把人民币充值金额换算成 USD 支付金额。"
+      })
+    ]));
+    expect(blocked.status).toBe(422);
+    await expect(blocked.json()).resolves.toEqual({
+      error: "请配置 HAITU_RECHARGE_USD_PER_CNY，用于把人民币充值金额换算成 USD 支付金额。"
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("rejects unknown recharge payment method ids instead of falling back to Stripe", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_unknown_payment_method");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_unknown_payment_method");
@@ -2830,11 +3050,14 @@ describe("console API", () => {
         amount: "50.00",
         currency: "HKD",
         client_reference: expect.stringMatching(/^wallet-recharge-/),
-        request_id: payload.client_reference,
+        request_id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
         order_desc: "Haitu 余额充值",
         merchant_alias: "Haitu",
-        pay_methods: [1]
+        pay_methods: [1],
+        expires_in: 3600
       }));
+      expect(payload.request_id).not.toBe(payload.client_reference);
+      expect(payload).not.toHaveProperty("expires_at");
       expect(payload.success_url).toContain("payment=infini-success");
       expect(payload.success_url).toContain("https://haitu.online/console?");
       expect(payload.failure_url).toContain("https://haitu.online/console?");
@@ -2843,10 +3066,16 @@ describe("console API", () => {
         order_id: "infini_order_wallet_recharge",
         request_id: payload.request_id,
         checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_wallet_recharge",
-        client_reference: payload.client_reference
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
 
     const created = await server.fetchJson("/api/wallet/recharge-orders", {
       method: "POST",
@@ -2871,6 +3100,370 @@ describe("console API", () => {
       reservedCny: 0,
       availableCny: 0,
       transactions: []
+    }));
+  });
+
+  it("creates non-CNY recharge orders from a live exchange-rate quote and stores the quote snapshot", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_live_fx_order_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_live_fx_order_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_live_fx_order_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "usd");
+    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
+    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-live-fx-recharge-order-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD") {
+        return jsonResponse([{
+          date: "2026-07-03",
+          base: "CNY",
+          quote: "USD",
+          rate: 0.14737
+        }]);
+      }
+      expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order");
+      const payload = JSON.parse(String(init?.body));
+      expect(payload).toEqual(expect.objectContaining({
+        amount: "7.37",
+        currency: "USD"
+      }));
+      return jsonResponse({
+        order_id: "infini_order_live_fx_wallet_recharge",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_live_fx_wallet_recharge",
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    expect(created.order).toEqual(expect.objectContaining({
+      provider: "infini",
+      creditCny: 50,
+      paymentAmount: 7.37,
+      paymentCurrency: "usd",
+      walletCurrency: "cny",
+      fxRateSnapshot: expect.objectContaining({
+        from: "cny",
+        to: "usd",
+        rate: 0.14737,
+        source: "frankfurter",
+        sourceLabel: "Frankfurter",
+        asOfDate: "2026-07-03",
+        fetchedAt: "2026-07-03T10:20:30.000Z"
+      })
+    }));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("lists wallet recharge orders for the current workspace", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_list_order_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_list_order_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_list_order_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "cny");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-wallet-recharge-order-list-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_list_wallet",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_list_wallet",
+        client_reference: payload.client_reference,
+        expires_at: 1800003600
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    const listed = await server.fetchJson("/api/wallet/recharge-orders");
+
+    expect(listed.orders).toEqual([
+      expect.objectContaining({
+        id: created.order.id,
+        provider: "infini",
+        providerSessionId: "infini_order_list_wallet",
+        paymentAmount: 50,
+        paymentCurrency: "cny",
+        creditCny: 50,
+        status: "pending",
+        checkoutUrl: "https://checkout-sandbox.infini.money/pay/infini_order_list_wallet",
+        createdAt: "2026-07-03T10:20:30.000Z",
+        expiresAt: "2027-01-15T09:00:00.000Z"
+      })
+    ]);
+  });
+
+  it("marks expired pending recharge orders before listing them", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_expired_list_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_expired_list_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_expired_list_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "cny");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-wallet-recharge-order-expired-list-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      return jsonResponse({
+        order_id: "infini_order_expired_list_wallet",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_expired_list_wallet",
+        client_reference: payload.client_reference,
+        expires_at: 1783071000
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T09:30:01.000Z")
+    });
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    const listed = await server.fetchJson("/api/wallet/recharge-orders");
+
+    expect(created.order).toEqual(expect.objectContaining({
+      status: "pending",
+      expiresAt: "2026-07-03T09:30:00.000Z"
+    }));
+    expect(listed.orders).toEqual([
+      expect.objectContaining({
+        id: created.order.id,
+        provider: "infini",
+        providerSessionId: "infini_order_expired_list_wallet",
+        status: "expired",
+        checkoutUrl: "https://checkout-sandbox.infini.money/pay/infini_order_expired_list_wallet",
+        expiresAt: "2026-07-03T09:30:00.000Z"
+      })
+    ]);
+  });
+
+  it("queries Infini for the real order expiration time when creation omits expires_at", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_query_expiry_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_query_expiry_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_query_expiry_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "cny");
+    vi.stubEnv("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS", "1800");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-wallet-recharge-order-query-expiry-"));
+    tempDirs.push(root);
+    let clientReference = "";
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://openapi-sandbox.infini.money/v1/acquiring/order" && init?.method === "POST") {
+        const payload = JSON.parse(String(init?.body));
+        clientReference = payload.client_reference;
+        expect(payload.expires_in).toBe(1800);
+        expect(payload).not.toHaveProperty("expires_at");
+        return jsonResponse({
+          order_id: "infini_order_query_expiry_wallet",
+          request_id: payload.request_id,
+          checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_query_expiry_wallet",
+          client_reference: payload.client_reference
+        });
+      }
+      expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order?order_id=infini_order_query_expiry_wallet");
+      expect(init?.method).toBe("GET");
+      return jsonResponse({
+        code: 0,
+        data: {
+          order_id: "infini_order_query_expiry_wallet",
+          status: "pending",
+          amount: "50",
+          currency: "CNY",
+          expires_at: 1783071030,
+          client_reference: clientReference
+        }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T09:00:30.000Z")
+    });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    expect(created.order).toEqual(expect.objectContaining({
+      provider: "infini",
+      providerSessionId: "infini_order_query_expiry_wallet",
+      status: "pending",
+      expiresAt: "2026-07-03T09:30:30.000Z"
+    }));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses one recharge expiration policy for Stripe and Infini without provider-specific TTL envs", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_unified_expiry");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_unified_expiry");
+    vi.stubEnv("STRIPE_CURRENCY", "cny");
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_unified_expiry_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_unified_expiry_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_unified_expiry_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "cny");
+    vi.stubEnv("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS", "7200");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-unified-recharge-expiry-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
+        const params = new URLSearchParams(String(init?.body));
+        expect(params.get("expires_at")).toBe("1783081230");
+        return jsonResponse({
+          id: "cs_test_unified_expiry",
+          url: "https://checkout.stripe.com/c/pay/cs_test_unified_expiry",
+          payment_intent: "pi_test_unified_expiry",
+          expires_at: 1783081230
+        });
+      }
+      expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order");
+      const payload = JSON.parse(String(init?.body));
+      expect(payload.expires_in).toBe(7200);
+      expect(payload).not.toHaveProperty("expires_at");
+      return jsonResponse({
+        order_id: "infini_order_unified_expiry",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_unified_expiry",
+        client_reference: payload.client_reference,
+        expires_at: 1783081230
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({
+      rootDir: root,
+      fetchImpl,
+      autoStartSavedJobs: false,
+      now: () => new Date("2026-07-03T10:20:30.000Z")
+    });
+
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "stripe" })
+    });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces Infini business errors instead of hiding them behind missing checkout links", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_business_error_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_business_error_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_business_error_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "cny");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-business-error-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      code: 40906,
+      message: "Order expired"
+    })) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const response = await server.fetch("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+    const handle = openDatabase({ dataDir: testDataDir(root), env: process.env });
+    let orderStatus: { provider: string; status: string; failure_reason: string | null } | undefined;
+    try {
+      orderStatus = handle.sqlite.prepare(`
+        SELECT provider, status, failure_reason
+        FROM wallet_recharge_orders
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get() as { provider: string; status: string; failure_reason: string | null } | undefined;
+    } finally {
+      closeDatabase(handle);
+    }
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "创建 Infini 支付订单失败：Order expired"
+    });
+    expect(orderStatus).toEqual({
+      provider: "infini",
+      status: "failed",
+      failure_reason: "创建 Infini 支付订单失败：Order expired"
+    });
+  });
+
+  it("defaults Infini recharge orders to USD with an explicit CNY exchange rate", async () => {
+    vi.stubEnv("INFINI_PUBLIC_KEY", "infini_default_cny_key");
+    vi.stubEnv("INFINI_PRIVATE_KEY", "infini_default_cny_secret");
+    vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_default_cny_webhook_secret");
+    vi.stubEnv("INFINI_ENV", "sandbox");
+    vi.stubEnv("INFINI_CURRENCY", "");
+    vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "");
+    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "0.14");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-infini-default-usd-recharge-order-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order");
+      const payload = JSON.parse(String(init?.body));
+      expect(payload).toEqual(expect.objectContaining({
+        amount: "7.00",
+        currency: "USD"
+      }));
+      return jsonResponse({
+        order_id: "infini_order_default_usd_wallet_recharge",
+        request_id: payload.request_id,
+        checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_default_usd_wallet_recharge",
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50, paymentMethodId: "infini" })
+    });
+
+    expect(created.order).toEqual(expect.objectContaining({
+      provider: "infini",
+      paymentAmount: 7,
+      paymentCurrency: "usd",
+      walletCurrency: "cny",
+      fxRateSnapshot: expect.objectContaining({
+        from: "cny",
+        to: "usd",
+        rate: 0.14
+      })
     }));
   });
 
@@ -2973,7 +3566,8 @@ describe("console API", () => {
           order_id: "infini_order_enveloped_wallet",
           request_id: payload.request_id,
           checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_enveloped_wallet",
-          client_reference: payload.client_reference
+          client_reference: payload.client_reference,
+          expires_at: 1790000000
         }
       });
     }) as unknown as typeof fetch;
@@ -2995,21 +3589,136 @@ describe("console API", () => {
     }));
   });
 
-  it("credits Stripe recharge orders once and only after a signed checkout webhook", async () => {
+  it("credits Stripe recharge orders with the actual selected payment method", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_recharge");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_recharge");
     vi.stubEnv("STRIPE_CURRENCY", "hkd");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-recharge-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
+        return jsonResponse({
+          id: "cs_test_webhook_wallet",
+          url: "https://checkout.stripe.com/c/pay/cs_test_webhook_wallet",
+          payment_intent: "pi_test_webhook_wallet",
+          expires_at: 1790000000
+        });
+      }
+      expect(String(url)).toBe("https://api.stripe.com/v1/payment_intents/pi_test_webhook_wallet?expand%5B%5D=latest_charge");
+      return jsonResponse({
+        id: "pi_test_webhook_wallet",
+        latest_charge: {
+          id: "ch_test_webhook_wallet",
+          payment_method_details: {
+            type: "card",
+            card: {
+              brand: "visa",
+              last4: "4242",
+              wallet: { type: "apple_pay" }
+            }
+          }
+        }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const created = await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 88 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_checkout_completed",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_webhook_wallet",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 8800,
+          currency: "hkd",
+          payment_intent: "pi_test_webhook_wallet"
+        }
+      }
+    });
+    const signature = stripeTestSignature(payload, "whsec_webhook_recharge");
+
+    const first = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature
+      },
+      body: payload
+    });
+    const duplicate = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": signature
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+    const rechargeOrders = await server.fetchJson("/api/wallet/recharge-orders");
+
+    await expect(first.json()).resolves.toEqual({ received: true });
+    await expect(duplicate.json()).resolves.toEqual({ received: true, duplicate: true });
+    expect(wallet).toEqual(expect.objectContaining({
+      balanceCny: 88,
+      reservedCny: 0,
+      availableCny: 88
+    }));
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 88,
+        description: "Stripe Apple Pay Visa 尾号 4242 充值到账",
+        metadata: expect.objectContaining({
+          paymentMethodProvider: "stripe",
+          paymentMethodType: "card",
+          paymentMethodLabel: "Apple Pay Visa 尾号 4242",
+          stripeChargeId: "ch_test_webhook_wallet",
+          cardBrand: "visa",
+          cardLast4: "4242",
+          cardWallet: "apple_pay"
+        })
+      })
+    ]);
+    expect(rechargeOrders.orders).toEqual([
+      expect.objectContaining({
+        id: created.order.id,
+        status: "paid",
+        metadata: expect.objectContaining({
+          paymentMethodProvider: "stripe",
+          paymentMethodType: "card",
+          paymentMethodLabel: "Apple Pay Visa 尾号 4242",
+          stripeChargeId: "ch_test_webhook_wallet",
+          cardBrand: "visa",
+          cardLast4: "4242",
+          cardWallet: "apple_pay"
+        })
+      })
+    ]);
+  });
+
+  it("falls back to generic Stripe recharge descriptions when payment method details are unavailable", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_recharge");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_recharge");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-recharge-fallback-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
+        return jsonResponse({
         id: "cs_test_webhook_wallet",
         url: "https://checkout.stripe.com/c/pay/cs_test_webhook_wallet",
         payment_intent: "pi_test_webhook_wallet",
         expires_at: 1790000000
-      })
-    ) as unknown as typeof fetch;
+        });
+      }
+      throw new TypeError("Stripe detail lookup failed");
+    }) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
     await server.fetchJson("/api/wallet/recharge-orders", {
       method: "POST",
@@ -3065,6 +3774,77 @@ describe("console API", () => {
     ]);
   });
 
+  it("labels Stripe wallet recharge records for non-card payment methods", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_webhook_alipay");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_webhook_alipay");
+    vi.stubEnv("STRIPE_CURRENCY", "hkd");
+    vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
+    const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-alipay-"));
+    tempDirs.push(root);
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      if (String(url) === "https://api.stripe.com/v1/checkout/sessions") {
+        return jsonResponse({
+          id: "cs_test_webhook_alipay",
+          url: "https://checkout.stripe.com/c/pay/cs_test_webhook_alipay",
+          payment_intent: "pi_test_webhook_alipay",
+          expires_at: 1790000000
+        });
+      }
+      return jsonResponse({
+        id: "pi_test_webhook_alipay",
+        latest_charge: {
+          id: "ch_test_webhook_alipay",
+          payment_method_details: {
+            type: "alipay"
+          }
+        }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    await server.fetchJson("/api/wallet/recharge-orders", {
+      method: "POST",
+      body: JSON.stringify({ amountCny: 50 })
+    });
+    const payload = JSON.stringify({
+      id: "evt_test_checkout_alipay_completed",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_webhook_alipay",
+          object: "checkout.session",
+          payment_status: "paid",
+          amount_total: 5000,
+          currency: "hkd",
+          payment_intent: "pi_test_webhook_alipay"
+        }
+      }
+    });
+
+    const response = await server.raw.fetch("/api/payments/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeTestSignature(payload, "whsec_webhook_alipay")
+      },
+      body: payload
+    });
+    const wallet = await server.fetchJson("/api/wallet");
+
+    expect(response.status).toBe(200);
+    expect(wallet.transactions).toEqual([
+      expect.objectContaining({
+        type: "recharge",
+        amountCny: 50,
+        description: "Stripe 支付宝 充值到账",
+        metadata: expect.objectContaining({
+          paymentMethodLabel: "支付宝",
+          paymentMethodType: "alipay",
+          stripeChargeId: "ch_test_webhook_alipay"
+        })
+      })
+    ]);
+  });
+
   it("credits Infini recharge orders once and only after a signed order.completed webhook", async () => {
     vi.stubEnv("INFINI_PUBLIC_KEY", "infini_webhook_key");
     vi.stubEnv("INFINI_PRIVATE_KEY", "infini_webhook_secret");
@@ -3080,7 +3860,8 @@ describe("console API", () => {
         order_id: "infini_order_webhook_wallet",
         request_id: payload.request_id,
         checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_webhook_wallet",
-        client_reference: payload.client_reference
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
@@ -3109,6 +3890,9 @@ describe("console API", () => {
       status: "paid",
       amount_confirmed: "88.00",
       amount_confirming: "0",
+      payment_currency: "USDT",
+      payment_network: "TRC20",
+      tx_hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       created_at: 1800000000,
       updated_at: 1800000002
     });
@@ -3130,6 +3914,7 @@ describe("console API", () => {
       body: completedPayload
     });
     const wallet = await server.fetchJson("/api/wallet");
+    const rechargeOrders = await server.fetchJson("/api/wallet/recharge-orders");
 
     expect(processing.status).toBe(200);
     await expect(processing.json()).resolves.toEqual({ received: true });
@@ -3145,7 +3930,29 @@ describe("console API", () => {
       expect.objectContaining({
         type: "recharge",
         amountCny: 88,
-        description: "Infini 数字货币充值到账"
+        description: "Infini USDT-TRC20 充值到账",
+        metadata: expect.objectContaining({
+          paymentMethodProvider: "infini",
+          paymentMethodType: "crypto",
+          paymentMethodLabel: "USDT-TRC20",
+          cryptoCurrency: "USDT",
+          cryptoNetwork: "TRC20",
+          cryptoTxHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+          cryptoTxHashShort: "0x123456...90abcdef"
+        })
+      })
+    ]);
+    expect(rechargeOrders.orders).toEqual([
+      expect.objectContaining({
+        status: "paid",
+        metadata: expect.objectContaining({
+          paymentMethodProvider: "infini",
+          paymentMethodType: "crypto",
+          paymentMethodLabel: "USDT-TRC20",
+          cryptoCurrency: "USDT",
+          cryptoNetwork: "TRC20",
+          cryptoTxHashShort: "0x123456...90abcdef"
+        })
       })
     ]);
   });
@@ -3168,7 +3975,8 @@ describe("console API", () => {
           order_id: "infini_order_sync_wallet",
           request_id: payload.request_id,
           checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_sync_wallet",
-          client_reference: payload.client_reference
+          client_reference: payload.client_reference,
+          expires_at: 1790000000
         });
       }
       if (String(url) === "https://openapi-sandbox.infini.money/v1/acquiring/order?order_id=infini_order_sync_wallet" && init?.method === "GET") {
@@ -3187,6 +3995,9 @@ describe("console API", () => {
             amount_confirmed: "50",
             amount_confirming: "0",
             status: "paid",
+            payment_currency: "USDC",
+            payment_network: "ERC20",
+            tx_hash: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
             updated_at: 1800000002
           }
         });
@@ -3233,7 +4044,11 @@ describe("console API", () => {
       expect.objectContaining({
         type: "recharge",
         amountCny: 50,
-        description: "Infini 数字货币充值到账"
+        description: "Infini USDC-ERC20 充值到账",
+        metadata: expect.objectContaining({
+          paymentMethodLabel: "USDC-ERC20",
+          cryptoTxHashShort: "0xabcdef...cdefabcd"
+        })
       })
     ]);
   });
@@ -3518,7 +4333,8 @@ describe("console API", () => {
         order_id: "infini_order_old_signature",
         request_id: payload.request_id,
         checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_old_signature",
-        client_reference: payload.client_reference
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
     const server = createConsoleServer({
@@ -3574,7 +4390,8 @@ describe("console API", () => {
         order_id: "infini_order_precision",
         request_id: payload.request_id,
         checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_precision",
-        client_reference: payload.client_reference
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
@@ -3623,7 +4440,8 @@ describe("console API", () => {
         order_id: "infini_order_late_payment",
         request_id: payload.request_id,
         checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_late_payment",
-        client_reference: payload.client_reference
+        client_reference: payload.client_reference,
+        expires_at: 1790000000
       });
     }) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
@@ -3697,7 +4515,8 @@ describe("console API", () => {
           order_id: "infini_order_provider_scoped",
           request_id: payload.request_id,
           checkout_url: "https://checkout-sandbox.infini.money/pay/infini_order_provider_scoped",
-          client_reference: payload.client_reference
+          client_reference: payload.client_reference,
+          expires_at: 1790000000
         });
       }
       throw new Error(`Unexpected payment request ${String(url)}`);
@@ -4496,6 +5315,41 @@ describe("console API", () => {
       const afterDelete = await server.fetchJson("/api/platform/model-configs");
       expect(afterDelete.textModels.some((model: { credentialId?: string }) => model.credentialId === credentialId)).toBe(false);
       expect(JSON.stringify(afterDelete)).not.toContain("platform-reveal-secret-123456");
+    } finally {
+      restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
+    }
+  });
+
+  it("returns credential ids for grouped platform model variants", async () => {
+    const previousAdminEmail = process.env.HAITU_ADMIN_EMAIL;
+    process.env.HAITU_ADMIN_EMAIL = "console-test@example.com";
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-admin-platform-models-grouped-"));
+      tempDirs.push(root);
+      const server = createConsoleServer({ rootDir: root, autoStartSavedJobs: false });
+
+      await server.fetchJson("/api/platform/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "platform-grouped-video-secret-123456",
+          name: "Seedance",
+          vendor: "volcengine",
+          baseUrl: "https://ark.cn-beijing.volces.com",
+          model: ["seedance-2.0-fast", "seedance-2.0"],
+          enabled: true
+        })
+      });
+
+      const response = await server.fetchJson("/api/platform/model-configs");
+      const credentialIds = response.videoModels.map((model: { credentialId?: string }) => model.credentialId);
+
+      expect(response.videoModels).toHaveLength(2);
+      expect(credentialIds.every(Boolean)).toBe(true);
+      expect(new Set(credentialIds).size).toBe(1);
+      expect(response.videoModels.map((model: { model: string }) => model.model)).toEqual([
+        "doubao-seedance-2-0-fast-260128",
+        "doubao-seedance-2-0-260128"
+      ]);
     } finally {
       restoreEnv("HAITU_ADMIN_EMAIL", previousAdminEmail);
     }
@@ -5511,7 +6365,7 @@ describe("console API", () => {
     expect(productCreationWorkspace).toContain("<ProductCreationComposer");
     expect(productCreationWorkspace).not.toContain("<ProductCreationStartPanel");
     expect(productCreationWorkspace).not.toContain("选择商品开始创作");
-    expect(productCreationWorkspace).toContain("selectedProductStoryboardHistory");
+    expect(productCreationWorkspace).not.toContain("selectedProductStoryboardHistory");
     expect(productCreationWorkspace).toContain("onOrganizeProductPackage");
     expect(productCreationWorkspace).toContain("onDeleteProduct");
     expect(productCreationWorkspace).not.toContain("ensureVideoProductSelection");
@@ -5577,7 +6431,7 @@ describe("console API", () => {
     const modelConfigChoiceLabelSource = modelServiceSelectionSource.slice(modelServiceSelectionSource.indexOf("export function modelConfigChoiceLabel"), modelServiceSelectionSource.indexOf("export function platformConfiguredModels"));
     const defaultStoryboardSource = storyboardDraftsSource.slice(storyboardDraftsSource.indexOf("export function defaultStoryboardDraft"), storyboardDraftsSource.indexOf("export function defaultStudioScriptDraft"));
     expect(workspaceSource).toContain("<ProductCreationComposer");
-    expect(workspaceSource).toContain("selectedProductStoryboardHistory");
+    expect(workspaceSource).not.toContain("selectedProductStoryboardHistory");
     expect(workspaceSource).not.toContain("<ProductStudio");
     expect(workspaceSource).not.toContain("<VideoCreationEmptyShell");
     expect(workspaceSource).not.toContain("ensureVideoProductSelection");
@@ -5588,7 +6442,7 @@ describe("console API", () => {
     expect(appSource).toContain("selectedImageModelConfigId");
     expect(appSource).toContain("selectedVideoModelConfigId");
     expect(appSource).toContain("useState(defaultVideoDurationSeconds)");
-    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "scene";');
+    expect(appSource).toContain('const defaultVideoTemplate: TemplateName = "auto";');
     expect(appSource).toContain("useState<TemplateName>(defaultVideoTemplate)");
     expect(appSource).toContain("setTemplate(defaultVideoTemplate)");
     expect(appSource).toContain("setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? \"auto\")");
@@ -5674,11 +6528,12 @@ describe("console API", () => {
     expect(composerSource).toContain('const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"]');
     expect(appSource).toContain('if (value === "en") return t("languages.en");');
     expect(composerSource).toContain('density="micro"');
-    expect(composerSource).toContain("video-generate-summary");
-    expect(composerSource).toContain("{generateVideoSummary}");
-    expect(composerSource).toContain("tracking-0");
-    expect(composerSource).toContain("whitespace-normal");
-    expect(composerSource).toContain("break-words");
+    expect(composerSource).toContain("prompt-composer-primary-action-slot");
+    expect(composerSource).toContain("primaryActionDisabled");
+    expect(composerSource).toContain("primaryActionLabel");
+    expect(composerSource).not.toContain("video-generate-summary");
+    expect(composerSource).not.toContain("{generateVideoSummary}");
+    expect(composerSource).not.toContain("product-creative-action-summary");
     expect(composerSource).not.toContain("video-generate-summary min-w-0 truncate");
     expect(composerSource).not.toContain("generateVideoSummaryItems.map");
     expect(composerSource).not.toContain("video-generate-summary-item");
@@ -5686,12 +6541,10 @@ describe("console API", () => {
     expect(composerSource).not.toContain("generation-status-message");
     expect(composerSource).not.toContain("video-generate-status-center");
     expect(composerSource).not.toContain("subtitle={generateVideoSummary}");
-    expect(composerSource).toContain("video-generate-bar");
+    expect(composerSource).not.toContain("video-generate-bar");
     expect(composerSource).not.toContain('<div className="min-w-0 truncate text-xs font-bold text-[var(--muted)]">{schemeSummary}</div>');
     expect(composerSource).not.toContain("footer={");
-    expect(composerSource.indexOf("video-generate-bar")).toBeLessThan(composerSource.indexOf("<VideoHistoryPanel"));
-    expect(composerSource.indexOf("product-creative-compose-panel")).toBeLessThan(composerSource.indexOf("<ProductModeActionBar"));
-    expect(composerSource.indexOf("<ProductModeActionBar")).toBeLessThan(composerSource.indexOf("product-creative-history"));
+    expect(composerSource.indexOf("product-creative-compose-panel")).toBeLessThan(composerSource.indexOf("product-creative-history"));
     expect(productCreativeWorkbenchSource).not.toContain("max-w-[960px]");
     expect(productCreativeWorkbenchSource).not.toContain("mx-auto");
     expect(composerSource).toContain("product-creative-product-details");
@@ -5801,10 +6654,11 @@ describe("console API", () => {
     expect(composerSource).toContain("onDeleteReferenceImage");
     expect(composerSource).not.toContain("aria-disabled={!product}");
     expect(composerSource).not.toContain('tVideo("reference.generateDisabledToast")');
-    expect(composerSource).toContain("const selectedCreationReferenceImages = imagePromptReferences.map((image) => image.original).filter(Boolean);");
-    expect(composerSource).toContain("const activeCreationReferenceCount = selectedCreationReferenceImages.length > 0 ? selectedCreationReferenceImages.length : previewableReferenceImages.length;");
     expect(composerSource).toContain("function selectedCreationReferenceImagesForProduct(product: ProductDetail)");
-    expect(composerSource).toContain("referenceImages: selectedCreationReferenceImagesForProduct(savedProduct)");
+    expect(composerSource).toContain("if (imagePromptReferences.length === 0) return undefined;");
+    expect(composerSource).toContain("referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []");
+    expect(composerSource).toContain('onToast(tVideo("storyboard.previewNeedsFacts"))');
+    expect(composerSource).toContain('onToast(errorMessage(error))');
     expect(composerSource).toContain('tVideo("facts.organize")');
     expect(composerSource).toContain('isPacking ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Package size={13} />');
     expect(composerSource).toContain('{isPacking ? tVideo("facts.organizing") : tVideo("facts.organize")}');
@@ -5813,26 +6667,39 @@ describe("console API", () => {
     expect(appSource).toContain("onFlushProductFactsAutoSave={flushProductFactsAutoSave}");
     expect(composerSource).toContain("onFlushProductFactsAutoSave");
     expect(composerSource).toContain("await onFlushProductFactsAutoSave()");
-    expect(composerSource).toContain('promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />');
-    expect(composerSource).toContain("promptOptimizeActionLabel");
-    expect(composerSource).toContain('mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate")');
+    expect(composerSource).toContain("function previewProductForPromptCompiler");
+    expect(composerSource).toContain("compileProductPrompt({");
+    expect(composerSource).toContain("const compiledVideoPrompt = compileProductPrompt({");
+    expect(composerSource).toContain("storyboardLines: splitDraftLines(compiledVideoPrompt.prompt)");
+    expect(composerSource).toContain("const selectedReferenceImages = selectedCreationReferenceImagesForProduct(savedProduct) ?? [];");
+    expect(composerSource).toContain("referenceImages: selectedReferenceImages,");
+    expect(composerSource).not.toContain("const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(composerSource).not.toContain("const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true })");
+    expect(composerSource).toContain('promptPreviewActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Eye size={13} />');
+    expect(composerSource).toContain("promptPreviewActionLabel");
+    expect(composerSource).toContain('tVideo("storyboard.generate")');
+    expect(composerSource).toContain('variant="ghost"');
+    expect(composerSource).toContain("max-w-[112px]");
+    expect(composerSource).not.toContain('"预览模型提示词"');
+    expect(composerSource).not.toContain("w-[168px]");
     expect(productDetailsSource).toContain("product-facts-header");
     expect(productDetailsSource).toContain("product-facts-action");
     expect(productDetailsSource.indexOf("product-facts-action")).toBeLessThan(productDetailsSource.indexOf("product-facts-editor"));
     expect(productDetailsSource).not.toContain("sm:grid-cols-[minmax(0,1fr)_auto]");
     expect(composerSource).toContain("storyboard-title-row");
     expect(composerSource).toContain("storyboard-title-action");
-    expect(composerSource).toContain("prompt-composer-footer absolute bottom-2 left-3 right-3");
-    expect(composerSource).toContain("grid-cols-[auto_minmax(0,1fr)_150px]");
-    expect(composerSource).toContain("h-7 min-h-7");
+    expect(composerSource).toContain("prompt-composer-footer grid min-h-12");
+    expect(composerSource).toContain("grid-cols-[auto_minmax(0,1fr)_minmax(176px,240px)]");
+    expect(composerSource).toContain("h-10 min-h-10");
     expect(composerSource).toContain("whitespace-nowrap");
     expect(composerSource).toContain("prompt-composer-mode-slot");
     expect(composerSource).toContain("prompt-composer-settings-slot");
-    expect(composerSource).toContain("prompt-composer-history-slot");
+    expect(composerSource).toContain("prompt-composer-primary-action-slot");
+    expect(composerSource).not.toContain("storyboard-title-history");
     expect(composerSource).toContain("prompt-composer-settings-slot flex min-w-0 flex-nowrap items-center gap-1.5 overflow-visible");
     expect(composerSource).toContain("placeholder={promptPlaceholder}");
     expect(composerSource).not.toContain("整理资料并生成视频");
-    expect(composerSource).toContain('label={tVideo("controls.template")}');
+    expect(composerSource).toContain('label={tVideo("controls.creativeStyle")}');
     expect(composerSource).toContain('label={tVideo("controls.duration")}');
     expect(composerSource).toContain('label={tVideo("controls.finalLanguage")}');
     expect(composerSource).not.toContain('label={tVideo("controls.modelScheme")}');
@@ -6509,7 +7376,7 @@ describe("console API", () => {
     }
   });
 
-  it("uses the configured text model to draft storyboard lines for the selected product", async () => {
+  it("compiles video prompt drafts for the selected product and target video model", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.TEXT_MODEL_API_KEY;
@@ -6529,31 +7396,13 @@ describe("console API", () => {
         forbidden_claims: ["UVカット率は未確認"],
         reference_images: ["arm-01.jpg", "arm-02.jpg", "arm-03.jpg"]
       });
-      const fetchImpl = vi.fn(async () =>
-        jsonResponse({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  scriptLines: ["通勤前快速戴上袖套。", "自然覆盖到指尖附近。"],
-                  storyboardLines: ["0-2s: 展示通勤前的手部和商品整体。", "2-6s: 展示指孔和面料近景。", "6-8s: 展示穿戴后的整体效果。"],
-                  storyboardCnLines: ["0-2 秒：展示通勤前的手部和商品整体。", "2-6 秒：展示指孔和面料近景。", "6-8 秒：展示穿戴后的整体效果。"],
-                  notes: ["未确认 UV 宣称未使用。"]
-                })
-              }
-            }
-          ],
-          usage: {
-            total_tokens: 321
-          }
-        })
-      ) as unknown as typeof fetch;
+      const fetchImpl = vi.fn(async () => jsonResponse({ ok: true })) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-storyboard-secret-7777",
-          apiMode: "chat_completions"
+          apiKey: "video-prompt-secret-7777",
+          model: "seedance-2.0-fast"
         })
       });
 
@@ -6562,29 +7411,40 @@ describe("console API", () => {
         method: "POST",
         body: JSON.stringify({
           duration: 8,
-          template: "pain-point"
+          aspectRatio: "9:16",
+          finalLanguage: "ja",
+          template: "pain-point",
+          creativeStyle: "ugc",
+          prompt: "做日本 TikTok 通勤骑车视频，突出轻薄透气。",
+          referenceImages: ["arm-02.jpg"]
         })
       });
 
-      expect(response.scriptLines).toEqual(["通勤前快速戴上袖套。", "自然覆盖到指尖附近。"]);
-      expect(response.storyboardLines).toEqual(["0-2s: 展示通勤前的手部和商品整体。", "2-6s: 展示指孔和面料近景。", "6-8s: 展示穿戴后的整体效果。"]);
-      expect(response.storyboardCnLines).toEqual(["0-2 秒：展示通勤前的手部和商品整体。", "2-6 秒：展示指孔和面料近景。", "6-8 秒：展示穿戴后的整体效果。"]);
-      expect(response.notes).toContain("未确认 UV 宣称未使用。");
-      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
-        authorization: "Bearer text-storyboard-secret-7777"
-      }));
-      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
-      expect(body.messages.at(-1).content).toContain("pain-point");
-      expect(body.messages.at(-1).content).toContain("接触冷感アームカバー");
-      expect(body.messages[0].content).toContain("storyboardCnLines");
-      expect(body.messages[0].content).toContain("storyboardLines 必须使用简体中文");
+      expect(response.scriptLines).toEqual([]);
+      expect(response.storyboardCnLines).toEqual([]);
+      expect(response.storyboardLines.join("\n")).toContain("生成 8 秒 9:16 竖版 TikTok Shop 商品视频");
+      expect(response.storyboardLines.join("\n")).toContain("目标视频模型：volcengine-seedance");
+      expect(response.storyboardLines.join("\n")).toContain("doubao-seedance-2-0-fast");
+      expect(response.storyboardLines.join("\n")).toContain("arm-02.jpg");
+      expect(response.storyboardLines.join("\n")).toContain("视频提示词：");
+      expect(response.storyboardLines.join("\n")).toContain("真实 TikTok Shop 商品短视频");
+      expect(response.storyboardLines.join("\n")).toContain("商品以已选参考图为准");
+      expect(response.storyboardLines.join("\n")).toContain("视觉风格：真实 UGC 用户分享风");
+      expect(response.storyboardLines.join("\n")).toContain("镜头运动：");
+      expect(response.storyboardLines.join("\n")).toContain("质量与限制：");
+      expect(response.storyboardLines.join("\n")).toContain("轻薄透气");
+      expect(response.storyboardLines.join("\n")).toContain("UVカット率は未確認");
+      expect(response.storyboardLines.join("\n")).not.toContain("商品标题：");
+      expect(response.storyboardLines.join("\n")).not.toContain("用户意图：");
+      expect(response.notes).toContain("已按 seedance-video@v2 编译为视频模型提示词。");
+      expect(fetchImpl).not.toHaveBeenCalled();
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
     }
   });
 
-  it("uses the configured text model to optimize image prompt drafts for the selected product", async () => {
+  it("compiles image prompt drafts for the selected product and target image model", async () => {
     const previousTextKey = process.env.TEXT_MODEL_API_KEY;
     const previousOpenAiKey = process.env.OPENAI_API_KEY;
     delete process.env.TEXT_MODEL_API_KEY;
@@ -6604,29 +7464,13 @@ describe("console API", () => {
         forbidden_claims: ["UVカット率は未確認"],
         reference_images: ["arm-01.jpg", "arm-02.jpg"]
       });
-      const fetchImpl = vi.fn(async () =>
-        jsonResponse({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  prompt: "保留接触冷感アームカバー真实外观，生成白底主图，突出指孔、面料纹理和轻薄质感，不添加文字。",
-                  notes: ["未使用未确认 UV 宣称。"]
-                })
-              }
-            }
-          ],
-          usage: {
-            total_tokens: 188
-          }
-        })
-      ) as unknown as typeof fetch;
+      const fetchImpl = vi.fn(async () => jsonResponse({ ok: true })) as unknown as typeof fetch;
       const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/model-configs/openai-compatible-text", {
+      await server.fetchJson("/api/model-configs/openai-compatible-image", {
         method: "PUT",
         body: JSON.stringify({
-          apiKey: "text-image-prompt-secret-7777",
-          apiMode: "chat_completions"
+          apiKey: "image-prompt-secret-7777",
+          model: "gpt-image-2"
         })
       });
 
@@ -6635,90 +7479,21 @@ describe("console API", () => {
         method: "POST",
         body: JSON.stringify({
           prompt: "白底主图",
-          targetImage: "arm-02.jpg"
+          targetImage: "arm-02.jpg",
+          imageModelConfigId: "auto",
+          locale: "en"
         })
       });
 
-      expect(response.prompt).toBe("保留接触冷感アームカバー真实外观，生成白底主图，突出指孔、面料纹理和轻薄质感，不添加文字。");
-      expect(response.notes).toContain("未使用未确认 UV 宣称。");
-      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
-        authorization: "Bearer text-image-prompt-secret-7777"
-      }));
-      const body = JSON.parse(String(vi.mocked(fetchImpl).mock.calls[0]?.[1]?.body));
-      expect(body.messages[0].content).toContain("图片提示词优化助手");
-      expect(body.messages.at(-1).content).toContain("白底主图");
-      expect(body.messages.at(-1).content).toContain("arm-02.jpg");
-      expect(body.messages.at(-1).content).toContain("接触冷感アームカバー");
-    } finally {
-      restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
-      restoreEnv("OPENAI_API_KEY", previousOpenAiKey);
-    }
-  });
-
-  it("rejects storyboard drafts when the text model mixes Japanese into Chinese fields", async () => {
-    const previousTextKey = process.env.TEXT_MODEL_API_KEY;
-    const previousOpenAiKey = process.env.OPENAI_API_KEY;
-    delete process.env.TEXT_MODEL_API_KEY;
-    delete process.env.OPENAI_API_KEY;
-    try {
-      const root = await mkdtemp(join(tmpdir(), "haitu-storyboard-lang-"));
-      tempDirs.push(root);
-      const fixturesDir = testProductsDir(root);
-      await writeProduct(testProductPath(fixturesDir, "storyboard"), {
-        sku: "STORY-LANG",
-        title_ja: "接触冷感アームカバー",
-        category: "スポーツ用スリーブ",
-        materials: ["ポリエステル"],
-        dimensions: "15x10x5cm / 0.1kg",
-        verified_selling_points: ["指先までカバーしやすい", "通気性のある生地"],
-        usage_scenes: ["通勤", "スポーツ"],
-        forbidden_claims: ["UVカット率は未確認"],
-        reference_images: ["arm-01.jpg", "arm-02.jpg", "arm-03.jpg"]
-      });
-      const fetchImpl = vi.fn(async () =>
-        jsonResponse({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  scriptLines: ["通勤前快速戴上袖套。"],
-                  storyboardLines: [
-                    "0-2s: 以场景型开场，展示通勤和商品整体。",
-                    "2-3s: 近景展示指先までカバーしやすい一体型デザイン。"
-                  ],
-                  storyboardCnLines: ["0-2 秒：展示通勤和商品整体。"],
-                  notes: []
-                })
-              }
-            }
-          ],
-          usage: {
-            total_tokens: 99
-          }
-        })
-      ) as unknown as typeof fetch;
-      const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
-      await server.fetchJson("/api/model-configs/openai-compatible-text", {
-        method: "PUT",
-        body: JSON.stringify({
-          apiKey: "text-storyboard-secret-7777",
-          apiMode: "chat_completions"
-        })
-      });
-
-      await topUpWalletForAiUsage(server);
-      const response = await server.fetchJson("/api/products/STORY-LANG/storyboard-draft", {
-        method: "POST",
-        body: JSON.stringify({
-          duration: 8,
-          template: "scene"
-        })
-      });
-
-      expect(response.storyboardLines.join("\n")).not.toContain("まで");
-      expect(response.storyboardLines.join("\n")).not.toContain("やすい");
-      expect(response.storyboardCnLines).toEqual(response.storyboardLines);
-      expect(response.notes).toContain("文本模型返回内容混入日文，已改用中文模板分镜。");
+      expect(response.prompt).toContain("Create a clean ecommerce product image");
+      expect(response.prompt).toContain("Target image model: openai-compatible-image");
+      expect(response.prompt).toContain("gpt-image-2");
+      expect(response.prompt).toContain("arm-02.jpg");
+      expect(response.prompt).toContain("白底主图");
+      expect(response.prompt).toContain("通気性のある生地");
+      expect(response.prompt).toContain("UVカット率は未確認");
+      expect(response.notes).toContain("Compiled image model prompt with commercial-image@v1.");
+      expect(fetchImpl).not.toHaveBeenCalled();
     } finally {
       restoreEnv("TEXT_MODEL_API_KEY", previousTextKey);
       restoreEnv("OPENAI_API_KEY", previousOpenAiKey);

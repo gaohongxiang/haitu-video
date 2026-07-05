@@ -57,6 +57,10 @@ const migrations: Migration[] = [
   {
     id: "0013_model_pricing_catalog_versions",
     sql: readMigrationSql("0013_model_pricing_catalog_versions.sql")
+  },
+  {
+    id: "0014_model_service_preference_model_choices",
+    sql: readMigrationSql("0014_model_service_preference_model_choices.sql")
   }
 ];
 
@@ -83,10 +87,34 @@ CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (
       continue;
     }
     const apply = handle.sqlite.transaction(() => {
+      applyCompatibilityFixesBeforeMigration(handle, migration.id);
       handle.sqlite.exec(migration.sql);
       insertMigration.run(migration.id, new Date().toISOString());
     });
     apply();
+  }
+}
+
+function applyCompatibilityFixesBeforeMigration(handle: DatabaseHandle, migrationId: string): void {
+  if (migrationId !== "0014_model_service_preference_model_choices") {
+    return;
+  }
+  ensureColumns(handle, "model_service_preferences", [
+    ["text_model_config_id", "TEXT"],
+    ["image_model_config_id", "TEXT"],
+    ["video_model_config_id", "TEXT"]
+  ]);
+}
+
+function ensureColumns(handle: DatabaseHandle, tableName: string, columns: Array<[name: string, type: string]>): void {
+  const existingColumns = new Set(
+    (handle.sqlite.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).map((column) => column.name)
+  );
+  for (const [name, type] of columns) {
+    if (existingColumns.has(name)) {
+      continue;
+    }
+    handle.sqlite.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${name} ${type}`).run();
   }
 }
 

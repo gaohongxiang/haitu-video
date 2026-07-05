@@ -61,6 +61,7 @@ export interface ProviderConfigLedger {
 export interface ModelServiceAdminConfigItem {
   id: ModelProviderId;
   configId?: string;
+  credentialId?: string;
   label: string;
   vendor?: string;
   model: string;
@@ -132,6 +133,7 @@ function modelServiceAdminConfigItem(config: ModelStoredConfig): ModelServiceAdm
   return {
     id: config.providerId,
     configId: config.configId,
+    credentialId: config.credentialId,
     label: config.label,
     vendor: config.vendor,
     model: config.model,

@@ -86,13 +86,17 @@
       "rmbEmpty": "后台暂未启用 RMB 支付",
       "cryptoEmpty": "后台暂未启用数字货币支付",
       "amount": "支付金额",
-      "credit": "到账余额",
+      "credit": "到账金额",
+      "rate": "汇率",
+      "refreshRate": "刷新汇率",
       "selected": "已选择",
       "selectable": "可选择",
       "notConfigured": "未配置",
       "disabled": "未启用",
       "unavailable": "该支付方式暂不可用，请稍后再试。",
-      "pay": "支付"
+      "quoteUnavailable": "暂时无法获取支付报价，请稍后再试。",
+      "pay": "支付",
+      "processing": "处理中"
     }
   },
   "dashboard": {
@@ -330,6 +334,33 @@
     "emptyTransactions": "还没有余额记录",
     "emptyRechargeTransactions": "还没有充值记录",
     "emptyConsumptionTransactions": "还没有消费记录",
+    "paymentMethods": {
+      "stripe": "Stripe",
+      "infini": "稳定币支付"
+    },
+    "orderTable": {
+      "order": "订单编号",
+      "topUpAmount": "充值金额",
+      "paymentMethod": "支付方式",
+      "status": "状态",
+      "createdAt": "创建时间",
+      "action": "操作",
+      "continuePay": "继续支付",
+      "statuses": {
+        "pending": "待支付",
+        "paid": "已完成",
+        "expired": "已过期",
+        "failed": "失败"
+      }
+    },
+    "transactionTable": {
+      "type": "类型",
+      "description": "说明",
+      "amount": "金额",
+      "balance": "余额",
+      "createdAt": "创建时间",
+      "action": "操作"
+    },
     "filters": {
       "ariaLabel": "消费明细筛选",
       "all": "全部",
@@ -374,6 +405,12 @@
       "balanceAfter": "变动后余额",
       "reservedAfter": "变动后冻结",
       "description": "说明",
+      "paymentMethod": "支付方式",
+      "paymentCurrency": "支付币种",
+      "cryptoCurrency": "到账币种",
+      "cryptoNetwork": "链网络",
+      "cryptoTxHash": "交易哈希",
+      "stripeCharge": "Stripe 流水号",
       "billingMode": "计费模式",
       "usageKind": "使用类型",
       "model": "模型",
@@ -890,8 +927,8 @@
     "selectParsedRow": "请选择已解析出商品资料的行。",
     "filledFromFile": "已把文件里的商品资料填入当前商品: {{title}}",
     "fileImportDone": "文件导入完成: 成功 {{imported}}/{{requested}}，失败 {{failed}}",
-    "storyboardGenerated": "AI 已优化视频提示词。",
-    "storyboardTimeout": "文本模型生成超时，请检查 API 配置或稍后重试。",
+    "storyboardGenerated": "模型提示词已预览。",
+    "storyboardTimeout": "模型提示词预览超时，请稍后重试。",
     "productUpdated": "商品资料已更新",
     "productSavedAndVideo": "商品已保存并进入视频创作",
     "productSaved": "商品资料已保存",
@@ -971,6 +1008,7 @@
     },
     "controls": {
       "template": "视频风格",
+      "creativeStyle": "拍法",
       "duration": "视频时长",
       "resolution": "视频分辨率",
       "aspectRatio": "画幅",
@@ -1125,14 +1163,18 @@
     "storyboard": {
       "title": "视频提示词",
       "subtitle": "可选；留空会按商品资料生成。",
-      "generate": "AI 优化提示词",
-      "generating": "优化中",
+      "placeholder": "可写你想要的视频方向，例如：日常通勤场景、模特佩戴走动、近景展示材质和颜色。留空也可以直接生成。",
+      "generate": "查看提示词",
+      "generating": "预览中",
+      "previewReadyToast": "模型提示词已预览。",
+      "previewFailed": "模型提示词预览失败，请稍后重试。",
+      "previewNeedsFacts": "先填写商品资料，再查看最终提示词。",
       "history": "提示词历史",
       "deleteRecord": "删除提示词记录",
-      "emptyHistory": "还没有 AI 生成历史",
+      "emptyHistory": "还没有提示词历史",
       "emptyPreview": "空提示词",
       "default": "默认提示词",
-      "ai": "AI 优化提示词",
+      "ai": "模型提示词预览",
       "manual": "手动提示词",
       "defaultDrafts": {
         "scene": [
@@ -1171,11 +1213,14 @@
       "referenceImages": "参考图 {{count}} 张"
     },
     "templates": {
+      "auto": "未选择",
+      "lifestyle": "生活化",
       "scene": "场景型",
       "painPoint": "痛点型",
       "benefit": "卖点型",
       "ugc": "UGC 型",
-      "unboxing": "开箱型"
+      "unboxing": "开箱型",
+      "detail": "细节型"
     },
     "videoStatus": {
       "expired": "已过期",
@@ -1516,6 +1561,12 @@
         "reservedAfter": "变动后冻结",
         "workspace": "业务空间",
         "description": "说明",
+        "paymentMethod": "支付方式",
+        "paymentCurrency": "支付币种",
+        "cryptoCurrency": "到账币种",
+        "cryptoNetwork": "链网络",
+        "cryptoTxHash": "交易哈希",
+        "stripeCharge": "Stripe 流水号",
         "billingMode": "计费模式",
         "usageKind": "使用类型",
         "model": "模型",

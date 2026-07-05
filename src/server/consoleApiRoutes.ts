@@ -147,7 +147,9 @@ export async function handleConsoleApiRoutes(input: {
   const settingsTemplateRouteResponse = await handleSettingsTemplateRoutes({
     request,
     url,
-    settingsStore
+    settingsStore,
+    fetchImpl,
+    now: requestContext.now
   });
   if (settingsTemplateRouteResponse) {
     return settingsTemplateRouteResponse;

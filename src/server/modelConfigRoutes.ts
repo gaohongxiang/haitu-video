@@ -92,13 +92,13 @@ export async function handleModelConfigRoutes(input: {
       return adminResponse;
     }
     const provider = parseModelProviderId(decodeURIComponent(platformModelConfigMatch[1] ?? ""));
-    const configId = url.searchParams.get("configId") ?? undefined;
-    const deleted = await requestContext.platformModelConfigStore.delete(provider, configId);
+    const configIds = url.searchParams.getAll("configId").filter(Boolean);
+    const deleted = await deleteModelConfigs(requestContext.platformModelConfigStore, provider, configIds);
     await auditLog.append({
       action: "platform_model_config.deleted",
       target: provider,
       metadata: {
-        configId
+        configIds
       }
     });
     return jsonResponse({ provider: deleted });
@@ -152,13 +152,14 @@ export async function handleModelConfigRoutes(input: {
   }
   if (modelConfigMatch && request.method === "DELETE") {
     const provider = parseModelProviderId(decodeURIComponent(modelConfigMatch[1] ?? ""));
-    const configId = url.searchParams.get("configId") ?? undefined;
-    const deleted = await requestContext.modelConfigStore.delete(provider, configId);
+    const configIds = url.searchParams.getAll("configId").filter(Boolean);
+    const deleted = await deleteModelConfigs(requestContext.modelConfigStore, provider, configIds);
     await auditLog.append({
       action: "model_config.deleted",
       target: provider,
       metadata: {
-        keySource: deleted.keySource
+        keySource: deleted.keySource,
+        configIds
       }
     });
     return jsonResponse({
@@ -176,4 +177,19 @@ function parseModelProviderId(value: string): ModelProviderId {
     return "volcengine-seedance";
   }
   throw new Error(`Unknown model provider target: ${value}`);
+}
+
+async function deleteModelConfigs(
+  store: ConsoleRequestContext["modelConfigStore"],
+  provider: ModelProviderId,
+  configIds: string[]
+) {
+  if (configIds.length === 0) {
+    return store.delete(provider);
+  }
+  let deleted;
+  for (const configId of Array.from(new Set(configIds))) {
+    deleted = await store.delete(provider, configId);
+  }
+  return deleted ?? store.delete(provider);
 }

@@ -160,8 +160,8 @@ describe("product workflow view-model helpers", () => {
     expect(productAutoSaveStatusLabel("saving")).toBe("保存中");
     expect(productAutoSaveStatusLabel("saving", "en")).toBe("Saving");
     expect(productAutoSaveStatusLabel("idle")).toBe("");
-    expect(storyboardStatusLabel("ai")).toBe("AI 优化提示词");
-    expect(storyboardStatusLabel("ai", "en")).toBe("AI prompt");
+    expect(storyboardStatusLabel("ai")).toBe("模型提示词预览");
+    expect(storyboardStatusLabel("ai", "en")).toBe("Model prompt preview");
     expect(storyboardStatusLabel("manual")).toBe("手动提示词");
   });
 

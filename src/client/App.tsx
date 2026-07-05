@@ -15,6 +15,7 @@ import {
   Database,
   Download,
   ExternalLink,
+  Eye,
   FileText,
   FileSpreadsheet,
   FileArchive,
@@ -121,8 +122,6 @@ import {
 import {
   isStoryboardTemplateName,
   splitDraftLines,
-  storyboardTemplateNames,
-  storyboardTimeRanges,
   templateLabel,
   type StoryboardTemplateName
 } from "./storyboardDrafts.js";
@@ -139,7 +138,6 @@ import {
   formatDeletionTime,
   formatCreativeVersionTime,
   formatHistoryTime,
-  historyPreview,
   readableVideoJobError,
   statusLabel,
   videoDownloadProductContext,
@@ -164,6 +162,7 @@ import {
 import {
   productDraftToFacts,
   productDraftToProductDetail,
+  productDraftToPreviewProduct,
   productFactsToDraft,
   splitLines
 } from "./productDraftFacts.js";
@@ -175,6 +174,7 @@ import {
 import {
   apiModeForProviderDraft,
   defaultModelConfigPreset,
+  modelConfigDeleteQuery,
   syncModelConfigDraftsFromLedger,
   updateProviderConfigStatus,
   type ModelConfigDraft,
@@ -195,6 +195,7 @@ import {
 import {
   modelLabelForId
 } from "../providers/modelCatalog.js";
+import { compileProductPrompt } from "../core/productPromptCompiler.js";
 import { cn } from "./lib/utils.js";
 import {
   localizedModelPricingEntry,
@@ -244,7 +245,8 @@ const floatingTooltipClass =
   "pointer-events-none absolute whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--field)] px-2.5 py-1.5 text-[11px] font-black text-[var(--muted)] opacity-0 shadow-[0_10px_24px_rgba(96,64,43,.12)] transition";
 
 type ProviderName = "mock" | "volcengine-seedance";
-type TemplateName = StoryboardTemplateName;
+type CreativeStyleName = "auto" | "lifestyle" | "detail" | StoryboardTemplateName;
+type TemplateName = CreativeStyleName;
 type VideoResolution = "480p" | "720p" | "1080p" | "4k";
 type VideoAspectRatio = "9:16" | "16:9";
 type ProductComposerSource = "structured" | "freeform";
@@ -428,11 +430,13 @@ interface ProductVideoGenerationOptions {
   resolution?: VideoResolution;
   aspectRatio?: VideoAspectRatio;
   referenceImages?: string[];
+  storyboardLines?: string[];
 }
 
 interface ProductImageGenerationOptions {
   prompt?: string;
   referenceImages?: string[];
+  locale?: AppLocale;
 }
 
 interface Preflight {
@@ -585,16 +589,29 @@ interface WalletLedger {
 
 interface WalletRechargeOrder {
   id: string;
+  workspaceId?: string;
   provider: "stripe" | "infini";
   providerSessionId?: string;
+  providerPaymentIntentId?: string;
   paymentAmount: number;
   paymentAmountCents: number;
   paymentCurrency: string;
   walletCurrency: "cny";
   creditCny: number;
   creditCents: number;
+  fxRateSnapshot?: Record<string, unknown>;
   status: "pending" | "paid" | "expired" | "failed";
   checkoutUrl?: string;
+  failureReason?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  expiresAt?: string;
+}
+
+interface WalletRechargeOrdersResponse {
+  orders: WalletRechargeOrder[];
 }
 
 interface WalletRechargeOrderResponse {
@@ -615,8 +632,29 @@ interface PaymentMethodView {
   enabled: boolean;
   configured: boolean;
   available: boolean;
+  paymentCurrency: string;
+  quote?: RechargePaymentQuote;
   description: string;
   unavailableReason?: string;
+}
+
+interface RechargePaymentQuote {
+  walletCurrency: "cny";
+  creditCny: number;
+  creditCents: number;
+  paymentCurrency: string;
+  paymentAmount: number;
+  paymentAmountCents: number;
+  fxRateSnapshot: {
+    from: "cny";
+    to: string;
+    rate: number;
+    source?: "identity" | "frankfurter" | "env";
+    sourceLabel?: string;
+    sourceUrl?: string;
+    asOfDate?: string;
+    fetchedAt?: string;
+  };
 }
 
 interface PaymentMethodsResponse {
@@ -854,7 +892,8 @@ const defaultSettings: SettingsState = {
 };
 
 const defaultVideoDurationSeconds = 10;
-const defaultVideoTemplate: TemplateName = "scene";
+const defaultVideoTemplate: TemplateName = "auto";
+const creativeStyleBaseOptions: TemplateName[] = ["auto", "lifestyle", "scene", "pain-point", "benefit", "ugc", "unboxing", "detail"];
 const defaultVideoResolution: VideoResolution = "480p";
 const videoResolutionOptions: VideoResolution[] = ["480p", "720p", "1080p", "4k"];
 const defaultVideoAspectRatio: VideoAspectRatio = "9:16";
@@ -879,7 +918,24 @@ function makeAppTranslator(scope: string): AppTranslator {
 const tVideoGlobal: VideoStudioTranslator = (key, options) => tAppGlobal(`videoStudio.${key}`, options);
 
 function isTemplateName(value: unknown): value is TemplateName {
-  return isStoryboardTemplateName(value);
+  return value === "auto" || value === "lifestyle" || value === "detail" || isStoryboardTemplateName(value);
+}
+
+function creativeStyleOptions(current: TemplateName, enabledTemplates: TemplateName[]): TemplateName[] {
+  const allowed = creativeStyleBaseOptions.filter((option) => (
+    option === "auto" ||
+    option === "lifestyle" ||
+    option === "detail" ||
+    enabledTemplates.includes(option)
+  ));
+  return allowed.includes(current) ? allowed : [current, ...allowed];
+}
+
+function legacyTemplateForVideoJob(value: TemplateName): StoryboardTemplateName {
+  if (isStoryboardTemplateName(value)) {
+    return value;
+  }
+  return "scene";
 }
 
 function restoreProductStudioSku(availableProducts: ProductSummary[], preferredSku?: string): string {
@@ -966,6 +1022,7 @@ export function App() {
     availableCny: 0,
     transactions: []
   });
+  const [walletRechargeOrders, setWalletRechargeOrders] = useState<WalletRechargeOrder[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodView[]>([]);
   const [pendingRechargeAmountCny, setPendingRechargeAmountCny] = useState<number | undefined>();
   const [modelPricingCatalog, setModelPricingCatalog] = useState<ActiveModelPricingCatalogView>({
@@ -1009,6 +1066,8 @@ export function App() {
   const productAutoSaveStatusRef = useRef<ProductAutoSaveStatus>("idle");
   const productAutoSaveSignatureRef = useRef("");
   const productAutoSaveInFlightRef = useRef<Promise<ProductDetail | undefined> | undefined>(undefined);
+  const modelServicePreferenceSaveInFlightRef = useRef(false);
+  const modelServicePreferenceMutationSeqRef = useRef(0);
   const handledWalletPaymentReturnRef = useRef(false);
 
   const enabledTemplateOptions = settings.enabledTemplates;
@@ -1494,6 +1553,7 @@ export function App() {
   async function refreshConsole(options: { applySettings?: boolean; reason?: RefreshConsoleReason; showLoading?: boolean } = {}) {
     const polling = options.reason === "polling";
     const showLoading = options.showLoading === true && !polling;
+    const modelServicePreferenceMutationSeq = modelServicePreferenceMutationSeqRef.current;
     if (showLoading) {
       setIsLoading(true);
     }
@@ -1512,6 +1572,7 @@ export function App() {
         settingsResponse,
         videoJobsResponse,
         walletResponse,
+        walletRechargeOrdersResponse,
         paymentMethodsResponse,
         modelPricingCatalogResponse,
         modelServicePreferenceResponse
@@ -1528,6 +1589,7 @@ export function App() {
         settingsResponse: { settings: SettingsState };
         videoJobsResponse: { jobs: VideoJob[] };
         walletResponse: WalletLedger;
+        walletRechargeOrdersResponse: WalletRechargeOrdersResponse;
         paymentMethodsResponse: PaymentMethodsResponse;
         modelPricingCatalogResponse: ModelPricingCatalogResponse;
         modelServicePreferenceResponse: { preference: ModelServicePreference };
@@ -1545,12 +1607,18 @@ export function App() {
       setAuditLog(auditLogResponse);
       setProviderConfig(providerConfigResponse);
       setWallet(walletResponse);
+      setWalletRechargeOrders(walletRechargeOrdersResponse.orders);
       setPaymentMethods(paymentMethodsResponse.methods);
       setModelPricingCatalog(modelPricingCatalogResponse.active);
-      setModelServicePreference(modelServicePreferenceResponse.preference);
-      setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? "auto");
-      setSelectedImageModelConfigId(modelServicePreferenceResponse.preference.imageModelConfigId ?? "auto");
-      setSelectedVideoModelConfigId(modelServicePreferenceResponse.preference.videoModelConfigId ?? "auto");
+      if (
+        !modelServicePreferenceSaveInFlightRef.current
+        && modelServicePreferenceMutationSeq === modelServicePreferenceMutationSeqRef.current
+      ) {
+        setModelServicePreference(modelServicePreferenceResponse.preference);
+        setSelectedTextModelConfigId(modelServicePreferenceResponse.preference.textModelConfigId ?? "auto");
+        setSelectedImageModelConfigId(modelServicePreferenceResponse.preference.imageModelConfigId ?? "auto");
+        setSelectedVideoModelConfigId(modelServicePreferenceResponse.preference.videoModelConfigId ?? "auto");
+      }
       setModelConfigDrafts((current) => syncModelConfigDraftsFromLedger(providerConfigResponse, current));
       setSettings(settingsResponse.settings);
       setVideoJobs(videoJobsResponse.jobs);
@@ -1640,14 +1708,6 @@ export function App() {
     setStatusText(tApp("status.storyboardApplied", { template: localizedTemplateLabel(record.style, tVideoApp), duration: formatDuration(record.duration) }));
   }
 
-  function injectTemplateStoryboardDraft(nextTemplate: TemplateName) {
-    setStudioScriptDraft("");
-    setStudioStoryboardDraft(localizedDefaultStoryboardDraft(nextTemplate, duration, appLocale));
-    setStoryboardDraftSource("default");
-    setStudioStoryboardCnDraft("");
-    markPreflightStale();
-  }
-
   async function deleteStoryboardHistory(recordId: string) {
     if (!selectedProduct) return;
     await deleteJson(`/api/products/${encodeURIComponent(selectedProduct.sku)}/storyboards/${encodeURIComponent(recordId)}`);
@@ -1674,7 +1734,7 @@ export function App() {
         duration,
         resolution: selectedVideoResolution,
         aspectRatio: selectedVideoAspectRatio,
-        template,
+        template: legacyTemplateForVideoJob(template),
         finalLanguage,
         cta,
         scriptLines: splitDraftLines(studioScriptDraft),
@@ -1709,7 +1769,7 @@ export function App() {
         provider: "volcengine-seedance",
         providerModelConfigId: effectiveSelectedVideoModelConfigId,
         duration,
-        template,
+        template: legacyTemplateForVideoJob(template),
         finalLanguage,
         cta,
         scriptLines: splitDraftLines(studioScriptDraft),
@@ -1826,6 +1886,13 @@ export function App() {
   }
 
   async function saveModelServicePreference(patch: Partial<ModelServicePreference>) {
+    const previousPreference = modelServicePreference;
+    const optimisticPreference = {
+      ...modelServicePreference,
+      ...patch
+    };
+    modelServicePreferenceSaveInFlightRef.current = true;
+    setModelServicePreference(optimisticPreference);
     setIsBusy(true);
     try {
       const preference = await persistModelServicePreference(patch);
@@ -1835,13 +1902,16 @@ export function App() {
       setStatusText(preference.serviceMode === "platform" ? tApp("status.platformMode") : tApp("status.byokMode"));
       await refreshConsole();
     } catch (error) {
+      setModelServicePreference(previousPreference);
       showError(error);
     } finally {
+      modelServicePreferenceSaveInFlightRef.current = false;
       setIsBusy(false);
     }
   }
 
   async function persistModelServicePreference(patch: Partial<ModelServicePreference>): Promise<ModelServicePreference> {
+    modelServicePreferenceMutationSeqRef.current += 1;
     const nextPreference = {
       ...modelServicePreference,
       ...patch
@@ -1959,10 +2029,10 @@ export function App() {
     }
   }
 
-  async function clearModelConfig(providerId: ModelConfigProviderId, configId?: string) {
+  async function clearModelConfig(providerId: ModelConfigProviderId, configIds?: string[]) {
     setIsBusy(true);
     try {
-      const suffix = configId ? `?configId=${encodeURIComponent(configId)}` : "";
+      const suffix = modelConfigDeleteQuery(configIds);
       const response = await fetch(`/api/model-configs/${providerId}${suffix}`, {
         method: "DELETE"
       });
@@ -2433,10 +2503,10 @@ export function App() {
         resolution: videoGenerationOptions.resolution ?? selectedVideoResolution,
         aspectRatio: videoGenerationOptions.aspectRatio ?? selectedVideoAspectRatio,
         referenceImages: videoGenerationOptions.referenceImages,
-        template,
+        template: legacyTemplateForVideoJob(template),
         finalLanguage,
         cta,
-        storyboardLines: splitDraftLines(studioStoryboardDraft),
+        storyboardLines: videoGenerationOptions.storyboardLines ?? splitDraftLines(studioStoryboardDraft),
         confirmPaid: (videoGenerationOptions.provider ?? "volcengine-seedance") !== "mock",
         versions: selectedVersionCount
       });
@@ -2631,15 +2701,15 @@ export function App() {
     }
   }
 
-  async function generateStoryboardDraft(product = selectedProduct) {
+  async function generateStoryboardDraft(product = selectedProduct, options: {
+    prompt?: string;
+    referenceImages?: string[];
+  } = {}) {
     if (!product) {
       setStatusText(tApp("status.selectProduct"));
       return;
     }
     if (isGeneratingStoryboard) {
-      return;
-    }
-    if (!ensureTextModelConfigured()) {
       return;
     }
     const controller = new AbortController();
@@ -2650,8 +2720,14 @@ export function App() {
         `/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`,
         {
           duration,
-          template,
-          textModelConfigId: effectiveSelectedTextModelConfigId
+          aspectRatio: selectedVideoAspectRatio,
+          finalLanguage,
+          template: legacyTemplateForVideoJob(template),
+          creativeStyle: template,
+          videoModelConfigId: effectiveSelectedVideoModelConfigId,
+          prompt: options.prompt?.trim() || undefined,
+          referenceImages: options.referenceImages ?? [],
+          locale: appLocale
         },
         controller.signal
       );
@@ -2662,7 +2738,7 @@ export function App() {
       setStoryboardDraftSource("ai");
       setStudioStoryboardCnDraft("");
       await pushStoryboardHistory({
-        style: template,
+        style: legacyTemplateForVideoJob(template),
         duration,
         script: nextStoryboardDraft
       }, product);
@@ -2674,9 +2750,12 @@ export function App() {
       ].join("\n"));
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        showError(new Error(tApp("status.storyboardTimeout")));
+        const timeoutError = new Error(tApp("status.storyboardTimeout"));
+        showError(timeoutError);
+        throw timeoutError;
       } else {
         showError(error);
+        throw error;
       }
     } finally {
       window.clearTimeout(timeout);
@@ -2684,15 +2763,12 @@ export function App() {
     }
   }
 
-  async function generateImagePromptDraft(product: ProductDetail, options: { prompt?: string; targetImage?: string } = {}) {
+  async function generateImagePromptDraft(product: ProductDetail, options: { prompt?: string; targetImage?: string; referenceImages?: string[] } = {}) {
     if (!product) {
       setStatusText(tApp("status.selectProduct"));
       return undefined;
     }
     if (isGeneratingImagePrompt) {
-      return undefined;
-    }
-    if (!ensureTextModelConfigured()) {
       return undefined;
     }
     const controller = new AbortController();
@@ -2704,20 +2780,25 @@ export function App() {
         {
           prompt: options.prompt?.trim() || undefined,
           targetImage: options.targetImage?.trim() || undefined,
-          textModelConfigId: effectiveSelectedTextModelConfigId
+          imageModelConfigId: effectiveSelectedImageModelConfigId,
+          referenceImages: options.referenceImages ?? [],
+          locale: appLocale
         },
         controller.signal
       );
       setStatusText([
-        "图片提示词已优化。",
+        "模型提示词已预览。",
         ...response.notes.map((note) => `- ${note}`)
       ].join("\n"));
       return response;
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        showError(new Error(tApp("status.storyboardTimeout")));
+        const timeoutError = new Error(tApp("status.storyboardTimeout"));
+        showError(timeoutError);
+        throw timeoutError;
       } else {
         showError(error);
+        throw error;
       }
       return undefined;
     } finally {
@@ -2872,7 +2953,8 @@ export function App() {
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {
         imageModelConfigId: effectiveSelectedImageModelConfigId,
         prompt: options.prompt?.trim() || undefined,
-        referenceImages: options.referenceImages ?? []
+        referenceImages: options.referenceImages ?? [],
+        locale: options.locale ?? appLocale
       });
       await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
@@ -3169,7 +3251,7 @@ export function App() {
           enabledTemplateOptions={enabledTemplateOptions}
           onTemplateChange={(nextTemplate) => {
             setTemplate(nextTemplate);
-            injectTemplateStoryboardDraft(nextTemplate);
+            markPreflightStale();
           }}
           finalLanguage={finalLanguage}
           onFinalLanguageChange={(nextLanguage) => {
@@ -3178,14 +3260,11 @@ export function App() {
           }}
           storyboardDraft={studioStoryboardDraft}
           storyboardDraftSource={storyboardDraftSource}
-          onStoryboardDraftChange={(nextDraft) => {
-            setStoryboardDraftSource("manual");
+          onStoryboardDraftChange={(nextDraft, source = "manual") => {
+            setStoryboardDraftSource(source);
             setStudioStoryboardDraft(nextDraft);
             markPreflightStale();
           }}
-          storyboardHistory={storyboardHistory}
-          onApplyStoryboardHistory={applyStoryboardHistory}
-          onDeleteStoryboardHistory={deleteStoryboardHistory}
           onPreviewProductFileImport={previewProductFileImport}
           onFillCurrentProductFromFileRow={fillCurrentProductFromFileRow}
           onCommitProductFileImportRows={commitProductFileImportRows}
@@ -3240,7 +3319,7 @@ export function App() {
       case "wallet":
         return (
           <section className="grid gap-4" aria-label={tApp("wallet.ariaLabel")}>
-            <WalletRechargePanel appLocale={appLocale} wallet={wallet} onRequestRecharge={openRechargeDialog} isBusy={isBusy} />
+            <WalletRechargePanel appLocale={appLocale} wallet={wallet} walletRechargeOrders={walletRechargeOrders} onRequestRecharge={openRechargeDialog} isBusy={isBusy} />
           </section>
         );
       case "pricing":
@@ -3775,16 +3854,51 @@ function PaymentMethodDialog({
   const tWallet = makeAppTranslator("wallet");
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<PaymentMethodView["id"]>("stripe");
   const [selectedPaymentKind, setSelectedPaymentKind] = useState<PaymentMethodView["kind"]>("rmb");
-  const rmbMethods = paymentMethods.filter((method) => method.kind === "rmb");
-  const cryptoMethods = paymentMethods.filter((method) => method.kind === "crypto");
-  const selectedMethodInAllMethods = paymentMethods.find((method) => method.id === selectedPaymentMethodId);
+  const [quotedPaymentMethods, setQuotedPaymentMethods] = useState<PaymentMethodView[]>(paymentMethods);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [quoteLoadFailed, setQuoteLoadFailed] = useState(false);
+  const quoteRequestSeqRef = useRef(0);
+  const displayPaymentMethods = quotedPaymentMethods.length > 0 ? quotedPaymentMethods : paymentMethods;
+  const rmbMethods = displayPaymentMethods.filter((method) => method.kind === "rmb");
+  const cryptoMethods = displayPaymentMethods.filter((method) => method.kind === "crypto");
+  const selectedMethodInAllMethods = displayPaymentMethods.find((method) => method.id === selectedPaymentMethodId);
   const visibleMethods = selectedPaymentKind === "crypto" ? cryptoMethods : rmbMethods;
   const selectedMethod = visibleMethods.find((method) => method.id === selectedPaymentMethodId) ?? visibleMethods[0];
-  const canContinue = Boolean(selectedMethod?.available);
+  const selectedQuote = selectedMethod?.quote;
+  const selectedQuoteReady = Boolean(selectedQuote) || (selectedMethod?.paymentCurrency === "cny" && !isLoadingQuote && !quoteLoadFailed);
+  const canContinue = Boolean(selectedMethod?.available && selectedQuoteReady);
   const methodGroups = [
     { kind: "rmb" as const, title: tPayment("rmb"), emptyText: tPayment("rmbEmpty"), methods: rmbMethods },
     { kind: "crypto" as const, title: tPayment("crypto"), emptyText: tPayment("cryptoEmpty"), methods: cryptoMethods }
   ];
+
+  function refreshPaymentQuote() {
+    if (!amountCny) {
+      setQuotedPaymentMethods(paymentMethods);
+      return;
+    }
+    const requestSeq = quoteRequestSeqRef.current + 1;
+    quoteRequestSeqRef.current = requestSeq;
+    setIsLoadingQuote(true);
+    setQuoteLoadFailed(false);
+    void getJson<PaymentMethodsResponse>(`/api/payment-methods?amountCny=${encodeURIComponent(String(amountCny))}&methodId=${encodeURIComponent(selectedPaymentMethodId)}`)
+      .then((response) => {
+        if (quoteRequestSeqRef.current === requestSeq) {
+          setQuotedPaymentMethods(response.methods);
+        }
+      })
+      .catch(() => {
+        if (quoteRequestSeqRef.current === requestSeq) {
+          setQuotedPaymentMethods(paymentMethods);
+          setQuoteLoadFailed(true);
+        }
+      })
+      .finally(() => {
+        if (quoteRequestSeqRef.current === requestSeq) {
+          setIsLoadingQuote(false);
+        }
+      });
+  }
 
   useEffect(() => {
     if (!amountCny) return;
@@ -3793,7 +3907,11 @@ function PaymentMethodDialog({
     if (!fallback) return;
     setSelectedPaymentMethodId(fallback?.id ?? "stripe");
     setSelectedPaymentKind(fallback?.kind ?? "rmb");
-  }, [amountCny, paymentMethods.length]);
+  }, [amountCny, displayPaymentMethods.length]);
+
+  useEffect(() => {
+    refreshPaymentQuote();
+  }, [amountCny, paymentMethods, selectedPaymentMethodId]);
 
   if (!amountCny) {
     return null;
@@ -3822,9 +3940,16 @@ function PaymentMethodDialog({
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--card)] p-3">
-          <MetricInline label={tPayment("amount")} value={`¥${money(amountCny)}`} />
-          <MetricInline label={tPayment("credit")} value={`¥${money(amountCny)}`} />
+        <div className="grid gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--card)] p-3 sm:grid-cols-[1fr_1fr_1.15fr]">
+          <MetricInline label={tPayment("credit")} value={`¥${money(selectedQuote?.creditCny ?? amountCny)}`} />
+          <MetricInline label={tPayment("amount")} value={paymentMethodPaymentAmountText(selectedMethod, amountCny, isLoadingQuote)} />
+          <PaymentRateMetric
+            label={tPayment("rate")}
+            value={paymentMethodFxRateText(selectedQuote, isLoadingQuote)}
+            refreshLabel={tPayment("refreshRate")}
+            loading={isLoadingQuote}
+            onRefresh={refreshPaymentQuote}
+          />
         </div>
 
         <div className="payment-kind-card-grid grid gap-2 sm:grid-cols-2">
@@ -3881,18 +4006,18 @@ function PaymentMethodDialog({
               </button>
             );
           })}
-          {selectedMethod && !selectedMethod.available ? (
+          {selectedMethod && (!selectedMethod.available || quoteLoadFailed) ? (
             <div className="rounded-[10px] border border-[color-mix(in_srgb,#f59e0b_36%,var(--border))] bg-[color-mix(in_srgb,#f59e0b_10%,var(--panel))] px-3 py-2 text-[12px] font-bold leading-5 text-[var(--muted)]">
-              {selectedMethod.unavailableReason ?? tPayment("unavailable")}
+              {quoteLoadFailed ? tPayment("quoteUnavailable") : selectedMethod.unavailableReason ?? tPayment("unavailable")}
             </div>
           ) : null}
         </div>
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button className="w-fit" variant="ghost" disabled={isBusy} onClick={onClose}>{tAppGlobal("commonActions.cancel")}</Button>
-          <Button className="w-fit" variant="primary" disabled={isBusy || !canContinue} onClick={() => selectedMethod && selectedMethod.available ? void onContinue(selectedMethod.id) : undefined}>
-            <CreditCard size={14} />
-            {tPayment("pay")}
+          <Button className="min-w-[96px]" variant="primary" disabled={isBusy || !canContinue} onClick={() => selectedMethod && selectedMethod.available ? void onContinue(selectedMethod.id) : undefined}>
+            {isBusy ? <RefreshCcw className="h-3.5 w-3.5 animate-spin" /> : <CreditCard size={14} />}
+            {isBusy ? tPayment("processing") : tPayment("pay")}
           </Button>
         </div>
       </section>
@@ -4313,9 +4438,6 @@ function ProductCreationWorkspace({
   storyboardDraft,
   storyboardDraftSource,
   onStoryboardDraftChange,
-  storyboardHistory,
-  onApplyStoryboardHistory,
-  onDeleteStoryboardHistory,
   onPreviewProductFileImport,
   onFillCurrentProductFromFileRow,
   onCommitProductFileImportRows,
@@ -4349,9 +4471,9 @@ function ProductCreationWorkspace({
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail, options?: { prompt?: string; referenceImages?: string[] }) => Promise<void>;
   isGeneratingStoryboard: boolean;
-  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string }) => Promise<ImagePromptDraftResponse | undefined>;
+  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string; referenceImages?: string[] }) => Promise<ImagePromptDraftResponse | undefined>;
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
@@ -4381,10 +4503,7 @@ function ProductCreationWorkspace({
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
   storyboardDraftSource: StoryboardDraftSource;
-  onStoryboardDraftChange: (draft: string) => void;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onStoryboardDraftChange: (draft: string, source?: StoryboardDraftSource) => void;
   onPreviewProductFileImport: (file: File) => Promise<ProductFileImportPreviewResponse>;
   onFillCurrentProductFromFileRow: (row: ProductFileImportRow) => Promise<void>;
   onCommitProductFileImportRows: (rows: ProductFileImportRow[], rowIds: string[]) => Promise<ProductFileImportCommitResponse>;
@@ -4410,10 +4529,6 @@ function ProductCreationWorkspace({
       videoJobs
     })
     : [];
-  const selectedProductStoryboardHistory = selectedProduct
-    ? storyboardHistory
-    : [];
-
   return (
     <ProductCreationComposer
       mode={mode}
@@ -4475,9 +4590,6 @@ function ProductCreationWorkspace({
       storyboardDraft={storyboardDraft}
       storyboardDraftSource={storyboardDraftSource}
       onStoryboardDraftChange={onStoryboardDraftChange}
-      storyboardHistory={selectedProductStoryboardHistory}
-      onApplyStoryboardHistory={onApplyStoryboardHistory}
-      onDeleteStoryboardHistory={onDeleteStoryboardHistory}
       onPreviewProductFileImport={onPreviewProductFileImport}
       onFillCurrentProductFromFileRow={onFillCurrentProductFromFileRow}
       onCommitProductFileImportRows={onCommitProductFileImportRows}
@@ -4546,9 +4658,6 @@ function ProductCreationComposer({
   storyboardDraft,
   storyboardDraftSource,
   onStoryboardDraftChange,
-  storyboardHistory,
-  onApplyStoryboardHistory,
-  onDeleteStoryboardHistory,
   onPreviewProductFileImport,
   onFillCurrentProductFromFileRow,
   onCommitProductFileImportRows,
@@ -4580,9 +4689,9 @@ function ProductCreationComposer({
   onDeleteLedgerVideo: (jobId: string) => Promise<void>;
   onRetryVideoJob: (job: VideoJob) => Promise<void>;
   onRecoverVideoJobDownload: (job: VideoJob) => Promise<void>;
-  onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
+  onGenerateStoryboardDraft: (product?: ProductDetail, options?: { prompt?: string; referenceImages?: string[] }) => Promise<void>;
   isGeneratingStoryboard: boolean;
-  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string }) => Promise<ImagePromptDraftResponse | undefined>;
+  onGenerateImagePromptDraft: (product: ProductDetail, options?: { prompt?: string; targetImage?: string; referenceImages?: string[] }) => Promise<ImagePromptDraftResponse | undefined>;
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
@@ -4612,10 +4721,7 @@ function ProductCreationComposer({
   onFinalLanguageChange: (language: FinalVideoLanguage) => void;
   storyboardDraft: string;
   storyboardDraftSource: StoryboardDraftSource;
-  onStoryboardDraftChange: (draft: string) => void;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onStoryboardDraftChange: (draft: string, source?: StoryboardDraftSource) => void;
   onPreviewProductFileImport: (file: File) => Promise<ProductFileImportPreviewResponse>;
   onFillCurrentProductFromFileRow: (row: ProductFileImportRow) => Promise<void>;
   onCommitProductFileImportRows: (rows: ProductFileImportRow[], rowIds: string[]) => Promise<ProductFileImportCommitResponse>;
@@ -4656,9 +4762,7 @@ function ProductCreationComposer({
   const durationOptions = ["5", "8", "10", "12", "15"];
   const versionCountOptions = ["1", "2", "3", "4", "5"];
   const languageOptions: FinalVideoLanguage[] = ["ja", "zh", "en"];
-  const templateOptions = enabledTemplateOptions.includes(template)
-    ? enabledTemplateOptions
-    : [template, ...enabledTemplateOptions];
+  const templateOptions = creativeStyleOptions(template, enabledTemplateOptions);
   const packingDisabled = isPacking || isSubmittingVideo || isSubmittingImage;
   const productFactsBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const productAutoSaveLabel = localizedProductAutoSaveStatusLabel(productAutoSaveStatus, tVideo);
@@ -4672,20 +4776,6 @@ function ProductCreationComposer({
   const generateVideoDisabled = packingDisabled || !generationReadiness.ready;
   const effectiveSelectedImageModelConfigId = effectiveModelConfigChoice(selectedImageModelConfigId, imageModelOptions);
   const effectiveSelectedVideoModelConfigId = effectiveModelConfigChoice(selectedVideoModelConfigId, videoModelOptions);
-  const selectedCreationReferenceImages = imagePromptReferences.map((image) => image.original).filter(Boolean);
-  const activeCreationReferenceCount = selectedCreationReferenceImages.length > 0 ? selectedCreationReferenceImages.length : previewableReferenceImages.length;
-  const videoModelLabel = localizedModelConfigChoiceLabel(effectiveSelectedVideoModelConfigId, videoModelOptions, tVideo);
-  const generateVideoSummary = [
-    localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
-    tVideo("summary.referenceImages", { count: activeCreationReferenceCount }),
-    localizedStoryboardStatusLabel(storyboardDraftSource, tVideo),
-    localizedTemplateLabel(template, tVideo),
-    formatDuration(duration),
-    videoResolutionLabel(selectedVideoResolution),
-    videoAspectRatioLabel(selectedVideoAspectRatio, tVideo),
-    finalLanguageLabel(finalLanguage, tVideo),
-    tVideo("models.videoModel", { model: videoModelLabel })
-  ].join(" · ");
   const productImageAssetCount = 0;
   const creativeWorkspace = buildProductCreativeWorkspace({
     mode,
@@ -4697,23 +4787,11 @@ function ProductCreationComposer({
   });
   const imageModelLabel = localizedModelConfigChoiceLabel(effectiveSelectedImageModelConfigId, imageModelOptions, tVideo);
   const imageGenerateDisabled = packingDisabled || creativeWorkspace.primaryAction.disabled;
-  const productModeActionButtonClass = "min-h-12 w-full justify-center rounded-[14px] text-sm";
-  const productModeActionDisabledClass = "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100";
   const selectedImagePromptReference = imagePromptReferenceIndex === undefined ? undefined : imagePromptReferences[imagePromptReferenceIndex];
   const selectedImagePromptReferenceNumber = selectedImagePromptReference
     ? Math.max(0, imagePromptReferences.indexOf(selectedImagePromptReference)) + 1
     : 0;
-  const imageTargetLabel = selectedImagePromptReference
-    ? `优化参考图 ${selectedImagePromptReferenceNumber} · 共 ${imagePromptReferences.length} 张已选`
-    : "按商品资料生成";
-  const imagePromptReadyLabel = imagePrompt.trim() ? "已填写图片提示词" : "默认图片提示词";
   const generateImageButtonLabel = "生成图片";
-  const imageGenerateSummary = [
-    localizedProductFactsStatusLabel({ selectedProduct, importText, tVideo }),
-    imageTargetLabel,
-    imagePromptReadyLabel,
-    tVideo("models.imageModel", { model: imageModelLabel })
-  ].join(" · ");
   useEffect(() => {
     setImagePromptReferences([]);
     setImagePromptReferenceIndex(undefined);
@@ -4782,12 +4860,28 @@ function ProductCreationComposer({
       const autoSavedProduct = await onFlushProductFactsAutoSave();
       const savedProduct = autoSavedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
+      const selectedReferenceImages = selectedCreationReferenceImagesForProduct(savedProduct) ?? [];
+      const compiledVideoPrompt = compileProductPrompt({
+        locale: appLocale,
+        mode: "video",
+        product: savedProduct,
+        userPrompt: storyboardDraft,
+        referenceImages: selectedReferenceImages,
+        targetModel: targetModelForPromptPreview(videoModelOptions, selectedVideoModelConfigId, "volcengine-seedance"),
+        video: {
+          durationSeconds: duration,
+          aspectRatio: selectedVideoAspectRatio,
+          finalLanguage,
+          creativeStyle: template
+        }
+      });
       await onGenerateVideo(productActionSummary(savedProduct), {
         provider: "volcengine-seedance",
         providerModelConfigId: effectiveSelectedVideoModelConfigId,
         resolution: selectedVideoResolution,
         aspectRatio: selectedVideoAspectRatio,
-        referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []
+        referenceImages: selectedReferenceImages,
+        storyboardLines: splitDraftLines(compiledVideoPrompt.prompt)
       });
       onToast(tVideo("generate.queuedToast"), "ok");
     } catch (error) {
@@ -4810,7 +4904,8 @@ function ProductCreationComposer({
       if (!savedProduct) return;
       await onGenerateReferenceImages(savedProduct.sku, {
         prompt: imagePrompt,
-        referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? []
+        referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? [],
+        locale: appLocale
       });
       onToast("商品图片优化已提交", "ok");
     } catch (error) {
@@ -4820,22 +4915,93 @@ function ProductCreationComposer({
     }
   }
 
+  function selectedReferenceImagesForPromptPreview(): string[] {
+    return imagePromptReferences.map((reference) => reference.original.trim()).filter(Boolean);
+  }
+
+  function targetModelForPromptPreview(models: ProviderConfigItem[], selectedConfigId: ModelConfigChoice, fallbackProviderId: string) {
+    const effectiveConfigId = effectiveModelConfigChoice(selectedConfigId, models);
+    const model = models.find((item) => item.configId === effectiveConfigId);
+    return {
+      providerId: model?.id ?? fallbackProviderId,
+      vendor: model?.providerLabel,
+      model: model?.model,
+      baseUrl: model?.baseUrl
+    };
+  }
+
+  function previewProductForPromptCompiler(): ProductDetail | undefined {
+    const fallbackDraft = selectedProduct ? productFactsToDraft(selectedProduct) : draft;
+    const previewDraft = productComposerTextToDraft(importText, fallbackDraft);
+    const sourceText = previewDraft.source_text || importText.trim() || selectedProduct?.source_text || "";
+    if (!sourceText && !previewDraft.title_ja.trim() && !selectedProduct) {
+      return undefined;
+    }
+    const previewProduct = productDraftToPreviewProduct({
+      ...previewDraft,
+      source_text: sourceText
+    });
+    if (!selectedProduct) {
+      return previewProduct;
+    }
+    return {
+      ...previewProduct,
+      path: selectedProduct.path,
+      referenceImageCount: previewProduct.reference_images.length || selectedProduct.referenceImageCount,
+      importQuality: selectedProduct.importQuality,
+      paidReadiness: selectedProduct.paidReadiness,
+      reference_image_statuses: selectedProduct.reference_image_statuses,
+      reference_images: previewProduct.reference_images.length > 0 ? previewProduct.reference_images : selectedProduct.reference_images
+    };
+  }
+
   async function handleGenerateStoryboardDraft() {
-    const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
-    if (!productForStoryboard) return;
-    await onGenerateStoryboardDraft(productForStoryboard);
+    try {
+      const productForStoryboard = previewProductForPromptCompiler();
+      if (!productForStoryboard) {
+        onToast(tVideo("storyboard.previewNeedsFacts"));
+        return;
+      }
+      const response = compileProductPrompt({
+        locale: appLocale,
+        mode: "video",
+        product: productForStoryboard,
+        userPrompt: storyboardDraft,
+        referenceImages: selectedReferenceImagesForPromptPreview(),
+        targetModel: targetModelForPromptPreview(videoModelOptions, selectedVideoModelConfigId, "volcengine-seedance"),
+        video: {
+          durationSeconds: duration,
+          aspectRatio: selectedVideoAspectRatio,
+          finalLanguage,
+          creativeStyle: template
+        }
+      });
+      onStoryboardDraftChange(response.prompt, "ai");
+      onToast(tVideo("storyboard.previewReadyToast"), "ok");
+    } catch (error) {
+      onToast(errorMessage(error));
+    }
   }
 
   async function handleGenerateImagePromptDraft() {
-    const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
-    if (!productForPrompt) return;
-    const response = await onGenerateImagePromptDraft(productForPrompt, {
-      prompt: imagePrompt,
-      targetImage: selectedImagePromptReference?.original
-    });
-    if (response?.prompt) {
+    try {
+      const productForPrompt = previewProductForPromptCompiler();
+      if (!productForPrompt) {
+        onToast(tVideo("storyboard.previewNeedsFacts"));
+        return;
+      }
+      const response = compileProductPrompt({
+        locale: appLocale,
+        mode: "image",
+        product: productForPrompt,
+        userPrompt: imagePrompt,
+        referenceImages: selectedReferenceImagesForPromptPreview(),
+        targetModel: targetModelForPromptPreview(imageModelOptions, selectedImageModelConfigId, "openai-compatible-image")
+      });
       setImagePrompt(response.prompt);
-      onToast("图片提示词已优化", "ok");
+      onToast(tVideo("storyboard.previewReadyToast"), "ok");
+    } catch (error) {
+      onToast(errorMessage(error));
     }
   }
 
@@ -5155,17 +5321,10 @@ function ProductCreationComposer({
           onImagePromptReferenceRemove={handleRemoveImagePromptReference}
           onImagePromptReferenceFilesChange={handleImagePromptReferenceFiles}
           storyboardDraft={storyboardDraft}
-          storyboardHistory={storyboardHistory}
           onStoryboardDraftChange={onStoryboardDraftChange}
-          onApplyStoryboardHistory={onApplyStoryboardHistory}
-          onDeleteStoryboardHistory={onDeleteStoryboardHistory}
           isGeneratingStoryboard={isGeneratingStoryboard}
           storyboardProductReady={storyboardProductReady}
-          generateVideoSummary={generateVideoSummary}
-          imageGenerateSummary={imageGenerateSummary}
           generationReadiness={generationReadiness}
-          actionButtonClass={productModeActionButtonClass}
-          actionDisabledClass={productModeActionDisabledClass}
           generateVideoDisabled={generateVideoDisabled}
           imageGenerateDisabled={imageGenerateDisabled}
           generateVideoButtonLabel={generateVideoButtonLabel}
@@ -5175,7 +5334,6 @@ function ProductCreationComposer({
           videoEstimate={billingEstimates?.estimates.video}
           imageEstimate={billingEstimates?.estimates.referenceImages}
           organizeProductEstimate={billingEstimates?.estimates.organizeProduct}
-          storyboardEstimate={billingEstimates?.estimates.storyboard}
           onSelectReferenceImage={handleSelectReferenceImage}
           onPreviewReferenceImage={handlePreviewReferenceImage}
           onPendingSelect={handleSelectReferenceImage}
@@ -5311,17 +5469,10 @@ function ProductCreativeWorkbench({
   onImagePromptReferenceRemove,
   onImagePromptReferenceFilesChange,
   storyboardDraft,
-  storyboardHistory,
   onStoryboardDraftChange,
-  onApplyStoryboardHistory,
-  onDeleteStoryboardHistory,
   isGeneratingStoryboard,
   storyboardProductReady,
-  generateVideoSummary,
-  imageGenerateSummary,
   generationReadiness,
-  actionButtonClass,
-  actionDisabledClass,
   generateVideoDisabled,
   imageGenerateDisabled,
   generateVideoButtonLabel,
@@ -5331,7 +5482,6 @@ function ProductCreativeWorkbench({
   videoEstimate,
   imageEstimate,
   organizeProductEstimate,
-  storyboardEstimate,
   onSelectReferenceImage,
   onPreviewReferenceImage,
   onPendingSelect,
@@ -5405,17 +5555,10 @@ function ProductCreativeWorkbench({
   onImagePromptReferenceRemove: (index: number) => void;
   onImagePromptReferenceFilesChange: (files: FileList | File[] | null) => void;
   storyboardDraft: string;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onStoryboardDraftChange: (draft: string) => void;
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onStoryboardDraftChange: (draft: string, source?: StoryboardDraftSource) => void;
   isGeneratingStoryboard: boolean;
   storyboardProductReady: boolean;
-  generateVideoSummary: string;
-  imageGenerateSummary: string;
   generationReadiness: { ready: boolean; label: string };
-  actionButtonClass: string;
-  actionDisabledClass: string;
   generateVideoDisabled: boolean;
   imageGenerateDisabled: boolean;
   generateVideoButtonLabel: string;
@@ -5425,7 +5568,6 @@ function ProductCreativeWorkbench({
   videoEstimate?: BillingActionEstimate;
   imageEstimate?: BillingActionEstimate;
   organizeProductEstimate?: BillingActionEstimate;
-  storyboardEstimate?: BillingActionEstimate;
   onSelectReferenceImage: (index: number) => void;
   onPreviewReferenceImage: (index: number) => void;
   onPendingSelect: (index: number) => void;
@@ -5537,27 +5679,13 @@ function ProductCreativeWorkbench({
           versionCountOptions={versionCountOptions}
           onVersionCountChange={onVersionCountChange}
           storyboardDraft={storyboardDraft}
-          storyboardHistory={storyboardHistory}
           onStoryboardDraftChange={onStoryboardDraftChange}
-          onApplyStoryboardHistory={onApplyStoryboardHistory}
-          onDeleteStoryboardHistory={onDeleteStoryboardHistory}
           onGenerateStoryboardDraft={onGenerateStoryboardDraft}
           onGenerateImagePromptDraft={onGenerateImagePromptDraft}
           isGeneratingStoryboard={isGeneratingStoryboard}
           isGeneratingImagePrompt={isGeneratingImagePrompt}
           productReady={storyboardProductReady}
-          storyboardEstimate={storyboardEstimate}
-        />
-
-        <ProductModeActionBar
-          mode={mode}
-          tVideo={tVideo}
-          workspace={workspace}
-          generateVideoSummary={generateVideoSummary}
-          imageGenerateSummary={imageGenerateSummary}
           generationReadiness={generationReadiness}
-          actionButtonClass={actionButtonClass}
-          actionDisabledClass={actionDisabledClass}
           generateVideoDisabled={generateVideoDisabled}
           imageGenerateDisabled={imageGenerateDisabled}
           generateVideoButtonLabel={generateVideoButtonLabel}
@@ -5566,6 +5694,8 @@ function ProductCreativeWorkbench({
           isSubmittingImage={isSubmittingImage}
           videoEstimate={videoEstimate}
           imageEstimate={imageEstimate}
+          workspacePrimaryActionDisabled={workspace.primaryAction.disabled}
+          workspacePrimaryActionReason={workspace.primaryAction.reason}
           onGenerateVideo={onGenerateVideo}
           onGenerateProductImages={onGenerateProductImages}
         />
@@ -5642,11 +5772,11 @@ function ProductCreativeSettingsTray({
     <div className="product-creative-controls prompt-inline-settings flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-visible rounded-[8px] bg-transparent pr-0.5 text-[11px]">
       <ProductCreativeToolbarChoice
         icon={Clapperboard}
-        label={tVideo("controls.template")}
+        label={tVideo("controls.creativeStyle")}
         value={template}
         options={templateOptions}
         formatOption={(option) => localizedTemplateLabel(option, tVideo)}
-        formatActiveLabel={(option) => compactTemplateLabel(option, tVideo)}
+        formatActiveLabel={(option) => localizedTemplateLabel(option, tVideo)}
         onChange={onTemplateChange}
       />
       <ProductCreativeToolbarChoice
@@ -5707,7 +5837,7 @@ function ProductCreativeModeSwitch({
   ];
 
   return (
-    <div className="product-creative-mode-switch flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] p-0.5 text-[11px] font-black">
+    <div className="product-creative-mode-switch flex h-10 shrink-0 items-center gap-1.5 rounded-[9px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] p-1 text-xs font-black">
       {options.map(({ mode: optionMode, label, icon: Icon }) => {
         const active = mode === optionMode;
         return (
@@ -5715,7 +5845,7 @@ function ProductCreativeModeSwitch({
             key={optionMode}
             type="button"
             className={cn(
-              "inline-flex h-6 min-w-[42px] items-center justify-center gap-0.5 rounded-[6px] px-1 transition",
+              "inline-flex h-8 min-w-[50px] items-center justify-center gap-1 rounded-[7px] px-2 transition",
               active
                 ? "bg-[var(--text)] text-[var(--card)] shadow-[0_6px_14px_rgba(96,64,43,.14)]"
                 : "text-[var(--muted)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
@@ -5727,7 +5857,7 @@ function ProductCreativeModeSwitch({
               }
             }}
           >
-            <Icon size={11} />
+            <Icon size={13} />
             <span>{label}</span>
           </button>
         );
@@ -5754,7 +5884,7 @@ function ProductCreativeToolbarChoice<T extends string>({
   onChange: (option: T) => void;
 }) {
   return (
-    <div className="product-creative-toolbar-choice min-w-[42px] max-w-[96px] shrink-0" title={label}>
+    <div className="product-creative-toolbar-choice min-w-[42px] max-w-[128px] shrink-0" title={label}>
       <CompactChoiceDropdown
         label={<Icon size={12} className="shrink-0" aria-hidden="true" />}
         value={value}
@@ -5767,92 +5897,6 @@ function ProductCreativeToolbarChoice<T extends string>({
         menuPlacement="top"
         menuWidth="content"
       />
-    </div>
-  );
-}
-
-function ProductModeActionBar({
-  mode,
-  tVideo,
-  workspace,
-  generateVideoSummary,
-  imageGenerateSummary,
-  generationReadiness,
-  actionButtonClass,
-  actionDisabledClass,
-  generateVideoDisabled,
-  imageGenerateDisabled,
-  generateVideoButtonLabel,
-  generateImageButtonLabel,
-  isSubmittingVideo,
-  isSubmittingImage,
-  videoEstimate,
-  imageEstimate,
-  onGenerateVideo,
-  onGenerateProductImages
-}: {
-  mode: ProductCreativeWorkspaceMode;
-  tVideo: VideoStudioTranslator;
-  workspace: ProductCreativeWorkspace;
-  generateVideoSummary: string;
-  imageGenerateSummary: string;
-  generationReadiness: { ready: boolean; label: string };
-  actionButtonClass: string;
-  actionDisabledClass: string;
-  generateVideoDisabled: boolean;
-  imageGenerateDisabled: boolean;
-  generateVideoButtonLabel: string;
-  generateImageButtonLabel: string;
-  isSubmittingVideo: boolean;
-  isSubmittingImage: boolean;
-  videoEstimate?: BillingActionEstimate;
-  imageEstimate?: BillingActionEstimate;
-  onGenerateVideo: () => Promise<void>;
-  onGenerateProductImages: () => Promise<void>;
-}) {
-  if (mode === "video") {
-    return (
-      <div className="video-generate-bar product-creative-action-panel grid gap-2 border-t border-[var(--border)] pt-3">
-        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(190px,240px)] sm:items-center">
-          <div className="video-generate-summary product-creative-action-summary min-w-0 whitespace-normal break-words text-xs font-bold leading-5 tracking-0 text-[var(--muted)]" title={generateVideoSummary} aria-label={generateVideoSummary}>
-            {generationReadiness.ready ? generateVideoSummary : generationReadiness.label}
-          </div>
-          <Button
-            className={cn(actionButtonClass, generateVideoDisabled && actionDisabledClass)}
-            variant={generateVideoDisabled ? "default" : "primary"}
-            disabled={generateVideoDisabled}
-            aria-disabled={generateVideoDisabled}
-            title={generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label}
-            onClick={generateVideoDisabled ? undefined : () => void onGenerateVideo()}
-          >
-            {isSubmittingVideo ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Play size={15} />}
-            {isSubmittingVideo ? tVideo("generate.submitting") : generateVideoButtonLabel}
-            <ActionButtonCost tVideo={tVideo} estimate={videoEstimate} amountCny={videoEstimate?.upstreamEstimatedCostCny} />
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="video-generate-bar product-creative-action-panel grid gap-2 border-t border-[var(--border)] pt-3">
-      <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(190px,240px)] sm:items-center">
-        <div className="video-generate-summary product-creative-action-summary min-w-0 whitespace-normal break-words text-xs font-bold leading-5 tracking-0 text-[var(--muted)]" title={imageGenerateSummary} aria-label={imageGenerateSummary}>
-          {workspace.primaryAction.disabled ? workspace.primaryAction.reason : imageGenerateSummary}
-        </div>
-        <Button
-          className={cn(actionButtonClass, imageGenerateDisabled && actionDisabledClass)}
-          variant={imageGenerateDisabled ? "default" : "primary"}
-          disabled={imageGenerateDisabled}
-          aria-disabled={imageGenerateDisabled}
-          title={workspace.primaryAction.disabled ? workspace.primaryAction.reason : generateImageButtonLabel}
-          onClick={imageGenerateDisabled ? undefined : () => void onGenerateProductImages()}
-        >
-          {isSubmittingImage ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <ImageIcon size={15} />}
-          {isSubmittingImage ? tVideo("generate.submitting") : generateImageButtonLabel}
-          <ActionButtonCost tVideo={tVideo} estimate={imageEstimate} />
-        </Button>
-      </div>
     </div>
   );
 }
@@ -5950,16 +5994,25 @@ function ProductModeOutputPanel({
   versionCountOptions,
   onVersionCountChange,
   storyboardDraft,
-  storyboardHistory,
   onStoryboardDraftChange,
-  onApplyStoryboardHistory,
-  onDeleteStoryboardHistory,
   onGenerateStoryboardDraft,
   onGenerateImagePromptDraft,
   isGeneratingStoryboard,
   isGeneratingImagePrompt,
   productReady,
-  storyboardEstimate
+  generationReadiness,
+  generateVideoDisabled,
+  imageGenerateDisabled,
+  generateVideoButtonLabel,
+  generateImageButtonLabel,
+  isSubmittingVideo,
+  isSubmittingImage,
+  videoEstimate,
+  imageEstimate,
+  workspacePrimaryActionDisabled,
+  workspacePrimaryActionReason,
+  onGenerateVideo,
+  onGenerateProductImages
 }: {
   mode: ProductCreativeWorkspaceMode;
   onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
@@ -5998,16 +6051,25 @@ function ProductModeOutputPanel({
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
   storyboardDraft: string;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onStoryboardDraftChange: (draft: string) => void;
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onStoryboardDraftChange: (draft: string, source?: StoryboardDraftSource) => void;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   onGenerateImagePromptDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
   isGeneratingImagePrompt: boolean;
   productReady: boolean;
-  storyboardEstimate?: BillingActionEstimate;
+  generationReadiness: { ready: boolean; label: string };
+  generateVideoDisabled: boolean;
+  imageGenerateDisabled: boolean;
+  generateVideoButtonLabel: string;
+  generateImageButtonLabel: string;
+  isSubmittingVideo: boolean;
+  isSubmittingImage: boolean;
+  videoEstimate?: BillingActionEstimate;
+  imageEstimate?: BillingActionEstimate;
+  workspacePrimaryActionDisabled: boolean;
+  workspacePrimaryActionReason?: string;
+  onGenerateVideo: () => Promise<void>;
+  onGenerateProductImages: () => Promise<void>;
 }) {
   return (
     <StoryboardComposerPanel
@@ -6048,16 +6110,25 @@ function ProductModeOutputPanel({
       versionCountOptions={versionCountOptions}
       onVersionCountChange={onVersionCountChange}
       storyboardDraft={storyboardDraft}
-      storyboardHistory={storyboardHistory}
       onStoryboardDraftChange={onStoryboardDraftChange}
-      onApplyStoryboardHistory={onApplyStoryboardHistory}
-      onDeleteStoryboardHistory={onDeleteStoryboardHistory}
       onGenerateStoryboardDraft={onGenerateStoryboardDraft}
       onGenerateImagePromptDraft={onGenerateImagePromptDraft}
       isGeneratingStoryboard={isGeneratingStoryboard}
       isGeneratingImagePrompt={isGeneratingImagePrompt}
       productReady={productReady}
-      estimate={storyboardEstimate}
+      generationReadiness={generationReadiness}
+      generateVideoDisabled={generateVideoDisabled}
+      imageGenerateDisabled={imageGenerateDisabled}
+      generateVideoButtonLabel={generateVideoButtonLabel}
+      generateImageButtonLabel={generateImageButtonLabel}
+      isSubmittingVideo={isSubmittingVideo}
+      isSubmittingImage={isSubmittingImage}
+      videoEstimate={videoEstimate}
+      imageEstimate={imageEstimate}
+      workspacePrimaryActionDisabled={workspacePrimaryActionDisabled}
+      workspacePrimaryActionReason={workspacePrimaryActionReason}
+      onGenerateVideo={onGenerateVideo}
+      onGenerateProductImages={onGenerateProductImages}
     />
   );
 }
@@ -6076,7 +6147,7 @@ function ProductImageHistoryPanel({
         ? ""
         : "border-t border-[var(--border)] bg-[var(--card)] p-5"
     )}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={cn("flex flex-wrap items-center justify-between gap-2", compact && "hidden")}>
         <div>
           <div className="text-base font-black text-[var(--text)]">图片历史</div>
           <div className="mt-1 text-xs font-bold text-[var(--muted)]">当前商品生成过的图片记录会显示在这里。</div>
@@ -6514,7 +6585,6 @@ function StoryboardComposerPanel({
   tVideo,
   mode,
   onModeChange,
-  estimate,
   imageModelLabel,
   imageModelOptions,
   selectedImageModelConfigId,
@@ -6548,21 +6618,30 @@ function StoryboardComposerPanel({
   versionCountOptions,
   onVersionCountChange,
   storyboardDraft,
-  storyboardHistory,
   onStoryboardDraftChange,
-  onApplyStoryboardHistory,
-  onDeleteStoryboardHistory,
   onGenerateStoryboardDraft,
   onGenerateImagePromptDraft,
   isGeneratingStoryboard,
   isGeneratingImagePrompt,
-  productReady
+  productReady,
+  generationReadiness,
+  generateVideoDisabled,
+  imageGenerateDisabled,
+  generateVideoButtonLabel,
+  generateImageButtonLabel,
+  isSubmittingVideo,
+  isSubmittingImage,
+  videoEstimate,
+  imageEstimate,
+  workspacePrimaryActionDisabled,
+  workspacePrimaryActionReason,
+  onGenerateVideo,
+  onGenerateProductImages
 }: {
   appLocale: AppLocale;
   tVideo: VideoStudioTranslator;
   mode: ProductCreativeWorkspaceMode;
   onModeChange: (mode: ProductCreativeWorkspaceMode) => void;
-  estimate?: BillingActionEstimate;
   imageModelLabel: string;
   imageModelOptions: ProviderConfigItem[];
   selectedImageModelConfigId: ModelConfigChoice;
@@ -6596,27 +6675,36 @@ function StoryboardComposerPanel({
   versionCountOptions: string[];
   onVersionCountChange: (versionCount: number) => void;
   storyboardDraft: string;
-  storyboardHistory: StoryboardHistoryRecord[];
-  onStoryboardDraftChange: (draft: string) => void;
-  onApplyStoryboardHistory: (record: StoryboardHistoryRecord) => void;
-  onDeleteStoryboardHistory: (recordId: string) => Promise<void>;
+  onStoryboardDraftChange: (draft: string, source?: StoryboardDraftSource) => void;
   onGenerateStoryboardDraft: (product?: ProductDetail) => Promise<void>;
   onGenerateImagePromptDraft: () => Promise<void>;
   isGeneratingStoryboard: boolean;
   isGeneratingImagePrompt: boolean;
   productReady: boolean;
+  generationReadiness: { ready: boolean; label: string };
+  generateVideoDisabled: boolean;
+  imageGenerateDisabled: boolean;
+  generateVideoButtonLabel: string;
+  generateImageButtonLabel: string;
+  isSubmittingVideo: boolean;
+  isSubmittingImage: boolean;
+  videoEstimate?: BillingActionEstimate;
+  imageEstimate?: BillingActionEstimate;
+  workspacePrimaryActionDisabled: boolean;
+  workspacePrimaryActionReason?: string;
+  onGenerateVideo: () => Promise<void>;
+  onGenerateProductImages: () => Promise<void>;
 }) {
-  const [historyOpen, setHistoryOpen] = useState(false);
   const imagePromptPresets = ["白底主图", "场景图", "细节图", "保留外观"];
   const promptTitle = mode === "image" ? "图片提示词" : tVideo("storyboard.title");
-  const promptOptimizeActionLoading = mode === "image" ? isGeneratingImagePrompt : isGeneratingStoryboard;
-  const promptOptimizeActionDisabled = promptOptimizeActionLoading || !productReady;
-  const promptOptimizeActionLabel = promptOptimizeActionLoading
+  const promptPreviewActionLoading = mode === "image" ? isGeneratingImagePrompt : isGeneratingStoryboard;
+  const promptPreviewActionDisabled = promptPreviewActionLoading || !productReady;
+  const promptPreviewActionLabel = promptPreviewActionLoading
     ? tVideo("storyboard.generating")
-    : mode === "image" ? "AI 优化提示词" : tVideo("storyboard.generate");
+    : tVideo("storyboard.generate");
   const promptPlaceholder = mode === "image"
     ? "例如：保留商品外观，换成白底主图；或放到日系通勤场景，突出容量和轻便。"
-    : "";
+    : tVideo("storyboard.placeholder");
   const activeModelConfigId = mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId;
   const activeModelConfigChange = mode === "image" ? onImageModelConfigChange : onVideoModelConfigChange;
   const activeModelOptions = mode === "image" ? imageModelOptions : videoModelOptions;
@@ -6625,6 +6713,19 @@ function StoryboardComposerPanel({
   const activeModelIcon = mode === "image"
     ? <ImageIcon size={12} className="shrink-0" aria-hidden="true" />
     : <Clapperboard size={12} className="shrink-0" aria-hidden="true" />;
+  const primaryActionLoading = mode === "video" ? isSubmittingVideo : isSubmittingImage;
+  const primaryActionDisabled = mode === "video" ? generateVideoDisabled : imageGenerateDisabled;
+  const primaryActionTitle = mode === "video"
+    ? generationReadiness.ready ? generateVideoButtonLabel : generationReadiness.label
+    : workspacePrimaryActionDisabled ? workspacePrimaryActionReason : generateImageButtonLabel;
+  const primaryActionLabel = primaryActionLoading
+    ? tVideo("generate.submitting")
+    : mode === "video" ? generateVideoButtonLabel : generateImageButtonLabel;
+  const primaryActionIcon = primaryActionLoading
+    ? <RefreshCcw className="h-4 w-4 animate-spin" />
+    : mode === "video" ? <Play size={14} /> : <ImageIcon size={14} />;
+  const primaryActionEstimate = mode === "video" ? videoEstimate : imageEstimate;
+  const primaryActionAmountCny = mode === "video" ? videoEstimate?.upstreamEstimatedCostCny : undefined;
 
   function onPromptDraftChange(value: string) {
     if (mode === "image") {
@@ -6649,45 +6750,30 @@ function StoryboardComposerPanel({
     <section className="storyboard-side-panel grid min-h-[300px] grid-rows-[auto_minmax(0,1fr)] gap-2 border-t border-[var(--border)] pt-3">
       <div className="storyboard-title-row flex min-h-8 items-center justify-between gap-3">
         <div className="min-w-0 text-sm font-black text-[var(--text)]">{promptTitle}</div>
-        <Button
-          className="storyboard-title-action min-h-8 w-[168px] justify-center rounded-[8px] px-2.5 text-[11px]"
-          size="sm"
-          variant="soft"
-          disabled={promptOptimizeActionDisabled}
-          onClick={() => {
-            if (!productReady) {
-              return;
-            }
-            void (mode === "image" ? onGenerateImagePromptDraft() : onGenerateStoryboardDraft());
-          }}
-        >
-          {promptOptimizeActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Sparkles size={13} />}
-          <span className="truncate">{promptOptimizeActionLabel}</span>
-          <ActionButtonCost tVideo={tVideo} estimate={estimate} />
-        </Button>
+        <div className="flex min-w-0 shrink items-center justify-end gap-2">
+          <Button
+            className="storyboard-title-action h-8 min-h-8 w-auto max-w-[112px] justify-center rounded-[8px] px-2 text-[11px] font-bold text-[var(--muted)]"
+            size="sm"
+            variant="ghost"
+            disabled={promptPreviewActionDisabled}
+            onClick={() => {
+              if (!productReady) {
+                return;
+              }
+              void (mode === "image" ? onGenerateImagePromptDraft() : onGenerateStoryboardDraft());
+            }}
+          >
+            {promptPreviewActionLoading ? <RefreshCcw className="h-4 w-4 animate-spin" /> : <Eye size={13} />}
+            <span className="truncate">{promptPreviewActionLabel}</span>
+          </Button>
+        </div>
       </div>
 
       <div
-        className="storyboard-history-dropdown relative min-h-0"
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setHistoryOpen(false);
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            setHistoryOpen(false);
-          }
-        }}
+        className="storyboard-prompt-shell grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] storyboard-history-dropdown relative"
       >
-        <Textarea
-          className="h-full min-h-[230px] resize-none border-[var(--border-strong)] bg-[var(--card)] pb-12 pt-[96px] text-sm font-bold leading-7 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,.65)] transition-colors"
-          value={mode === "image" ? imagePrompt : storyboardDraft}
-          onChange={(event) => onPromptDraftChange(event.target.value)}
-          placeholder={promptPlaceholder}
-        />
         <div
-          className="image-prompt-media-strip absolute left-3 right-3 top-3 z-10 flex h-[74px] min-w-0 items-start gap-2 overflow-x-auto pb-1"
+          className="image-prompt-media-strip storyboard-prompt-media-row flex min-h-[82px] border-b border-[var(--border)] min-w-0 items-start gap-2 overflow-x-auto px-2.5 py-2"
           onDragOver={(event) => {
             if (!Array.from(event.dataTransfer.types).includes("Files")) return;
             event.preventDefault();
@@ -6735,7 +6821,13 @@ function StoryboardComposerPanel({
             </div>
           ))}
         </div>
-        <div className="prompt-composer-footer absolute bottom-2 left-3 right-3 grid h-7 min-h-7 min-w-0 grid-cols-[auto_minmax(0,1fr)_150px] items-center gap-1.5">
+        <Textarea
+          className="storyboard-prompt-textarea h-full min-h-[220px] resize-none border-0 bg-transparent overflow-y-auto text-sm font-bold leading-7 text-[var(--text)] shadow-none transition-colors focus-visible:ring-0"
+          value={mode === "image" ? imagePrompt : storyboardDraft}
+          onChange={(event) => onPromptDraftChange(event.target.value)}
+          placeholder={promptPlaceholder}
+        />
+        <div className="prompt-composer-footer grid min-h-12 min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(176px,240px)] items-center gap-2 border-t border-[var(--border)] px-2.5 py-2">
           <div className="prompt-composer-mode-slot shrink-0">
             <ProductCreativeModeSwitch mode={mode} onModeChange={onModeChange} />
           </div>
@@ -6779,7 +6871,7 @@ function StoryboardComposerPanel({
                   <button
                     key={preset}
                     type="button"
-                    className="h-7 shrink-0 whitespace-nowrap rounded-[7px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-1.5 text-[11px] font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="h-9 shrink-0 whitespace-nowrap rounded-[8px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-2 text-xs font-black text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                     onClick={() => appendImagePromptPreset(preset)}
                   >
                     {preset}
@@ -6788,81 +6880,24 @@ function StoryboardComposerPanel({
               </>
             )}
           </div>
-          <div className="prompt-composer-history-slot flex h-7 min-h-7 justify-end overflow-hidden">
-            <button
-              type="button"
+          <div className="prompt-composer-primary-action-slot flex h-10 min-h-10 justify-end overflow-hidden">
+            <Button
               className={cn(
-                "flex h-7 min-h-7 w-[150px] items-center justify-between gap-1 overflow-hidden whitespace-nowrap rounded-[8px] border bg-[color-mix(in_srgb,var(--card)_72%,transparent)] px-1.5 text-left text-[11px] font-bold text-[var(--muted)] transition",
-                mode === "image" && "invisible pointer-events-none",
-                historyOpen
-                  ? "border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] shadow-[0_0_0_3px_rgba(10,163,148,.10)]"
-                  : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-strong))]"
+                "h-10 min-h-10 w-full min-w-[176px] max-w-[240px] justify-center rounded-[10px] px-3 text-sm",
+                primaryActionDisabled && "border-[var(--border-strong)] bg-[var(--panel2)] text-[var(--muted)] shadow-none hover:brightness-100 disabled:opacity-100"
               )}
-              aria-haspopup="listbox"
-              aria-expanded={historyOpen}
-              tabIndex={mode === "image" ? -1 : 0}
-              onClick={() => {
-                if (mode === "video") {
-                  setHistoryOpen((open) => !open);
-                }
-              }}
+              variant={primaryActionDisabled ? "default" : "primary"}
+              disabled={primaryActionDisabled}
+              aria-disabled={primaryActionDisabled}
+              title={primaryActionTitle}
+              onClick={primaryActionDisabled ? undefined : () => void (mode === "video" ? onGenerateVideo() : onGenerateProductImages())}
             >
-              <span className="shrink-0">{tVideo("storyboard.history")}</span>
-              <span className="flex shrink-0 items-center gap-1">
-                <Badge className="min-h-5 shrink-0 px-1.5 text-[10px]">{tVideo("counts.record", { count: storyboardHistory.length })}</Badge>
-                <ChevronDown size={14} className={cn("text-[var(--muted)] transition", historyOpen && "rotate-180 text-[var(--accent)]")} />
-              </span>
-            </button>
+              {primaryActionIcon}
+              <span className="truncate">{primaryActionLabel}</span>
+              <ActionButtonCost tVideo={tVideo} estimate={primaryActionEstimate} amountCny={primaryActionAmountCny} />
+            </Button>
           </div>
         </div>
-        {mode === "video" && historyOpen ? (
-          <div
-            className="absolute bottom-20 left-3 right-3 z-30 grid max-h-[260px] overflow-auto rounded-[12px] border border-[var(--border-strong)] bg-[var(--card)] p-2 shadow-[0_18px_42px_rgba(96,64,43,.16)]"
-            role="listbox"
-          >
-            {storyboardHistory.length > 0 ? (
-              storyboardHistory.map((record) => (
-                <article key={record.id} className="group/storyboard-record grid grid-cols-[minmax(0,1fr)_32px] items-start gap-1 rounded-[10px] transition hover:bg-[var(--panel2)]">
-                  <button
-                    type="button"
-                    role="option"
-                    className="grid min-w-0 gap-2 rounded-[10px] px-2.5 py-2.5 text-left"
-                    onClick={() => {
-                      onApplyStoryboardHistory(record);
-                      setHistoryOpen(false);
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-black text-[var(--text)]">{formatHistoryTime(record.createdAt, { locale: appLocale })}</div>
-                      <div className="flex gap-1">
-                        <Badge>{localizedTemplateLabel(record.style, tVideo)}</Badge>
-                        <Badge>{formatDuration(record.duration)}</Badge>
-                      </div>
-                    </div>
-                    <div className="line-clamp-2 whitespace-pre-line text-xs font-semibold leading-5 text-[var(--muted)]">{historyPreview(record.script, appLocale)}</div>
-                  </button>
-                  <button
-                    type="button"
-                    className="mr-1 mt-2 grid h-8 w-8 place-items-center rounded-lg text-red-400 opacity-80 transition hover:bg-red-50 hover:text-red-600 min-[900px]:opacity-0 min-[900px]:group-hover/storyboard-record:opacity-100"
-                    title={tVideo("storyboard.deleteRecord")}
-                    aria-label={`${tVideo("storyboard.deleteRecord")} ${formatHistoryTime(record.createdAt, { locale: appLocale })}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void onDeleteStoryboardHistory(record.id);
-                      setHistoryOpen(false);
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                </article>
-              ))
-            ) : (
-              <div className="rounded-[10px] border border-dashed border-[var(--border)] bg-[var(--panel2)] px-3 py-4 text-center text-xs font-bold text-[var(--muted)]">
-                {tVideo("storyboard.emptyHistory")}
-              </div>
-            )}
-          </div>
-        ) : null}
       </div>
     </section>
   );
@@ -6905,7 +6940,7 @@ function VideoHistoryPanel({
         ? ""
         : "border-t border-[var(--border)] bg-[var(--card)] p-5"
     )}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={cn("flex flex-wrap items-center justify-between gap-2", compact && "hidden")}>
         <div>
           <div className="text-base font-black text-[var(--text)]">{tVideo("history.title")}</div>
           <div className="mt-1 text-xs font-bold text-[var(--muted)]">{tVideo("history.subtitle")}</div>
@@ -8490,11 +8525,13 @@ function ChartBlock({ option, height, empty }: { option: EChartsOption; height: 
 function WalletRechargePanel({
   appLocale,
   wallet,
+  walletRechargeOrders,
   onRequestRecharge,
   isBusy
 }: {
   appLocale: AppLocale;
   wallet: WalletLedger;
+  walletRechargeOrders: WalletRechargeOrder[];
   onRequestRecharge: (amountCny?: number) => void;
   isBusy: boolean;
 }) {
@@ -8509,7 +8546,7 @@ function WalletRechargePanel({
   const customRechargeAmountValid = customRechargeAmountCny !== undefined;
   const selectedRechargePaymentAmountCny = selectedRechargeAmountCny;
   const selectedRechargeCanPay = selectedRechargePaymentAmountCny !== undefined && selectedRechargePaymentAmountCny >= 50 && selectedRechargePaymentAmountCny <= 1000;
-  const walletRechargeTransactions = wallet.transactions.filter(walletTransactionIsRechargeRecord);
+  const rechargeTransactionsByOrderId = useMemo(() => walletRechargeTransactionsByOrderId(wallet.transactions), [wallet.transactions]);
   const walletConsumptionTransactions = wallet.transactions.filter(walletTransactionIsConsumptionRecord);
   const filteredConsumptionTransactions = walletConsumptionTransactions.filter((transaction) => walletTransactionMatchesConsumptionFilter(transaction, activeConsumptionFilter));
   const consumptionFilters: WalletConsumptionFilter[] = ["all", "charge", "reserve", "refund", "adjustment"];
@@ -8644,12 +8681,10 @@ function WalletRechargePanel({
 
         {activeTab === "recharge" ? (
           <div id="wallet-center-panel-recharge" role="tabpanel" className="grid gap-3">
-            <WalletTransactionList
-              appLocale={appLocale}
-              transactions={walletRechargeTransactions.slice(0, 8)}
+            <WalletRechargeOrderTable
+              orders={walletRechargeOrders}
+              rechargeTransactionsByOrderId={rechargeTransactionsByOrderId}
               emptyText={tWallet("emptyRechargeTransactions")}
-              showTypeBadge={false}
-              onSelectTransaction={setSelectedTransaction}
             />
           </div>
         ) : (
@@ -8675,7 +8710,7 @@ function WalletRechargePanel({
                 );
               })}
             </div>
-            <WalletTransactionList
+            <WalletConsumptionTransactionTable
               appLocale={appLocale}
               transactions={filteredConsumptionTransactions}
               emptyText={tWallet("emptyConsumptionTransactions")}
@@ -8691,10 +8726,6 @@ function WalletRechargePanel({
       />
     </Card>
   );
-}
-
-function walletTransactionIsRechargeRecord(transaction: WalletTransaction) {
-  return transaction.type === "recharge" || transaction.type === "bonus";
 }
 
 function walletTransactionIsConsumptionRecord(transaction: WalletTransaction) {
@@ -8727,62 +8758,412 @@ function normalizeCustomRechargeAmountCny(value: string): number | undefined {
   return Number.isInteger(amount) && amount >= 50 && amount <= 1000 ? amount : undefined;
 }
 
-function WalletTransactionList({
+function walletRechargeTransactionsByOrderId(transactions: WalletTransaction[]): Map<string, WalletTransaction> {
+  const entries = transactions
+    .filter((transaction) => transaction.type === "recharge" || transaction.type === "bonus")
+    .map((transaction) => [stringMetadata(transaction.metadata?.rechargeOrderId), transaction] as const)
+    .filter((entry): entry is [string, WalletTransaction] => Boolean(entry[0]));
+  return new Map(entries);
+}
+
+function WalletRechargeOrderTable({
+  orders,
+  rechargeTransactionsByOrderId,
+  emptyText
+}: {
+  orders: WalletRechargeOrder[];
+  rechargeTransactionsByOrderId: Map<string, WalletTransaction>;
+  emptyText: string;
+}) {
+  const tWallet = makeAppTranslator("wallet");
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div className="wallet-recharge-order-table overflow-x-auto rounded-[8px] border border-[var(--border)] bg-[var(--card)]">
+      <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
+        <colgroup>
+          <col className="w-[20%]" />
+          <col className="w-[12%]" />
+          <col className="w-[22%]" />
+          <col className="w-[12%]" />
+          <col className="w-[18%]" />
+          <col className="w-[16%]" />
+        </colgroup>
+        <thead className="bg-[color-mix(in_srgb,var(--panel2)_78%,var(--card))] text-[var(--muted)]">
+          <tr>
+            <WalletTableHeaderCell>{tWallet("orderTable.order")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("orderTable.topUpAmount")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("orderTable.paymentMethod")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("orderTable.status")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("orderTable.createdAt")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("orderTable.action")}</WalletTableHeaderCell>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => {
+            const transaction = rechargeTransactionsByOrderId.get(order.id);
+            const paymentMethod = walletRechargeOrderPaymentMethodView(order, tWallet, transaction);
+            const status = walletRechargeOrderEffectiveStatus(order, nowTick);
+            const expiresInText = walletRechargeOrderExpiresInText(order, nowTick);
+            const canContinue = status === "pending" && Boolean(order.checkoutUrl);
+            return (
+              <tr key={order.id} className="wallet-recharge-order-row bg-[var(--card)]">
+                <WalletTableCell>
+                  <div className="truncate font-bold text-[var(--text)]" title={order.id}>{walletRechargeOrderDisplayCode(order)}</div>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <div className="min-w-0">
+                    <strong className="font-black tabular-nums text-[var(--text)]">{walletRechargeOrderCreditAmountText(order)}</strong>
+                    {walletRechargeOrderSettlementAmountText(order) ? (
+                      <div className="wallet-recharge-order-settlement mt-0.5 truncate text-[11px] font-semibold tabular-nums text-[var(--muted)]">
+                        {walletRechargeOrderSettlementAmountText(order)}
+                      </div>
+                    ) : null}
+                  </div>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <div className="min-w-0">
+                    <div className="truncate font-bold text-[var(--text)]" title={paymentMethod.primary}>{paymentMethod.primary}</div>
+                    {paymentMethod.detail ? (
+                      <div className="mt-0.5 truncate text-[11px] font-semibold text-[var(--muted)]" title={paymentMethod.detail}>{paymentMethod.detail}</div>
+                    ) : null}
+                  </div>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <Badge className="min-h-6 px-2.5 text-[11px]" tone={walletRechargeOrderStatusTone(status)}>
+                    {walletRechargeOrderStatusLabel(status, tWallet)}
+                  </Badge>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <span className="font-semibold text-[var(--muted)]">{formatWalletTableDateTime(order.createdAt)}</span>
+                </WalletTableCell>
+                <WalletTableCell>
+                  {canContinue ? (
+                    <div className="flex min-w-0 items-center justify-start">
+                      <Button
+                        className="h-8 min-h-8 whitespace-nowrap px-2.5 text-[12px]"
+                        size="sm"
+                        variant="soft"
+                        type="button"
+                        onClick={() => window.location.assign(order.checkoutUrl as string)}
+                      >
+                        {tWallet("orderTable.continuePay")}
+                        {expiresInText ? (
+                          <span className="wallet-recharge-order-countdown border-l border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] pl-1.5 text-[11px] font-black tabular-nums text-[var(--accent)] opacity-80">
+                            {expiresInText}
+                          </span>
+                        ) : null}
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="font-semibold text-[var(--muted)]">-</span>
+                  )}
+                </WalletTableCell>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {orders.length === 0 ? <WalletTableEmptyState emptyText={emptyText} /> : null}
+    </div>
+  );
+}
+
+function WalletConsumptionTransactionTable({
   appLocale,
   transactions,
   emptyText,
-  onSelectTransaction,
-  showTypeBadge = true,
-  className
+  onSelectTransaction
 }: {
   appLocale: AppLocale;
   transactions: WalletTransaction[];
   emptyText: string;
   onSelectTransaction?: (transaction: WalletTransaction) => void;
-  showTypeBadge?: boolean;
-  className?: string;
 }) {
   const tWallet = makeAppTranslator("wallet");
   return (
-    <div className={cn("wallet-transaction-list overflow-hidden rounded-lg bg-[color-mix(in_srgb,var(--field)_58%,transparent)]", className)}>
-      {transactions.map((transaction) => (
-        <div
-          key={transaction.id}
-          className={cn(
-            "wallet-transaction-row grid gap-2 border-b border-[var(--border)] px-3 py-3 text-xs last:border-b-0 md:items-center",
-            showTypeBadge ? "md:grid-cols-[56px_minmax(0,1fr)_104px_128px_72px]" : "md:grid-cols-[minmax(0,1fr)_104px_128px_72px]"
-          )}
-        >
-          {showTypeBadge ? (
-            <Badge className="recharge-transaction-type-badge min-h-5 w-12 justify-center px-0 text-center text-[10px]" tone={transaction.amountCny >= 0 ? "ok" : "warn"}>{walletTransactionTypeLabel(transaction.type, tWallet)}</Badge>
-          ) : null}
-          <span className="min-w-0 truncate font-bold text-[var(--text)]">{walletTransactionDescriptionLabel(transaction.description, appLocale)}</span>
-          <strong className={cn("font-black md:text-right", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
-            {transaction.amountCny >= 0 ? "+" : ""}¥{money(transaction.amountCny)}
-          </strong>
-          <span className="text-[var(--muted)] md:text-right">{formatDateTime(transaction.createdAt)}</span>
-          <Button
-            className="w-fit justify-self-start md:justify-self-end"
-            size="sm"
-            variant="ghost"
-            type="button"
-            onClick={() => onSelectTransaction?.(transaction)}
-          >
-            <FileText size={13} />
-            {tWallet("details")}
-          </Button>
-        </div>
-      ))}
-      {transactions.length === 0 ? (
-        <div className="wallet-transaction-empty grid min-h-[104px] place-items-center rounded-lg bg-[color-mix(in_srgb,var(--field)_46%,transparent)] px-4 py-6 text-center text-sm font-bold text-[var(--muted)]">
-          <div className="grid justify-items-center gap-2">
-            <WalletCards className="text-[var(--accent)] opacity-80" size={24} />
-            {emptyText}
-          </div>
-        </div>
-      ) : null}
+    <div className="wallet-consumption-transaction-table overflow-x-auto rounded-[8px] border border-[var(--border)] bg-[var(--card)]">
+      <table className="w-full min-w-[820px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
+        <colgroup>
+          <col className="w-[12%]" />
+          <col className="w-[34%]" />
+          <col className="w-[14%]" />
+          <col className="w-[14%]" />
+          <col className="w-[18%]" />
+          <col className="w-[8%]" />
+        </colgroup>
+        <thead className="bg-[color-mix(in_srgb,var(--panel2)_78%,var(--card))] text-[var(--muted)]">
+          <tr>
+            <WalletTableHeaderCell>{tWallet("transactionTable.type")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.description")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.amount")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.balance")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.createdAt")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.action")}</WalletTableHeaderCell>
+          </tr>
+        </thead>
+        <tbody>
+          {transactions.map((transaction) => (
+            <tr key={transaction.id} className="wallet-consumption-transaction-row bg-[var(--card)]">
+              <WalletTableCell>
+                <Badge className="recharge-transaction-type-badge min-h-6 px-2.5 text-[11px]" tone={transaction.amountCny < 0 ? "danger" : "ok"}>
+                  {walletTransactionTypeLabel(transaction.type, tWallet)}
+                </Badge>
+              </WalletTableCell>
+              <WalletTableCell>
+                <div className="max-w-[320px] truncate font-bold text-[var(--text)]" title={walletTransactionDescriptionLabel(transaction.description, appLocale)}>
+                  {walletTransactionDescriptionLabel(transaction.description, appLocale)}
+                </div>
+              </WalletTableCell>
+              <WalletTableCell>
+                <strong className={cn("font-black tabular-nums", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
+                  {transaction.amountCny >= 0 ? "+" : "-"}¥{money(Math.abs(transaction.amountCny))}
+                </strong>
+              </WalletTableCell>
+              <WalletTableCell>
+                <span className="font-semibold tabular-nums text-[var(--text)]">¥{money(transaction.balanceAfterCny)}</span>
+              </WalletTableCell>
+              <WalletTableCell>
+                <span className="font-semibold text-[var(--muted)]">{formatWalletTableDateTime(transaction.createdAt)}</span>
+              </WalletTableCell>
+              <WalletTableCell>
+                <Button
+                  className="h-8 min-h-8 px-2 text-[12px]"
+                  size="sm"
+                  variant="ghost"
+                  type="button"
+                  onClick={() => onSelectTransaction?.(transaction)}
+                >
+                  <FileText size={13} />
+                  {tWallet("details")}
+                </Button>
+              </WalletTableCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {transactions.length === 0 ? <WalletTableEmptyState emptyText={emptyText} /> : null}
     </div>
   );
+}
+
+function WalletTableHeaderCell({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <th className={cn("border-b border-[var(--border)] px-4 py-3 text-xs font-black", className)}>
+      {children}
+    </th>
+  );
+}
+
+function WalletTableCell({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <td className={cn("border-b border-[var(--border)] px-4 py-4 align-middle last:border-b", className)}>
+      {children}
+    </td>
+  );
+}
+
+function WalletTableEmptyState({ emptyText }: { emptyText: string }) {
+  return (
+    <div className="wallet-transaction-empty grid min-h-[128px] place-items-center border-t border-[var(--border)] bg-[var(--card)] px-4 py-8 text-center text-sm font-bold text-[var(--muted)]">
+      <div className="grid justify-items-center gap-2">
+        <WalletCards className="text-[var(--accent)] opacity-80" size={24} />
+        {emptyText}
+      </div>
+    </div>
+  );
+}
+
+function walletRechargeOrderDisplayCode(order: WalletRechargeOrder): string {
+  const compactId = order.id.replace(/^wallet-recharge-/u, "").replace(/-/gu, "");
+  return compactId ? `WR-${compactId.slice(0, 12).toUpperCase()}` : order.id;
+}
+
+function walletRechargeOrderCreditAmountText(order: WalletRechargeOrder): string {
+  return `¥${money(order.creditCny)}`;
+}
+
+function walletRechargeOrderSettlementAmountText(order: WalletRechargeOrder): string | undefined {
+  if (order.paymentCurrency.toLowerCase() === "cny") {
+    return undefined;
+  }
+  return `${order.paymentCurrency.toUpperCase()} ${money(order.paymentAmount)}`;
+}
+
+function walletRechargeOrderPaymentMethodView(
+  order: WalletRechargeOrder,
+  tWallet: AppTranslator,
+  transaction?: WalletTransaction
+): { primary: string; detail?: string } {
+  const metadata = walletRechargeOrderPaymentMetadata(order, transaction);
+  const metadataLabel = stringMetadata(metadata.paymentMethodLabel);
+  const cryptoCurrency = stringMetadata(metadata.cryptoCurrency);
+  const cryptoNetwork = stringMetadata(metadata.cryptoNetwork);
+  const cryptoDetail = [cryptoCurrency, cryptoNetwork].filter(Boolean).join("-");
+  const cardLast4 = stringMetadata(metadata.cardLast4);
+  const cardBrand = stripeCardBrandDisplayLabel(stringMetadata(metadata.cardBrand));
+  const cardWallet = stripeWalletDisplayLabel(stringMetadata(metadata.cardWallet));
+  const cardDetail = [cardWallet, cardBrand, cardLast4 ? `尾号 ${cardLast4}` : undefined].filter(Boolean).join(" ");
+  if (order.provider === "infini") {
+    return {
+      primary: tWallet("paymentMethods.infini"),
+      detail: cryptoDetail || metadataLabel || stringMetadata(metadata.cryptoTxHashShort)
+    };
+  }
+  if (order.provider === "stripe") {
+    const primary = metadataLabel ? `${tWallet("paymentMethods.stripe")} ${metadataLabel}` : tWallet("paymentMethods.stripe");
+    return {
+      primary,
+      detail: cardDetail && cardDetail !== metadataLabel ? cardDetail : undefined
+    };
+  }
+  return {
+    primary: metadataLabel || order.provider
+  };
+}
+
+function walletRechargeOrderPaymentMetadata(order: WalletRechargeOrder, transaction?: WalletTransaction): Record<string, unknown> {
+  if (order.metadata && hasPaymentMethodMetadata(order.metadata)) {
+    return order.metadata;
+  }
+  if (transaction?.metadata && hasPaymentMethodMetadata(transaction.metadata)) {
+    return transaction.metadata;
+  }
+  return order.metadata ?? transaction?.metadata ?? {};
+}
+
+function hasPaymentMethodMetadata(metadata: Record<string, unknown> | undefined): boolean {
+  return Boolean(
+    stringMetadata(metadata?.paymentMethodLabel) ||
+    stringMetadata(metadata?.cryptoCurrency) ||
+    stringMetadata(metadata?.cryptoNetwork) ||
+    stringMetadata(metadata?.cardLast4)
+  );
+}
+
+function stringMetadata(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function stripeCardBrandDisplayLabel(brand: string): string {
+  if (!brand) return "";
+  const labels: Record<string, string> = {
+    visa: "Visa",
+    mastercard: "Mastercard",
+    amex: "American Express",
+    discover: "Discover",
+    diners: "Diners Club",
+    jcb: "JCB",
+    unionpay: "UnionPay"
+  };
+  return labels[brand.toLowerCase()] ?? brand;
+}
+
+function stripeWalletDisplayLabel(wallet: string): string {
+  if (!wallet) return "";
+  const labels: Record<string, string> = {
+    apple_pay: "Apple Pay",
+    google_pay: "Google Pay",
+    samsung_pay: "Samsung Pay",
+    link: "Link"
+  };
+  return labels[wallet.toLowerCase()] ?? wallet;
+}
+
+function walletRechargeOrderEffectiveStatus(order: WalletRechargeOrder, nowMs: number): WalletRechargeOrder["status"] {
+  if (order.status === "pending" && walletRechargeOrderIsExpired(order, nowMs)) {
+    return "expired";
+  }
+  return order.status;
+}
+
+function walletRechargeOrderIsExpired(order: WalletRechargeOrder, nowMs: number): boolean {
+  const expiresAtMs = walletRechargeOrderExpiresAtMs(order);
+  return expiresAtMs !== undefined && expiresAtMs <= nowMs;
+}
+
+function walletRechargeOrderExpiresAtMs(order: WalletRechargeOrder): number | undefined {
+  if (!order.expiresAt) {
+    return undefined;
+  }
+  const value = new Date(order.expiresAt).getTime();
+  return Number.isNaN(value) ? undefined : value;
+}
+
+function walletRechargeOrderExpiresInText(order: WalletRechargeOrder, nowMs: number): string | undefined {
+  if (order.status !== "pending") {
+    return undefined;
+  }
+  const expiresAtMs = walletRechargeOrderExpiresAtMs(order);
+  if (expiresAtMs === undefined || expiresAtMs <= nowMs) {
+    return undefined;
+  }
+  const totalSeconds = Math.ceil((expiresAtMs - nowMs) / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `剩 ${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `剩 ${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function walletRechargeOrderPaymentMethodLabel(order: WalletRechargeOrder, tWallet: AppTranslator): string {
+  const metadataLabel = stringMetadata(order.metadata?.paymentMethodLabel);
+  if (metadataLabel) {
+    return metadataLabel;
+  }
+  if (order.provider === "infini") {
+    return tWallet("paymentMethods.infini");
+  }
+  if (order.provider === "stripe") {
+    return tWallet("paymentMethods.stripe");
+  }
+  return order.provider;
+}
+
+function walletRechargeOrderStatusLabel(status: WalletRechargeOrder["status"], tWallet: AppTranslator): string {
+  switch (status) {
+    case "pending":
+      return tWallet("orderTable.statuses.pending");
+    case "paid":
+      return tWallet("orderTable.statuses.paid");
+    case "expired":
+      return tWallet("orderTable.statuses.expired");
+    case "failed":
+      return tWallet("orderTable.statuses.failed");
+  }
+}
+
+function walletRechargeOrderStatusTone(status: WalletRechargeOrder["status"]) {
+  switch (status) {
+    case "paid":
+      return "ok";
+    case "pending":
+      return "warn";
+    case "failed":
+      return "danger";
+    case "expired":
+      return "neutral";
+  }
+}
+
+function formatWalletTableDateTime(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
 }
 
 function WalletTransactionDetailDialog({
@@ -8867,8 +9248,17 @@ function walletTransactionDetailRows(
   appLocale: AppLocale
 ): Array<{ label: string; value: ReactNode }> {
   const tWallet = makeAppTranslator("wallet");
+  const paymentRows = [
+    { label: tWallet("detail.paymentMethod"), value: detailText(metadata.paymentMethodLabel), rawValue: metadata.paymentMethodLabel },
+    { label: tWallet("detail.paymentCurrency"), value: detailText(metadata.paymentCurrency), rawValue: metadata.paymentCurrency },
+    { label: tWallet("detail.cryptoCurrency"), value: detailText(metadata.cryptoCurrency), rawValue: metadata.cryptoCurrency },
+    { label: tWallet("detail.cryptoNetwork"), value: detailText(metadata.cryptoNetwork), rawValue: metadata.cryptoNetwork },
+    { label: tWallet("detail.cryptoTxHash"), value: detailText(metadata.cryptoTxHash ?? metadata.cryptoTxHashShort), rawValue: metadata.cryptoTxHash ?? metadata.cryptoTxHashShort },
+    { label: tWallet("detail.stripeCharge"), value: detailText(metadata.stripeChargeId), rawValue: metadata.stripeChargeId }
+  ].filter((row) => hasDetailValue(row.rawValue));
   return [
     { label: tWallet("detail.description"), value: walletTransactionDescriptionLabel(transaction.description, appLocale) },
+    ...paymentRows.map(({ label, value }) => ({ label, value })),
     { label: tWallet("detail.billingMode"), value: detailText(metadata.apiBillingMode) },
     { label: tWallet("detail.usageKind"), value: detailText(metadata.usageKind ?? priceSnapshot?.kind) },
     { label: tWallet("detail.model"), value: detailText(metadata.model ?? priceSnapshot?.requestedModel ?? priceSnapshot?.model) },
@@ -8891,6 +9281,10 @@ function detailText(value: unknown): string {
   if (typeof value === "number") return formatNumber(value);
   if (typeof value === "string") return value;
   return JSON.stringify(value);
+}
+
+function hasDetailValue(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
 }
 
 function moneyText(value: unknown): string {
@@ -9665,6 +10059,39 @@ function MetricInline({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function PaymentRateMetric({
+  label,
+  value,
+  refreshLabel,
+  loading,
+  onRefresh
+}: {
+  label: string;
+  value: ReactNode;
+  refreshLabel: string;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="min-w-0">
+      <span className="flex min-w-0 items-center gap-1.5 text-[var(--muted)]">
+        <span className="truncate">{label}</span>
+        <button
+          type="button"
+          className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--field)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(10,163,148,.16)] disabled:cursor-wait disabled:opacity-60"
+          aria-label={refreshLabel}
+          title={refreshLabel}
+          disabled={loading}
+          onClick={onRefresh}
+        >
+          <RefreshCcw className={cn("h-3 w-3", loading && "animate-spin")} />
+        </button>
+      </span>
+      <strong className="mt-0.5 block truncate text-[var(--text)]">{value}</strong>
+    </div>
+  );
+}
+
 function MetricLine({ label, value }: { label: string; value: ReactNode }) {
   return (
     <>
@@ -9947,11 +10374,14 @@ function creativeVersionMetaParts(job: CreativeVersionItem, locale?: AppLocale):
 }
 
 function localizedTemplateLabel(value: string | undefined, tVideo: VideoStudioTranslator): string {
+  if (value === "auto") return tVideo("templates.auto");
+  if (value === "lifestyle") return tVideo("templates.lifestyle");
   if (value === "scene") return tVideo("templates.scene");
   if (value === "pain-point") return tVideo("templates.painPoint");
   if (value === "benefit") return tVideo("templates.benefit");
   if (value === "ugc") return tVideo("templates.ugc");
   if (value === "unboxing") return tVideo("templates.unboxing");
+  if (value === "detail") return tVideo("templates.detail");
   return value || "-";
 }
 
@@ -10016,30 +10446,6 @@ function localizedStoryboardStatusLabel(storyboardDraftSource: StoryboardDraftSo
   if (storyboardDraftSource === "default") return tVideo("storyboard.default");
   if (storyboardDraftSource === "ai") return tVideo("storyboard.ai");
   return tVideo("storyboard.manual");
-}
-
-function localizedDefaultStoryboardDraft(template: TemplateName, durationSeconds: number, locale: AppLocale): string {
-  const ranges = storyboardTimeRanges(durationSeconds);
-  return localizedDefaultStoryboardDraftDescriptions(template, locale)
-    .map((description, index) => `${ranges[index]}: ${description}`)
-    .join("\n");
-}
-
-function localizedDefaultStoryboardDraftDescriptions(template: TemplateName, locale: AppLocale): string[] {
-  const templateKey = storyboardTemplateResourceKey(template);
-  const descriptions = i18n.t(`app:videoStudio.storyboard.defaultDrafts.${templateKey}`, { lng: locale, returnObjects: true });
-  if (isStringArray(descriptions)) return descriptions;
-  const fallback = i18n.t("app:videoStudio.storyboard.defaultDrafts.scene", { lng: "zh", returnObjects: true });
-  return isStringArray(fallback) ? fallback : [];
-}
-
-function storyboardTemplateResourceKey(template: TemplateName): string {
-  if (template === "pain-point") return "painPoint";
-  return template;
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function localizedCreativeVersionDisplayStatus(job: CreativeVersionItem, tVideo: VideoStudioTranslator): string {
@@ -10328,6 +10734,46 @@ function paymentMethodLabel(id: PaymentMethodView["id"]) {
   if (id === "stripe") return "Stripe";
   if (id === "infini") return "Infini";
   return id;
+}
+
+function paymentMethodPaymentAmountText(method: PaymentMethodView | undefined, fallbackAmountCny: number, loading = false): string {
+  if (loading && !method?.quote) return "...";
+  if (method?.quote) {
+    return paymentCurrencyAmountText(method.quote.paymentCurrency, method.quote.paymentAmount);
+  }
+  const currency = method?.paymentCurrency ?? "cny";
+  return paymentCurrencyAmountText(currency, currency.toLowerCase() === "cny" ? fallbackAmountCny : 0);
+}
+
+function paymentMethodFxRateText(quote: RechargePaymentQuote | undefined, loading = false): string {
+  if (loading && !quote) return "...";
+  const snapshot = quote?.fxRateSnapshot;
+  if (!snapshot) return "-";
+  const to = snapshot.to.toLowerCase();
+  if (to === "cny" || snapshot.rate === 1) return "¥1 = ¥1";
+  return `${paymentCurrencySymbol(to)}1 = ¥${formatReverseFxRate(snapshot.rate)}`;
+}
+
+function paymentCurrencyAmountText(currency: string, amount: number): string {
+  const normalized = currency.toLowerCase();
+  if (normalized === "cny") return `¥${money(amount)}`;
+  return `${paymentCurrencySymbol(normalized)}${money(amount)}`;
+}
+
+function paymentCurrencySymbol(currency: string): string {
+  const normalized = currency.toLowerCase();
+  if (normalized === "cny") return "¥";
+  if (normalized === "usd") return "$";
+  if (normalized === "hkd") return "HK$";
+  if (normalized === "eur") return "€";
+  if (normalized === "gbp") return "£";
+  if (normalized === "jpy") return "¥";
+  return normalized.toUpperCase();
+}
+
+function formatReverseFxRate(rate: number): string {
+  if (!Number.isFinite(rate) || rate <= 0) return "-";
+  return (1 / rate).toFixed(2);
 }
 
 function paymentMethodBadges(id: PaymentMethodView["id"], tWallet: AppTranslator) {

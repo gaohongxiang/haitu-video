@@ -211,6 +211,44 @@ describe("SQLite database infrastructure", () => {
     }
   });
 
+  it("upgrades legacy model service preferences that were created with bundle columns", async () => {
+    const dataDir = await makeTempDir();
+    const handle = openDatabase({ dataDir, env: {} });
+
+    try {
+      handle.sqlite.exec(`
+        CREATE TABLE __drizzle_migrations (
+          id TEXT PRIMARY KEY,
+          applied_at TEXT NOT NULL
+        );
+        CREATE TABLE model_service_preferences (
+          workspace_id TEXT PRIMARY KEY,
+          service_mode TEXT NOT NULL DEFAULT 'byok',
+          platform_bundle_id TEXT,
+          byok_bundle_id TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT INTO __drizzle_migrations (id, applied_at)
+        VALUES ('0008_model_service_preferences', '2026-06-25T00:00:00.000Z');
+      `);
+
+      runMigrations(handle);
+
+      const preferenceColumns = handle.sqlite
+        .prepare("PRAGMA table_info(model_service_preferences)")
+        .all() as Array<{ name: string }>;
+
+      expect(preferenceColumns.map((column) => column.name)).toEqual(expect.arrayContaining([
+        "text_model_config_id",
+        "image_model_config_id",
+        "video_model_config_id"
+      ]));
+    } finally {
+      closeDatabase(handle);
+    }
+  });
+
   it("does not register legacy provider key migrations after the unified model config reset", async () => {
     const dataDir = await makeTempDir();
     const handle = openDatabase({ dataDir, env: {} });

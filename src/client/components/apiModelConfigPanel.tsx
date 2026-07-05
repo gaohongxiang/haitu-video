@@ -56,7 +56,7 @@ export function ApiModelConfigPanel({
   onTest: (providerId: ModelConfigProviderId) => Promise<void>;
   onRefreshModels: (providerId: ModelConfigProviderId) => Promise<void>;
   onRevealApiKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
-  onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onClear: (providerId: ModelConfigProviderId, configIds?: string[]) => Promise<void>;
   onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onServicePreferenceChange: (patch: Partial<ModelServicePreference>) => Promise<void>;
   isBusy: boolean;
@@ -188,12 +188,13 @@ function ApiServiceModeCards({
             <button
               key={mode.id}
               type="button"
-              disabled={isBusy}
+              aria-disabled={isBusy ? "true" : undefined}
               className={cn(
                 "grid min-h-[118px] gap-2 rounded-lg border p-4 text-left transition",
                 active
                   ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_8%,var(--card))] shadow-[0_12px_26px_rgba(96,64,43,.10)]"
-                  : "border-[var(--border)] bg-[var(--card2)] hover:border-[var(--border-strong)]"
+                  : "border-[var(--border)] bg-[var(--card2)] hover:border-[var(--border-strong)]",
+                isBusy && "opacity-80"
               )}
               onClick={() => onServiceModeChange(mode.id)}
             >
@@ -227,7 +228,7 @@ function ModelServiceOwnerPanel({
   drafts: Record<ModelConfigProviderId, ModelConfigDraft>;
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
   onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
-  onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onClear: (providerId: ModelConfigProviderId, configIds?: string[]) => Promise<void>;
   onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onAdd: (providerId: ModelConfigProviderId) => void;
   onEdit: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;

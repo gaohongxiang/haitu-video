@@ -35,6 +35,8 @@ import { clientLocaleStorageKey, i18n } from "../i18n/client.js";
 import {
   apiModeForProviderDraft,
   draftFromProviderConfig,
+  groupConfiguredModelServices,
+  modelConfigDeleteQuery,
   modelConfigPresets,
   resetModelConfigDraft,
   SharedModelConfigDialog,
@@ -914,11 +916,11 @@ export function AdminApp() {
     }
   }
 
-  async function clearPlatformModelConfig(providerId: ModelConfigProviderId, configId?: string) {
+  async function clearPlatformModelConfig(providerId: ModelConfigProviderId, configIds?: string[]) {
     setBusy(true);
     setStatus("");
     try {
-      const suffix = configId ? `?configId=${encodeURIComponent(configId)}` : "";
+      const suffix = modelConfigDeleteQuery(configIds);
       const response = await fetch(`${modelServicesEndpoint(providerId)}${suffix}`, {
         method: "DELETE"
       });
@@ -1261,7 +1263,7 @@ function AdminDashboard({
   onPlatformPresetApply: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
   onAddPlatformModelService: (providerId: ModelConfigProviderId) => void;
   onEditPlatformModelService: (providerId: ModelConfigProviderId, model: ProviderConfigItem, models: ProviderConfigItem[]) => void;
-  onClearPlatformModelConfig: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onClearPlatformModelConfig: (providerId: ModelConfigProviderId, configIds?: string[]) => Promise<void>;
   onTogglePlatformModelConfigEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onRevealPlatformModelConfigKey: (providerId: ModelConfigProviderId, configId: string) => Promise<string>;
   onClosePlatformModelDialog: () => void;
@@ -1732,7 +1734,7 @@ function AdminModelServicesPanel({
   testStatuses: Partial<Record<ModelConfigProviderId, ModelConfigTestStatus>>;
   onAdd: (providerId: ModelConfigProviderId) => void;
   onApplyPreset: (providerId: ModelConfigProviderId, preset: ModelConfigDraft) => void;
-  onClear: (providerId: ModelConfigProviderId, configId?: string) => Promise<void>;
+  onClear: (providerId: ModelConfigProviderId, configIds?: string[]) => Promise<void>;
   onToggleEnabled: (providerId: ModelConfigProviderId, service: ProviderConfigServiceItem, enabled: boolean) => Promise<void>;
   onCloseDialog: () => void;
   onDraftChange: (providerId: ModelConfigProviderId, patch: Partial<ModelConfigDraft>) => void;
@@ -1749,7 +1751,10 @@ function AdminModelServicesPanel({
     badge: modelServicesGroupBadge(provider.groupKey)
   }));
   const editingGroup = groups.find((group) => group.providerId === editingProviderId);
-  const configuredCount = groups.reduce((total, group) => total + group.models.filter((model) => model.configured).length, 0);
+  const configuredCount = groups.reduce(
+    (total, group) => total + groupConfiguredModelServices(group.providerId, group.models.filter((model) => model.configured)).length,
+    0
+  );
   return (
     <Card className="bg-[var(--card)]">
       <CardHeader
@@ -4014,9 +4019,18 @@ function adminWalletTransactionDetailRows(
   metadata: Record<string, unknown>,
   priceSnapshot: Record<string, unknown> | undefined
 ): Array<{ label: string; value: React.ReactNode }> {
+  const paymentRows = [
+    { label: tAdmin("finance.transactionDetail.paymentMethod"), value: adminDetailText(metadata.paymentMethodLabel), rawValue: metadata.paymentMethodLabel },
+    { label: tAdmin("finance.transactionDetail.paymentCurrency"), value: adminDetailText(metadata.paymentCurrency), rawValue: metadata.paymentCurrency },
+    { label: tAdmin("finance.transactionDetail.cryptoCurrency"), value: adminDetailText(metadata.cryptoCurrency), rawValue: metadata.cryptoCurrency },
+    { label: tAdmin("finance.transactionDetail.cryptoNetwork"), value: adminDetailText(metadata.cryptoNetwork), rawValue: metadata.cryptoNetwork },
+    { label: tAdmin("finance.transactionDetail.cryptoTxHash"), value: adminDetailText(metadata.cryptoTxHash ?? metadata.cryptoTxHashShort), rawValue: metadata.cryptoTxHash ?? metadata.cryptoTxHashShort },
+    { label: tAdmin("finance.transactionDetail.stripeCharge"), value: adminDetailText(metadata.stripeChargeId), rawValue: metadata.stripeChargeId }
+  ].filter((row) => adminHasDetailValue(row.rawValue));
   return [
     { label: tAdmin("finance.transactionDetail.workspace"), value: `${adminBusinessSpaceName(transaction.workspaceName)} / ${transaction.ownerEmail ?? transaction.workspaceId}` },
     { label: tAdmin("finance.transactionDetail.description"), value: transaction.description ?? transaction.id },
+    ...paymentRows.map(({ label, value }) => ({ label, value })),
     { label: tAdmin("finance.transactionDetail.billingMode"), value: adminDetailText(metadata.apiBillingMode) },
     { label: tAdmin("finance.transactionDetail.usageKind"), value: adminDetailText(metadata.usageKind ?? priceSnapshot?.kind) },
     { label: tAdmin("finance.transactionDetail.model"), value: adminDetailText(metadata.model ?? priceSnapshot?.requestedModel ?? priceSnapshot?.model) },
@@ -4039,6 +4053,10 @@ function adminDetailText(value: unknown): string {
   if (typeof value === "number") return formatNumber(value);
   if (typeof value === "string") return value;
   return JSON.stringify(value);
+}
+
+function adminHasDetailValue(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
 }
 
 function adminMoneyText(value: unknown): string {

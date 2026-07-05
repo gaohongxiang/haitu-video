@@ -38,6 +38,7 @@ export interface ConsoleRequestContext {
   walletStore: WalletStore;
   videoJobQueue: LocalVideoJobQueue;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
+  now?: () => Date;
 }
 
 export async function createConsoleRequestContext(input: {
@@ -113,6 +114,7 @@ export async function createConsoleRequestContext(input: {
       workspaceId: resolved.workspaceId,
       now: input.now
     }),
+    now: input.now,
     referenceImageUrlResolver,
     videoJobQueue: videoJobQueueForWorkspace({
       workspaceId: resolved.workspaceId,

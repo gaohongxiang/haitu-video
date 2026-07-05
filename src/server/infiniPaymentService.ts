@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import type { DatabaseHandle } from "./db/client.js";
 import { WalletRechargeOrderStore, normalizeCurrency, type WalletRechargeOrder } from "./walletRechargeOrderStore.js";
@@ -27,6 +27,7 @@ export interface InfiniCreateOrderResponse {
 }
 
 interface InfiniCreateOrderResponseBody extends Partial<InfiniCreateOrderResponse> {
+  code?: number;
   checkoutUrl?: string;
   data?: Partial<InfiniCreateOrderResponse> & {
     checkoutUrl?: string;
@@ -43,6 +44,10 @@ export interface InfiniOrderStatus {
   status?: string;
   amountConfirmed?: string | number;
   amountConfirming?: string | number;
+  paymentCurrency?: string;
+  paymentNetwork?: string;
+  transactionHash?: string;
+  expiresAt?: number;
   raw: Record<string, unknown>;
 }
 
@@ -63,7 +68,20 @@ export interface InfiniWebhookEvent {
   status?: string;
   amountConfirmed?: string | number;
   amountConfirming?: string | number;
+  paymentCurrency?: string;
+  paymentNetwork?: string;
+  transactionHash?: string;
   raw: Record<string, unknown>;
+}
+
+interface InfiniResolvedPaymentMethod {
+  provider: "infini";
+  type: "crypto";
+  label: string;
+  cryptoCurrency?: string;
+  cryptoNetwork?: string;
+  cryptoTxHash?: string;
+  cryptoTxHashShort?: string;
 }
 
 export function infiniPaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env): InfiniPaymentConfig {
@@ -84,7 +102,7 @@ export function infiniPaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env)
     secretKey,
     webhookSecret,
     apiBaseUrl: normalizeInfiniApiBaseUrl(env),
-    currency: normalizeCurrency(env.INFINI_CURRENCY ?? "hkd"),
+    currency: normalizeCurrency(normalizeEnvText(env.INFINI_CURRENCY) || "usd"),
     appUrl: normalizeAppUrl(env.HAITU_PUBLIC_BASE_URL ?? env.BETTER_AUTH_URL),
     merchantAlias: normalizeEnvText(env.INFINI_MERCHANT_ALIAS) || "Haitu"
   };
@@ -93,22 +111,24 @@ export function infiniPaymentConfigFromEnv(env: NodeJS.ProcessEnv = process.env)
 export async function createInfiniCheckoutRechargeSession(input: {
   order: WalletRechargeOrder;
   config: InfiniPaymentConfig;
+  orderExpiresInSeconds: number;
   fetchImpl?: typeof fetch;
 }): Promise<InfiniCreateOrderResponse> {
   const fetcher = input.fetchImpl ?? fetch;
   const path = "/v1/acquiring/order";
-  const body = JSON.stringify({
+  const requestBody: Record<string, unknown> = {
     amount: input.order.paymentAmount.toFixed(2),
-    request_id: input.order.id,
+    request_id: randomUUID(),
     client_reference: input.order.id,
     order_desc: "Haitu 余额充值",
-    expires_in: 3600,
     merchant_alias: input.config.merchantAlias,
     success_url: `${input.config.appUrl}/console?section=wallet&payment=infini-success&orderId=${encodeURIComponent(input.order.id)}`,
     failure_url: `${input.config.appUrl}/console?section=wallet&payment=infini-cancel&orderId=${encodeURIComponent(input.order.id)}`,
     pay_methods: [1],
     currency: input.order.paymentCurrency.toUpperCase()
-  });
+  };
+  requestBody.expires_in = input.orderExpiresInSeconds;
+  const body = JSON.stringify(requestBody);
   let response: Response;
   try {
     response = await fetcher(`${input.config.apiBaseUrl}${path}`, {
@@ -129,8 +149,8 @@ export async function createInfiniCheckoutRechargeSession(input: {
     throw new Error(`Infini 支付订单请求失败，请稍后重试。原因: ${errorMessage(error)}`);
   }
   const responseBody = await response.json().catch(() => ({})) as InfiniCreateOrderResponseBody;
-  if (!response.ok) {
-    throw new Error(responseBody.error?.message ?? responseBody.message ?? "创建 Infini 支付订单失败。");
+  if (!response.ok || isInfiniErrorResponse(responseBody)) {
+    throw new Error(infiniCreateOrderErrorMessage(responseBody));
   }
   const orderResponse = normalizeInfiniCreateOrderResponse(responseBody);
   if (!orderResponse.order_id || !orderResponse.checkout_url) {
@@ -140,12 +160,20 @@ export async function createInfiniCheckoutRechargeSession(input: {
     });
     throw new Error("Infini 未返回可用的支付链接。");
   }
+  const expiresAt = orderResponse.expires_at ?? await queryInfiniOrderExpiresAt({
+    orderId: orderResponse.order_id,
+    config: input.config,
+    fetchImpl: fetcher
+  });
+  if (!expiresAt) {
+    throw new Error("Infini 未返回订单过期时间。");
+  }
   return {
     order_id: orderResponse.order_id,
     request_id: orderResponse.request_id,
     checkout_url: orderResponse.checkout_url,
     client_reference: orderResponse.client_reference,
-    expires_at: orderResponse.expires_at
+    expires_at: expiresAt
   };
 }
 
@@ -179,6 +207,15 @@ export async function queryInfiniCheckoutRechargeOrder(input: {
     throw new Error("Infini 未返回有效订单状态。");
   }
   return orderStatus as InfiniOrderStatus;
+}
+
+async function queryInfiniOrderExpiresAt(input: {
+  orderId: string;
+  config: InfiniPaymentConfig;
+  fetchImpl?: typeof fetch;
+}): Promise<number | undefined> {
+  const status = await queryInfiniCheckoutRechargeOrder(input);
+  return status.expiresAt;
 }
 
 export async function syncInfiniCheckoutRechargeOrder(input: {
@@ -261,6 +298,9 @@ export async function syncInfiniCheckoutRechargeOrder(input: {
         status: status.status,
         amountConfirmed: status.amountConfirmed,
         amountConfirming: status.amountConfirming,
+        paymentCurrency: status.paymentCurrency,
+        paymentNetwork: status.paymentNetwork,
+        transactionHash: status.transactionHash,
         raw: status.raw
       },
       orderStore,
@@ -273,6 +313,15 @@ export async function syncInfiniCheckoutRechargeOrder(input: {
     };
   });
   return syncPaidOrder();
+}
+
+function isInfiniErrorResponse(responseBody: InfiniCreateOrderResponseBody): boolean {
+  return typeof responseBody.code === "number" && responseBody.code !== 0;
+}
+
+function infiniCreateOrderErrorMessage(responseBody: InfiniCreateOrderResponseBody): string {
+  const message = responseBody.error?.message ?? responseBody.message;
+  return message ? `创建 Infini 支付订单失败：${message}` : "创建 Infini 支付订单失败。";
 }
 
 function normalizeInfiniCreateOrderResponse(responseBody: InfiniCreateOrderResponseBody): Partial<InfiniCreateOrderResponse> {
@@ -296,6 +345,10 @@ function normalizeInfiniOrderStatus(responseBody: InfiniOrderStatusResponseBody)
     status: normalizeOptionalText(body.status),
     amountConfirmed: normalizeOptionalAmount(body.amount_confirmed),
     amountConfirming: normalizeOptionalAmount(body.amount_confirming),
+    paymentCurrency: infiniCryptoCurrencyFromRaw(body),
+    paymentNetwork: infiniCryptoNetworkFromRaw(body),
+    transactionHash: infiniTransactionHashFromRaw(body),
+    expiresAt: normalizeOptionalTimestamp(body.expires_at),
     raw: body
   };
 }
@@ -374,6 +427,9 @@ export function constructInfiniWebhookEvent(input: {
     status: normalizeOptionalText(parsed.status),
     amountConfirmed: parsed.amount_confirmed as string | number | undefined,
     amountConfirming: parsed.amount_confirming as string | number | undefined,
+    paymentCurrency: infiniCryptoCurrencyFromRaw(parsed),
+    paymentNetwork: infiniCryptoNetworkFromRaw(parsed),
+    transactionHash: infiniTransactionHashFromRaw(parsed),
     raw: parsed
   };
 }
@@ -450,9 +506,19 @@ function handleInfiniOrderCompleted(input: {
     workspaceId: order.workspaceId,
     now: input.now
   });
+  const paymentMethod = infiniPaymentMethodFromEvent(input.event);
+  const paymentMetadata = {
+    paymentMethodProvider: paymentMethod.provider,
+    paymentMethodType: paymentMethod.type,
+    paymentMethodLabel: paymentMethod.label,
+    cryptoCurrency: paymentMethod.cryptoCurrency,
+    cryptoNetwork: paymentMethod.cryptoNetwork,
+    cryptoTxHash: paymentMethod.cryptoTxHash,
+    cryptoTxHashShort: paymentMethod.cryptoTxHashShort
+  };
   walletStore.topUp({
     amountCny: order.creditCny,
-    description: "Infini 数字货币充值到账",
+    description: infiniRechargeDescription(paymentMethod),
     metadata: {
       provider: "infini",
       rechargeOrderId: order.id,
@@ -463,12 +529,19 @@ function handleInfiniOrderCompleted(input: {
       paymentAmountCents: order.paymentAmountCents,
       fxRateSnapshot: order.fxRateSnapshot,
       amountConfirmed: input.event.amountConfirmed,
-      amountConfirming: input.event.amountConfirming
+      amountConfirming: input.event.amountConfirming,
+      ...paymentMetadata
     }
   });
   input.orderStore.markPaid({
     orderId: order.id,
-    providerPaymentIntentId: input.event.orderId
+    providerPaymentIntentId: input.event.orderId,
+    metadata: {
+      infiniOrderId: input.event.orderId,
+      amountConfirmed: input.event.amountConfirmed,
+      amountConfirming: input.event.amountConfirming,
+      ...paymentMetadata
+    }
   });
 }
 
@@ -497,6 +570,139 @@ function normalizeOptionalText(value: unknown): string | undefined {
 
 function normalizeOptionalAmount(value: unknown): string | number | undefined {
   return typeof value === "string" || typeof value === "number" ? value : undefined;
+}
+
+function normalizeOptionalTimestamp(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const timestamp = Number(value.trim());
+    return Number.isSafeInteger(timestamp) && timestamp > 0 ? timestamp : undefined;
+  }
+  return undefined;
+}
+
+function infiniPaymentMethodFromEvent(event: InfiniWebhookEvent): InfiniResolvedPaymentMethod {
+  const cryptoCurrency = normalizeCryptoSymbol(event.paymentCurrency);
+  const cryptoNetwork = normalizeCryptoNetwork(event.paymentNetwork);
+  const cryptoTxHash = normalizeOptionalText(event.transactionHash);
+  const label = [cryptoCurrency, cryptoNetwork].filter(Boolean).join("-") || "数字货币";
+  return {
+    provider: "infini",
+    type: "crypto",
+    label,
+    cryptoCurrency,
+    cryptoNetwork,
+    cryptoTxHash,
+    cryptoTxHashShort: shortTransactionHash(cryptoTxHash)
+  };
+}
+
+function infiniRechargeDescription(paymentMethod: InfiniResolvedPaymentMethod): string {
+  return paymentMethod.label === "数字货币"
+    ? "Infini 数字货币充值到账"
+    : `Infini ${paymentMethod.label} 充值到账`;
+}
+
+function infiniCryptoCurrencyFromRaw(raw: Record<string, unknown>): string | undefined {
+  return normalizeCryptoSymbol(firstNestedText(raw, [
+    "payment_currency",
+    "crypto_currency",
+    "pay_currency",
+    "token",
+    "coin",
+    "asset",
+    "currency_type",
+    "payment.currency",
+    "payment.token",
+    "payment.asset",
+    "transaction.currency",
+    "transaction.token"
+  ]));
+}
+
+function infiniCryptoNetworkFromRaw(raw: Record<string, unknown>): string | undefined {
+  return normalizeCryptoNetwork(firstNestedText(raw, [
+    "payment_network",
+    "crypto_network",
+    "pay_network",
+    "network",
+    "chain",
+    "chain_name",
+    "blockchain",
+    "payment.network",
+    "payment.chain",
+    "transaction.network",
+    "transaction.chain"
+  ]));
+}
+
+function infiniTransactionHashFromRaw(raw: Record<string, unknown>): string | undefined {
+  return normalizeOptionalText(firstNestedText(raw, [
+    "tx_hash",
+    "transaction_hash",
+    "transaction_id",
+    "hash",
+    "txn_hash",
+    "payment.tx_hash",
+    "payment.transaction_hash",
+    "transaction.tx_hash",
+    "transaction.hash"
+  ]));
+}
+
+function firstNestedText(raw: Record<string, unknown>, paths: string[]): string | undefined {
+  for (const path of paths) {
+    const value = nestedValue(raw, path);
+    const text = normalizeOptionalText(value);
+    if (text) {
+      return text;
+    }
+  }
+  return undefined;
+}
+
+function nestedValue(raw: Record<string, unknown>, path: string): unknown {
+  let current: unknown = raw;
+  for (const part of path.split(".")) {
+    if (!isPlainObject(current)) {
+      return undefined;
+    }
+    current = current[part];
+  }
+  return current;
+}
+
+function normalizeCryptoSymbol(value: unknown): string | undefined {
+  const text = normalizeOptionalText(value);
+  return text ? text.toUpperCase() : undefined;
+}
+
+function normalizeCryptoNetwork(value: unknown): string | undefined {
+  const text = normalizeOptionalText(value);
+  if (!text) {
+    return undefined;
+  }
+  const normalized = text.replace(/[_\s]+/g, "-").toUpperCase();
+  const labels: Record<string, string> = {
+    TRON: "TRC20",
+    "TRON-TRC20": "TRC20",
+    ETHEREUM: "ERC20",
+    "ETHEREUM-ERC20": "ERC20",
+    BSC: "BEP20",
+    "BNB-SMART-CHAIN": "BEP20",
+    POLYGON: "Polygon",
+    SOLANA: "Solana"
+  };
+  return labels[normalized] ?? normalized;
+}
+
+function shortTransactionHash(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-8)}` : value;
 }
 
 function normalizeEnvText(value: unknown): string {

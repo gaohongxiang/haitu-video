@@ -79,6 +79,27 @@ describe("api service mode source", () => {
     expect(sharedSource).toContain("<EnabledSwitchButton");
   });
 
+  it("keeps service mode cards clickable and switches locally before refresh", async () => {
+    const source = await readFile(appPath, "utf8");
+    const apiPanelSource = await readFile(apiModelConfigPanelPath, "utf8");
+    const modeCardsSource = apiPanelSource.slice(apiPanelSource.indexOf("function ApiServiceModeCards"), apiPanelSource.indexOf("function ModelServiceOwnerPanel"));
+    const savePreferenceSource = source.slice(source.indexOf("async function saveModelServicePreference"), source.indexOf("async function persistModelServicePreference"));
+    const persistPreferenceSource = source.slice(source.indexOf("async function persistModelServicePreference"), source.indexOf("async function testModelConfig"));
+
+    expect(modeCardsSource).not.toContain("disabled={isBusy}");
+    expect(modeCardsSource).toContain('aria-disabled={isBusy ? "true" : undefined}');
+    expect(modeCardsSource).toContain("onClick={() => onServiceModeChange(mode.id)}");
+    expect(savePreferenceSource).toContain("const optimisticPreference = {");
+    expect(source).toContain("modelServicePreferenceSaveInFlightRef");
+    expect(source).toContain("modelServicePreferenceMutationSeqRef");
+    expect(source).toContain("const modelServicePreferenceMutationSeq = modelServicePreferenceMutationSeqRef.current;");
+    expect(source).toContain("!modelServicePreferenceSaveInFlightRef.current");
+    expect(source).toContain("modelServicePreferenceMutationSeq === modelServicePreferenceMutationSeqRef.current");
+    expect(persistPreferenceSource).toContain("modelServicePreferenceMutationSeqRef.current += 1;");
+    expect(savePreferenceSource).toContain("setModelServicePreference(optimisticPreference)");
+    expect(savePreferenceSource).toContain("setModelServicePreference(previousPreference)");
+  });
+
   it("keeps platform-hosted model names on the same line without availability copy", async () => {
     const sharedSource = await readFile(sharedModelConfigPath, "utf8");
     const platformBranchStart = sharedSource.indexOf('if (!canManageServices && apiOwner === "platform")');
@@ -108,5 +129,30 @@ describe("api service mode source", () => {
     expect(storyboardPanelSource).toContain('mode === "image" ? selectedImageModelConfigId : selectedVideoModelConfigId');
     expect(storyboardPanelSource).toContain('mode === "image" ? onImageModelConfigChange : onVideoModelConfigChange');
     expect(storyboardPanelSource).toContain('mode === "image" ? imageModelOptions : videoModelOptions');
+  });
+
+  it("keeps prompt previews deterministic while server draft APIs accept target models and references", async () => {
+    const source = await readFile(appPath, "utf8");
+    const storyboardRequestSource = source.slice(
+      source.indexOf('`/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`'),
+      source.indexOf("controller.signal", source.indexOf('`/api/products/${encodeURIComponent(product.sku)}/storyboard-draft`'))
+    );
+    const imagePromptRequestSource = source.slice(
+      source.indexOf('`/api/products/${encodeURIComponent(product.sku)}/image-prompt-draft`'),
+      source.indexOf("controller.signal", source.indexOf('`/api/products/${encodeURIComponent(product.sku)}/image-prompt-draft`'))
+    );
+
+    expect(source).toContain("videoModelConfigId: effectiveSelectedVideoModelConfigId");
+    expect(source).toContain("imageModelConfigId: effectiveSelectedImageModelConfigId");
+    expect(source).toContain("referenceImages: options.referenceImages ?? []");
+    expect(source).toContain("function selectedReferenceImagesForPromptPreview()");
+    expect(source).toContain("referenceImages: selectedReferenceImagesForPromptPreview()");
+    expect(source).toContain("locale: appLocale");
+    expect(source).toContain("targetModel: targetModelForPromptPreview(videoModelOptions, selectedVideoModelConfigId, \"volcengine-seedance\")");
+    expect(source).toContain("targetModel: targetModelForPromptPreview(imageModelOptions, selectedImageModelConfigId, \"openai-compatible-image\")");
+    expect(source).not.toContain("const productForPrompt = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(source).not.toContain("const productForStoryboard = await onFlushProductFactsAutoSave() ?? selectedProduct;");
+    expect(storyboardRequestSource).not.toContain("textModelConfigId");
+    expect(imagePromptRequestSource).not.toContain("textModelConfigId");
   });
 });

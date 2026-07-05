@@ -162,18 +162,28 @@ export class WalletRechargeOrderStore {
   markPaid(input: {
     orderId: string;
     providerPaymentIntentId?: string;
+    metadata?: Record<string, unknown>;
   }): WalletRechargeOrder {
     const now = this.nowIso();
+    const existing = this.getById(input.orderId);
+    const metadata = input.metadata
+      ? {
+          ...(existing.metadata ?? {}),
+          ...input.metadata
+        }
+      : existing.metadata;
     this.input.handle.sqlite.prepare(`
       UPDATE wallet_recharge_orders
       SET status = 'paid',
         provider_payment_intent_id = COALESCE(@providerPaymentIntentId, provider_payment_intent_id),
+        metadata_json = @metadataJson,
         completed_at = COALESCE(completed_at, @completedAt),
         updated_at = @updatedAt
       WHERE id = @orderId
     `).run({
       orderId: input.orderId,
       providerPaymentIntentId: input.providerPaymentIntentId ?? null,
+      metadataJson: metadata ? JSON.stringify(metadata) : null,
       completedAt: now,
       updatedAt: now
     });
@@ -290,8 +300,39 @@ export class WalletRechargeOrderStore {
     return walletRechargeOrderFromRow(row);
   }
 
+  listByWorkspaceId(workspaceId: string, limit = 50): WalletRechargeOrder[] {
+    this.markWorkspaceExpiredPendingOrders(workspaceId);
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const rows = this.input.handle.sqlite.prepare(`
+      SELECT *
+      FROM wallet_recharge_orders
+      WHERE workspace_id = @workspaceId
+      ORDER BY created_at DESC, id DESC
+      LIMIT @limit
+    `).all({
+      workspaceId,
+      limit: safeLimit
+    }) as WalletRechargeOrderRow[];
+    return rows.map(walletRechargeOrderFromRow);
+  }
+
   private nowIso(): string {
     return (this.input.now ?? (() => new Date()))().toISOString();
+  }
+
+  private markWorkspaceExpiredPendingOrders(workspaceId: string): void {
+    this.input.handle.sqlite.prepare(`
+      UPDATE wallet_recharge_orders
+      SET status = 'expired',
+        updated_at = @updatedAt
+      WHERE workspace_id = @workspaceId
+        AND status = 'pending'
+        AND expires_at IS NOT NULL
+        AND expires_at <= @updatedAt
+    `).run({
+      workspaceId,
+      updatedAt: this.nowIso()
+    });
   }
 }
 
@@ -349,9 +390,22 @@ function fxRateSnapshotFromMetadata(metadataJson: string | null): RechargeFxRate
     ? {
         from: "cny",
         to: record.to,
-        rate: record.rate
+        rate: record.rate,
+        source: rechargeFxSource(record.source),
+        sourceLabel: stringValue(record.sourceLabel),
+        sourceUrl: stringValue(record.sourceUrl),
+        asOfDate: stringValue(record.asOfDate),
+        fetchedAt: stringValue(record.fetchedAt)
       }
     : undefined;
+}
+
+function rechargeFxSource(value: unknown): RechargeFxRateSnapshot["source"] | undefined {
+  return value === "identity" || value === "frankfurter" || value === "env" ? value : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export function normalizeCurrency(value: unknown): string {

@@ -271,6 +271,13 @@ export class SqliteModelConfigStore implements ModelConfigStore {
 
     if (input.model !== undefined) {
       this.deleteVariantsNotInModels(credentialId, models);
+      this.deleteDuplicateServiceCredentials({
+        providerId,
+        apiOwner,
+        vendor,
+        baseUrl,
+        keepCredentialId: credentialId
+      });
     }
 
     return maskedModelProviderStatus(providerId, secret, savedConfigIds[0]);
@@ -471,6 +478,31 @@ export class SqliteModelConfigStore implements ModelConfigStore {
         AND credential_id = ?
         AND model NOT IN (${placeholders})
     `).run(this.input.workspaceId, credentialId, ...models);
+  }
+
+  private deleteDuplicateServiceCredentials(input: {
+    providerId: ModelProviderId;
+    apiOwner: "platform" | "byok";
+    vendor?: string;
+    baseUrl?: string;
+    keepCredentialId: string;
+  }): void {
+    this.input.handle.sqlite.prepare(`
+      DELETE FROM model_credentials
+      WHERE workspace_id = @workspaceId
+        AND provider_id = @providerId
+        AND api_owner = @apiOwner
+        AND COALESCE(vendor, '') = COALESCE(@vendor, '')
+        AND COALESCE(base_url, '') = COALESCE(@baseUrl, '')
+        AND credential_id <> @keepCredentialId
+    `).run({
+      workspaceId: this.input.workspaceId,
+      providerId: input.providerId,
+      apiOwner: input.apiOwner,
+      vendor: input.vendor ?? null,
+      baseUrl: input.baseUrl ?? null,
+      keepCredentialId: input.keepCredentialId
+    });
   }
 }
 

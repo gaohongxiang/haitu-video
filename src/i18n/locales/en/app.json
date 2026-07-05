@@ -86,13 +86,17 @@
       "rmbEmpty": "RMB payments are not enabled yet",
       "cryptoEmpty": "Crypto payments are not enabled yet",
       "amount": "Payment Amount",
-      "credit": "Wallet Credit",
+      "credit": "Credit Amount",
+      "rate": "Exchange Rate",
+      "refreshRate": "Refresh exchange rate",
       "selected": "Selected",
       "selectable": "Available",
       "notConfigured": "Not configured",
       "disabled": "Disabled",
       "unavailable": "This payment method is temporarily unavailable.",
-      "pay": "Pay"
+      "quoteUnavailable": "Payment quote is temporarily unavailable. Please try again later.",
+      "pay": "Pay",
+      "processing": "Processing"
     }
   },
   "dashboard": {
@@ -330,6 +334,33 @@
     "emptyTransactions": "No balance records yet",
     "emptyRechargeTransactions": "No top-up records yet",
     "emptyConsumptionTransactions": "No spending records yet",
+    "paymentMethods": {
+      "stripe": "Stripe",
+      "infini": "Stablecoin payment"
+    },
+    "orderTable": {
+      "order": "Order ID",
+      "topUpAmount": "Top-up",
+      "paymentMethod": "Payment Method",
+      "status": "Status",
+      "createdAt": "Created",
+      "action": "Action",
+      "continuePay": "Continue",
+      "statuses": {
+        "pending": "Pending",
+        "paid": "Completed",
+        "expired": "Expired",
+        "failed": "Failed"
+      }
+    },
+    "transactionTable": {
+      "type": "Type",
+      "description": "Description",
+      "amount": "Amount",
+      "balance": "Balance",
+      "createdAt": "Created",
+      "action": "Action"
+    },
     "filters": {
       "ariaLabel": "Spending detail filters",
       "all": "All",
@@ -374,6 +405,12 @@
       "balanceAfter": "Balance After",
       "reservedAfter": "Reserved After",
       "description": "Description",
+      "paymentMethod": "Payment Method",
+      "paymentCurrency": "Payment Currency",
+      "cryptoCurrency": "Crypto Currency",
+      "cryptoNetwork": "Network",
+      "cryptoTxHash": "Transaction Hash",
+      "stripeCharge": "Stripe Charge",
       "billingMode": "Billing Mode",
       "usageKind": "Usage Kind",
       "model": "Model",
@@ -890,8 +927,8 @@
     "selectParsedRow": "Select a parsed product row first.",
     "filledFromFile": "Filled the current product with file data: {{title}}",
     "fileImportDone": "File import complete: {{imported}}/{{requested}} succeeded, {{failed}} failed",
-    "storyboardGenerated": "AI optimized the video prompt.",
-    "storyboardTimeout": "Text model generation timed out. Check API settings or try again later.",
+    "storyboardGenerated": "Model prompt preview ready.",
+    "storyboardTimeout": "Model prompt preview timed out. Try again later.",
     "productUpdated": "Product facts updated",
     "productSavedAndVideo": "Product saved and opened in video creation",
     "productSaved": "Product facts saved",
@@ -971,6 +1008,7 @@
     },
     "controls": {
       "template": "Video Style",
+      "creativeStyle": "Shooting Style",
       "duration": "Duration",
       "resolution": "Resolution",
       "aspectRatio": "Frame",
@@ -1125,14 +1163,18 @@
     "storyboard": {
       "title": "Video Prompt",
       "subtitle": "Optional. Leave blank to generate from product facts.",
-      "generate": "AI Optimize Prompt",
-      "generating": "Optimizing",
+      "placeholder": "Describe the video direction, for example: daily commute scene, model wearing the product, close-up details of material and color. You can also leave this blank.",
+      "generate": "View Prompt",
+      "generating": "Previewing",
+      "previewReadyToast": "Model prompt preview ready.",
+      "previewFailed": "Model prompt preview failed. Try again later.",
+      "previewNeedsFacts": "Fill in product facts before viewing the final prompt.",
       "history": "Prompt History",
       "deleteRecord": "Delete prompt record",
-      "emptyHistory": "No AI history yet",
+      "emptyHistory": "No prompt history yet",
       "emptyPreview": "Empty prompt",
       "default": "Default prompt",
-      "ai": "AI prompt",
+      "ai": "Model prompt preview",
       "manual": "Manual prompt",
       "defaultDrafts": {
         "scene": [
@@ -1171,11 +1213,14 @@
       "referenceImages": "{{count}} reference images"
     },
     "templates": {
+      "auto": "None",
+      "lifestyle": "Lifestyle",
       "scene": "Scene",
       "painPoint": "Pain Point",
       "benefit": "Benefit",
       "ugc": "UGC",
-      "unboxing": "Unboxing"
+      "unboxing": "Unboxing",
+      "detail": "Detail"
     },
     "videoStatus": {
       "expired": "Expired",
@@ -1516,6 +1561,12 @@
         "reservedAfter": "Reserved After",
         "workspace": "Workspace",
         "description": "Description",
+        "paymentMethod": "Payment Method",
+        "paymentCurrency": "Payment Currency",
+        "cryptoCurrency": "Crypto Currency",
+        "cryptoNetwork": "Network",
+        "cryptoTxHash": "Transaction Hash",
+        "stripeCharge": "Stripe Charge",
         "billingMode": "Billing Mode",
         "usageKind": "Usage Kind",
         "model": "Model",

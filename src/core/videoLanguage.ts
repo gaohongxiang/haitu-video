@@ -17,7 +17,22 @@ export function finalVideoLanguageUiLabel(language: FinalVideoLanguage): string 
   return language === "zh" ? "中文" : "日文";
 }
 
-export function finalVideoLanguageRestriction(language: FinalVideoLanguage): string {
+export function finalVideoLanguagePromptLabel(language: FinalVideoLanguage, locale: "zh" | "en" = "en"): string {
+  if (locale === "zh") {
+    return finalVideoLanguageUiLabel(language);
+  }
+  return finalVideoLanguageLabel(language);
+}
+
+export function finalVideoLanguageRestriction(language: FinalVideoLanguage, locale: "zh" | "en" = "en"): string {
+  if (locale === "zh") {
+    if (language === "en") {
+      return "最终视频中不要使用日文或中文文字。";
+    }
+    return language === "zh"
+      ? "最终视频中不要使用日文或英文文字。"
+      : "最终视频中不要使用中文或英文文字。";
+  }
   if (language === "en") {
     return "Do not use Japanese or Chinese text in the final video.";
   }

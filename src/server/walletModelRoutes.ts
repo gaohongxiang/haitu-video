@@ -14,7 +14,8 @@ import {
   infiniPaymentConfigFromEnv,
   syncInfiniCheckoutRechargeOrder
 } from "./infiniPaymentService.js";
-import { resolveRechargePaymentAmount } from "./rechargePaymentAmount.js";
+import { rechargeOrderExpirationPolicyFromEnv } from "./rechargeOrderExpiration.js";
+import { quoteRechargePaymentAmount } from "./rechargePaymentAmount.js";
 import { WalletRechargeOrderStore } from "./walletRechargeOrderStore.js";
 import {
   normalizeServiceMode,
@@ -39,6 +40,15 @@ export async function handleWalletModelRoutes(input: {
   if (request.method === "GET" && url.pathname === "/api/wallet") {
     return jsonResponse(requestContext.walletStore.getSummary());
   }
+  if (request.method === "GET" && url.pathname === "/api/wallet/recharge-orders") {
+    const orderStore = new WalletRechargeOrderStore({
+      handle: requestContext.databaseHandle,
+      now: requestContext.now
+    });
+    return jsonResponse({
+      orders: orderStore.listByWorkspaceId(requestContext.workspaceId)
+    });
+  }
   if (request.method === "POST" && url.pathname === "/api/wallet/recharge-orders") {
     const body = (await request.json()) as WalletRechargeOrderRequest;
     const amountCny = normalizeRechargeOrderAmountCny(body.amountCny);
@@ -49,15 +59,22 @@ export async function handleWalletModelRoutes(input: {
       settingsStore,
       paymentMethodId: body.paymentMethodId
     });
-    const paymentCurrency = paymentMethod.id === "stripe"
-      ? stripePaymentConfigFromEnv().currency
-      : infiniPaymentConfigFromEnv().currency;
-    const paymentAmount = resolveRechargePaymentAmount({
+    const stripeConfig = paymentMethod.id === "stripe" ? stripePaymentConfigFromEnv() : undefined;
+    const infiniConfig = paymentMethod.id === "infini" ? infiniPaymentConfigFromEnv() : undefined;
+    const paymentCurrency = stripeConfig?.currency ?? infiniConfig?.currency;
+    if (!paymentCurrency) {
+      throw new Error("暂不支持该支付方式。");
+    }
+    const expirationPolicy = rechargeOrderExpirationPolicyFromEnv();
+    const paymentAmount = await quoteRechargePaymentAmount({
       creditCny: amountCny,
-      paymentCurrency
+      paymentCurrency,
+      fetchImpl,
+      now: requestContext.now
     });
     const orderStore = new WalletRechargeOrderStore({
-      handle: requestContext.databaseHandle
+      handle: requestContext.databaseHandle,
+      now: requestContext.now
     });
     const order = orderStore.createPending({
       workspaceId: requestContext.workspaceId,
@@ -81,19 +98,28 @@ export async function handleWalletModelRoutes(input: {
     let expiresAt: string | undefined;
     try {
       if (paymentMethod.id === "stripe") {
+        if (!stripeConfig) {
+          throw new Error("暂不支持该支付方式。");
+        }
         const session = await createStripeCheckoutRechargeSession({
           order,
-          config: stripePaymentConfigFromEnv(),
-          fetchImpl
+          config: stripeConfig,
+          checkoutExpiresInSeconds: expirationPolicy.expiresInSeconds,
+          fetchImpl,
+          now: requestContext.now
         });
         providerSessionId = session.id;
         providerPaymentIntentId = session.payment_intent ?? undefined;
         checkoutUrl = session.url;
         expiresAt = session.expires_at ? new Date(session.expires_at * 1000).toISOString() : undefined;
       } else {
+        if (!infiniConfig) {
+          throw new Error("暂不支持该支付方式。");
+        }
         const session = await createInfiniCheckoutRechargeSession({
           order,
-          config: infiniPaymentConfigFromEnv(),
+          config: infiniConfig,
+          orderExpiresInSeconds: expirationPolicy.expiresInSeconds,
           fetchImpl
         });
         providerSessionId = session.order_id;
@@ -135,7 +161,8 @@ export async function handleWalletModelRoutes(input: {
   if (request.method === "POST" && rechargeSyncMatch) {
     const orderId = decodeURIComponent(rechargeSyncMatch[1] ?? "");
     const orderStore = new WalletRechargeOrderStore({
-      handle: requestContext.databaseHandle
+      handle: requestContext.databaseHandle,
+      now: requestContext.now
     });
     const existingOrder = orderStore.getById(orderId);
     if (existingOrder.workspaceId !== requestContext.workspaceId) {
@@ -145,7 +172,8 @@ export async function handleWalletModelRoutes(input: {
       orderId,
       config: infiniPaymentConfigFromEnv(),
       handle: requestContext.databaseHandle,
-      fetchImpl
+      fetchImpl,
+      now: requestContext.now
     });
     await auditLog.append({
       action: "wallet.recharge_order.synced",
