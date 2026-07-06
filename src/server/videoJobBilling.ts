@@ -20,6 +20,56 @@ interface VideoJobReader {
   get(id: string): Promise<VideoJobRecord>;
 }
 
+export interface VideoJobBillingPlan {
+  apiBillingMode?: "platform" | "byok";
+  platformFeeCny?: number;
+  upstreamEstimatedCostCny?: number;
+  reserveAmountCny: number;
+  billingCatalogVersion?: string;
+  billingPriceSnapshot?: ModelPricingSnapshot;
+}
+
+export function estimateVideoJobBilling(input: {
+  provider: VideoProviderName | undefined;
+  modelConfig?: Partial<ModelStoredConfig>;
+  durationSeconds: number;
+  resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+}): VideoJobBillingPlan {
+  if (!input.provider || input.provider === "mock") {
+    return {
+      reserveAmountCny: 0
+    };
+  }
+  const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
+  const videoRule = input.billingPolicyStore.getRule("video");
+  const platformFeeCny = videoRule.serviceFeeCny;
+  const upstreamEstimatedCostCny = apiBillingMode === "platform"
+    ? estimatedVideoUpstreamCostCny(input.durationSeconds, input.modelConfig?.model, input.resolution, input.aspectRatio, input.modelPricingCatalog)
+    : 0;
+  const estimatedTokens = estimateVideoTokens(input.durationSeconds, input.resolution, input.aspectRatio).expected;
+  const billingPriceSnapshot = modelPricingSnapshotForUsage({
+    kind: "video",
+    model: input.modelConfig?.model,
+    resolution: input.resolution,
+    aspectRatio: input.aspectRatio,
+    totalTokens: estimatedTokens,
+    catalog: input.modelPricingCatalog,
+    catalogVersion: input.modelPricingCatalogVersion
+  });
+  return {
+    apiBillingMode,
+    platformFeeCny,
+    upstreamEstimatedCostCny,
+    reserveAmountCny: roundMoney(platformFeeCny + upstreamEstimatedCostCny),
+    billingCatalogVersion: billingPriceSnapshot.catalogVersion,
+    billingPriceSnapshot
+  };
+}
+
 export function reserveVideoJobBilling(input: {
   walletStore: WalletStore;
   provider: VideoProviderName | undefined;
@@ -31,43 +81,27 @@ export function reserveVideoJobBilling(input: {
   modelPricingCatalog?: readonly ModelPricingEntry[];
   modelPricingCatalogVersion?: string;
 }): Pick<VideoJobRequest, "apiBillingMode" | "platformFeeCny" | "upstreamEstimatedCostCny" | "walletReservationId" | "billingCatalogVersion" | "billingPriceSnapshot"> {
-  if (!input.provider || input.provider === "mock") {
+  const plan = estimateVideoJobBilling(input);
+  if (!plan.apiBillingMode) {
     return {};
   }
-  const apiBillingMode = input.modelConfig?.apiOwner === "platform" ? "platform" : "byok";
-  const videoRule = input.billingPolicyStore.getRule("video");
-  const platformFeeCny = videoRule.serviceFeeCny;
-  const upstreamEstimatedCostCny = apiBillingMode === "platform"
-    ? estimatedVideoUpstreamCostCny(input.durationSeconds, input.modelConfig?.model, input.resolution, input.aspectRatio, input.modelPricingCatalog)
-    : 0;
-  const estimatedTokens = estimateVideoTokens(input.durationSeconds, input.resolution, input.aspectRatio).expected;
-  const reserveAmountCny = roundMoney(platformFeeCny + upstreamEstimatedCostCny);
-  const priceSnapshot = modelPricingSnapshotForUsage({
-    kind: "video",
-    model: input.modelConfig?.model,
-    resolution: input.resolution,
-    aspectRatio: input.aspectRatio,
-    totalTokens: estimatedTokens,
-    catalog: input.modelPricingCatalog,
-    catalogVersion: input.modelPricingCatalogVersion
-  });
   const reservation = input.walletStore.reserve({
-    amountCny: reserveAmountCny,
+    amountCny: plan.reserveAmountCny,
     description: "视频生成预扣",
     metadata: {
-      apiBillingMode,
-      platformFeeCny,
-      upstreamEstimatedCostCny,
-      priceSnapshot
+      apiBillingMode: plan.apiBillingMode,
+      platformFeeCny: plan.platformFeeCny,
+      upstreamEstimatedCostCny: plan.upstreamEstimatedCostCny,
+      priceSnapshot: plan.billingPriceSnapshot
     }
   });
   return {
-    apiBillingMode,
-    platformFeeCny,
-    upstreamEstimatedCostCny,
+    apiBillingMode: plan.apiBillingMode,
+    platformFeeCny: plan.platformFeeCny,
+    upstreamEstimatedCostCny: plan.upstreamEstimatedCostCny,
     walletReservationId: reservation.reservationId,
-    billingCatalogVersion: priceSnapshot.catalogVersion,
-    billingPriceSnapshot: priceSnapshot
+    billingCatalogVersion: plan.billingCatalogVersion,
+    billingPriceSnapshot: plan.billingPriceSnapshot
   };
 }
 

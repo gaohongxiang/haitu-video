@@ -15,8 +15,8 @@ import { resolveVideoRequestModel } from "./modelConfigSelection.js";
 import { findProductFileBySku } from "./productFileStore.js";
 import { assertPaidProductReady } from "./productReadiness.js";
 import { assertTemplateEnabled } from "./videoTemplateService.js";
-import { reserveVideoJobBilling } from "./videoJobBilling.js";
-import { WalletStore } from "./walletStore.js";
+import { estimateVideoJobBilling, reserveVideoJobBilling } from "./videoJobBilling.js";
+import { cnyToCents, InsufficientWalletBalanceError, WalletStore } from "./walletStore.js";
 
 export interface MakeVideoRequest {
   productPath: string;
@@ -65,11 +65,36 @@ interface EnqueueProductVideoJobsBySkuOptions extends EnqueueBatchVideoJobsOptio
   sku: string;
 }
 
+type VideoRequestModel = Awaited<ReturnType<typeof resolveVideoRequestModel>>;
+
+interface PreparedVideoJob {
+  productPath: string;
+  settings: Awaited<ReturnType<ConsoleSettingsStore["read"]>>;
+  providerName: VideoProviderName;
+  videoModel: VideoRequestModel;
+  durationSeconds: number;
+  resolution: VideoResolution;
+  aspectRatio: VideoAspectRatio;
+}
+
 export async function enqueueBatchVideoJobs(
   body: BatchVideoJobRequest,
   options: EnqueueBatchVideoJobsOptions
 ) {
   const versions = clampInteger(body.versions ?? 1, 1, 5);
+  const prepared = await prepareVideoJob(body, options);
+  assertWalletCanCoverBatch({
+    walletStore: options.walletStore,
+    versions,
+    provider: prepared.providerName,
+    modelConfig: prepared.videoModel.config,
+    durationSeconds: prepared.durationSeconds,
+    resolution: prepared.resolution,
+    aspectRatio: prepared.aspectRatio,
+    billingPolicyStore: options.billingPolicyStore,
+    modelPricingCatalog: options.modelPricingCatalog,
+    modelPricingCatalogVersion: options.modelPricingCatalogVersion
+  });
   const jobs = [];
   for (let index = 1; index <= versions; index += 1) {
     jobs.push(await enqueueVideoJob({
@@ -86,6 +111,54 @@ export async function enqueueVideoJob(
   body: MakeVideoRequest,
   options: EnqueueVideoJobOptions
 ) {
+  const prepared = await prepareVideoJob(body, options);
+  const billing = reserveVideoJobBilling({
+    walletStore: options.walletStore,
+    provider: prepared.providerName,
+    modelConfig: prepared.videoModel.config,
+    durationSeconds: prepared.durationSeconds,
+    resolution: prepared.resolution,
+    aspectRatio: prepared.aspectRatio,
+    billingPolicyStore: options.billingPolicyStore,
+    modelPricingCatalog: options.modelPricingCatalog,
+    modelPricingCatalogVersion: options.modelPricingCatalogVersion
+  });
+  return options.videoJobQueue.enqueue({
+    productPath: prepared.productPath,
+    outDirName: body.outDirName,
+    provider: body.provider,
+    providerModelConfigId: prepared.videoModel.providerModelConfigId,
+    providerModel: prepared.videoModel.providerModel,
+    duration: body.duration,
+    resolution: prepared.resolution,
+    aspectRatio: prepared.aspectRatio,
+    template: body.template,
+    finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? prepared.settings.defaultLanguage),
+    cta: body.cta,
+    scriptLines: sanitizeLines(body.scriptLines),
+    storyboardLines: sanitizeLines(body.storyboardLines),
+    referenceImages: sanitizeReferenceImages(body.referenceImages),
+    confirmPaid: body.confirmPaid ?? prepared.providerName !== "mock",
+    ...billing,
+    reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
+  });
+}
+
+export async function enqueueProductVideoJobsBySku(
+  body: ProductVideoJobRequest,
+  options: EnqueueProductVideoJobsBySkuOptions
+) {
+  const productPath = await findProductFileBySku(options.fixturesDir, options.sku);
+  return enqueueBatchVideoJobs({
+    ...body,
+    productPath
+  }, options);
+}
+
+async function prepareVideoJob(
+  body: MakeVideoRequest,
+  options: EnqueueVideoJobOptions
+): Promise<PreparedVideoJob> {
   const productPath = resolveWithin(options.rootDir, body.productPath);
   const settings = await options.settingsStore.read();
   const providerName = body.provider ?? settings.defaultProvider;
@@ -102,47 +175,47 @@ export async function enqueueVideoJob(
     productPath,
     rootDir: options.rootDir
   });
-  const billing = reserveVideoJobBilling({
-    walletStore: options.walletStore,
-    provider: providerName,
-    modelConfig: videoModel.config,
+  return {
+    productPath,
+    settings,
+    providerName,
+    videoModel,
     durationSeconds: body.duration ?? settings.defaultDurationSeconds,
     resolution: normalizeVideoResolution(body.resolution),
-    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio),
-    billingPolicyStore: options.billingPolicyStore,
-    modelPricingCatalog: options.modelPricingCatalog,
-    modelPricingCatalogVersion: options.modelPricingCatalogVersion
-  });
-  return options.videoJobQueue.enqueue({
-    productPath,
-    outDirName: body.outDirName,
-    provider: body.provider,
-    providerModelConfigId: videoModel.providerModelConfigId,
-    providerModel: videoModel.providerModel,
-    duration: body.duration,
-    resolution: normalizeVideoResolution(body.resolution),
-    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio),
-    template: body.template,
-    finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? settings.defaultLanguage),
-    cta: body.cta,
-    scriptLines: sanitizeLines(body.scriptLines),
-    storyboardLines: sanitizeLines(body.storyboardLines),
-    referenceImages: sanitizeReferenceImages(body.referenceImages),
-    confirmPaid: body.confirmPaid ?? providerName !== "mock",
-    ...billing,
-    reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
-  });
+    aspectRatio: normalizeVideoAspectRatio(body.aspectRatio)
+  };
 }
 
-export async function enqueueProductVideoJobsBySku(
-  body: ProductVideoJobRequest,
-  options: EnqueueProductVideoJobsBySkuOptions
-) {
-  const productPath = await findProductFileBySku(options.fixturesDir, options.sku);
-  return enqueueBatchVideoJobs({
-    ...body,
-    productPath
-  }, options);
+function assertWalletCanCoverBatch(input: {
+  walletStore: WalletStore;
+  versions: number;
+  provider: VideoProviderName | undefined;
+  modelConfig?: VideoRequestModel["config"];
+  durationSeconds: number;
+  resolution?: VideoResolution;
+  aspectRatio?: VideoAspectRatio;
+  billingPolicyStore: BillingPolicyStore;
+  modelPricingCatalog?: readonly ModelPricingEntry[];
+  modelPricingCatalogVersion?: string;
+}): void {
+  const billing = estimateVideoJobBilling({
+    provider: input.provider,
+    modelConfig: input.modelConfig,
+    durationSeconds: input.durationSeconds,
+    resolution: input.resolution,
+    aspectRatio: input.aspectRatio,
+    billingPolicyStore: input.billingPolicyStore,
+    modelPricingCatalog: input.modelPricingCatalog,
+    modelPricingCatalogVersion: input.modelPricingCatalogVersion
+  });
+  if (billing.reserveAmountCny <= 0) {
+    return;
+  }
+  const requiredCents = cnyToCents(billing.reserveAmountCny) * input.versions;
+  const availableCents = cnyToCents(input.walletStore.getSummary().availableCny);
+  if (availableCents < requiredCents) {
+    throw new InsufficientWalletBalanceError();
+  }
 }
 
 function normalizeVideoResolution(value: unknown): VideoResolution {

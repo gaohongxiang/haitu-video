@@ -9,7 +9,7 @@ import type { BillingPolicyStore } from "./billingPolicyStore.js";
 import { resolveWithin } from "./consoleAssetService.js";
 import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
-import { selectedVideoModelConfig } from "./modelConfigSelection.js";
+import { resolveVideoRequestModel } from "./modelConfigSelection.js";
 import type { ModelServicePreferenceStore } from "./modelServicePreferenceStore.js";
 import { assertPaidProductReady } from "./productReadiness.js";
 import type { MakeVideoRequest } from "./videoJobService.js";
@@ -34,21 +34,21 @@ export async function runConsoleMakeVideo(
   const productPath = resolveWithin(options.rootDir, body.productPath);
   const outDirName = sanitizePathSegment(body.outDirName ?? `console-${Date.now()}`);
   const settings = await options.settingsStore.read();
-  await assertTemplateEnabled(body, options.settingsStore);
   const providerName = body.provider ?? settings.defaultProvider;
+  const videoModel = await resolveVideoRequestModel({
+    modelConfigStore: options.modelConfigStore,
+    platformModelConfigStore: options.platformModelConfigStore,
+    modelServicePreferenceStore: options.modelServicePreferenceStore,
+    provider: providerName,
+    body
+  });
+  await assertTemplateEnabled(body, options.settingsStore);
   await assertPaidProductReady({
     provider: providerName,
     productPath,
     rootDir: options.rootDir
   });
   await mkdir(options.outputsDir, { recursive: true });
-  const providerConfig = await selectedVideoModelConfig({
-    modelConfigStore: options.modelConfigStore,
-    platformModelConfigStore: options.platformModelConfigStore,
-    modelServicePreferenceStore: options.modelServicePreferenceStore,
-    provider: providerName,
-    providerModelConfigId: body.providerModelConfigId
-  });
   const runPipeline = options.runMakeVideoPipeline ?? runMakeVideoPipeline;
   return runPipeline({
     productPath,
@@ -64,11 +64,11 @@ export async function runConsoleMakeVideo(
     storyboardLines: sanitizeLines(body.storyboardLines),
     confirmPaid: body.confirmPaid ?? providerName !== "mock",
     reuseManifestPath: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined,
-    apiKey: providerConfig.apiKey,
-    providerBaseUrl: providerConfig.baseUrl,
-    providerModelConfigId: providerConfig.configId,
-    providerModel: providerConfig.model,
-    tokenPriceCnyPerMillion: tokenPriceCnyPerMillionForVideoModel(providerConfig.model, body.resolution),
+    apiKey: videoModel.config?.apiKey,
+    providerBaseUrl: videoModel.config?.baseUrl,
+    providerModelConfigId: videoModel.providerModelConfigId,
+    providerModel: videoModel.providerModel,
+    tokenPriceCnyPerMillion: tokenPriceCnyPerMillionForVideoModel(videoModel.providerModel, body.resolution),
     fetchImpl: options.fetchImpl,
     referenceImageUrlResolver: options.referenceImageUrlResolver
   });

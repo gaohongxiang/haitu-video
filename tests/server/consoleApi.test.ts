@@ -10735,6 +10735,53 @@ describe("console API", () => {
     }
   });
 
+  it("rejects direct paid make-video requests before running the pipeline when the video model API key is missing", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-direct-missing-video-model-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      const calls: string[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          calls.push(input.outDir);
+          throw new Error("Pipeline should not run when the video model is missing.");
+        }
+      });
+
+      const response = await server.fetch("/api/make-video", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          outDirName: "missing-video-model-direct",
+          provider: "volcengine-seedance",
+          duration: 8,
+          template: "scene",
+          cta: "今すぐチェック",
+          confirmPaid: true
+        })
+      });
+
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toEqual({
+        error: "请先配置视频模型，再生成视频。"
+      });
+      expect(calls).toEqual([]);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
+  });
+
   it("queues a mock video job and exposes async job status", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-video-job-"));
     tempDirs.push(root);
@@ -11738,6 +11785,93 @@ describe("console API", () => {
       await waitForJobStatus(server, job.id, "completed");
     }
     expect(calls).toHaveLength(3);
+  });
+
+  it("does not partially enqueue paid batch video jobs when the wallet cannot cover every version", async () => {
+    const previousSeedanceKey = process.env.SEEDANCE_API_KEY;
+    const previousArkKey = process.env.ARK_API_KEY;
+    delete process.env.SEEDANCE_API_KEY;
+    delete process.env.ARK_API_KEY;
+    try {
+      const root = await mkdtemp(join(tmpdir(), "haitu-console-video-batch-partial-balance-"));
+      tempDirs.push(root);
+      const fixturesDir = testProductsDir(root);
+      const outputsDir = testJobsDir(root);
+      const productPath = testProductPath(fixturesDir, "box");
+      await writeProduct(productPath);
+      await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
+      const calls: string[] = [];
+      const server = createConsoleServer({
+        rootDir: root,
+        fixturesDir,
+        outputsDir,
+        runMakeVideoPipeline: async (input) => {
+          calls.push(input.outDir);
+          return {
+            type: "haitu_make_video_report",
+            status: "completed",
+            productSku: "TK-001",
+            provider: input.providerName,
+            durationSeconds: input.durationSeconds,
+            paidRequestConfirmed: input.confirmPaid,
+            raw: {
+              manifestPath: join(input.outDir, "raw", "manifest.json"),
+              outputPath: join(input.outDir, "raw", "video.mp4")
+            },
+            totalCost: {
+              amount: 0,
+              currency: "USD"
+            },
+            reusedRawManifest: false,
+            recoveredRawOutput: false,
+            reportPath: join(input.outDir, "make-video-report.json")
+          };
+        }
+      });
+      await server.fetchJson("/api/model-configs/volcengine-seedance", {
+        method: "PUT",
+        body: JSON.stringify({
+          apiKey: "paid-batch-key",
+          baseUrl: "https://ark.example.test",
+          model: "doubao-seedance-2-0-fast-260128"
+        })
+      });
+      await creditTestWallet(server, 2, "partial batch video balance");
+
+      const response = await server.fetch("/api/video-jobs/batch", {
+        method: "POST",
+        body: JSON.stringify({
+          productPath,
+          provider: "volcengine-seedance",
+          duration: 8,
+          template: "scene",
+          cta: "今すぐチェック",
+          confirmPaid: true,
+          versions: 3
+        })
+      });
+      const wallet = await server.fetchJson("/api/wallet");
+
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toEqual({
+        error: "余额不足，请先充值后再生成视频。"
+      });
+      await expect(server.fetchJson("/api/video-jobs")).resolves.toEqual({
+        jobs: []
+      });
+      expect(wallet).toEqual(expect.objectContaining({
+        balanceCny: 2,
+        reservedCny: 0,
+        availableCny: 2
+      }));
+      expect(wallet.transactions.map((tx: { type: string; amountCny: number }) => [tx.type, tx.amountCny])).toEqual([
+        ["recharge", 2]
+      ]);
+      expect(calls).toEqual([]);
+    } finally {
+      restoreEnv("SEEDANCE_API_KEY", previousSeedanceKey);
+      restoreEnv("ARK_API_KEY", previousArkKey);
+    }
   });
 
   it("keeps video jobs for one workspace on a single request queue", async () => {

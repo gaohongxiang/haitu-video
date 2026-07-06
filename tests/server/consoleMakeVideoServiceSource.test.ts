@@ -25,7 +25,7 @@ describe("console make-video service source boundaries", () => {
     expect(serviceSource).toContain("export async function runConsoleMakeVideo(");
     expect(serviceSource).toContain("assertTemplateEnabled");
     expect(serviceSource).toContain("assertPaidProductReady");
-    expect(serviceSource).toContain("selectedVideoModelConfig");
+    expect(serviceSource).toContain("resolveVideoRequestModel");
     expect(serviceSource).toContain("runMakeVideoPipeline");
     expect(serviceSource).toContain("normalizeFinalVideoLanguage");
     expect(serviceSource).toContain("reuseManifestPath: body.reuseManifest");
