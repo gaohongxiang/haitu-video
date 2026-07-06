@@ -359,7 +359,9 @@
       "amount": "金额",
       "balance": "余额",
       "createdAt": "创建时间",
-      "action": "操作"
+      "action": "操作",
+      "feeBreakdown": "平台服务费 ¥{{serviceFee}} · 官方成本 ¥{{upstreamCost}}",
+      "byokFeeBreakdown": "平台服务费 ¥{{serviceFee}} · 自有 API"
     },
     "filters": {
       "ariaLabel": "消费明细筛选",
@@ -404,6 +406,7 @@
       "amount": "变动金额",
       "balanceAfter": "变动后余额",
       "reservedAfter": "变动后冻结",
+      "totalCharge": "总扣费",
       "description": "说明",
       "paymentMethod": "支付方式",
       "paymentCurrency": "支付币种",

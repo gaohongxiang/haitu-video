@@ -359,7 +359,9 @@
       "amount": "Amount",
       "balance": "Balance",
       "createdAt": "Created",
-      "action": "Action"
+      "action": "Action",
+      "feeBreakdown": "Service fee ¥{{serviceFee}} · Official cost ¥{{upstreamCost}}",
+      "byokFeeBreakdown": "Service fee ¥{{serviceFee}} · Own API"
     },
     "filters": {
       "ariaLabel": "Spending detail filters",
@@ -404,6 +406,7 @@
       "amount": "Amount",
       "balanceAfter": "Balance After",
       "reservedAfter": "Reserved After",
+      "totalCharge": "Total Charge",
       "description": "Description",
       "paymentMethod": "Payment Method",
       "paymentCurrency": "Payment Currency",

@@ -16,6 +16,13 @@ export interface WalletDisplayTransaction {
   createdAt: string;
 }
 
+export interface WalletTransactionBillingBreakdown {
+  totalCny: number;
+  platformFeeCny: number;
+  upstreamCostCny: number;
+  apiBillingMode?: "platform" | "byok";
+}
+
 export function walletTransactionDescriptionLabel(description?: string, locale?: AppLocale): string {
   const normalized = description?.trim();
   if (!normalized) {
@@ -34,6 +41,23 @@ export function walletTransactionDescriptionLabel(description?: string, locale?:
     return appText("wallet.transactionDescriptions.settled", locale);
   }
   return normalized;
+}
+
+export function walletTransactionBillingBreakdown(
+  transaction: Pick<WalletDisplayTransaction, "amountCny" | "metadata">
+): WalletTransactionBillingBreakdown | undefined {
+  const metadata = transaction.metadata ?? {};
+  const platformFeeCny = optionalMoney(metadata.platformFeeCny);
+  const upstreamCostCny = optionalMoney(metadata.upstreamActualCostCny ?? metadata.upstreamCostCny ?? metadata.upstreamEstimatedCostCny);
+  if (platformFeeCny === undefined && upstreamCostCny === undefined) {
+    return undefined;
+  }
+  return {
+    totalCny: roundMoney(Math.abs(transaction.amountCny)),
+    platformFeeCny: platformFeeCny ?? 0,
+    upstreamCostCny: upstreamCostCny ?? 0,
+    apiBillingMode: metadata.apiBillingMode === "platform" || metadata.apiBillingMode === "byok" ? metadata.apiBillingMode : undefined
+  };
 }
 
 export function walletVisibleConsumptionTransactions<T extends WalletDisplayTransaction>(transactions: T[]): T[] {
@@ -83,4 +107,13 @@ function findLastTransaction<T extends WalletDisplayTransaction>(transactions: T
 function timestampMs(value: string): number {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function optionalMoney(value: unknown): number | undefined {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? roundMoney(amount) : undefined;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }

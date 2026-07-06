@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  walletTransactionBillingBreakdown,
   walletTransactionDescriptionLabel,
   walletVisibleConsumptionTransactions,
   type WalletDisplayTransaction
@@ -106,6 +107,42 @@ describe("wallet display helpers", () => {
         description: "释放生成任务冻结金额"
       })
     ]);
+  });
+
+  it("reads platform service fee and official cost from wallet transaction metadata", () => {
+    expect(walletTransactionBillingBreakdown(walletTransaction({
+      id: "tx-charge",
+      type: "charge",
+      amountCny: -4.73,
+      metadata: {
+        apiBillingMode: "platform",
+        platformFeeCny: 1,
+        upstreamCostCny: 3.73
+      }
+    }))).toEqual({
+      totalCny: 4.73,
+      platformFeeCny: 1,
+      upstreamCostCny: 3.73,
+      apiBillingMode: "platform"
+    });
+  });
+
+  it("treats BYOK wallet charges as platform service fee only when no official cost is charged", () => {
+    expect(walletTransactionBillingBreakdown(walletTransaction({
+      id: "tx-byok-charge",
+      type: "charge",
+      amountCny: -1.5,
+      metadata: {
+        apiBillingMode: "byok",
+        platformFeeCny: 1.5,
+        upstreamEstimatedCostCny: 0
+      }
+    }))).toEqual({
+      totalCny: 1.5,
+      platformFeeCny: 1.5,
+      upstreamCostCny: 0,
+      apiBillingMode: "byok"
+    });
   });
 });
 

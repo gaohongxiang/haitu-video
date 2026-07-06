@@ -226,6 +226,7 @@ import {
   i18n
 } from "../i18n/client.js";
 import {
+  walletTransactionBillingBreakdown,
   walletTransactionDescriptionLabel,
   walletTransactionIsConsumptionRecord,
   walletVisibleConsumptionTransactions
@@ -9023,43 +9024,53 @@ function WalletConsumptionTransactionTable({
           </tr>
         </thead>
         <tbody>
-          {transactions.map((transaction) => (
-            <tr key={transaction.id} className="wallet-consumption-transaction-row bg-[var(--card)]">
-              <WalletTableCell>
-                <Badge className="recharge-transaction-type-badge min-h-6 px-2.5 text-[11px]" tone={transaction.amountCny < 0 ? "danger" : "ok"}>
-                  {walletTransactionTypeLabel(transaction.type, tWallet)}
-                </Badge>
-              </WalletTableCell>
-              <WalletTableCell>
-                <div className="max-w-[320px] truncate font-bold text-[var(--text)]" title={walletTransactionDescriptionLabel(transaction.description, appLocale)}>
-                  {walletTransactionDescriptionLabel(transaction.description, appLocale)}
-                </div>
-              </WalletTableCell>
-              <WalletTableCell>
-                <strong className={cn("font-black tabular-nums", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
-                  {transaction.amountCny >= 0 ? "+" : "-"}¥{money(Math.abs(transaction.amountCny))}
-                </strong>
-              </WalletTableCell>
-              <WalletTableCell>
-                <span className="font-semibold tabular-nums text-[var(--text)]">¥{money(transaction.balanceAfterCny)}</span>
-              </WalletTableCell>
-              <WalletTableCell>
-                <span className="font-semibold text-[var(--muted)]">{formatWalletTableDateTime(transaction.createdAt)}</span>
-              </WalletTableCell>
-              <WalletTableCell>
-                <Button
-                  className="h-8 min-h-8 px-2 text-[12px]"
-                  size="sm"
-                  variant="ghost"
-                  type="button"
-                  onClick={() => onSelectTransaction?.(transaction)}
-                >
-                  <FileText size={13} />
-                  {tWallet("details")}
-                </Button>
-              </WalletTableCell>
-            </tr>
-          ))}
+          {transactions.map((transaction) => {
+            const billingBreakdown = walletTransactionBillingBreakdown(transaction);
+            return (
+              <tr key={transaction.id} className="wallet-consumption-transaction-row bg-[var(--card)]">
+                <WalletTableCell>
+                  <Badge className="recharge-transaction-type-badge min-h-6 px-2.5 text-[11px]" tone={transaction.amountCny < 0 ? "danger" : "ok"}>
+                    {walletTransactionTypeLabel(transaction.type, tWallet)}
+                  </Badge>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <div className="max-w-[320px] truncate font-bold text-[var(--text)]" title={walletTransactionDescriptionLabel(transaction.description, appLocale)}>
+                    {walletTransactionDescriptionLabel(transaction.description, appLocale)}
+                  </div>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <div className="grid min-w-0 gap-1">
+                    <strong className={cn("font-black tabular-nums", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
+                      {transaction.amountCny >= 0 ? "+" : "-"}¥{money(Math.abs(transaction.amountCny))}
+                    </strong>
+                    {billingBreakdown ? (
+                      <span className="truncate text-[11px] font-semibold tabular-nums text-[var(--muted)]" title={walletBillingBreakdownText(billingBreakdown, tWallet)}>
+                        {walletBillingBreakdownText(billingBreakdown, tWallet)}
+                      </span>
+                    ) : null}
+                  </div>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <span className="font-semibold tabular-nums text-[var(--text)]">¥{money(transaction.balanceAfterCny)}</span>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <span className="font-semibold text-[var(--muted)]">{formatWalletTableDateTime(transaction.createdAt)}</span>
+                </WalletTableCell>
+                <WalletTableCell>
+                  <Button
+                    className="h-8 min-h-8 px-2 text-[12px]"
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    onClick={() => onSelectTransaction?.(transaction)}
+                  >
+                    <FileText size={13} />
+                    {tWallet("details")}
+                  </Button>
+                </WalletTableCell>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {transactions.length === 0 ? <WalletTableEmptyState emptyText={emptyText} /> : null}
@@ -9150,6 +9161,21 @@ function walletRechargeOrderPaymentMetadata(order: WalletRechargeOrder, transact
     return transaction.metadata;
   }
   return order.metadata ?? transaction?.metadata ?? {};
+}
+
+function walletBillingBreakdownText(
+  breakdown: NonNullable<ReturnType<typeof walletTransactionBillingBreakdown>>,
+  tWallet: AppTranslator
+): string {
+  if (breakdown.apiBillingMode === "byok" && breakdown.upstreamCostCny === 0) {
+    return tWallet("transactionTable.byokFeeBreakdown", {
+      serviceFee: money(breakdown.platformFeeCny)
+    });
+  }
+  return tWallet("transactionTable.feeBreakdown", {
+    serviceFee: money(breakdown.platformFeeCny),
+    upstreamCost: money(breakdown.upstreamCostCny)
+  });
 }
 
 function hasPaymentMethodMetadata(metadata: Record<string, unknown> | undefined): boolean {
@@ -9297,6 +9323,7 @@ function WalletTransactionDetailDialog({
   const metadata = transaction.metadata ?? {};
   const priceSnapshot = recordValue(metadata.priceSnapshot);
   const detailRows = walletTransactionDetailRows(transaction, metadata, priceSnapshot, appLocale);
+  const billingBreakdown = walletTransactionBillingBreakdown(transaction);
 
   return (
     <div
@@ -9329,6 +9356,13 @@ function WalletTransactionDetailDialog({
             <WalletDetailMetric label={tWallet("detail.balanceAfter")} value={`¥${money(transaction.balanceAfterCny)}`} />
             <WalletDetailMetric label={tWallet("detail.reservedAfter")} value={`¥${money(transaction.reservedAfterCny)}`} />
           </div>
+          {billingBreakdown ? (
+            <div className="grid grid-cols-3 overflow-hidden rounded-[8px] border border-[var(--border)]">
+              <WalletDetailMetric label={tWallet("detail.totalCharge")} value={`¥${money(billingBreakdown.totalCny)}`} />
+              <WalletDetailMetric label={tWallet("detail.serviceFee")} value={`¥${money(billingBreakdown.platformFeeCny)}`} />
+              <WalletDetailMetric label={tWallet("detail.upstreamCost")} value={`¥${money(billingBreakdown.upstreamCostCny)}`} />
+            </div>
+          ) : null}
           <div className="grid gap-2">
             {detailRows.map((row) => (
               <WalletDetailRow key={row.label} label={row.label} value={row.value} />
