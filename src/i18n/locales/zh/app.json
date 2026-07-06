@@ -67,7 +67,7 @@
     "loading": "正在检查登录状态...",
     "toastTitle": "操作提示",
     "consoleLoading": "正在载入{{label}}",
-    "consoleLoadingDetail": "正在同步模型服务、任务和账户数据。",
+    "consoleLoadingDetail": "正在读取创作所需的商品、模型、价格和余额。",
     "consoleLoadFailed": "{{label}}载入失败",
     "sidebarExpand": "展开侧边栏",
     "sidebarCollapse": "折叠侧边栏",
@@ -865,6 +865,9 @@
   "status": {
     "idle": "等待操作",
     "loadingConsole": "正在载入控制台。",
+    "backgroundSyncing": "正在同步任务历史、资产和审计数据。",
+    "backgroundSyncFailed": "任务历史、资产或审计数据同步失败：{{message}}",
+    "backgroundSyncFailedShort": "任务历史、资产或审计数据同步失败。",
     "formChanged": "表单已变更，请重新生成预检后再运行。",
     "selectProduct": "请选择商品",
     "preflighting": "预检中...",

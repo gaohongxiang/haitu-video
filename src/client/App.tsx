@@ -146,7 +146,17 @@ import {
   videoLabel
 } from "./videoDisplayViewModel.js";
 import { filterProductLibraryProducts } from "./productLibrarySearch.js";
-import { deleteJson, fetchConsoleSnapshot, getJson, postJson, postJsonWithSignal, putJson, readJsonResponse } from "./consoleApiClient.js";
+import {
+  deleteJson,
+  fetchConsoleSnapshotPrimary,
+  fetchConsoleSnapshotPolling,
+  fetchConsoleSnapshotSecondary,
+  getJson,
+  postJson,
+  postJsonWithSignal,
+  putJson,
+  readJsonResponse
+} from "./consoleApiClient.js";
 import {
   defaultProductDraft,
   draftReferenceImageStatuses,
@@ -523,6 +533,7 @@ interface BillingEstimatesResponse {
 }
 
 type BillingEstimatesStatus = "idle" | "loading" | "ready" | "error";
+type ConsoleSecondarySnapshotStatus = "idle" | "loading" | "ready" | "error";
 type GeneratedReferenceImageResult = { reference: string };
 
 interface Filters {
@@ -1043,6 +1054,7 @@ export function App() {
   const [storageBackup, setStorageBackup] = useState<StorageBackupReport | undefined>();
   const [localBackups, setLocalBackups] = useState<LocalBackupLedger | undefined>();
   const [auditLog, setAuditLog] = useState<AuditLogLedger | undefined>();
+  const [secondarySnapshotStatus, setSecondarySnapshotStatus] = useState<ConsoleSecondarySnapshotStatus>("idle");
   const [consoleReady, setConsoleReady] = useState(false);
   const [consoleLoadError, setConsoleLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -1572,15 +1584,31 @@ export function App() {
     }
     try {
       setConsoleLoadError("");
+      if (polling) {
+        const {
+          videoJobsResponse,
+          walletResponse
+        } = await fetchConsoleSnapshotPolling<{
+          videoJobsResponse: { jobs: VideoJob[] };
+          walletResponse: WalletLedger;
+        }>();
+        const completedTransitions = detectCompletedVideoJobTransitions(videoJobsRef.current, videoJobsResponse.jobs);
+        setVideoJobs(videoJobsResponse.jobs);
+        videoJobsRef.current = videoJobsResponse.jobs;
+        setWallet(walletResponse);
+        const selectedSku = selectedProductSkuRef.current;
+        if (selectedSku && shouldRefreshSelectedProductForStudio(completedTransitions, selectedSku)) {
+          await refreshSelectedProductForStudio(selectedSku);
+        }
+        if (completedTransitions.completedJobIds.length > 0) {
+          setStatusText(formatStudioAutoRefreshStatus(completedTransitions));
+          void refreshConsoleSecondarySnapshot({ toastOnError: false });
+        }
+        setConsoleReady(true);
+        return;
+      }
       const {
         productsResponse,
-        reportsResponse,
-        ledgerResponse,
-        qcSummaryResponse,
-        videoAssetsResponse,
-        storageBackupResponse,
-        localBackupsResponse,
-        auditLogResponse,
         providerConfigResponse,
         settingsResponse,
         videoJobsResponse,
@@ -1589,15 +1617,8 @@ export function App() {
         paymentMethodsResponse,
         modelPricingCatalogResponse,
         modelServicePreferenceResponse
-      } = await fetchConsoleSnapshot<{
+      } = await fetchConsoleSnapshotPrimary<{
         productsResponse: { products: ProductSummary[] };
-        reportsResponse: { reports: Report[] };
-        ledgerResponse: Ledger;
-        qcSummaryResponse: QcSummaryLedger;
-        videoAssetsResponse: VideoAssetLedger;
-        storageBackupResponse: StorageBackupReport;
-        localBackupsResponse: LocalBackupLedger;
-        auditLogResponse: AuditLogLedger;
         providerConfigResponse: ProviderConfigLedger;
         settingsResponse: { settings: SettingsState };
         videoJobsResponse: { jobs: VideoJob[] };
@@ -1607,17 +1628,10 @@ export function App() {
         modelPricingCatalogResponse: ModelPricingCatalogResponse;
         modelServicePreferenceResponse: { preference: ModelServicePreference };
       }>();
-      const ledgerWithQc = attachQcToLedger(ledgerResponse, qcSummaryResponse);
       const completedTransitions = polling
         ? detectCompletedVideoJobTransitions(videoJobsRef.current, videoJobsResponse.jobs)
         : { completedJobIds: [], affectedProductSkus: [] };
       setProducts(productsResponse.products);
-      setReports(reportsResponse.reports);
-      setLedger(ledgerWithQc);
-      setVideoAssets(videoAssetsResponse);
-      setStorageBackup(storageBackupResponse);
-      setLocalBackups(localBackupsResponse);
-      setAuditLog(auditLogResponse);
       setProviderConfig(providerConfigResponse);
       setWallet(walletResponse);
       setWalletRechargeOrders(walletRechargeOrdersResponse.orders);
@@ -1661,6 +1675,9 @@ export function App() {
         applySettings(settingsResponse.settings);
       }
       setConsoleReady(true);
+      if (!polling || completedTransitions.completedJobIds.length > 0) {
+        void refreshConsoleSecondarySnapshot({ toastOnError: !polling });
+      }
     } catch (error) {
       const message = errorMessage(error);
       showError(error);
@@ -1671,6 +1688,41 @@ export function App() {
     } finally {
       if (showLoading) {
         setIsLoading(false);
+      }
+    }
+  }
+
+  async function refreshConsoleSecondarySnapshot(options: { toastOnError?: boolean } = {}) {
+    setSecondarySnapshotStatus("loading");
+    try {
+      const {
+        reportsResponse,
+        ledgerResponse,
+        qcSummaryResponse,
+        videoAssetsResponse,
+        storageBackupResponse,
+        localBackupsResponse,
+        auditLogResponse
+      } = await fetchConsoleSnapshotSecondary<{
+        reportsResponse: { reports: Report[] };
+        ledgerResponse: Ledger;
+        qcSummaryResponse: QcSummaryLedger;
+        videoAssetsResponse: VideoAssetLedger;
+        storageBackupResponse: StorageBackupReport;
+        localBackupsResponse: LocalBackupLedger;
+        auditLogResponse: AuditLogLedger;
+      }>();
+      setReports(reportsResponse.reports);
+      setLedger(attachQcToLedger(ledgerResponse, qcSummaryResponse));
+      setVideoAssets(videoAssetsResponse);
+      setStorageBackup(storageBackupResponse);
+      setLocalBackups(localBackupsResponse);
+      setAuditLog(auditLogResponse);
+      setSecondarySnapshotStatus("ready");
+    } catch (error) {
+      setSecondarySnapshotStatus("error");
+      if (options.toastOnError !== false) {
+        showConsoleToast(tApp("status.backgroundSyncFailed", { message: errorMessage(error) }));
       }
     }
   }
@@ -3305,12 +3357,16 @@ export function App() {
             <KpiGrid
               items={[
                 { label: tApp("dashboard.kpi.products"), value: formatNumber(products.length), hint: tApp("dashboard.kpi.productsHint"), icon: Package, tone: "clay" },
-                { label: tApp("dashboard.kpi.jobs"), value: formatNumber(ledger?.summary.totalJobs), hint: tApp("dashboard.kpi.completedHint", { count: formatNumber(ledger?.summary.completedJobs) }), icon: Clapperboard, tone: "green" },
-                { label: tApp("dashboard.kpi.paidJobs"), value: formatNumber(ledger?.summary.paidJobs), hint: tApp("dashboard.kpi.mockHint", { count: formatNumber(ledger?.summary.mockJobs) }), icon: CircleDollarSign, tone: "ember" },
-                { label: tApp("dashboard.kpi.tokens"), value: formatNumber(ledger?.summary.totalTokens), hint: `¥${money(ledger?.summary.estimatedCostCny)}`, icon: Gauge, tone: "ochre" },
-                { label: tApp("dashboard.kpi.finalVideos"), value: formatNumber(ledger?.summary.finalVideos), hint: tApp("dashboard.kpi.finalVideosHint"), icon: FileVideo, tone: "coral" },
-                { label: tApp("dashboard.kpi.reusedRaw"), value: formatNumber(ledger?.summary.reusedRawManifests), hint: tApp("dashboard.kpi.reusedRawHint"), icon: Database, tone: "sage" }
+                { label: tApp("dashboard.kpi.jobs"), value: formatNumber(ledger?.summary.totalJobs), hint: ledger ? tApp("dashboard.kpi.completedHint", { count: formatNumber(ledger.summary.completedJobs) }) : tApp("status.backgroundSyncing"), icon: Clapperboard, tone: "green" },
+                { label: tApp("dashboard.kpi.paidJobs"), value: formatNumber(ledger?.summary.paidJobs), hint: ledger ? tApp("dashboard.kpi.mockHint", { count: formatNumber(ledger.summary.mockJobs) }) : tApp("status.backgroundSyncing"), icon: CircleDollarSign, tone: "ember" },
+                { label: tApp("dashboard.kpi.tokens"), value: formatNumber(ledger?.summary.totalTokens), hint: ledger ? `¥${money(ledger.summary.estimatedCostCny)}` : tApp("status.backgroundSyncing"), icon: Gauge, tone: "ochre" },
+                { label: tApp("dashboard.kpi.finalVideos"), value: formatNumber(ledger?.summary.finalVideos), hint: ledger ? tApp("dashboard.kpi.finalVideosHint") : tApp("status.backgroundSyncing"), icon: FileVideo, tone: "coral" },
+                { label: tApp("dashboard.kpi.reusedRaw"), value: formatNumber(ledger?.summary.reusedRawManifests), hint: ledger ? tApp("dashboard.kpi.reusedRawHint") : tApp("status.backgroundSyncing"), icon: Database, tone: "sage" }
               ]}
+            />
+            <ConsoleSecondarySyncNotice
+              status={secondarySnapshotStatus}
+              onRetry={() => void refreshConsoleSecondarySnapshot({ toastOnError: true })}
             />
 
             <DashboardStatsPanel
@@ -3320,7 +3376,7 @@ export function App() {
               onRangeChange={setDashboardRange}
               onGranularityChange={setDashboardGranularity}
               onRefresh={() => void refreshConsole()}
-              isBusy={isBusy || isLoading}
+              isBusy={isBusy || isLoading || secondarySnapshotStatus === "loading"}
             />
           </section>
         );
@@ -3330,6 +3386,10 @@ export function App() {
       case "ledger":
         return (
           <section className="grid gap-4" aria-label={tApp("ledger.ariaLabel")}>
+            <ConsoleSecondarySyncNotice
+              status={secondarySnapshotStatus}
+              onRetry={() => void refreshConsoleSecondarySnapshot({ toastOnError: true })}
+            />
             <VideoJobsPanel appLocale={appLocale} jobs={videoJobs} products={products} onCancel={cancelVideoJob} onRetry={retryVideoJob} onRecoverDownload={recoverVideoJobDownload} />
             <VideoAssetsPanel assets={videoAssets} onDelete={deleteVideoAsset} isBusy={isBusy} />
           </section>
@@ -10070,6 +10130,39 @@ function KpiGrid({ items }: { items: Array<{ label: string; value: string; hint:
         </article>
       ))}
     </section>
+  );
+}
+
+function ConsoleSecondarySyncNotice({
+  status,
+  onRetry
+}: {
+  status: ConsoleSecondarySnapshotStatus;
+  onRetry: () => void;
+}) {
+  const tStatus = makeAppTranslator("status");
+  if (status !== "loading" && status !== "error") {
+    return null;
+  }
+  const failed = status === "error";
+  return (
+    <div className={cn(
+      "flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs font-semibold",
+      failed
+        ? "border-amber-200 bg-amber-50 text-amber-800"
+        : "border-[var(--border)] bg-[var(--card)] text-[var(--muted)]"
+    )}>
+      <div className="flex min-w-0 items-center gap-2">
+        {failed ? <AlertTriangle size={14} /> : <RefreshCcw className="animate-spin" size={14} />}
+        <span>{failed ? tStatus("backgroundSyncFailedShort") : tStatus("backgroundSyncing")}</span>
+      </div>
+      {failed ? (
+        <Button size="sm" variant="soft" onClick={onRetry}>
+          <RefreshCcw size={13} />
+          {tAppGlobal("commonActions.refresh")}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

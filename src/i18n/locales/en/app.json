@@ -67,7 +67,7 @@
     "loading": "Checking sign-in status...",
     "toastTitle": "Notice",
     "consoleLoading": "Loading {{label}}",
-    "consoleLoadingDetail": "Syncing model services, tasks, and account data.",
+    "consoleLoadingDetail": "Loading the product, model, pricing, and balance data needed to create.",
     "consoleLoadFailed": "Failed to load {{label}}",
     "sidebarExpand": "Expand sidebar",
     "sidebarCollapse": "Collapse sidebar",
@@ -865,6 +865,9 @@
   "status": {
     "idle": "Waiting for action",
     "loadingConsole": "Loading console.",
+    "backgroundSyncing": "Syncing task history, assets, and audit data.",
+    "backgroundSyncFailed": "Task history, asset, or audit sync failed: {{message}}",
+    "backgroundSyncFailedShort": "Task history, asset, or audit sync failed.",
     "formChanged": "The form changed. Generate preflight again before running.",
     "selectProduct": "Select a product first",
     "preflighting": "Running preflight...",
