@@ -1738,7 +1738,9 @@ describe("console API", () => {
     expect(appSource).not.toContain("fixed right-5 top-[86px] z-[70]");
     expect(appSource).toContain("recharge-transaction-type-badge");
     expect(appSource).toContain("wallet-consumption-transaction-table");
-    expect(appSource).toContain("w-full min-w-[1040px] table-fixed");
+    expect(appSource).toContain("wallet-consumption-transaction-table overflow-hidden");
+    expect(appSource).toContain("w-full table-fixed");
+    expect(appSource).not.toContain("w-full min-w-[1040px] table-fixed");
     expect(appSource).toContain("<colgroup>");
     expect(appSource).not.toContain("disabled={cryptoMethods.length === 0}");
     expect(appSource).not.toContain("disabled={rmbMethods.length === 0}");

@@ -9003,16 +9003,16 @@ function WalletConsumptionTransactionTable({
 }) {
   const tWallet = makeAppTranslator("wallet");
   return (
-    <div className="wallet-consumption-transaction-table overflow-x-auto rounded-[8px] border border-[var(--border)] bg-[var(--card)]">
-      <table className="w-full min-w-[1040px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
+    <div className="wallet-consumption-transaction-table overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--card)]">
+      <table className="w-full table-fixed border-separate border-spacing-0 text-left text-[13px]">
         <colgroup>
-          <col className="w-[10%]" />
-          <col className="w-[24%]" />
+          <col className="w-[9%]" />
+          <col className="w-[17%]" />
           <col className="w-[12%]" />
-          <col className="w-[24%]" />
-          <col className="w-[11%]" />
-          <col className="w-[13%]" />
-          <col className="w-[6%]" />
+          <col className="w-[30%]" />
+          <col className="w-[10%]" />
+          <col className="w-[14%]" />
+          <col className="w-[8%]" />
         </colgroup>
         <thead className="bg-[color-mix(in_srgb,var(--panel2)_78%,var(--card))] text-[var(--muted)]">
           <tr>
@@ -9036,7 +9036,7 @@ function WalletConsumptionTransactionTable({
                   </Badge>
                 </WalletTableCell>
                 <WalletTableCell>
-                  <div className="max-w-[320px] truncate font-bold text-[var(--text)]" title={walletTransactionDescriptionLabel(transaction.description, appLocale)}>
+                  <div className="min-w-0 truncate font-bold text-[var(--text)]" title={walletTransactionDescriptionLabel(transaction.description, appLocale)}>
                     {walletTransactionDescriptionLabel(transaction.description, appLocale)}
                   </div>
                 </WalletTableCell>
@@ -9090,7 +9090,7 @@ function WalletBillingBreakdownInline({
     ? tWallet("transactionTable.ownApi")
     : tWallet("transactionTable.officialCost");
   return (
-    <div className="grid min-w-[210px] grid-cols-2 gap-2">
+    <div className="grid min-w-0 grid-cols-2 gap-2">
       <div className="min-w-0 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--field))] px-2.5 py-1.5">
         <div className="truncate text-[10px] font-black text-[var(--muted)]">{tWallet("transactionTable.serviceFee")}</div>
         <div className="mt-0.5 truncate text-[13px] font-black tabular-nums text-[var(--text)]">¥{money(breakdown.platformFeeCny)}</div>
