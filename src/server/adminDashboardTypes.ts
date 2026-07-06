@@ -32,6 +32,9 @@ export interface AdminUserSummary {
   workspaceCount: number;
   productCount: number;
   videoJobCount: number;
+  totalBalanceCny: number;
+  totalRechargeCny: number;
+  totalSpendCny: number;
   createdAt: string;
   lastActiveAt?: string;
 }

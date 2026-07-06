@@ -260,6 +260,10 @@ describe("admin app source", () => {
     expect(userPanel).toContain("<AdminUsersTable");
     expect(userPanel).toContain("users={visibleUsers}");
     expect(usersTable).toContain("selectedUserDetail");
+    expect(usersTable).toContain("money(user.totalBalanceCny)");
+    expect(usersTable).toContain("money(user.totalRechargeCny)");
+    expect(usersTable).toContain("money(user.totalSpendCny)");
+    expect(usersTable).not.toContain("adminUserFinanceSnapshot(");
     expect(usersTable).toContain("<AdminUserExpandedRow");
     expect(usersTable).toContain("colSpan={8}");
     expect(expandedRow).not.toContain("<AdminSidePanel");

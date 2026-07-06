@@ -5,6 +5,7 @@ import type {
 } from "./adminDashboardTypes.js";
 import { buildUserVideoJobs } from "./adminDashboardVideoJobs.js";
 import type { DatabaseHandle } from "./db/client.js";
+import { centsToCny } from "./walletLedger.js";
 
 interface UserRow {
   id: string;
@@ -16,6 +17,9 @@ interface UserRow {
   workspace_count: number;
   product_count: number;
   video_job_count: number;
+  total_balance_cents: number;
+  total_recharge_cents: number;
+  total_spend_cents: number;
   last_active_at: string | null;
 }
 
@@ -71,6 +75,41 @@ export function buildAdminUserDetail(handle: DatabaseHandle, userId: string): Ad
 
 function findUserDetail(handle: DatabaseHandle, userId: string): AdminUserDetail["user"] | undefined {
   const row = handle.sqlite.prepare(`
+    WITH latest_wallet AS (
+      SELECT
+        workspace_id,
+        balance_after_cents,
+        ROW_NUMBER() OVER (
+          PARTITION BY workspace_id
+          ORDER BY created_at DESC, rowid DESC
+        ) AS row_number
+      FROM wallet_transactions
+    ),
+    wallet_spend AS (
+      SELECT workspace_id, SUM(ABS(amount_cents)) AS spend_cents
+      FROM wallet_transactions
+      WHERE type = 'charge'
+      GROUP BY workspace_id
+    ),
+    paid_recharges AS (
+      SELECT workspace_id, SUM(credit_cents) AS recharge_cents
+      FROM wallet_recharge_orders
+      WHERE status = 'paid'
+      GROUP BY workspace_id
+    ),
+    finance_by_user AS (
+      SELECT
+        wm.user_id,
+        SUM(COALESCE(lw.balance_after_cents, 0)) AS total_balance_cents,
+        SUM(COALESCE(pr.recharge_cents, 0)) AS total_recharge_cents,
+        SUM(COALESCE(ws.spend_cents, 0)) AS total_spend_cents
+      FROM workspace_members wm
+      LEFT JOIN latest_wallet lw ON lw.workspace_id = wm.workspace_id AND lw.row_number = 1
+      LEFT JOIN paid_recharges pr ON pr.workspace_id = wm.workspace_id
+      LEFT JOIN wallet_spend ws ON ws.workspace_id = wm.workspace_id
+      WHERE wm.user_id = ?
+      GROUP BY wm.user_id
+    )
     SELECT
       au.id,
       au.email,
@@ -81,6 +120,9 @@ function findUserDetail(handle: DatabaseHandle, userId: string): AdminUserDetail
       COUNT(DISTINCT wm.workspace_id) AS workspace_count,
       COUNT(DISTINCT p.id) AS product_count,
       COUNT(DISTINCT vj.id) AS video_job_count,
+      COALESCE(fbu.total_balance_cents, 0) AS total_balance_cents,
+      COALESCE(fbu.total_recharge_cents, 0) AS total_recharge_cents,
+      COALESCE(fbu.total_spend_cents, 0) AS total_spend_cents,
       MAX(activity.active_at) AS last_active_at,
       MAX(session_activity.active_at) AS last_session_at
     FROM auth_users au
@@ -88,6 +130,7 @@ function findUserDetail(handle: DatabaseHandle, userId: string): AdminUserDetail
     LEFT JOIN workspace_members wm ON wm.user_id = au.id
     LEFT JOIN products p ON p.workspace_id = wm.workspace_id
     LEFT JOIN video_jobs vj ON vj.workspace_id = wm.workspace_id
+    LEFT JOIN finance_by_user fbu ON fbu.user_id = au.id
     LEFT JOIN (
       SELECT user_id, updated_at AS active_at
       FROM auth_sessions
@@ -102,7 +145,7 @@ function findUserDetail(handle: DatabaseHandle, userId: string): AdminUserDetail
     ) session_activity ON session_activity.user_id = au.id
     WHERE au.id = ?
     GROUP BY au.id
-  `).get(userId) as DetailUserRow | undefined;
+  `).get(userId, userId) as DetailUserRow | undefined;
   if (!row) {
     return undefined;
   }
@@ -115,6 +158,9 @@ function findUserDetail(handle: DatabaseHandle, userId: string): AdminUserDetail
     workspaceCount: row.workspace_count,
     productCount: row.product_count,
     videoJobCount: row.video_job_count,
+    totalBalanceCny: centsToCny(row.total_balance_cents),
+    totalRechargeCny: centsToCny(row.total_recharge_cents),
+    totalSpendCny: centsToCny(row.total_spend_cents),
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at ?? undefined,
     lastSessionAt: row.last_session_at ?? undefined

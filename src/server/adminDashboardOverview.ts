@@ -3,6 +3,7 @@ import type {
   AdminOverview,
   AdminUserSummary
 } from "./adminDashboardTypes.js";
+import { centsToCny } from "./walletLedger.js";
 
 interface CountRow {
   count: number;
@@ -29,6 +30,9 @@ interface UserRow {
   workspace_count: number;
   product_count: number;
   video_job_count: number;
+  total_balance_cents: number;
+  total_recharge_cents: number;
+  total_spend_cents: number;
   last_active_at: string | null;
 }
 
@@ -114,6 +118,73 @@ function buildActivity(handle: DatabaseHandle, days: string[]): AdminOverview["a
 
 function buildUsers(handle: DatabaseHandle): AdminUserSummary[] {
   const rows = handle.sqlite.prepare(`
+    WITH user_workspaces AS (
+      SELECT user_id, workspace_id
+      FROM workspace_members
+    ),
+    workspace_counts AS (
+      SELECT user_id, COUNT(DISTINCT workspace_id) AS workspace_count
+      FROM user_workspaces
+      GROUP BY user_id
+    ),
+    product_counts AS (
+      SELECT uw.user_id, COUNT(DISTINCT p.id) AS product_count
+      FROM user_workspaces uw
+      LEFT JOIN products p ON p.workspace_id = uw.workspace_id
+      GROUP BY uw.user_id
+    ),
+    video_job_counts AS (
+      SELECT uw.user_id, COUNT(DISTINCT vj.id) AS video_job_count
+      FROM user_workspaces uw
+      LEFT JOIN video_jobs vj ON vj.workspace_id = uw.workspace_id
+      GROUP BY uw.user_id
+    ),
+    latest_activity AS (
+      SELECT user_id, MAX(active_at) AS last_active_at
+      FROM (
+        SELECT user_id, updated_at AS active_at
+        FROM auth_sessions
+        UNION ALL
+        SELECT wm.user_id, vj.created_at AS active_at
+        FROM video_jobs vj
+        INNER JOIN workspace_members wm ON wm.workspace_id = vj.workspace_id
+      )
+      GROUP BY user_id
+    ),
+    latest_wallet AS (
+      SELECT
+        workspace_id,
+        balance_after_cents,
+        ROW_NUMBER() OVER (
+          PARTITION BY workspace_id
+          ORDER BY created_at DESC, rowid DESC
+        ) AS row_number
+      FROM wallet_transactions
+    ),
+    wallet_spend AS (
+      SELECT workspace_id, SUM(ABS(amount_cents)) AS spend_cents
+      FROM wallet_transactions
+      WHERE type = 'charge'
+      GROUP BY workspace_id
+    ),
+    paid_recharges AS (
+      SELECT workspace_id, SUM(credit_cents) AS recharge_cents
+      FROM wallet_recharge_orders
+      WHERE status = 'paid'
+      GROUP BY workspace_id
+    ),
+    finance_by_user AS (
+      SELECT
+        uw.user_id,
+        SUM(COALESCE(lw.balance_after_cents, 0)) AS total_balance_cents,
+        SUM(COALESCE(pr.recharge_cents, 0)) AS total_recharge_cents,
+        SUM(COALESCE(ws.spend_cents, 0)) AS total_spend_cents
+      FROM user_workspaces uw
+      LEFT JOIN latest_wallet lw ON lw.workspace_id = uw.workspace_id AND lw.row_number = 1
+      LEFT JOIN paid_recharges pr ON pr.workspace_id = uw.workspace_id
+      LEFT JOIN wallet_spend ws ON ws.workspace_id = uw.workspace_id
+      GROUP BY uw.user_id
+    )
     SELECT
       au.id,
       au.email,
@@ -121,24 +192,20 @@ function buildUsers(handle: DatabaseHandle): AdminUserSummary[] {
       COALESCE(u.role, 'user') AS role,
       au.email_verified,
       au.created_at,
-      COUNT(DISTINCT wm.workspace_id) AS workspace_count,
-      COUNT(DISTINCT p.id) AS product_count,
-      COUNT(DISTINCT vj.id) AS video_job_count,
-      MAX(activity.active_at) AS last_active_at
+      COALESCE(wc.workspace_count, 0) AS workspace_count,
+      COALESCE(pc.product_count, 0) AS product_count,
+      COALESCE(vjc.video_job_count, 0) AS video_job_count,
+      COALESCE(fbu.total_balance_cents, 0) AS total_balance_cents,
+      COALESCE(fbu.total_recharge_cents, 0) AS total_recharge_cents,
+      COALESCE(fbu.total_spend_cents, 0) AS total_spend_cents,
+      la.last_active_at
     FROM auth_users au
     LEFT JOIN users u ON u.id = au.id
-    LEFT JOIN workspace_members wm ON wm.user_id = au.id
-    LEFT JOIN products p ON p.workspace_id = wm.workspace_id
-    LEFT JOIN video_jobs vj ON vj.workspace_id = wm.workspace_id
-    LEFT JOIN (
-      SELECT user_id, updated_at AS active_at
-      FROM auth_sessions
-      UNION ALL
-      SELECT wm2.user_id, vj2.created_at AS active_at
-      FROM video_jobs vj2
-      INNER JOIN workspace_members wm2 ON wm2.workspace_id = vj2.workspace_id
-    ) activity ON activity.user_id = au.id
-    GROUP BY au.id
+    LEFT JOIN workspace_counts wc ON wc.user_id = au.id
+    LEFT JOIN product_counts pc ON pc.user_id = au.id
+    LEFT JOIN video_job_counts vjc ON vjc.user_id = au.id
+    LEFT JOIN finance_by_user fbu ON fbu.user_id = au.id
+    LEFT JOIN latest_activity la ON la.user_id = au.id
     ORDER BY au.created_at DESC
   `).all() as UserRow[];
   return rows.map((row) => ({
@@ -150,6 +217,9 @@ function buildUsers(handle: DatabaseHandle): AdminUserSummary[] {
     workspaceCount: row.workspace_count,
     productCount: row.product_count,
     videoJobCount: row.video_job_count,
+    totalBalanceCny: centsToCny(row.total_balance_cents),
+    totalRechargeCny: centsToCny(row.total_recharge_cents),
+    totalSpendCny: centsToCny(row.total_spend_cents),
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at ?? undefined
   }));

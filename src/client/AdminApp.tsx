@@ -217,6 +217,9 @@ interface AdminUserSummary {
   workspaceCount: number;
   productCount: number;
   videoJobCount: number;
+  totalBalanceCny: number;
+  totalRechargeCny: number;
+  totalSpendCny: number;
   createdAt: string;
   lastActiveAt?: string;
 }
@@ -3351,11 +3354,6 @@ function AdminUsersTable({
         <tbody>
           {users.map((user) => {
             const selected = user.id === selectedUserId;
-            const detail = selected ? selectedUserDetail : undefined;
-            const userWallets = adminWalletsForUserDetail(detail, wallets);
-            const userRechargeOrders = adminRechargeOrdersForUserDetail(detail, rechargeOrders);
-            const userWalletTransactions = adminWalletTransactionsForUserDetail(detail, walletTransactions);
-            const finance = adminUserFinanceSnapshot(userWallets, userRechargeOrders, userWalletTransactions);
             return (
               <Fragment key={user.id}>
                 <tr
@@ -3383,9 +3381,9 @@ function AdminUsersTable({
                     </div>
                   </AdminTd>
                   <AdminTd>{formatNumber(user.workspaceCount)}</AdminTd>
-                  <AdminTd>¥{money(finance.totalBalanceCny)}</AdminTd>
-                  <AdminTd>¥{money(finance.totalRechargeCny)}</AdminTd>
-                  <AdminTd>¥{money(finance.totalSpendCny)}</AdminTd>
+                  <AdminTd>¥{money(user.totalBalanceCny)}</AdminTd>
+                  <AdminTd>¥{money(user.totalRechargeCny)}</AdminTd>
+                  <AdminTd>¥{money(user.totalSpendCny)}</AdminTd>
                   <AdminTd>{formatNumber(user.videoJobCount)}</AdminTd>
                   <AdminTd>{formatDateTime(user.lastActiveAt)}</AdminTd>
                 </tr>
