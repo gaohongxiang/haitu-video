@@ -523,6 +523,7 @@ interface BillingEstimatesResponse {
 }
 
 type BillingEstimatesStatus = "idle" | "loading" | "ready" | "error";
+type GeneratedReferenceImageResult = { reference: string };
 
 interface Filters {
   productSku: string;
@@ -1194,27 +1195,33 @@ export function App() {
     setConfirmAction(undefined);
   }
 
-  function ensureTextModelConfigured(): boolean {
+  function ensureTextModelConfigured(options: { toast?: boolean } = {}): boolean {
     if (textModelConfigured) {
       return true;
     }
-    showConsoleToast(tApp("status.textModelRequired"));
+    if (options.toast !== false) {
+      showConsoleToast(tApp("status.textModelRequired"));
+    }
     return false;
   }
 
-  function ensureImageModelConfigured(): boolean {
+  function ensureImageModelConfigured(options: { toast?: boolean } = {}): boolean {
     if (imageModelConfigured) {
       return true;
     }
-    showConsoleToast(tApp("status.imageModelRequired"));
+    if (options.toast !== false) {
+      showConsoleToast(tApp("status.imageModelRequired"));
+    }
     return false;
   }
 
-  function ensureVideoModelConfigured(): boolean {
+  function ensureVideoModelConfigured(options: { toast?: boolean } = {}): boolean {
     if (videoModelConfigured) {
       return true;
     }
-    showConsoleToast(tApp("status.videoModelRequired"));
+    if (options.toast !== false) {
+      showConsoleToast(tApp("status.videoModelRequired"));
+    }
     return false;
   }
 
@@ -2944,17 +2951,17 @@ export function App() {
     }
   }
 
-  async function generateProductReferenceImages(sku: string, options: ProductImageGenerationOptions = {}) {
+  async function generateProductReferenceImages(sku: string, options: ProductImageGenerationOptions = {}): Promise<GeneratedReferenceImageResult[] | undefined> {
     if (!sku) {
       return;
     }
-    if (!ensureImageModelConfigured()) {
-      return;
+    if (!ensureImageModelConfigured({ toast: false })) {
+      throw new Error(tApp("status.imageModelRequired"));
     }
     setIsBusy(true);
     try {
       const response = await postJson<{
-        generated: Array<{ reference: string }>;
+        generated: GeneratedReferenceImageResult[];
         product: ProductDetail;
       }>(`/api/products/${encodeURIComponent(sku)}/reference-images/generate`, {
         imageModelConfigId: effectiveSelectedImageModelConfigId,
@@ -2962,14 +2969,18 @@ export function App() {
         referenceImages: options.referenceImages ?? [],
         locale: options.locale ?? appLocale
       });
+      if (response.generated.length === 0) {
+        throw new Error(tApp("status.noGeneratedReferences"));
+      }
       await applyProductToCreationComposerWithStoryboards(response.product);
       setStatusText([
         tApp("status.generatedReferences", { count: response.generated.length }),
         ...response.generated.map((item) => `- ${item.reference}`)
       ].join("\n"));
       await refreshConsole();
+      return response.generated;
     } catch (error) {
-      showError(error);
+      throw error;
     } finally {
       setIsBusy(false);
     }
@@ -4486,7 +4497,7 @@ function ProductCreationWorkspace({
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<GeneratedReferenceImageResult[] | undefined>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   textModelOptions: ProviderConfigItem[];
@@ -4707,7 +4718,7 @@ function ProductCreationComposer({
   isGeneratingImagePrompt: boolean;
   onImportAssets: (sku: string) => Promise<void>;
   onUploadImages: (sku: string, files: FileList | File[] | null) => Promise<ProductDetail | undefined>;
-  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<void>;
+  onGenerateReferenceImages: (sku: string, options?: ProductImageGenerationOptions) => Promise<GeneratedReferenceImageResult[] | undefined>;
   onDeleteReferenceImage: (sku: string, index: number) => Promise<void>;
   onReorderReferenceImage: (sku: string, referenceImages: string[]) => Promise<ProductDetail | undefined>;
   textModelOptions: ProviderConfigItem[];
@@ -4789,6 +4800,8 @@ function ProductCreationComposer({
   const effectiveSelectedImageModelConfigId = effectiveModelConfigChoice(selectedImageModelConfigId, imageModelOptions);
   const effectiveSelectedVideoModelConfigId = effectiveModelConfigChoice(selectedVideoModelConfigId, videoModelOptions);
   const productImageAssetCount = 0;
+  const imageModelReady = imageModelOptions.length > 0;
+  const videoModelReady = videoModelOptions.length > 0;
   const creativeWorkspace = buildProductCreativeWorkspace({
     mode,
     products,
@@ -4866,6 +4879,10 @@ function ProductCreationComposer({
       onToast(generationReadiness.label);
       return;
     }
+    if (!videoModelReady) {
+      onToast(tCurrentApp(appLocale, "status.videoModelRequired"));
+      return;
+    }
     if (packingDisabled) return;
     setIsSubmittingVideo(true);
     try {
@@ -4908,18 +4925,25 @@ function ProductCreationComposer({
       onToast(creativeWorkspace.primaryAction.reason ?? generationReadiness.label);
       return;
     }
+    if (!imageModelReady) {
+      onToast(tCurrentApp(appLocale, "status.imageModelRequired"));
+      return;
+    }
     if (packingDisabled) return;
     setIsSubmittingImage(true);
     try {
       const autoSavedProduct = await onFlushProductFactsAutoSave();
       const savedProduct = autoSavedProduct ?? selectedProduct ?? await handleOrganizeProductPackage({ silentSuccess: true });
       if (!savedProduct) return;
-      await onGenerateReferenceImages(savedProduct.sku, {
+      const generatedImages = await onGenerateReferenceImages(savedProduct.sku, {
         prompt: imagePrompt,
         referenceImages: selectedCreationReferenceImagesForProduct(savedProduct) ?? [],
         locale: appLocale
       });
-      onToast("商品图片优化已提交", "ok");
+      if (!generatedImages || generatedImages.length === 0) {
+        return;
+      }
+      onToast(tVideo("generate.imageGenerated", { count: generatedImages.length }), "ok");
     } catch (error) {
       onToast(errorMessage(error));
     } finally {

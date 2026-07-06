@@ -15,7 +15,11 @@ export function consoleErrorResponse(error: unknown, message: string): Response 
   if (message.includes("Can recover only video jobs")) {
     return jsonResponse({ error: "这条任务没有可恢复的成片下载。只有视频已生成、但服务器下载失败的任务才能重新下载成片。" }, 409);
   }
-  if (message.includes("Unknown model provider target") || message.includes("Provider API key is required")) {
+  if (
+    message.includes("Unknown model provider target") ||
+    message.includes("Provider API key is required") ||
+    message.includes("请先在 API 管理配置图片模型 API Key")
+  ) {
     return jsonResponse({ error: message }, 422);
   }
   if (

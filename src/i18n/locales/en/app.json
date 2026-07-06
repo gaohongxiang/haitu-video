@@ -937,6 +937,7 @@
     "deletedReference": "Deleted reference image: {{reference}}",
     "reorderedReferences": "Reference image order updated.",
     "generatedReferences": "AI generated reference images: {{count}}",
+    "noGeneratedReferences": "The image model did not generate any images. Adjust the prompt or references and try again.",
     "cancelledTask": "Canceled queued task: {{taskId}}",
     "deletedVideoRecord": "Deleted video record: {{jobId}}",
     "deletedHistoryVideo": "Deleted historical video record: {{jobId}}",
@@ -1059,6 +1060,7 @@
       "buttonWithCount": "Generate {{count}} Videos",
       "submitting": "Submitting",
       "queuedToast": "Added to history. You can cancel while it is generating, then preview and download when complete.",
+      "imageGenerated": "Generated {{count}} product images.",
       "packageReadyToast": "Fact pack organized.",
       "imageOnlyToast": "Only JPG, PNG, and WebP images are supported.",
       "ignoredFileToast": "Non-image files were ignored."

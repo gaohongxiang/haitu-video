@@ -199,6 +199,9 @@ export async function generateProductReferenceImages(input: {
     imageModelConfigId: input.input.imageModelConfigId,
     fetchImpl: input.fetchImpl
   });
+  if (!imageModel.config.apiKey) {
+    throw new Error("请先在 API 管理配置图片模型 API Key。");
+  }
   const images = await runMeteredAiAction({
     walletStore: input.walletStore,
     billingPolicyStore: input.billingPolicyStore,

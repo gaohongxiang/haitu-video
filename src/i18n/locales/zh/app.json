@@ -937,6 +937,7 @@
     "deletedReference": "已删除参考图: {{reference}}",
     "reorderedReferences": "已调整参考图顺序。",
     "generatedReferences": "AI 已生成参考图: {{count}}",
+    "noGeneratedReferences": "图片模型没有生成图片，请调整提示词或参考图后再试。",
     "cancelledTask": "已取消排队任务：{{taskId}}",
     "deletedVideoRecord": "已删除视频记录: {{jobId}}",
     "deletedHistoryVideo": "已删除历史视频记录: {{jobId}}",
@@ -1059,6 +1060,7 @@
       "buttonWithCount": "生成 {{count}} 个视频",
       "submitting": "提交中",
       "queuedToast": "已加入历史记录，生成中可删除取消，完成后可预览和下载。",
+      "imageGenerated": "已生成 {{count}} 张商品图片。",
       "packageReadyToast": "资料包已整理。",
       "imageOnlyToast": "只支持 JPG、PNG、WebP 图片。",
       "ignoredFileToast": "已忽略非图片文件。"

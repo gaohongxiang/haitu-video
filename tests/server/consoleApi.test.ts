@@ -8458,6 +8458,29 @@ describe("console API", () => {
     }));
   });
 
+  it("reports missing image model before wallet balance when generating product images", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-console-image-model-missing-before-wallet-"));
+    tempDirs.push(root);
+    const fixturesDir = testProductsDir(root);
+    const productPath = testProductPath(fixturesDir, "wallet");
+    await writeProduct(productPath, {
+      sku: "IMG-MODEL-MISSING-001",
+      title_ja: "画像モデル未設定商品",
+      reference_images: []
+    });
+    const server = createConsoleServer({ rootDir: root, fixturesDir, autoStartSavedJobs: false });
+
+    const blocked = await server.fetch("/api/products/IMG-MODEL-MISSING-001/reference-images/generate", {
+      method: "POST",
+      body: JSON.stringify({ count: 1 })
+    });
+
+    expect(blocked.status).toBe(422);
+    await expect(blocked.json()).resolves.toEqual({
+      error: "请先在 API 管理配置图片模型 API Key。"
+    });
+  });
+
   it("reorders product reference images in the product file", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-reorder-reference-images-"));
     tempDirs.push(root);
