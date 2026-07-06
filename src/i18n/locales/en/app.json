@@ -357,11 +357,13 @@
       "type": "Type",
       "description": "Description",
       "amount": "Amount",
+      "feeComposition": "Fee Breakdown",
       "balance": "Balance",
       "createdAt": "Created",
       "action": "Action",
-      "feeBreakdown": "Service fee ¥{{serviceFee}} · Official cost ¥{{upstreamCost}}",
-      "byokFeeBreakdown": "Service fee ¥{{serviceFee}} · Own API"
+      "serviceFee": "Service Fee",
+      "officialCost": "Official Cost",
+      "ownApi": "Own API"
     },
     "filters": {
       "ariaLabel": "Spending detail filters",

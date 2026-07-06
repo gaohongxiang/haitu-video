@@ -181,6 +181,10 @@ describe("full site i18n source boundaries", () => {
     expect(walletSource).toContain('tWallet("transactionTable.type")');
     expect(walletSource).toContain('tWallet("transactionTable.description")');
     expect(walletSource).toContain('tWallet("transactionTable.amount")');
+    expect(walletSource).toContain('tWallet("transactionTable.feeComposition")');
+    expect(walletSource).toContain("WalletBillingBreakdownInline");
+    expect(walletSource).toContain('tWallet("transactionTable.serviceFee")');
+    expect(walletSource).toContain('tWallet("transactionTable.officialCost")');
     expect(walletSource).toContain('tWallet("transactionTable.balance")');
     expect(walletSource).toContain('tWallet("transactionTable.createdAt")');
     expect(walletSource).toContain('tWallet("transactionTable.action")');

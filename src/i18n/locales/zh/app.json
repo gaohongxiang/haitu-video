@@ -357,11 +357,13 @@
       "type": "类型",
       "description": "说明",
       "amount": "金额",
+      "feeComposition": "费用组成",
       "balance": "余额",
       "createdAt": "创建时间",
       "action": "操作",
-      "feeBreakdown": "平台服务费 ¥{{serviceFee}} · 官方成本 ¥{{upstreamCost}}",
-      "byokFeeBreakdown": "平台服务费 ¥{{serviceFee}} · 自有 API"
+      "serviceFee": "平台服务费",
+      "officialCost": "官方成本",
+      "ownApi": "自有 API"
     },
     "filters": {
       "ariaLabel": "消费明细筛选",

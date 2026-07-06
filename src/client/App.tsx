@@ -9004,20 +9004,22 @@ function WalletConsumptionTransactionTable({
   const tWallet = makeAppTranslator("wallet");
   return (
     <div className="wallet-consumption-transaction-table overflow-x-auto rounded-[8px] border border-[var(--border)] bg-[var(--card)]">
-      <table className="w-full min-w-[820px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
+      <table className="w-full min-w-[1040px] table-fixed border-separate border-spacing-0 text-left text-[13px]">
         <colgroup>
+          <col className="w-[10%]" />
+          <col className="w-[24%]" />
           <col className="w-[12%]" />
-          <col className="w-[34%]" />
-          <col className="w-[14%]" />
-          <col className="w-[14%]" />
-          <col className="w-[18%]" />
-          <col className="w-[8%]" />
+          <col className="w-[24%]" />
+          <col className="w-[11%]" />
+          <col className="w-[13%]" />
+          <col className="w-[6%]" />
         </colgroup>
         <thead className="bg-[color-mix(in_srgb,var(--panel2)_78%,var(--card))] text-[var(--muted)]">
           <tr>
             <WalletTableHeaderCell>{tWallet("transactionTable.type")}</WalletTableHeaderCell>
             <WalletTableHeaderCell>{tWallet("transactionTable.description")}</WalletTableHeaderCell>
             <WalletTableHeaderCell>{tWallet("transactionTable.amount")}</WalletTableHeaderCell>
+            <WalletTableHeaderCell>{tWallet("transactionTable.feeComposition")}</WalletTableHeaderCell>
             <WalletTableHeaderCell>{tWallet("transactionTable.balance")}</WalletTableHeaderCell>
             <WalletTableHeaderCell>{tWallet("transactionTable.createdAt")}</WalletTableHeaderCell>
             <WalletTableHeaderCell>{tWallet("transactionTable.action")}</WalletTableHeaderCell>
@@ -9039,16 +9041,16 @@ function WalletConsumptionTransactionTable({
                   </div>
                 </WalletTableCell>
                 <WalletTableCell>
-                  <div className="grid min-w-0 gap-1">
-                    <strong className={cn("font-black tabular-nums", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
-                      {transaction.amountCny >= 0 ? "+" : "-"}¥{money(Math.abs(transaction.amountCny))}
-                    </strong>
-                    {billingBreakdown ? (
-                      <span className="truncate text-[11px] font-semibold tabular-nums text-[var(--muted)]" title={walletBillingBreakdownText(billingBreakdown, tWallet)}>
-                        {walletBillingBreakdownText(billingBreakdown, tWallet)}
-                      </span>
-                    ) : null}
-                  </div>
+                  <strong className={cn("font-black tabular-nums", transaction.amountCny >= 0 ? "text-emerald-700" : "text-[var(--text)]")}>
+                    {transaction.amountCny >= 0 ? "+" : "-"}¥{money(Math.abs(transaction.amountCny))}
+                  </strong>
+                </WalletTableCell>
+                <WalletTableCell>
+                  {billingBreakdown ? (
+                    <WalletBillingBreakdownInline breakdown={billingBreakdown} />
+                  ) : (
+                    <span className="font-semibold text-[var(--muted)]">-</span>
+                  )}
                 </WalletTableCell>
                 <WalletTableCell>
                   <span className="font-semibold tabular-nums text-[var(--text)]">¥{money(transaction.balanceAfterCny)}</span>
@@ -9074,6 +9076,29 @@ function WalletConsumptionTransactionTable({
         </tbody>
       </table>
       {transactions.length === 0 ? <WalletTableEmptyState emptyText={emptyText} /> : null}
+    </div>
+  );
+}
+
+function WalletBillingBreakdownInline({
+  breakdown
+}: {
+  breakdown: NonNullable<ReturnType<typeof walletTransactionBillingBreakdown>>;
+}) {
+  const tWallet = makeAppTranslator("wallet");
+  const upstreamLabel = breakdown.apiBillingMode === "byok" && breakdown.upstreamCostCny === 0
+    ? tWallet("transactionTable.ownApi")
+    : tWallet("transactionTable.officialCost");
+  return (
+    <div className="grid min-w-[210px] grid-cols-2 gap-2">
+      <div className="min-w-0 rounded-[8px] border border-[color-mix(in_srgb,var(--accent)_24%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_6%,var(--field))] px-2.5 py-1.5">
+        <div className="truncate text-[10px] font-black text-[var(--muted)]">{tWallet("transactionTable.serviceFee")}</div>
+        <div className="mt-0.5 truncate text-[13px] font-black tabular-nums text-[var(--text)]">¥{money(breakdown.platformFeeCny)}</div>
+      </div>
+      <div className="min-w-0 rounded-[8px] border border-[var(--border)] bg-[var(--field)] px-2.5 py-1.5">
+        <div className="truncate text-[10px] font-black text-[var(--muted)]">{upstreamLabel}</div>
+        <div className="mt-0.5 truncate text-[13px] font-black tabular-nums text-[var(--text)]">¥{money(breakdown.upstreamCostCny)}</div>
+      </div>
     </div>
   );
 }
@@ -9161,21 +9186,6 @@ function walletRechargeOrderPaymentMetadata(order: WalletRechargeOrder, transact
     return transaction.metadata;
   }
   return order.metadata ?? transaction?.metadata ?? {};
-}
-
-function walletBillingBreakdownText(
-  breakdown: NonNullable<ReturnType<typeof walletTransactionBillingBreakdown>>,
-  tWallet: AppTranslator
-): string {
-  if (breakdown.apiBillingMode === "byok" && breakdown.upstreamCostCny === 0) {
-    return tWallet("transactionTable.byokFeeBreakdown", {
-      serviceFee: money(breakdown.platformFeeCny)
-    });
-  }
-  return tWallet("transactionTable.feeBreakdown", {
-    serviceFee: money(breakdown.platformFeeCny),
-    upstreamCost: money(breakdown.upstreamCostCny)
-  });
 }
 
 function hasPaymentMethodMetadata(metadata: Record<string, unknown> | undefined): boolean {
