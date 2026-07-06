@@ -5,7 +5,7 @@ export interface RechargeFxRateSnapshot {
   from: "cny";
   to: string;
   rate: number;
-  source?: "identity" | "frankfurter" | "env";
+  source?: "identity" | "frankfurter";
   sourceLabel?: string;
   sourceUrl?: string;
   asOfDate?: string;
@@ -25,11 +25,10 @@ export interface RechargePaymentAmount {
 export function resolveRechargePaymentAmount(input: {
   creditCny: number;
   paymentCurrency: string;
-  env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 }): RechargePaymentAmount {
   return buildRechargePaymentAmount({
     creditCny: input.creditCny,
-    fxRateSnapshot: rechargeCurrencyRateFromCny(input.paymentCurrency, input.env ?? process.env)
+    fxRateSnapshot: identityRechargeCurrencyRate(input.paymentCurrency)
   });
 }
 
@@ -76,10 +75,7 @@ function buildRechargePaymentAmount(input: {
   };
 }
 
-function rechargeCurrencyRateFromCny(
-  paymentCurrency: string,
-  env: NodeJS.ProcessEnv | Record<string, string | undefined>
-): RechargeFxRateSnapshot {
+function identityRechargeCurrencyRate(paymentCurrency: string): RechargeFxRateSnapshot {
   const currency = normalizeCurrency(paymentCurrency);
   if (currency === "cny") {
     return {
@@ -89,11 +85,7 @@ function rechargeCurrencyRateFromCny(
       source: "identity"
     };
   }
-  const envRate = rechargeCurrencyRateFromEnv(currency, env);
-  if (envRate === undefined) {
-    throw new Error(`请配置 ${rechargeCurrencyRateEnvKey(currency)}，用于把人民币充值金额换算成 ${currency.toUpperCase()} 支付金额。`);
-  }
-  return envRate;
+  throw new Error(`非人民币充值必须实时获取 CNY 到 ${currency.toUpperCase()} 的汇率。`);
 }
 
 async function rechargeCurrencyRateFromCnyLive(input: {
@@ -105,59 +97,20 @@ async function rechargeCurrencyRateFromCnyLive(input: {
   const paymentCurrency = normalizeCurrency(input.paymentCurrency);
   if (paymentCurrency === "cny") {
     return {
-      from: "cny",
-      to: "cny",
-      rate: 1,
-      source: "identity",
+      ...identityRechargeCurrencyRate(paymentCurrency),
       fetchedAt: input.now().toISOString()
     };
   }
-  const provider = normalizeFxProvider(input.env.HAITU_RECHARGE_FX_RATE_PROVIDER);
-  if (provider === "frankfurter") {
-    try {
-      return await fetchFrankfurterCnyRate({
-        paymentCurrency,
-        env: input.env,
-        fetchImpl: input.fetchImpl,
-        now: input.now
-      });
-    } catch (error) {
-      const fallback = rechargeCurrencyRateFromEnv(paymentCurrency, input.env, input.now);
-      if (fallback) {
-        return fallback;
-      }
-      throw new Error(`无法获取 CNY 到 ${paymentCurrency.toUpperCase()} 的实时汇率。请稍后重试，或配置 ${rechargeCurrencyRateEnvKey(paymentCurrency)} 作为兜底。`);
-    }
+  try {
+    return await fetchFrankfurterCnyRate({
+      paymentCurrency,
+      env: input.env,
+      fetchImpl: input.fetchImpl,
+      now: input.now
+    });
+  } catch {
+    throw new Error(`无法获取 CNY 到 ${paymentCurrency.toUpperCase()} 的实时汇率。请稍后重试。`);
   }
-  const envRate = rechargeCurrencyRateFromEnv(paymentCurrency, input.env, input.now);
-  if (!envRate) {
-    throw new Error(`请配置 ${rechargeCurrencyRateEnvKey(paymentCurrency)}，用于把人民币充值金额换算成 ${paymentCurrency.toUpperCase()} 支付金额。`);
-  }
-  return envRate;
-}
-
-function normalizeFxProvider(value: unknown): "frankfurter" | "env" {
-  return String(value ?? "frankfurter").trim().toLowerCase() === "env" ? "env" : "frankfurter";
-}
-
-function rechargeCurrencyRateFromEnv(
-  paymentCurrency: string,
-  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
-  now?: () => Date
-): RechargeFxRateSnapshot | undefined {
-  const envKey = rechargeCurrencyRateEnvKey(paymentCurrency);
-  const rate = Number(env[envKey]);
-  if (!Number.isFinite(rate) || rate <= 0) {
-    return undefined;
-  }
-  return {
-    from: "cny",
-    to: paymentCurrency,
-    rate,
-    source: "env",
-    sourceLabel: envKey,
-    fetchedAt: now?.().toISOString()
-  };
 }
 
 async function fetchFrankfurterCnyRate(input: {
@@ -166,8 +119,7 @@ async function fetchFrankfurterCnyRate(input: {
   fetchImpl: typeof fetch;
   now: () => Date;
 }): Promise<RechargeFxRateSnapshot> {
-  const baseUrl = String(input.env.HAITU_RECHARGE_FX_RATE_URL ?? "https://api.frankfurter.dev/v2/rates").trim();
-  const url = new URL(baseUrl);
+  const url = new URL("https://api.frankfurter.dev/v2/rates");
   url.searchParams.set("base", "CNY");
   url.searchParams.set("quotes", input.paymentCurrency.toUpperCase());
   const response = await input.fetchImpl(url.toString());
@@ -207,10 +159,6 @@ function normalizeFrankfurterRateResponse(body: unknown, paymentCurrency: string
     return Number.isFinite(rate) && rate > 0 ? { date: stringValue(record.date), rate } : undefined;
   }
   return undefined;
-}
-
-function rechargeCurrencyRateEnvKey(paymentCurrency: string): string {
-  return `HAITU_RECHARGE_${paymentCurrency.toUpperCase()}_PER_CNY`;
 }
 
 function stringValue(value: unknown): string | undefined {

@@ -63,33 +63,30 @@ sudo nano /etc/haitu-video.env
 最低成本默认值：
 
 ```env
-HAITU_HOST=127.0.0.1
-HAITU_PORT=4173
-HAITU_DATA_DIR=/var/lib/haitu-video
-HAITU_DB_PATH=/var/lib/haitu-video/haitu.sqlite
 HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes
-HAITU_ADMIN_EMAIL=you@haitu.online
-HAITU_PUBLIC_BASE_URL=https://haitu.online
 BETTER_AUTH_URL=https://haitu.online
+HAITU_DATA_DIR=/var/lib/haitu-video
+HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS=3600
+HAITU_ADMIN_EMAIL=you@haitu.online
 HAITU_AUTH_EMAIL_FROM=login@haitu.online
 RESEND_API_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+STRIPE_CURRENCY=cny
 INFINI_ENV=sandbox
 INFINI_PUBLIC_KEY=
 INFINI_PRIVATE_KEY=
 INFINI_WEBHOOK_SECRET=
-SEEDANCE_RESOLUTION=480p
-SEEDANCE_WATERMARK=false
+INFINI_CURRENCY=usd
 ```
 
 `HAITU_SECRET_KEY` 用于启用 SQLite 用户账号体系，并加密数据库里的平台模型 API Key 和用户自带 API Key。生产环境必须使用至少 32 字节的随机值并长期保存；丢失后数据库中的加密 Key 无法解密。平台 API Key 在 `/admin` 的平台模型页面配置并加密写入 SQLite；用户自带 Key 由用户在 API 管理保存，两者都不写进仓库或 env 文件。
 
-`HAITU_PUBLIC_BASE_URL` 是公开官网的生产基准地址，部署脚本会用它运行 SEO/GEO 生产检查。正常生产值保持 `https://haitu.online`；只有预发或域名迁移时才需要改。
+`BETTER_AUTH_URL` 是公开官网的生产基准地址，部署脚本会用它运行 SEO/GEO 生产检查。正常生产值保持 `https://haitu.online`；只有预发或域名迁移时才需要改。
 
 账号注册和忘记密码使用邮箱验证码。配置 `RESEND_API_KEY` 和 `HAITU_AUTH_EMAIL_FROM` 后会发送真实邮件；未配置时验证码会写入 `/var/lib/haitu-video/system/auth-email-outbox.jsonl`，只适合本地调试。
 
-充值中心支持 Stripe Checkout 和 Infini Hosted Checkout。支付平台密钥放在服务器 env；后台只负责启用或停用支付方式。Infini 的 webhook 地址配置为 `https://haitu.online/api/payments/infini/webhook`，订阅 `order.update`，收到 `order.completed` 后才会写入钱包充值流水。
+充值中心支持 Stripe Checkout 和 Infini Hosted Checkout。支付平台密钥放在服务器 env；后台只负责启用或停用支付方式。当前配置用 `STRIPE_CURRENCY=cny` 和 `INFINI_CURRENCY=usd`；美元支付会实时查询汇率，查不到就不创建充值订单，让用户稍后重试。Infini 的 webhook 地址配置为 `https://haitu.online/api/payments/infini/webhook`，订阅 `order.update`，收到 `order.completed` 后才会写入钱包充值流水。
 
 `HAITU_ADMIN_EMAIL` 对应账号完成邮箱验证后，可以访问 `https://haitu.online/admin` 查看项目方后台。普通用户从 `https://haitu.online/app` 进入创作控制台。第一版后台只给项目方查看全站用户增长、活跃和用户列表，不开放普通用户访问。
 

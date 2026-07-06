@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
 import { ensureDefaultWorkspace, runMigrations } from "../../src/server/db/migrate.js";
-import { resolveRechargePaymentAmount } from "../../src/server/rechargePaymentAmount.js";
 import { WalletRechargeOrderStore } from "../../src/server/walletRechargeOrderStore.js";
 
 const tempDirs: string[] = [];
@@ -23,20 +22,18 @@ describe("wallet recharge orders", () => {
     runMigrations(handle);
     ensureDefaultWorkspace(handle);
     try {
-      const payment = resolveRechargePaymentAmount({
-        creditCny: 50,
-        paymentCurrency: "hkd",
-        env: {
-          HAITU_RECHARGE_HKD_PER_CNY: "1.1"
-        }
-      });
       const order = new WalletRechargeOrderStore({ handle }).createPending({
         workspaceId: "default",
         provider: "stripe",
         creditCny: 50,
-        paymentCurrency: payment.paymentCurrency,
-        paymentAmountCents: payment.paymentAmountCents,
-        fxRateSnapshot: payment.fxRateSnapshot
+        paymentCurrency: "hkd",
+        paymentAmountCents: 5500,
+        fxRateSnapshot: {
+          from: "cny",
+          to: "hkd",
+          rate: 1.1,
+          source: "frankfurter"
+        }
       });
 
       expect(order).toEqual(expect.objectContaining({
@@ -57,11 +54,4 @@ describe("wallet recharge orders", () => {
     }
   });
 
-  it("requires an explicit exchange rate for non-CNY payment currencies", () => {
-    expect(() => resolveRechargePaymentAmount({
-      creditCny: 50,
-      paymentCurrency: "hkd",
-      env: {}
-    })).toThrow("请配置 HAITU_RECHARGE_HKD_PER_CNY");
-  });
 });

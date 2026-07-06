@@ -3,6 +3,24 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+const localEnvKeys = [
+  "HAITU_SECRET_KEY",
+  "BETTER_AUTH_URL",
+  "HAITU_DATA_DIR",
+  "HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS",
+  "HAITU_ADMIN_EMAIL",
+  "HAITU_AUTH_EMAIL_FROM",
+  "RESEND_API_KEY",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_CURRENCY",
+  "INFINI_ENV",
+  "INFINI_PUBLIC_KEY",
+  "INFINI_PRIVATE_KEY",
+  "INFINI_WEBHOOK_SECRET",
+  "INFINI_CURRENCY"
+];
+
 describe("no-Docker VPS deployment package", () => {
   it("documents and templates a Cloudflare Tunnel-first VPS deployment for haitu.online", async () => {
     const root = process.cwd();
@@ -33,20 +51,27 @@ describe("no-Docker VPS deployment package", () => {
     expect(caddy).toContain("reverse_proxy 127.0.0.1:4173");
     expect(caddy).not.toMatch(/docker/i);
 
-    expect(envExample).toContain("HAITU_HOST=127.0.0.1");
-    expect(envExample).toContain("HAITU_PORT=4173");
     expect(envExample).toContain("HAITU_DATA_DIR=/var/lib/haitu-video");
     expect(envExample).toContain("HAITU_SECRET_KEY=replace-with-at-least-32-random-bytes");
     expect(envExample).toContain("HAITU_ADMIN_EMAIL=");
-    expect(envExample).toContain("HAITU_PUBLIC_BASE_URL=https://haitu.online");
     expect(envExample).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(envExample).toContain("HAITU_AUTH_EMAIL_FROM=");
     expect(envExample).toContain("RESEND_API_KEY=");
+    expect(envExample).toContain("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS=3600");
     expect(envExample).not.toContain("HAITU_AUTH_PASSWORD");
+    expect(envExample).not.toContain("HAITU_HOST=");
+    expect(envExample).not.toContain("HAITU_PORT=");
+    expect(envExample).not.toContain("HAITU_DB_PATH=");
+    expect(envExample).not.toContain("HAITU_PUBLIC_BASE_URL=");
     expect(envExample).not.toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
     expect(envExample).not.toContain("HAITU_PLATFORM_DEFAULT_VIDEO_MODEL=seedance-2.0-fast");
-    expect(envExample).toContain("Platform model API keys are configured in /admin");
-    expect(envExample).toContain("SEEDANCE_RESOLUTION=480p");
+    expect(envExample).not.toContain("HAITU_PLATFORM_FEE_CNY_PER_TEXT");
+    expect(envExample).not.toContain("HAITU_PLATFORM_FEE_CNY_PER_IMAGE");
+    expect(envExample).not.toContain("HAITU_PLATFORM_FEE_CNY_PER_VIDEO");
+    expect(envExample).toContain("平台模型 API Key 和服务费在 /admin 配置");
+    expect(envExample).toContain("STRIPE_CURRENCY=cny");
+    expect(envExample).toContain("INFINI_CURRENCY=usd");
+    expect(envExample).not.toContain("SEEDANCE_RESOLUTION=");
     expect(envExample).not.toContain("ARK_API_KEY");
     expect(envExample).not.toContain("SEEDANCE_API_KEY");
     expect(envExample).not.toContain("SEEDANCE_MODEL=");
@@ -97,9 +122,12 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("Cloudflare R2");
     expect(guide).toContain("HAITU_SECRET_KEY=change-this-to-at-least-32-random-bytes");
     expect(guide).toContain("HAITU_ADMIN_EMAIL=you@haitu.online");
-    expect(guide).toContain("HAITU_PUBLIC_BASE_URL=https://haitu.online");
     expect(guide).toContain("BETTER_AUTH_URL=https://haitu.online");
     expect(guide).toContain("HAITU_AUTH_EMAIL_FROM=login@haitu.online");
+    expect(guide).toContain("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS=3600");
+    expect(guide).toContain("STRIPE_CURRENCY=cny");
+    expect(guide).toContain("INFINI_CURRENCY=usd");
+    expect(guide).toContain("查不到就不创建充值订单，让用户稍后重试");
     expect(guide).not.toContain("HAITU_PLATFORM_VOLCENGINE_API_KEY=");
     expect(guide).toContain("平台 API Key 在 `/admin` 的平台模型页面配置并加密写入 SQLite");
     expect(guide).toContain("RESEND_API_KEY=");
@@ -130,4 +158,33 @@ describe("no-Docker VPS deployment package", () => {
     expect(guide).toContain("deploy/scripts/deploy-from-github.sh");
     expect(guide).toContain("npm run seo:check -- --base \"$PUBLIC_BASE_URL\"");
   });
+
+  it("keeps the checked-in .env example aligned with the current local env shape without real secrets", async () => {
+    const root = process.cwd();
+    const envExample = await readFile(join(root, ".env.example"), "utf8");
+    const deployEnvExample = await readFile(join(root, "deploy", "env", "haitu-video.env.example"), "utf8");
+
+    expect(envKeys(envExample)).toEqual(localEnvKeys);
+    expect(envKeys(deployEnvExample)).toEqual(localEnvKeys);
+
+    expect(envExample).toContain("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS=3600");
+    expect(envExample).toContain("STRIPE_CURRENCY=cny");
+    expect(envExample).toContain("INFINI_ENV=sandbox");
+    expect(envExample).toContain("INFINI_CURRENCY=usd");
+    expect(envExample).not.toContain("INFINI_ENV=sandbox/production");
+    expect(envExample).not.toContain("HAITU_RECHARGE_FX_RATE_PROVIDER");
+    expect(envExample).not.toContain("HAITU_RECHARGE_FX_RATE_URL");
+    expect(envExample).not.toContain("HAITU_RECHARGE_HKD_PER_CNY");
+    expect(envExample).not.toContain("HAITU_RECHARGE_USD_PER_CNY");
+    expect(envExample).not.toMatch(/sk_(test|live)_/);
+    expect(envExample).not.toMatch(/whsec_/);
+  });
 });
+
+function envKeys(content: string): string[] {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && line.includes("="))
+    .map((line) => line.split("=", 1)[0] ?? "");
+}

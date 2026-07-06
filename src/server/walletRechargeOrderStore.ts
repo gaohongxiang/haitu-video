@@ -401,7 +401,7 @@ function fxRateSnapshotFromMetadata(metadataJson: string | null): RechargeFxRate
 }
 
 function rechargeFxSource(value: unknown): RechargeFxRateSnapshot["source"] | undefined {
-  return value === "identity" || value === "frankfurter" || value === "env" ? value : undefined;
+  return value === "identity" || value === "frankfurter" ? value : undefined;
 }
 
 function stringValue(value: unknown): string | undefined {

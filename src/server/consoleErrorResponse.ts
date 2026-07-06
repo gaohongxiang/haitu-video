@@ -31,8 +31,7 @@ export function consoleErrorResponse(error: unknown, message: string): Response 
     message.includes("工作区不存在") ||
     message.includes("调整后余额不能小于冻结金额") ||
     message.includes("无法换算") ||
-    message.includes("无法获取 CNY 到") ||
-    message.includes("请配置 HAITU_RECHARGE_")
+    message.includes("无法获取 CNY 到")
   ) {
     return jsonResponse({ error: message }, 422);
   }

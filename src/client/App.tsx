@@ -225,7 +225,11 @@ import {
   clientLocaleStorageKey,
   i18n
 } from "../i18n/client.js";
-import { walletTransactionDescriptionLabel } from "./walletDisplayViewModel.js";
+import {
+  walletTransactionDescriptionLabel,
+  walletTransactionIsConsumptionRecord,
+  walletVisibleConsumptionTransactions
+} from "./walletDisplayViewModel.js";
 
 type NavLabelKey = "dashboard" | "creative" | "video" | "image" | "ledger" | "wallet" | "pricing" | "settings";
 type AppTranslator = (key: string, options?: Record<string, unknown>) => string;
@@ -8664,7 +8668,7 @@ function WalletRechargePanel({
   const selectedRechargePaymentAmountCny = selectedRechargeAmountCny;
   const selectedRechargeCanPay = selectedRechargePaymentAmountCny !== undefined && selectedRechargePaymentAmountCny >= 50 && selectedRechargePaymentAmountCny <= 1000;
   const rechargeTransactionsByOrderId = useMemo(() => walletRechargeTransactionsByOrderId(wallet.transactions), [wallet.transactions]);
-  const walletConsumptionTransactions = wallet.transactions.filter(walletTransactionIsConsumptionRecord);
+  const walletConsumptionTransactions = useMemo(() => walletVisibleConsumptionTransactions(wallet.transactions), [wallet.transactions]);
   const filteredConsumptionTransactions = walletConsumptionTransactions.filter((transaction) => walletTransactionMatchesConsumptionFilter(transaction, activeConsumptionFilter));
   const consumptionFilters: WalletConsumptionFilter[] = ["all", "charge", "reserve", "refund", "adjustment"];
 
@@ -8843,10 +8847,6 @@ function WalletRechargePanel({
       />
     </Card>
   );
-}
-
-function walletTransactionIsConsumptionRecord(transaction: WalletTransaction) {
-  return transaction.type === "reserve" || transaction.type === "charge" || transaction.type === "refund" || transaction.type === "adjustment";
 }
 
 function walletTransactionMatchesConsumptionFilter(transaction: WalletTransaction, filter: WalletConsumptionFilter) {

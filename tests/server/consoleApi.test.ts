@@ -25,8 +25,6 @@ function sourceBetween(source: string, start: string, end: string): string {
 }
 
 beforeEach(() => {
-  vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1");
-  vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "env");
   vi.stubEnv("HAITU_RECHARGE_ORDER_EXPIRES_IN_SECONDS", "3600");
 });
 
@@ -2643,11 +2641,18 @@ describe("console API", () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_recharge_order");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_recharge_order");
     vi.stubEnv("STRIPE_CURRENCY", "hkd");
-    vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "1.1");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-recharge-order-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://api.frankfurter.dev/v2/rates?base=CNY&quotes=HKD") {
+        return jsonResponse([{
+          date: "2026-07-03",
+          base: "CNY",
+          quote: "HKD",
+          rate: 1
+        }]);
+      }
       expect(String(url)).toBe("https://api.stripe.com/v1/checkout/sessions");
       expect(init?.method).toBe("POST");
       expect(init?.headers).toEqual(expect.objectContaining({
@@ -2658,7 +2663,7 @@ describe("console API", () => {
       const params = new URLSearchParams(String(init?.body));
       expect(params.get("mode")).toBe("payment");
       expect(params.get("currency")).toBe("hkd");
-      expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5500");
+      expect(params.get("line_items[0][price_data][unit_amount]")).toBe("5000");
       expect(params.get("line_items[0][price_data][currency]")).toBe("hkd");
       expect(params.get("expires_at")).toBe("1783077630");
       expect(params.has("automatic_payment_methods[enabled]")).toBe(false);
@@ -2693,13 +2698,13 @@ describe("console API", () => {
         provider: "stripe",
         providerSessionId: "cs_test_wallet_recharge",
         creditCny: 50,
-        paymentAmount: 55,
+        paymentAmount: 50,
         paymentCurrency: "hkd",
         walletCurrency: "cny",
         fxRateSnapshot: expect.objectContaining({
           from: "cny",
           to: "hkd",
-          rate: 1.1
+          rate: 1
         }),
         status: "pending"
       })
@@ -2749,8 +2754,8 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-admin-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_disabled_should_not_call",
         url: "https://checkout.stripe.com/c/pay/cs_test_disabled_should_not_call"
       })
@@ -2859,8 +2864,6 @@ describe("console API", () => {
     vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_live_fx_secret");
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_live_fx_webhook_secret");
     vi.stubEnv("INFINI_CURRENCY", "usd");
-    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
-    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-live-fx-"));
     tempDirs.push(root);
@@ -2877,6 +2880,7 @@ describe("console API", () => {
       rootDir: root,
       fetchImpl,
       autoStartSavedJobs: false,
+      mockLiveFx: false,
       now: () => new Date("2026-07-03T10:20:30.000Z")
     });
 
@@ -2918,11 +2922,15 @@ describe("console API", () => {
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_scoped_quote_webhook_secret");
     vi.stubEnv("STRIPE_CURRENCY", "cny");
     vi.stubEnv("INFINI_CURRENCY", "usd");
-    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
-    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-scoped-quote-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toBe("https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD");
+      return new Response(JSON.stringify({ error: "temporarily unavailable" }), {
+        status: 503,
+        headers: { "content-type": "application/json" }
+      });
+    }) as unknown as typeof fetch;
     const server = createConsoleServer({
       rootDir: root,
       fetchImpl,
@@ -2958,19 +2966,24 @@ describe("console API", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("marks non-CNY recharge payment methods unavailable when env-rate mode has no exchange rate", async () => {
+  it("marks non-CNY recharge payment methods unavailable when live exchange-rate lookup fails", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_payment_method_fx");
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_payment_method_fx");
     vi.stubEnv("INFINI_PUBLIC_KEY", "infini_payment_method_fx_key");
     vi.stubEnv("INFINI_PRIVATE_KEY", "infini_payment_method_fx_secret");
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_payment_method_fx_webhook_secret");
     vi.stubEnv("INFINI_CURRENCY", "usd");
-    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-fx-missing-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toBe("https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD");
+      return new Response(JSON.stringify({ error: "temporarily unavailable" }), {
+        status: 503,
+        headers: { "content-type": "application/json" }
+      });
+    }) as unknown as typeof fetch;
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false, mockLiveFx: false });
 
     const methods = await server.fetchJson("/api/payment-methods?amountCny=50");
     const blocked = await server.fetch("/api/wallet/recharge-orders", {
@@ -2986,14 +2999,14 @@ describe("console API", () => {
         id: "infini",
         configured: true,
         available: false,
-        unavailableReason: "请配置 HAITU_RECHARGE_USD_PER_CNY，用于把人民币充值金额换算成 USD 支付金额。"
+        unavailableReason: "无法获取 CNY 到 USD 的实时汇率。请稍后重试。"
       })
     ]));
     expect(blocked.status).toBe(422);
     await expect(blocked.json()).resolves.toEqual({
-      error: "请配置 HAITU_RECHARGE_USD_PER_CNY，用于把人民币充值金额换算成 USD 支付金额。"
+      error: "无法获取 CNY 到 USD 的实时汇率。请稍后重试。"
     });
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledWith("https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD");
   });
 
   it("rejects unknown recharge payment method ids instead of falling back to Stripe", async () => {
@@ -3002,8 +3015,8 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-payment-methods-unknown-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_unknown_should_not_call",
         url: "https://checkout.stripe.com/c/pay/cs_test_unknown_should_not_call"
       })
@@ -3109,8 +3122,6 @@ describe("console API", () => {
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_live_fx_order_webhook_secret");
     vi.stubEnv("INFINI_ENV", "sandbox");
     vi.stubEnv("INFINI_CURRENCY", "usd");
-    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "");
-    vi.stubEnv("HAITU_RECHARGE_FX_RATE_PROVIDER", "frankfurter");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-infini-live-fx-recharge-order-"));
     tempDirs.push(root);
@@ -3141,6 +3152,7 @@ describe("console API", () => {
       rootDir: root,
       fetchImpl,
       autoStartSavedJobs: false,
+      mockLiveFx: false,
       now: () => new Date("2026-07-03T10:20:30.000Z")
     });
 
@@ -3387,11 +3399,11 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-infini-business-error-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () => jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => liveFxResponse(url) ?? jsonResponse({
       code: 40906,
       message: "Order expired"
     })) as unknown as typeof fetch;
-    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false });
+    const server = createConsoleServer({ rootDir: root, fetchImpl, autoStartSavedJobs: false, mockLiveFx: false });
 
     const response = await server.fetch("/api/wallet/recharge-orders", {
       method: "POST",
@@ -3421,22 +3433,28 @@ describe("console API", () => {
     });
   });
 
-  it("defaults Infini recharge orders to USD with an explicit CNY exchange rate", async () => {
+  it("defaults Infini recharge orders to USD with a live exchange-rate quote", async () => {
     vi.stubEnv("INFINI_PUBLIC_KEY", "infini_default_cny_key");
     vi.stubEnv("INFINI_PRIVATE_KEY", "infini_default_cny_secret");
     vi.stubEnv("INFINI_WEBHOOK_SECRET", "infini_default_cny_webhook_secret");
     vi.stubEnv("INFINI_ENV", "sandbox");
     vi.stubEnv("INFINI_CURRENCY", "");
-    vi.stubEnv("HAITU_RECHARGE_HKD_PER_CNY", "");
-    vi.stubEnv("HAITU_RECHARGE_USD_PER_CNY", "0.14");
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-infini-default-usd-recharge-order-"));
     tempDirs.push(root);
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url) === "https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD") {
+        return jsonResponse([{
+          date: "2026-07-03",
+          base: "CNY",
+          quote: "USD",
+          rate: 0.14737
+        }]);
+      }
       expect(String(url)).toBe("https://openapi-sandbox.infini.money/v1/acquiring/order");
       const payload = JSON.parse(String(init?.body));
       expect(payload).toEqual(expect.objectContaining({
-        amount: "7.00",
+        amount: "7.37",
         currency: "USD"
       }));
       return jsonResponse({
@@ -3456,13 +3474,14 @@ describe("console API", () => {
 
     expect(created.order).toEqual(expect.objectContaining({
       provider: "infini",
-      paymentAmount: 7,
+      paymentAmount: 7.37,
       paymentCurrency: "usd",
       walletCurrency: "cny",
       fxRateSnapshot: expect.objectContaining({
         from: "cny",
         to: "usd",
-        rate: 0.14
+        rate: 0.14737,
+        source: "frankfurter"
       })
     }));
   });
@@ -4060,8 +4079,8 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-async-webhook-recharge-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_async_webhook_wallet",
         url: "https://checkout.stripe.com/c/pay/cs_test_async_webhook_wallet",
         payment_intent: "pi_test_async_webhook_wallet",
@@ -4147,8 +4166,8 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-async-webhook-failure-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_async_webhook_failure",
         url: "https://checkout.stripe.com/c/pay/cs_test_async_webhook_failure",
         payment_intent: "pi_test_async_webhook_failure",
@@ -4213,8 +4232,8 @@ describe("console API", () => {
     vi.stubEnv("HAITU_PUBLIC_BASE_URL", "https://haitu.online");
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-mismatch-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_webhook_mismatch",
         url: "https://checkout.stripe.com/c/pay/cs_test_webhook_mismatch",
         payment_intent: "pi_test_webhook_mismatch",
@@ -4266,8 +4285,8 @@ describe("console API", () => {
     const nowSeconds = 1_800_000_000;
     const root = await mkdtemp(join(tmpdir(), "haitu-stripe-webhook-old-signature-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cs_test_webhook_old_signature",
         url: "https://checkout.stripe.com/c/pay/cs_test_webhook_old_signature",
         payment_intent: "pi_test_webhook_old_signature",
@@ -8695,7 +8714,7 @@ describe("console API", () => {
     const productPath = testProductPath(fixturesDir, "box");
     await writeProduct(productPath);
     await writeFile(productAssetPath(productPath, "main.jpg"), Buffer.from("main-image"));
-    const fetchImpl = vi.fn(async () => jsonResponse({ unexpected: true })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => liveFxResponse(url) ?? jsonResponse({ unexpected: true })) as unknown as typeof fetch;
     const server = createConsoleServer({ rootDir: root, fixturesDir, fetchImpl });
 
     const response = await server.fetchJson("/api/preflight", {
@@ -9083,8 +9102,8 @@ describe("console API", () => {
   it("lists official provider usage for customer support without creating generations", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-usage-list-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         total: 2,
         items: [
           {
@@ -10609,8 +10628,8 @@ describe("console API", () => {
   it("refuses to cancel provider tasks that are not queued", async () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-cancel-running-"));
     tempDirs.push(root);
-    const fetchImpl = vi.fn(async () =>
-      jsonResponse({
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      liveFxResponse(url) ?? jsonResponse({
         id: "cgt-running",
         status: "running"
       })
@@ -12959,20 +12978,32 @@ type TestConsoleServerHandle = ConsoleServerHandle & {
   workspaceId: string;
 };
 
-function createConsoleServer(options: ConsoleServerOptions = {}): TestConsoleServerHandle {
+function createConsoleServer(options: ConsoleServerOptions & { mockLiveFx?: boolean } = {}): TestConsoleServerHandle {
   if (!process.env.HAITU_SECRET_KEY) {
     vi.stubEnv("HAITU_SECRET_KEY", "0123456789abcdef0123456789abcdef");
   }
   vi.stubEnv("HAITU_AUTH_EMAIL_FROM", "");
   vi.stubEnv("RESEND_API_KEY", "");
-  const rootDir = options.rootDir ?? process.cwd();
-  const dataDir = options.dataDir
-    ? isAbsolute(options.dataDir)
-      ? options.dataDir
-      : join(rootDir, options.dataDir)
+  const { mockLiveFx = true, ...serverOptions } = options;
+  const rootDir = serverOptions.rootDir ?? process.cwd();
+  const dataDir = serverOptions.dataDir
+    ? isAbsolute(serverOptions.dataDir)
+      ? serverOptions.dataDir
+      : join(rootDir, serverOptions.dataDir)
     : testDataDir(rootDir);
+  const fetchImpl = serverOptions.fetchImpl || mockLiveFx
+    ? ((async (url: string | URL | Request, init?: RequestInit) => {
+        const fxResponse = mockLiveFx ? liveFxResponse(url) : undefined;
+        if (fxResponse) {
+          return fxResponse;
+        }
+        const targetFetch = serverOptions.fetchImpl ?? fetch;
+        return init === undefined ? targetFetch(url) : targetFetch(url, init);
+      }) as typeof fetch)
+    : undefined;
   const raw = createRawConsoleServer({
-    ...options,
+    ...serverOptions,
+    fetchImpl,
     rootDir,
     dataDir
   });
@@ -13345,6 +13376,27 @@ function jsonResponse(body: unknown): Response {
     status: 200,
     headers: { "content-type": "application/json" }
   });
+}
+
+function liveFxResponse(url: string | URL | Request): Response | undefined {
+  const text = String(url);
+  if (text === "https://api.frankfurter.dev/v2/rates?base=CNY&quotes=HKD") {
+    return jsonResponse([{
+      date: "2026-07-03",
+      base: "CNY",
+      quote: "HKD",
+      rate: 1
+    }]);
+  }
+  if (text === "https://api.frankfurter.dev/v2/rates?base=CNY&quotes=USD") {
+    return jsonResponse([{
+      date: "2026-07-03",
+      base: "CNY",
+      quote: "USD",
+      rate: 0.14737
+    }]);
+  }
+  return undefined;
 }
 
 function restoreEnv(name: string, value: string | undefined): void {
