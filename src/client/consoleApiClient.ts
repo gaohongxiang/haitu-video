@@ -3,11 +3,24 @@ export async function getJson<T>(path: string): Promise<T> {
   return readJsonResponse<T>(response);
 }
 
+class ConsoleApiResponseError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "ConsoleApiResponseError";
+  }
+}
+
 async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<T> {
   try {
     const response = await fetch(path, { signal });
     return await readJsonResponse<T>(response);
   } catch (error) {
+    if (error instanceof ConsoleApiResponseError && error.status === 401) {
+      throw error;
+    }
     throw new Error(`控制台初始化接口失败 ${path}: ${fetchErrorMessage(error)}`);
   }
 }
@@ -221,7 +234,7 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
 export async function readJsonResponse<T>(response: Response): Promise<T> {
   const body = await response.json();
   if (!response.ok) {
-    throw new Error(body.error || `HTTP ${response.status}`);
+    throw new ConsoleApiResponseError(body.error || `HTTP ${response.status}`, response.status);
   }
   return body as T;
 }

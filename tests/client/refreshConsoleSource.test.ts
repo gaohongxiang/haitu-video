@@ -97,6 +97,7 @@ describe("console refresh source", () => {
     expect(apiClientSource).toContain("const consoleSnapshotRequestTimeoutMs");
     expect(apiClientSource).toContain("AbortSignal.timeout(consoleSnapshotRequestTimeoutMs)");
     expect(apiClientSource).toContain("控制台初始化接口失败 ${path}");
+    expect(apiClientSource).toContain("error instanceof ConsoleApiResponseError && error.status === 401");
     expect(apiClientSource).toContain("getJsonWithSignal<T[\"providerConfigResponse\"]>(\"/api/provider-config\", signal)");
     expect(apiClientSource).toContain("getJsonWithSignal<T[\"modelServicePreferenceResponse\"]>(\"/api/model-service-preference\", signal)");
     expect(apiClientSource).toContain("export const consolePrimarySnapshotPaths");

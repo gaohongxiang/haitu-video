@@ -70,6 +70,15 @@ afterEach(() => {
 });
 
 describe("console API snapshots", () => {
+  it("preserves authentication failures so an expired session returns to the login screen", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "Authentication required" }), {
+      status: 401,
+      headers: { "content-type": "application/json" }
+    })));
+
+    await expect(fetchConsoleSnapshotPrimary()).rejects.toThrow("Authentication required");
+  });
+
   it("loads only first-screen data for the primary console snapshot", async () => {
     const fetchMock = stubFetch();
 
