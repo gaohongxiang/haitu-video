@@ -3,7 +3,6 @@ import type { FileAuditLog } from "./auditLog.js";
 import type { ConsoleSettingsStore } from "./consoleSettings.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
-import { runConsoleMakeVideo } from "./consoleMakeVideoService.js";
 import {
   cancelQueuedProviderTask,
   getProviderTask,
@@ -12,8 +11,10 @@ import {
 import type { FileReviewStore } from "./reviewStore.js";
 import {
   assertRetryVideoJobAllowed,
+  ensureRecoverDownloadVideoJobBilling,
   reserveRetryVideoJobBilling
 } from "./videoJobBilling.js";
+import type { LocalVideoJobQueueOptions } from "./consoleVideoJobQueue.js";
 import {
   enqueueBatchVideoJobs,
   enqueueVideoJob,
@@ -39,7 +40,7 @@ export async function handleVideoRoutes(input: {
   reviewStore: FileReviewStore;
   auditLog: FileAuditLog;
   fetchImpl?: typeof fetch;
-  runMakeVideoPipeline?: Parameters<typeof runConsoleMakeVideo>[1]["runMakeVideoPipeline"];
+  runMakeVideoPipeline?: LocalVideoJobQueueOptions["runMakeVideoPipeline"];
 }): Promise<Response | undefined> {
   const {
     request,
@@ -69,18 +70,31 @@ export async function handleVideoRoutes(input: {
   }
   if (request.method === "POST" && url.pathname === "/api/make-video") {
     const body = (await request.json()) as MakeVideoRequest;
-    const report = await runConsoleMakeVideo(body, {
+    const queued = await enqueueVideoJob(body, {
       rootDir: dataDir,
-      outputsDir: requestContext.outputsDir,
       settingsStore,
       modelConfigStore: requestContext.modelConfigStore,
       platformModelConfigStore: requestContext.platformModelConfigStore,
       modelServicePreferenceStore: requestContext.modelServicePreferenceStore,
-      fetchImpl,
-      runMakeVideoPipeline,
-      referenceImageUrlResolver: requestContext.referenceImageUrlResolver,
-      billingPolicyStore: requestContext.billingPolicyStore
+      walletStore: requestContext.walletStore,
+      videoJobQueue: requestContext.videoJobQueue,
+      billingPolicyStore: requestContext.billingPolicyStore,
+      modelPricingCatalog: requestContext.modelPricingCatalog,
+      modelPricingCatalogVersion: requestContext.modelPricingCatalogVersion
     });
+    const completed = await requestContext.videoJobQueue.waitForIdle(queued.id);
+    if (completed.status !== "completed" || !completed.reportPath) {
+      throw new Error(completed.error ?? "Video generation failed.");
+    }
+    const report = await readFile(completed.reportPath, "utf8")
+      .then((raw) => JSON.parse(raw) as unknown)
+      .catch(() => ({
+        status: completed.status,
+        productSku: completed.productSku,
+        provider: completed.provider,
+        durationSeconds: completed.durationSeconds,
+        reportPath: completed.reportPath
+      }));
     return jsonResponse({ report });
   }
   if (request.method === "POST" && url.pathname === "/api/video-jobs/batch") {
@@ -190,7 +204,14 @@ export async function handleVideoRoutes(input: {
   const videoJobRecoverDownloadMatch = url.pathname.match(/^\/api\/video-jobs\/([^/]+)\/recover-download$/);
   if (request.method === "POST" && videoJobRecoverDownloadMatch) {
     const jobId = decodeURIComponent(videoJobRecoverDownloadMatch[1] ?? "");
-    const job = await requestContext.videoJobQueue.recoverDownload(jobId);
+    const record = await requestContext.videoJobQueue.get(jobId);
+    const walletReservationId = ensureRecoverDownloadVideoJobBilling({
+      record,
+      walletStore: requestContext.walletStore
+    });
+    const job = await requestContext.videoJobQueue.recoverDownload(jobId, {
+      walletReservationId
+    });
     await auditLog.append({
       action: "video_job.download_recovered",
       target: job.id,
@@ -248,3 +269,4 @@ export async function handleVideoRoutes(input: {
   }
   return undefined;
 }
+import { readFile } from "node:fs/promises";

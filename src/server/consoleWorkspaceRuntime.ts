@@ -132,7 +132,8 @@ export async function createConsoleRequestContext(input: {
       fetchImpl: input.fetchImpl,
       runMakeVideoPipeline: input.runMakeVideoPipeline,
       referenceImageUrlResolver,
-      databaseHandle: input.databaseHandle
+      databaseHandle: input.databaseHandle,
+      now: input.now
     })
   };
 }
@@ -154,6 +155,7 @@ function videoJobQueueForWorkspace(input: {
   runMakeVideoPipeline?: typeof runMakeVideoPipeline;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   databaseHandle: DatabaseHandle;
+  now?: () => Date;
 }): LocalVideoJobQueue {
   if (input.workspaceId === DEFAULT_WORKSPACE_ID) {
     return input.defaultVideoJobQueue;
@@ -178,12 +180,14 @@ function videoJobQueueForWorkspace(input: {
       runMakeVideoPipeline: input.runMakeVideoPipeline
     }),
     referenceImageUrlResolver: input.referenceImageUrlResolver,
+    now: input.now,
     databaseHandle: input.databaseHandle,
     billingPolicyStore: input.billingPolicyStore,
     modelPricingCatalog: input.modelPricingCatalog,
     getModelPricingCatalogContext: input.getModelPricingCatalogContext
   });
   input.workspaceVideoJobQueues.set(input.workspaceId, queue);
+  void queue.startSavedJobs();
   return queue;
 }
 

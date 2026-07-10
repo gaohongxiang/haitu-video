@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { MemoryConsoleSettingsStore } from "../../src/server/consoleSettings.js";
 import { LocalVideoJobQueue } from "../../src/server/consoleVideoJobQueue.js";
+import { closeDatabase, openDatabase } from "../../src/server/db/client.js";
+import { ensureDefaultWorkspace, runMigrations } from "../../src/server/db/migrate.js";
 
 let tempDirs: string[] = [];
 
@@ -130,6 +132,57 @@ describe("LocalVideoJobQueue", () => {
     await expect(readFile(join(outputsDir, enqueued.id, "job.json"), "utf8")).resolves.toContain(
       "\"status\": \"completed\""
     );
+  });
+
+  it("records creative job creation and completion traffic events", async () => {
+    const root = await mkdtemp(join(tmpdir(), "haitu-video-job-traffic-"));
+    tempDirs.push(root);
+    const dataDir = join(root, "data");
+    const fixturesDir = join(root, "fixtures", "products");
+    const outputsDir = join(root, "outputs");
+    const productPath = join(fixturesDir, "box.json");
+    await writeProduct(productPath);
+    const handle = openDatabase({ dataDir, env: process.env });
+    runMigrations(handle);
+    ensureDefaultWorkspace(handle);
+    try {
+      const queue = new LocalVideoJobQueue({
+        rootDir: root,
+        outputsDir,
+        workspaceId: "default",
+        databaseHandle: handle,
+        settingsStore: new MemoryConsoleSettingsStore(),
+        now: () => new Date("2026-07-08T09:00:00.000Z"),
+        runMakeVideoPipeline: async (input) => makeReport(input)
+      });
+
+      const enqueued = await queue.enqueue({
+        productPath,
+        provider: "mock",
+        duration: 8,
+        confirmPaid: false
+      });
+      await queue.waitForIdle(enqueued.id);
+
+      const rows = handle.sqlite.prepare(`
+        SELECT event_name, workspace_id, metadata_json
+        FROM traffic_events
+        ORDER BY occurred_at ASC, rowid ASC
+      `).all() as Array<{ event_name: string; workspace_id: string; metadata_json: string }>;
+
+      expect(rows.map((row) => row.event_name)).toEqual([
+        "creative_job_created",
+        "creative_job_completed"
+      ]);
+      expect(rows.every((row) => row.workspace_id === "default")).toBe(true);
+      expect(JSON.parse(rows[1].metadata_json)).toEqual(expect.objectContaining({
+        jobId: enqueued.id,
+        provider: "mock",
+        status: "completed"
+      }));
+    } finally {
+      closeDatabase(handle);
+    }
   });
 
   it("passes the reference image URL resolver into the make-video pipeline", async () => {

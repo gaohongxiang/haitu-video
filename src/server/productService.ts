@@ -23,6 +23,7 @@ import {
   summarizeReferenceImages,
   type ProductImagePreview
 } from "./productReadiness.js";
+import { fetchRemoteImage } from "./remoteImageFetch.js";
 
 export { listProducts } from "./productListService.js";
 
@@ -196,7 +197,6 @@ async function importRemoteReferenceImages(input: {
   referenceImages: string[];
   fetchImpl?: typeof fetch;
 }): Promise<RemoteReferenceImportResult> {
-  const fetchReference = input.fetchImpl ?? fetch;
   const nextReferenceImages = withoutPlaceholderReferenceImages(input.referenceImages);
   const downloaded: ImportedProductAsset[] = [];
   for (const [index, reference] of nextReferenceImages.entries()) {
@@ -204,11 +204,8 @@ async function importRemoteReferenceImages(input: {
       continue;
     }
     try {
-      const response = await fetchReference(reference);
-      if (!response.ok) {
-        continue;
-      }
-      const contentType = response.headers.get("content-type") ?? "";
+      const remote = await fetchRemoteImage({ url: reference, fetchImpl: input.fetchImpl });
+      const contentType = remote.contentType;
       const extension = imageExtensionFromRemoteReference(reference, contentType);
       if (!extension) {
         continue;
@@ -221,7 +218,7 @@ async function importRemoteReferenceImages(input: {
       });
       const targetPath = target.path;
       await mkdir(dirname(targetPath), { recursive: true });
-      await writeFile(targetPath, Buffer.from(await response.arrayBuffer()));
+      await writeFile(targetPath, remote.bytes);
       const localReference = target.reference;
       nextReferenceImages[index] = localReference;
       downloaded.push({

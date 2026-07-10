@@ -39,6 +39,7 @@ export function createQueuedVideoJobRecord(input: {
     billingCatalogVersion: request.billingCatalogVersion,
     billingPriceSnapshot: request.billingPriceSnapshot,
     reuseManifest: request.reuseManifest,
+    clientRequestId: request.clientRequestId,
     outDir,
     createdAt,
     updatedAt: createdAt,

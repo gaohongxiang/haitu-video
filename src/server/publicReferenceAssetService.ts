@@ -8,6 +8,7 @@ import {
   isHttpReference
 } from "./productService.js";
 import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
+import { fetchRemoteImage } from "./remoteImageFetch.js";
 
 export const publicAssetTokenTtlMs = 2 * 60 * 60 * 1000;
 
@@ -78,12 +79,8 @@ async function cacheRemoteReferenceForPublicAsset(input: {
   reference: string;
   fetchImpl?: typeof fetch;
 }): Promise<string> {
-  const fetchReference = input.fetchImpl ?? fetch;
-  const response = await fetchReference(input.reference);
-  if (!response.ok) {
-    throw new Error("参考图地址无法访问。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
-  }
-  const contentType = response.headers.get("content-type") ?? "";
+  const remote = await fetchRemoteImage({ url: input.reference, fetchImpl: input.fetchImpl });
+  const contentType = remote.contentType;
   const extension = imageExtensionFromRemoteReference(input.reference, contentType);
   if (!extension) {
     throw new Error("参考图地址返回的不是可用图片。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
@@ -101,7 +98,7 @@ async function cacheRemoteReferenceForPublicAsset(input: {
     throw new Error("Reference image cache path must stay inside data root.");
   }
   await mkdir(dirname(targetPath), { recursive: true });
-  await writeFile(targetPath, Buffer.from(await response.arrayBuffer()));
+  await writeFile(targetPath, remote.bytes);
   return targetPath;
 }
 

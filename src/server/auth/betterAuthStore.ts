@@ -14,6 +14,7 @@ import type {
   ConsoleWorkspaceContext
 } from "../consoleAuth.js";
 import { jsonResponse } from "../consoleAuth.js";
+import { recordTrafficEvent } from "../adminTraffic.js";
 import type { DatabaseHandle } from "../db/client.js";
 import { sendAuthEmailOtp } from "./emailOtpSender.js";
 
@@ -53,6 +54,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     }
   ) {
     this.env = input.env ?? process.env;
+    const rateLimitEntries = new Map<string, { key: string; count: number; lastRequest: number }>();
     this.auth = betterAuth({
       appName: "Haitu",
       database: input.handle.sqlite,
@@ -60,7 +62,16 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       baseURL: this.env.BETTER_AUTH_URL,
       basePath: "/api/auth",
       rateLimit: {
-        enabled: false
+        enabled: true,
+        storage: "memory",
+        window: 60,
+        max: 30,
+        customStorage: {
+          get: async (key) => rateLimitEntries.get(key),
+          set: async (key, value) => {
+            rateLimitEntries.set(key, value);
+          }
+        }
       },
       advanced: {
         database: {
@@ -271,7 +282,13 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     if (!response.ok) {
       return await this.authErrorResponse(response);
     }
-    return this.sessionResponseFromAuthResponse(response);
+    const sessionResponse = await this.sessionResponseFromAuthResponse(response);
+    this.safeRecordTrafficEvent({
+      eventName: "auth_login",
+      path: "/api/auth/enter",
+      userId: existing.id
+    });
+    return sessionResponse;
   }
 
   async verifyEmail(input: ConsoleAuthVerifyEmailInput): Promise<Response> {
@@ -287,7 +304,16 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     if (!response.ok) {
       return await this.authErrorResponse(response);
     }
-    return this.sessionResponseFromAuthResponse(response);
+    const sessionResponse = await this.sessionResponseFromAuthResponse(response);
+    const verified = this.findAuthUserByEmail(email);
+    if (verified) {
+      this.safeRecordTrafficEvent({
+        eventName: "auth_signup",
+        path: "/",
+        userId: verified.id
+      });
+    }
+    return sessionResponse;
   }
 
   async requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput): Promise<Response> {
@@ -349,6 +375,26 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       headers: cookie ? { cookie } : {}
     }));
     return jsonResponse(session, 200, copySetCookieHeaders(response.headers));
+  }
+
+  private safeRecordTrafficEvent(input: {
+    eventName: "auth_signup" | "auth_login";
+    path: string;
+    userId: string;
+  }): void {
+    try {
+      const workspace = this.findUserWorkspace(input.userId);
+      recordTrafficEvent({
+        handle: this.input.handle,
+        eventName: input.eventName,
+        path: input.path,
+        userId: input.userId,
+        workspaceId: workspace?.id,
+        occurredAt: this.input.now?.() ?? new Date()
+      });
+    } catch {
+      // Analytics must not block authentication.
+    }
   }
 
   private async getBetterAuthSession(request: Request): Promise<{

@@ -32,6 +32,7 @@ interface VolcengineSeedanceProviderOptions {
   downloadTimeoutMs?: number;
   downloadMaxAttempts?: number;
   downloadChunkBytes?: number;
+  apiRequestTimeoutMs?: number;
 }
 
 interface VolcengineSeedanceTaskResponse {
@@ -123,6 +124,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   private readonly downloadTimeoutMs: number;
   private readonly downloadMaxAttempts: number;
   private readonly downloadChunkBytes: number;
+  private readonly apiRequestTimeoutMs: number;
 
   constructor(options: VolcengineSeedanceProviderOptions = {}) {
     this.apiKey = options.apiKey ?? "";
@@ -151,6 +153,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     this.downloadTimeoutMs = options.downloadTimeoutMs ?? Number(process.env.SEEDANCE_DOWNLOAD_TIMEOUT_MS ?? 60000);
     this.downloadMaxAttempts = options.downloadMaxAttempts ?? Number(process.env.SEEDANCE_DOWNLOAD_MAX_ATTEMPTS ?? 3);
     this.downloadChunkBytes = options.downloadChunkBytes ?? Number(process.env.SEEDANCE_DOWNLOAD_CHUNK_BYTES ?? 1048576);
+    this.apiRequestTimeoutMs = options.apiRequestTimeoutMs ?? Number(process.env.SEEDANCE_API_TIMEOUT_MS ?? 30000);
   }
 
   async generateVideo(request: VideoProviderRequest): Promise<VideoProviderResult> {
@@ -183,6 +186,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
     if (!taskId) {
       throw new Error("Volcengine Seedance create task response did not include a task id.");
     }
+    await request.onTaskCreated?.(taskId);
 
     let completedTask: VolcengineSeedanceTaskResponse;
     try {
@@ -328,7 +332,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   }
 
   private async postJson<T>(path: string, body: unknown): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const response = await this.fetchWithAbort(`${this.baseUrl}${path}`, this.apiRequestTimeoutMs, {
       method: "POST",
       headers: {
         authorization: `Bearer ${this.apiKey}`,
@@ -340,7 +344,7 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   }
 
   private async getJson<T>(path: string): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const response = await this.fetchWithAbort(`${this.baseUrl}${path}`, this.apiRequestTimeoutMs, {
       method: "GET",
       headers: {
         authorization: `Bearer ${this.apiKey}`
@@ -407,11 +411,15 @@ export class VolcengineSeedanceProvider implements VideoProvider {
   }
 
   private async fetchWithTimeout(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<Response> {
+    return this.fetchWithAbort(url, timeoutMs, { headers });
+  }
+
+  private async fetchWithAbort(url: string, timeoutMs: number, init: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await this.fetchImpl(url, {
-        headers,
+        ...init,
         signal: controller.signal
       });
     } finally {

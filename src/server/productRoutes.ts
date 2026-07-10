@@ -209,7 +209,8 @@ export async function handleProductRoutes(input: {
       await importProductReferenceAssets({
         fixturesDir: requestContext.fixturesDir,
         rootDir: dataDir,
-        sku: decodeURIComponent(importProductAssetsMatch[1] ?? "")
+        sku: decodeURIComponent(importProductAssetsMatch[1] ?? ""),
+        allowedImportRoot: process.env.HAITU_LOCAL_IMPORT_ROOT
       })
     );
   }

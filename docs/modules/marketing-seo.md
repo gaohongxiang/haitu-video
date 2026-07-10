@@ -2,13 +2,13 @@
 
 营销模块的目标是让搜索引擎、AI 答案引擎、支付审核方和真实跨境电商卖家都能准确理解 Haitu。
 
-长期规划见 [SEO / GEO 全局规划](../marketing/seo-geo-roadmap.md)，上线和监控动作见 [SEO / GEO 运营手册](../marketing/seo-geo-operations.md)，上线后证据和周期性复盘追加到 [SEO / GEO 监控记录](../marketing/seo-geo-monitoring-log.md)。
+长期规划和 SEO / GEO 能力地图见 [SEO / GEO 全局规划](../marketing/seo-geo-roadmap.md)，上线和监控动作见 [SEO / GEO 运营手册](../marketing/seo-geo-operations.md)，上线后证据和周期性复盘追加到 [SEO / GEO 监控记录](../marketing/seo-geo-monitoring-log.md)。
 
 ## 职责
 
 - 渲染中英文公开页面。
 - 维护可抓取页面元数据、canonical URL、`hreflang`、JSON-LD、sitemap、robots 和 `llms.txt`。
-- 保持产品定位诚实：Haitu 是面向电商商品事实、商品图片、营销脚本和商品视频的 AI 商品创作平台。
+- 保持产品定位诚实：Haitu 是面向电商商品事实、商品图片、营销脚本和商品视频的 AI 商品创作控制台，核心价值是减少无效生成、提高素材可用率、控制 AI 生成成本。
 - 让支付审核页说清楚：Haitu 提供数字化 SaaS 服务，不销售实物商品。
 - 控制台、后台、API、生成记录和用户媒体不能被搜索索引。
 

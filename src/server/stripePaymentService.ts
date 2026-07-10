@@ -44,6 +44,16 @@ interface StripePaymentIntentEventObject {
   };
 }
 
+interface StripeBalanceReversalObject {
+  id?: string;
+  charge?: string;
+  payment_intent?: string | null;
+  amount?: number;
+  amount_refunded?: number;
+  currency?: string;
+  status?: string;
+}
+
 interface StripePaymentIntentDetailsResponse {
   id?: string;
   latest_charge?: string | StripeChargeDetails | null;
@@ -253,10 +263,87 @@ export async function handleStripeWebhookEvent(input: {
       if (intent.id) {
         orderStore.markFailedByPaymentIntent("stripe", intent.id, intent.last_payment_error?.message ?? "Stripe 支付失败");
       }
+    } else if (
+      input.event.type === "charge.refunded"
+      || input.event.type === "charge.dispute.created"
+      || input.event.type === "charge.dispute.funds_withdrawn"
+    ) {
+      handleStripeBalanceReversal({
+        event: input.event,
+        orderStore,
+        handle: input.handle,
+        now: input.now
+      });
     }
     return { received: true as const };
   });
   return processEvent();
+}
+
+function handleStripeBalanceReversal(input: {
+  event: StripeEvent;
+  orderStore: WalletRechargeOrderStore;
+  handle: DatabaseHandle;
+  now?: () => Date;
+}): void {
+  const object = stripeBalanceReversalObject(input.event);
+  const order = input.orderStore.findStripeOrderForReversal({
+    paymentIntentId: normalizeOptionalText(object.payment_intent),
+    chargeId: input.event.type === "charge.refunded"
+      ? normalizeOptionalText(object.id)
+      : normalizeOptionalText(object.charge)
+  });
+  if (!order) {
+    throw new Error("Stripe 退款或拒付对应的充值订单不存在。");
+  }
+  if (normalizeCurrency(object.currency) !== order.paymentCurrency) {
+    throw new Error("Stripe 退款或拒付币种与充值订单不匹配。");
+  }
+  const reversedPaymentCents = input.event.type === "charge.refunded"
+    ? Number(object.amount_refunded)
+    : Number(object.amount);
+  if (!Number.isSafeInteger(reversedPaymentCents) || reversedPaymentCents <= 0 || reversedPaymentCents > order.paymentAmountCents) {
+    throw new Error("Stripe 退款或拒付金额无效。");
+  }
+  const targetCreditCents = Math.min(
+    order.creditCents,
+    Math.ceil(order.creditCents * reversedPaymentCents / order.paymentAmountCents)
+  );
+  const disputed = input.event.type.startsWith("charge.dispute.");
+  const reversal = input.orderStore.markReversed({
+    orderId: order.id,
+    targetReversedCreditCents: targetCreditCents,
+    status: disputed ? "disputed" : targetCreditCents >= order.creditCents ? "refunded" : "partially_refunded",
+    reason: disputed ? "Stripe 支付发生拒付或争议" : "Stripe 支付已退款",
+    metadata: {
+      stripeReversalEventId: input.event.id,
+      stripeReversalType: input.event.type,
+      stripeReversedPaymentCents: reversedPaymentCents
+    }
+  });
+  if (reversal.deltaCreditCents <= 0) {
+    return;
+  }
+  new WalletStore({
+    handle: input.handle,
+    workspaceId: order.workspaceId,
+    now: input.now
+  }).reverseRecharge({
+    amountCny: reversal.deltaCreditCents / 100,
+    rechargeOrderId: order.id,
+    providerEventId: input.event.id,
+    reason: disputed ? "Stripe 拒付，扣回充值余额" : "Stripe 退款，扣回充值余额",
+    metadata: {
+      stripeEventType: input.event.type,
+      reversedPaymentCents,
+      paymentCurrency: order.paymentCurrency
+    }
+  });
+}
+
+function stripeBalanceReversalObject(event: StripeEvent): StripeBalanceReversalObject {
+  const value = event.data?.object;
+  return value && typeof value === "object" ? value as StripeBalanceReversalObject : {};
 }
 
 function handleCheckoutCompleted(input: {

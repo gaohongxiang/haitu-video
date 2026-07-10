@@ -2,7 +2,7 @@
 
 适用站点：`https://haitu.online/`
 
-品牌口径：中文品牌叫“嗨兔”，英文和域名使用 `Haitu`。公开页面、监控记录和对外沟通不要写成“海兔”。
+品牌口径：中文品牌叫“嗨兔”，英文和域名使用 `Haitu`。公开页面、监控记录和对外沟通不要写成“海兔”。首页核心定位使用“更懂电商商品的 AI 创作控制台”，英文使用 “AI product creative console for ecommerce sellers”。
 
 这份手册把 [SEO / GEO 全局规划](seo-geo-roadmap.md) 里 P0/P3 的外部动作落成可执行检查表。它不替代自动化测试；本地测试负责守住代码和页面规则，运营手册负责上线后取证、提交和持续迭代。上线、每周搜索、每月 GEO、真实素材和薄内容清理结果统一追加到 [SEO / GEO 监控记录](seo-geo-monitoring-log.md)。
 
@@ -20,8 +20,8 @@ npm run build:console
 
 人工快速看一遍：
 
-- `/`：中文首页是否仍清楚说明 Haitu 是跨境电商 AI 商品图片优化与商品视频创作平台。
-- `/en/`：英文首页是否完整表达同样定位。
+- `/`：中文首页是否仍清楚说明 Haitu 是跨境电商 AI 商品创作控制台，并表达“减少无效生成、提高素材可用率、控制 AI 生成成本”。
+- `/en/`：英文首页是否完整表达同样定位，即 AI product creative console for ecommerce sellers。
 - `/terms`、`/privacy`、`/refund`、`/contact`：是否公开、可信、没有登录拦截。
 - `/robots.txt`：是否允许公开页，禁止 `/console`、`/admin`、`/app`、`/api`。
 - `/sitemap.xml`：是否包含公开中文/英文页面和政策页。
@@ -72,14 +72,52 @@ npm run seo:check -- --base https://haitu.online
 
 ## 3. Google Search Console 和 Bing Webmaster Tools
 
+提交分两类：站长平台提交 sitemap，IndexNow 提交 URL 更新通知。它们都不是提交代码、页面正文或图片，而是把公开可索引 URL 告诉搜索引擎。
+
 首次上线或大批页面变更后：
 
 1. 在 Google Search Console 设置 `https://haitu.online` 的域名资产或 URL 前缀资产。
 2. 验证站点所有权。
-3. 提交 sitemap：`https://haitu.online/sitemap.xml`。
+3. 在 Google Search Console 的 `Sitemaps` 页面提交 sitemap：`https://haitu.online/sitemap.xml`。
 4. 在 Bing Webmaster Tools 添加同一站点。
-5. 提交 sitemap：`https://haitu.online/sitemap.xml`。
+5. 在 Bing Webmaster Tools 的 `Sitemaps` 页面提交 sitemap：`https://haitu.online/sitemap.xml`。
 6. 把提交日期、提交人、状态和截图记录到 [SEO / GEO 监控记录](seo-geo-monitoring-log.md)。
+
+sitemap 提交对象：
+
+- 提交到哪里：Google Search Console 的 `Sitemaps`，Bing Webmaster Tools 的 `Sitemaps`。
+- 提交什么：`https://haitu.online/sitemap.xml`。
+- sitemap 里面应该只包含公开营销页、政策页和中英文对应页面，例如 `/`、`/en/`、`/features/...`、`/platforms/...`、`/tools/...`、`/use-cases/...`、`/categories/...`、`/compare/...`、`/terms`、`/privacy`、`/refund`、`/contact`。
+- sitemap 里面不能包含 `/console`、`/admin`、`/app`、`/api`、`/media`、用户商品资料、用户生成记录、临时下载链接、图片文件、JS 或 CSS 静态资源。
+
+IndexNow 用于主动通知支持方“这些 URL 已发布或已更新”。它是 sitemap 的补充，不替代 Google Search Console、Bing Webmaster Tools、`robots.txt` 或 `sitemap.xml`。
+
+IndexNow 提交对象：
+
+- 提交到哪里：`https://api.indexnow.org/indexnow`。
+- 提交什么：公开页面 URL 列表，即 sitemap 中的 `<loc>` URL；不要提交静态资源、控制台、后台、API、用户媒体或临时链接。
+- 需要什么验证：生产站必须能公开访问 `https://haitu.online/<INDEXNOW_KEY>.txt`，文件内容就是同一个 `INDEXNOW_KEY`。
+- 何时提交：生产部署成功、`npm run seo:check -- --base https://haitu.online` 通过后再提交；大批营销页改动、政策页改动、核心 title/description/FAQ 改动后也可以提交。
+- 如何提交：从 `https://haitu.online/sitemap.xml` 读取公开 URL，批量 POST 到 IndexNow；如果未来接入部署脚本，必须从 sitemap 白名单取 URL，避免把 `/media` 或静态图片误提交。
+
+IndexNow 请求示例：
+
+```bash
+curl -X POST "https://api.indexnow.org/indexnow" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{
+    "host": "haitu.online",
+    "key": "<INDEXNOW_KEY>",
+    "keyLocation": "https://haitu.online/<INDEXNOW_KEY>.txt",
+    "urlList": [
+      "https://haitu.online/",
+      "https://haitu.online/en/",
+      "https://haitu.online/features/ai-product-video-generator"
+    ]
+  }'
+```
+
+Cloudflare Crawler Hints 可以作为额外补充，但它是自动判断页面变化；Haitu 的主提交口径仍应以 sitemap 中的公开页面 URL 为准。
 
 每周检查：
 
@@ -88,6 +126,7 @@ npm run seo:check -- --base https://haitu.online
 - 查询词是否开始出现品牌词、商品视频、商品图优化、平台页和类目页长尾词。
 - 新增曝光页是否与页面搜索意图一致。
 - 是否有无价值页面进入索引，尤其是 `/console`、`/admin`、`/app`、`/api` 或用户媒体链接。
+- Bing Webmaster Tools 的 `IndexNow` 是否有提交记录、错误或超量提示；如果出现静态资源或私有路径，停止自动提交并回到 sitemap 白名单策略。
 
 ## 4. GEO 月度监控
 

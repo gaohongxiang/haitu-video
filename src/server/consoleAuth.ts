@@ -67,6 +67,9 @@ export function isPublicConsoleRoute(request: Request): boolean {
   if (url.pathname.startsWith("/api/auth/")) {
     return true;
   }
+  if (request.method === "POST" && url.pathname === "/api/traffic/events") {
+    return true;
+  }
   if (request.method === "POST" && url.pathname === "/api/payments/stripe/webhook") {
     return true;
   }

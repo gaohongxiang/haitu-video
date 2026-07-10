@@ -20,7 +20,8 @@ import {
   handleHealthRoutes,
   handleMarketingRoutes,
   handleMediaRoutes,
-  handlePublicAssetRoutes
+  handlePublicAssetRoutes,
+  handleTrafficEventRoutes
 } from "./consolePublicRoutes.js";
 import {
   handleConsoleApiRoutes
@@ -50,6 +51,15 @@ export function createConsoleRequestHandler(input: {
       if (healthRouteResponse) {
         return healthRouteResponse;
       }
+      const trafficEventRouteResponse = await handleTrafficEventRoutes({
+        request,
+        url,
+        databaseHandle: runtime.databaseHandle,
+        now: input.now
+      });
+      if (trafficEventRouteResponse) {
+        return trafficEventRouteResponse;
+      }
       const authAdminRouteResponse = await handleAuthAdminRoutes({
         request,
         url,
@@ -57,6 +67,7 @@ export function createConsoleRequestHandler(input: {
         settingsStore: runtime.settingsStore,
         databaseHandle: runtime.databaseHandle,
         auditLog: runtime.auditLog,
+        fetchImpl: input.fetchImpl,
         now: input.now
       });
       if (authAdminRouteResponse) {
@@ -72,7 +83,9 @@ export function createConsoleRequestHandler(input: {
       }
       const marketingRouteResponse = handleMarketingRoutes({
         request,
-        url
+        url,
+        databaseHandle: runtime.databaseHandle,
+        now: input.now
       });
       if (marketingRouteResponse) {
         return marketingRouteResponse;
@@ -115,7 +128,7 @@ export function createConsoleRequestHandler(input: {
         runMakeVideoPipeline: input.runMakeVideoPipeline,
         publicBaseUrl: runtime.publicBaseUrl,
         publicAssetTokenStore: runtime.publicAssetTokenStore,
-        platformModelConfigStore: runtime.defaultModelConfigStore,
+        platformModelConfigStore: runtime.platformModelConfigStore,
         now: input.now
       });
       const apiRouteResponse = await handleConsoleApiRoutes({
@@ -138,7 +151,9 @@ export function createConsoleRequestHandler(input: {
       const mediaRouteResponse = await handleMediaRoutes({
         request,
         url,
-        rootDir: runtime.dataDir
+        dataDir: runtime.dataDir,
+        workspaceDir: requestContext.workspacePaths.dir,
+        authStore: runtime.authStore
       });
       if (mediaRouteResponse) {
         return mediaRouteResponse;

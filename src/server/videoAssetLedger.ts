@@ -1,5 +1,5 @@
 import { readFile, readdir, stat, unlink } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 
 import type { MakeVideoReport } from "../pipeline/makeVideoPipeline.js";
 import { listPublishPackages } from "./publishPackage.js";
@@ -209,8 +209,8 @@ function mediaUrl(path: string): string {
 }
 
 function isPathInsideRoot(rootDir: string, path: string): boolean {
-  const relativePath = path.startsWith(rootDir) ? path.slice(rootDir.length) : "";
-  return path === rootDir || Boolean(relativePath && !relativePath.startsWith(".."));
+  const relativePath = relative(resolve(rootDir), resolve(path));
+  return relativePath !== ".." && !relativePath.startsWith(`..${"/"}`) && !isAbsolute(relativePath);
 }
 
 function resolveWithin(rootDir: string, path: string): string {

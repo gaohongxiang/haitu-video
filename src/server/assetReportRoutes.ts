@@ -1,4 +1,5 @@
 import type { FileAuditLog } from "./auditLog.js";
+import type { ConsoleAuthStore } from "./consoleAuth.js";
 import { queryValue } from "./consoleAssetService.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleRequestContext } from "./consoleWorkspaceRuntime.js";
@@ -25,6 +26,7 @@ export async function handleAssetReportRoutes(input: {
   outputsDir: string;
   reviewStore: FileReviewStore;
   auditLog: FileAuditLog;
+  authStore: ConsoleAuthStore;
 }): Promise<Response | undefined> {
   const {
     request,
@@ -33,7 +35,8 @@ export async function handleAssetReportRoutes(input: {
     rootDir,
     outputsDir,
     reviewStore,
-    auditLog
+    auditLog,
+    authStore
   } = input;
 
   if (request.method === "GET" && url.pathname === "/api/reports") {
@@ -69,25 +72,37 @@ export async function handleAssetReportRoutes(input: {
     return jsonResponse(result);
   }
   if (request.method === "GET" && url.pathname === "/api/qc-summary") {
-    return jsonResponse(await buildQcSummary(outputsDir));
+    return jsonResponse(await buildQcSummary(requestContext.outputsDir));
   }
   if (request.method === "GET" && url.pathname === "/api/video-assets") {
     return jsonResponse(await listVideoAssets({
-      rootDir,
+      rootDir: requestContext.workspacePaths.dir,
       outputsDir: requestContext.outputsDir
     }));
   }
   if (request.method === "GET" && url.pathname === "/api/storage-backup") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
     return jsonResponse(await buildStorageBackupReport({
       dataDir: rootDir
     }));
   }
   if (request.method === "GET" && url.pathname === "/api/backups") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
     return jsonResponse(await listLocalBackups({
       dataDir: rootDir
     }));
   }
   if (request.method === "POST" && url.pathname === "/api/backups") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
     const backup = await createLocalBackup({
       dataDir: rootDir
     });
@@ -104,13 +119,17 @@ export async function handleAssetReportRoutes(input: {
     });
   }
   if (request.method === "GET" && url.pathname === "/api/audit-log") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
     return jsonResponse(await auditLog.list({
       limit: positiveIntegerFromQuery(url, "limit", 50, 1, 200)
     }));
   }
   if (request.method === "DELETE" && url.pathname === "/api/video-assets") {
     const result = await deleteVideoAsset({
-      rootDir,
+      rootDir: requestContext.workspacePaths.dir,
       input: (await request.json()) as DeleteVideoAssetRequest
     });
     await auditLog.append({

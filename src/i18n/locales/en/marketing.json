@@ -241,37 +241,64 @@
   },
   "preview": {
     "ariaLabel": "Product creative studio preview",
-    "source": "Product photos",
-    "sourceMeta": "Hero / lifestyle / references",
-    "engine": "AI image optimization",
-    "engineMeta": "Cutout · Lighting · Scenes · Texture",
-    "output": "Product videos",
-    "outputMeta": "Scenes · Scripts · Final assets",
-    "metricOne": "Batch SKUs",
-    "metricTwo": "Image optimization",
-    "metricThree": "Video generation",
-    "workspace": "Image and video studio",
-    "board": "Product asset overview",
-    "batch": "Image optimization queue",
-    "market": "Video formats",
-    "review": "Review & publish",
-    "script": "Video storyboard",
-    "image": "Optimized hero image",
-    "title": "Ad image variants",
-    "model": "Model mode",
+    "libraryTitle": "Product library",
+    "libraryCount": "Example set",
+    "searchPlaceholder": "Search products",
+    "selectedProduct": "Product A · selected",
+    "productTwo": "Product B · queued",
+    "productThree": "Product C · draft",
+    "productFour": "Product D · generated",
+    "productFive": "Product E · review",
+    "generatable": "Video ready",
+    "referencesShort": "References",
+    "productTitle": "Product facts, references, and prompts in one workflow",
+    "versionCount": "Versions",
+    "factsHeading": "Product facts",
+    "aiPack": "AI fact pack",
+    "estimatedDraftCost": "Estimate",
+    "titleLabel": "Title:",
+    "productTitleValue": "Product title, materials, dimensions, and selling points",
+    "categoryLabel": "Category:",
+    "productCategoryValue": "Marketplace category and target market",
+    "imagesHeading": "Product images",
+    "addImage": "Add references",
+    "referenceOne": "Reference 1",
+    "referenceTwo": "Reference 2",
+    "referenceThree": "Reference 3",
+    "promptHeading": "Video prompt",
+    "promptLineOne": "Generate product video prompts from facts, references, and target channels.",
+    "promptLineTwo": "Keep real appearance, color, material, and proportion anchored to product facts.",
+    "promptLineThree": "Choose ratio, duration, resolution, language, and model mode.",
+    "promptLineFour": "Generated results enter history for review, reuse, and download.",
+    "imageMode": "Image",
+    "videoMode": "Video",
+    "videoModel": "seedance-2.0",
+    "storyboardStatus": "Prompt preview",
+    "aspectRatio": "Ratio",
+    "duration": "Duration",
+    "resolution": "Resolution",
+    "finalLanguage": "Language",
+    "estimateCost": "Estimate",
+    "generateVideo": "Generate video",
+    "historyHeading": "History",
+    "historyCount": "Recent",
+    "historyItem": "Generated version",
+    "expired": "Previewable",
+    "metricOne": "Product facts",
+    "metricTwo": "Image prompts and reference generation",
+    "metricThree": "Product video generation",
     "hostedModel": "Hosted models",
-    "customModel": "Own model",
-    "status": "Generating"
+    "customModel": "Own model"
   },
   "homepage": {
     "capability": {
       "eyebrow": "Capabilities",
       "title": "A workflow for product images and short videos",
-      "body": "Haitu organizes product data, references, selling points, and model configuration before script generation, image optimization, product video generation, review, and publishing. Full image creation will be added later, and this page keeps the current boundary clear.",
+      "body": "Haitu organizes product data, references, selling points, and model configuration before image prompts, reference image generation, script organization, product video generation, review, and publishing. Full hero image, lifestyle scene, and ad image suites continue to improve, and this page keeps the current boundary clear.",
       "items": [
         {
           "heading": "Product data and reference images",
-          "body": "Upload product photos, references, titles, materials, dimensions, and blocked claims into reusable product packets.",
+          "body": "Upload product photos, references, titles, materials, dimensions, and blocked claims into reusable product packets that constrain image prompts and video prompts.",
           "bullets": [
             "Image library",
             "Reference capture",
@@ -279,11 +306,12 @@
           ]
         },
         {
-          "heading": "Marketing scripts and product videos",
-          "body": "Generate short-video scripts, storyboards, caption direction, and product video assets from verified product facts.",
+          "heading": "Image prompts, references, and product videos",
+          "body": "Generate image prompts, additional references, short-video scripts, storyboards, caption direction, and product video assets from verified product facts.",
           "bullets": [
+            "Image prompts",
+            "Reference generation",
             "Script cleanup",
-            "Storyboards",
             "Video generation"
           ]
         },
@@ -395,22 +423,23 @@
     },
     "home": {
       "question": "What is Haitu?",
-      "answer": "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers. It helps users manage product data and reference images, then create marketing scripts, storyboards, and product short videos. Haitu is not a physical goods marketplace or a general entertainment video generator.",
+      "answer": "Haitu 嗨兔 is an AI product creative console for cross-border ecommerce sellers. It uses product facts, reference images, selling points, and marketplace context to create image prompts, marketing scripts, video storyboards, and product short videos, helping teams reduce wasted generations, improve usable asset rates, and control AI generation costs. Haitu is not a physical goods marketplace or a general entertainment video generator.",
       "points": [
         "Upload and manage product facts, SKUs, selling points, and references",
-        "Optimize product images and organize scripts and storyboards",
+        "Create image prompts, scripts, storyboards, and product videos",
+        "Reduce wasted generations and improve usable asset rates",
         "Use hosted platform models or connect your own models",
-        "Wallet balance is used for image optimization, video generation, and script services"
+        "Wallet balance is used for image optimization, video generation, and script services with clearer cost control"
       ]
     },
     "features-ai-product-image-generator": {
       "question": "What is the current status of Haitu AI product image generation?",
-      "answer": "The full image studio is not live yet. Haitu currently supports product image organization, reference management, and product video generation, then will add hero image, lifestyle scene, and ad image generation to the same product creative workflow later.",
+      "answer": "Haitu currently supports image prompt generation and additional reference image generation around product facts and reference images, then connects those assets to product video generation. Full hero image, lifestyle scene, and ad image suites continue to improve.",
       "points": [
-        "Current release supports product image organization",
-        "Current release supports reference management and video generation",
-        "Haitu does not present planned image features as fully shipped",
-        "This page becomes the full generator entry after the image studio ships"
+        "Supports image prompts and reference image generation today",
+        "Continues into product video generation",
+        "Full hero, lifestyle, and ad image suites are still maturing",
+        "Does not present unfinished suites as fully mature"
       ]
     },
     "features-image-to-product-video": {
@@ -854,7 +883,7 @@
     "features-product-image-optimization": [
       {
         "question": "How is product image optimization different from product image generation?",
-        "answer": "Product image optimization focuses on organizing original photos, references, materials, dimensions, and trusted selling points before video generation and future image creation. Full product image generation is part of the later image studio roadmap."
+        "answer": "Product image optimization focuses on organizing original photos, references, materials, dimensions, and trusted selling points before image prompts, reference image generation, and product video generation. Full hero, lifestyle, and ad image suites are still maturing."
       },
       {
         "question": "Will Haitu automatically change the product in the image?",
@@ -863,12 +892,12 @@
     ],
     "features-ai-product-image-generator": [
       {
-        "question": "What product images will Haitu generate after the image studio ships?",
-        "answer": "The roadmap includes hero images, lifestyle scenes, ad images, and product image extensions constrained by real product photos, references, materials, dimensions, and trusted selling points."
+        "question": "What product images can Haitu help create today?",
+        "answer": "Today Haitu is best for product-constrained image prompts and additional reference images that also feed product video creation. The broader suite continues to mature toward hero images, lifestyle scenes, ad images, and product image extensions."
       },
       {
         "question": "How should teams prepare for product image generation now?",
-        "answer": "Teams can organize original photos, references, categories, materials, dimensions, selling points, and blocked claims in Haitu today. Those inputs support product video generation and future image creation."
+        "answer": "Teams can organize original photos, references, categories, materials, dimensions, selling points, and blocked claims in Haitu today. Those inputs support image prompt generation, reference image generation, and product video generation."
       }
     ],
     "features-image-to-product-video": [
@@ -1254,7 +1283,7 @@
     "features-product-image-background-cleanup": [
       {
         "question": "How is background cleanup different from full product image generation?",
-        "answer": "Background cleanup focuses on organizing source photos, background requirements, and marketplace rules so product image inputs are cleaner. Full product image generation belongs to the later image studio roadmap."
+        "answer": "Background cleanup focuses on organizing source photos, background requirements, and marketplace rules so product image inputs are cleaner. Current image workflows support image prompts and additional reference generation, while full hero, lifestyle, and ad image suites continue to improve."
       },
       {
         "question": "Will background cleanup change the product itself?",
@@ -1409,16 +1438,16 @@
   "pages": {
     "home": {
       "slug": "",
-      "title": "Haitu - AI Product Image Optimization and Video Generation Platform",
-      "description": "Haitu helps cross-border ecommerce teams optimize product images, organize marketing scripts, and create product videos with wallet-based digital SaaS billing.",
-      "h1": "AI product image optimization and video generation platform",
-      "eyebrow": "Upgrade product images · scale product videos",
-      "lead": "Upload product photos, references, and product facts to optimize product images, organize marketing scripts, and create product videos for {{marketplaces}} with hosted models or your own models. Users top up through Stripe Checkout with WeChat Pay, Alipay, or cards; wallet balance is used for product image optimization, video generation, and script organization as digital SaaS services.",
+      "title": "Haitu - AI Product Creative Console for Ecommerce",
+      "description": "AI product creative console for ecommerce teams: turn product facts and references into image prompts, scripts, storyboards, and videos while controlling AI generation costs.",
+      "h1": "AI product creative console for ecommerce sellers",
+      "eyebrow": "Reduce wasted generations · improve usable asset rates · control costs",
+      "lead": "Upload product photos, references, and product facts to create image prompts, organize marketing scripts, plan storyboards, and generate product videos for {{marketplaces}} with hosted models or your own models. Haitu helps reduce wasted generations, improve usable asset rates, and control AI generation costs. Users top up through Stripe Checkout with WeChat Pay, Alipay, or cards; wallet balance is used for product image optimization, video generation, and script organization as digital SaaS services.",
       "primaryCta": "Optimize product images",
       "secondaryCta": "Open app",
       "heroTitleLines": [
-        "AI image optimization",
-        "product video generation"
+        "AI creative console",
+        "for ecommerce products"
       ],
       "sections": [
         {
@@ -1432,20 +1461,20 @@
           ]
         },
         {
-          "heading": "Upload product data and create product assets",
-          "body": "Optimize product images, organize marketing scripts, create storyboards, and generate short videos from product photos, references, titles, materials, dimensions, and selling points.",
+          "heading": "Upload product data and reduce wasted generations",
+          "body": "Create image prompts, organize marketing scripts, plan storyboards, and generate short videos from product photos, references, titles, materials, dimensions, and selling points, so teams avoid repeated trial-and-error prompts.",
           "bullets": [
             "Product data management",
-            "Product image optimization",
+            "Image prompts",
             "Marketing script organization",
             "Product video generation"
           ]
         },
         {
           "heading": "Use Haitu models or bring your own",
-          "body": "Teams can start with Haitu hosted text and video models, keep future image models in the same configuration layer, then connect their own models and creative pipeline when needed.",
+          "body": "Teams can start with Haitu hosted text and video models, keep future image models in the same configuration layer, then connect their own models and creative pipeline when needed. Wallet consumption records help teams control AI generation costs.",
           "bullets": [
-            "Image model roadmap",
+            "Image models",
             "Hosted video models",
             "Bring your own model",
             "Team workflow extension"
@@ -1455,7 +1484,7 @@
       "faqs": [
         {
           "question": "What does Haitu provide?",
-          "answer": "Haitu provides product image optimization, marketing script organization, and short-video creation for cross-border ecommerce. Users upload or manage product data, then create and organize digital content assets with AI."
+          "answer": "Haitu provides an AI product creative console for cross-border ecommerce. Users upload or manage product data, then create image prompts, organize marketing scripts, plan storyboards, and generate product short videos."
         },
         {
           "question": "How does billing work?",
@@ -1480,10 +1509,10 @@
     "features-product-image-optimization": {
       "slug": "features/product-image-optimization",
       "title": "Product Image Optimization for Ecommerce - Haitu",
-      "description": "Organize product photos, references, materials, dimensions, and selling points before creating ecommerce videos and future image creatives.",
+      "description": "Organize product photos, references, materials, dimensions, and selling points before generating image prompts, additional references, and ecommerce videos.",
       "h1": "Product image optimization for ecommerce",
       "eyebrow": "Clean product assets before generation",
-      "lead": "For ecommerce teams, Haitu organizes product photos, references, materials, dimensions, blocked claims, and selling points before product video generation and future image creative workflows.",
+      "lead": "For ecommerce teams, Haitu organizes product photos, references, materials, dimensions, blocked claims, and selling points before image prompts, additional reference generation, and product video creation.",
       "primaryCta": "Organize product images",
       "secondaryCta": "Generate product videos",
       "sections": [
@@ -1499,19 +1528,20 @@
         },
         {
           "heading": "Connect image assets to video workflows",
-          "body": "Haitu currently focuses on product-image-to-video workflows. More image generation and ad image expansion features will be added as the image studio ships.",
+          "body": "Haitu currently supports product-image-to-video workflows, image prompts, and additional reference generation. Full hero image, lifestyle scene, and ad image suites continue to improve.",
           "bullets": [
             "Image to video",
+            "Image prompts",
+            "Reference generation",
             "Script generation",
-            "Ad image requirements",
-            "Future image studio"
+            "Ad image requirements"
           ]
         }
       ],
       "faqs": [
         {
           "question": "Does this page mean image generation is fully available now?",
-          "answer": "Not yet. The image studio is planned for a later release. Today this workflow helps organize product images and facts, then feed product video generation."
+          "answer": "Not as a complete hero, lifestyle, and ad image suite. Haitu currently supports image prompts, additional reference image generation, product image organization, and product video generation."
         },
         {
           "question": "Why structure product images before generation?",
@@ -1521,43 +1551,43 @@
     },
     "features-ai-product-image-generator": {
       "slug": "features/ai-product-image-generator",
-      "title": "AI Product Image Generator Roadmap - Haitu",
-      "description": "Haitu is building AI product image generation around real references and verified selling points. Current workflows support image organization and product video generation.",
-      "h1": "AI product image generator roadmap",
-      "eyebrow": "Image creative features are coming",
-      "lead": "The full image studio is not live yet. Today you can organize product references, materials, dimensions, and selling points in Haitu for product video generation; hero image, lifestyle scene, and ad image generation will be added later.",
-      "primaryCta": "Prepare product images",
+      "title": "AI Product Image Generator - Haitu",
+      "description": "Haitu generates image prompts and additional reference images from product facts, then connects them to product video workflows.",
+      "h1": "AI product image generator",
+      "eyebrow": "Image prompts and reference generation",
+      "lead": "Haitu currently supports image prompt generation and additional reference image generation around product facts and reference images, then connects those assets to product video generation. Full hero image, lifestyle scene, and ad image suites continue to improve.",
+      "primaryCta": "Generate references",
       "secondaryCta": "Explore video generation",
       "sections": [
         {
-          "heading": "Prepare the facts image generation will need",
+          "heading": "Generate image prompts from product facts",
           "body": "Product image generation should be constrained by real product photos, references, materials, dimensions, usage scenes, and blocked claims.",
           "bullets": [
             "Reference capture",
             "Product fact constraints",
-            "Scene requirements",
-            "Image studio readiness"
+            "Image prompts",
+            "Additional references"
           ]
         },
         {
           "heading": "Clear boundary for the current release",
-          "body": "Haitu currently focuses on product image organization and video generation. This page will become the full image generator entry when the image studio ships.",
+          "body": "Haitu currently supports image prompts, reference image generation, and product video generation. Full hero image, lifestyle scene, and ad image suites continue to improve.",
           "bullets": [
-            "Current image organization",
-            "Current video generation",
-            "Future hero images",
-            "Future ad variants"
+            "Reference generation today",
+            "Video generation today",
+            "Hero image suite maturing",
+            "Ad image suite maturing"
           ]
         }
       ],
       "faqs": [
         {
           "question": "Can Haitu generate product images right now?",
-          "answer": "The full image studio is not live yet. Use the current workflow to organize product references and generate product videos."
+          "answer": "Haitu can generate additional reference images and image prompts constrained by product facts and reference images. The complete hero image, lifestyle scene, and ad image suite is still maturing."
         },
         {
-          "question": "Why keep this SEO page before launch?",
-          "answer": "Image creation is on the Haitu roadmap. The page sets the right expectation and routes users to image optimization and product video workflows today."
+          "question": "How is this different from a full product image suite?",
+          "answer": "The current workflow is best for product-constrained references and image prompts that also feed video creation. Batch hero images, lifestyle scenes, and ad image variants still require more product polish."
         }
       ]
     },
@@ -1645,11 +1675,11 @@
         },
         {
           "heading": "Covers text, video, and future image workflows",
-          "body": "Hosted models support product organization, scripts, and video generation today, with image studio capabilities added as they ship.",
+          "body": "Hosted models support product organization, image prompts, reference image generation, scripts, and video generation in one configuration layer.",
           "bullets": [
             "Text models",
             "Video models",
-            "Image model roadmap",
+            "Image models",
             "Team workflow"
           ]
         }
@@ -1668,7 +1698,7 @@
     "features-bring-your-own-model": {
       "slug": "features/bring-your-own-model",
       "title": "Bring Your Own AI Model API - Haitu",
-      "description": "Connect your own model APIs to Haitu for product fact organization, video generation, and future image creative workflows.",
+      "description": "Connect your own model APIs to Haitu for product fact organization, image prompts, reference image generation, and video generation.",
       "h1": "Bring your own AI model API",
       "eyebrow": "BYOK and custom model workflows",
       "lead": "Teams with existing model accounts or internal pipelines can connect their own text, image, and video model APIs to Haitu while keeping one product creative workflow.",
@@ -1692,7 +1722,7 @@
             "Fact organization",
             "Script generation",
             "Video generation",
-            "Future image studio"
+            "Image prompts"
           ]
         }
       ],

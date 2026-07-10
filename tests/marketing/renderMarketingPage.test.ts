@@ -43,9 +43,10 @@ describe("marketing SEO renderer", () => {
     });
 
     expect(html).toContain("<html lang=\"zh-CN\">");
-    expect(html).toContain("<title>Haitu 嗨兔 - 跨境电商 AI 商品视频与图片创作平台</title>");
+    expect(html).toContain("<title>Haitu 嗨兔 - 跨境电商 AI 商品创作控制台</title>");
     expect(html).toContain('<link rel="icon" href="/favicon.svg?v=haitu" type="image/svg+xml" />');
-    expect(html).toContain("跨境电商商品图片优化与 AI 视频生成平台");
+    expect(html).toContain("更懂电商商品的 AI 创作控制台");
+    expect(html).toContain("减少无效生成、提高素材可用率、控制 AI 生成成本");
     expect(html).toContain("商品图片优化");
     expect(html).toContain("平台模型或接入自有模型");
     expect(html).toContain("AI 商品视频生成器");
@@ -62,8 +63,8 @@ describe("marketing SEO renderer", () => {
     expect(html).toContain('<meta property="og:image:width" content="1200" />');
     expect(html).toContain('<meta property="og:image:height" content="630" />');
     expect(html).toContain('<meta property="og:image:alt" content="Haitu 嗨兔跨境电商 AI 商品图片优化与商品视频创作平台预览图" />');
-    expect(html).toContain('<meta name="twitter:title" content="Haitu 嗨兔 - 跨境电商 AI 商品视频与图片创作平台" />');
-    expect(html).toContain('<meta name="twitter:description" content="Haitu 嗨兔是跨境电商 AI 商品图片和视频创作平台，帮助卖家上传和管理商品资料，优化商品图、营销脚本和短视频创作，并通过余额支付数字化 SaaS 服务。" />');
+    expect(html).toContain('<meta name="twitter:title" content="Haitu 嗨兔 - 跨境电商 AI 商品创作控制台" />');
+    expect(html).toContain('<meta name="twitter:description" content="Haitu 嗨兔是面向跨境电商卖家的 AI 商品创作控制台，围绕商品资料、参考图、卖点和平台场景生成图片提示词、营销脚本、视频分镜和商品短视频，帮助减少无效生成、提高素材可用率并控制 AI 生成成本。" />');
     expect(html).toContain('<meta name="twitter:image:alt" content="Haitu 嗨兔跨境电商 AI 商品图片优化与商品视频创作平台预览图" />');
     expect(html).toContain('class="seo-footer"');
     expect(html).toContain("商品图片转视频");
@@ -73,12 +74,12 @@ describe("marketing SEO renderer", () => {
     expect(html).toContain('href="/console"');
     expect(html).toContain("先看清楚怎么用、怎么扣费");
     expect(html).toContain("Stripe Checkout");
-    expect(html).toContain("优化商品图、营销脚本和短视频");
+    expect(html).toContain("生成图片提示词、整理营销脚本、编排视频分镜");
     expect(html).toContain("商品图优化、营销脚本整理和短视频生成");
     expect(html).toContain("余额用于商品图优化、视频生成和脚本整理");
     expect(html).toContain("class=\"geo-answer-block\"");
     expect(html).toContain("Haitu 是什么？");
-    expect(html).toContain("Haitu 嗨兔是面向跨境电商卖家的 AI 商品图片优化与商品视频创作平台");
+    expect(html).toContain("Haitu 嗨兔是面向跨境电商卖家的 AI 商品创作控制台");
     expect(html).toContain("Haitu 不是实物商品商城");
     expect(html).toContain("\"@type\":\"Organization\"");
     expect(html).toContain("\"@type\":\"ContactPoint\"");
@@ -96,7 +97,7 @@ describe("marketing SEO renderer", () => {
     });
     const footer = extractSeoFooter(html);
 
-    expect(footer).toContain("跨境电商 AI 商品图片优化与商品视频创作平台");
+    expect(footer).toContain("跨境电商 AI 商品创作控制台");
     expect(footer).toContain('href="/features/product-image-optimization"');
     expect(footer).toContain('href="/features/ai-product-video-generator"');
     expect(footer).toContain('href="/features/bring-your-own-model"');
@@ -182,7 +183,7 @@ describe("marketing SEO renderer", () => {
           url: `https://haitu.example${marketingRendererTestPath(locale, "")}`
         }));
         expect(primaryNode, `${locale}:${page.slug || "/"} primary node`).toEqual(expect.objectContaining({
-          dateModified: "2026-06-28",
+          dateModified: "2026-07-08",
           inLanguage: getLocaleMeta(locale).hreflang,
           url: canonical
         }));
@@ -213,9 +214,9 @@ describe("marketing SEO renderer", () => {
     const i18n = createServerI18n("en", ["common", "marketing"]);
 
     expect(i18n.t("common:navigation.imageOptimization")).toBe("Images");
-    expect(i18n.t("marketing:pages.home.title")).toBe("Haitu - AI Product Image Optimization and Video Generation Platform");
+    expect(i18n.t("marketing:pages.home.title")).toBe("Haitu - AI Product Creative Console for Ecommerce");
     expect(getMarketingPageContent("zh", "")).toEqual(expect.objectContaining({
-      h1: "跨境电商商品图片优化与 AI 视频生成平台",
+      h1: "更懂电商商品的 AI 创作控制台",
       primaryCta: "开始优化商品图"
     }));
   });
@@ -241,20 +242,21 @@ describe("marketing SEO renderer", () => {
     expect(html).not.toContain(".language-switcher summary::after");
   });
 
-  it("keeps planned image generation SEO honest while routing users to current workflows", () => {
+  it("keeps image generation SEO honest while routing users to shipped image and video workflows", () => {
     const html = renderMarketingPage({
       origin: "https://haitu.example",
       locale: "zh",
       pageSlug: "features/ai-product-image-generator"
     });
 
-    expect(html).toContain("<title>AI 商品图生成器规划 - Haitu</title>");
-    expect(html).toContain("图片创作功能还没完整上线");
+    expect(html).toContain("<title>AI 商品图生成器 - Haitu</title>");
+    expect(html).toContain("图片提示词和参考图生成");
     expect(html).toContain("Haitu 的 AI 商品图生成器当前是什么状态？");
-    expect(html).toContain("当前完整图片创作功能还没有上线");
-    expect(html).toContain("先整理商品图");
-    expect(html).toContain("后续主图生成");
-    expect(html).not.toContain("完整图片创作功能已经上线");
+    expect(html).toContain("当前已支持围绕商品事实和参考图生成图片提示词、补充参考图");
+    expect(html).toContain("生成参考图");
+    expect(html).toContain("完整主图、场景图和广告图套件仍在继续完善");
+    expect(html).not.toContain("图片创作功能还没完整上线");
+    expect(html).not.toContain("AI 商品图生成器规划");
   });
 
   it("renders GEO answer blocks on feature pages for AI answer engines", () => {
@@ -816,7 +818,7 @@ describe("marketing SEO renderer", () => {
     expect(html).not.toContain("--paper:#f7f6ef");
   });
 
-  it("renders a substantial product-stage hero instead of a small tool card", () => {
+  it("renders a compact product-workflow hero without overly specific sample settings", () => {
     const html = renderMarketingPage({
       origin: "https://haitu.example",
       locale: "zh",
@@ -826,11 +828,27 @@ describe("marketing SEO renderer", () => {
     expect(html).toContain('class="hero-stage hero-home"');
     expect(html).toContain('class="studio-preview"');
     expect(html).toContain('class="metric-strip"');
-    expect(html).toContain("商品原图");
-    expect(html).toContain("商品视频");
+    expect(html).toContain("商品库");
+    expect(html).toContain("商品资料");
+    expect(html).toContain("商品图片");
+    expect(html).toContain("视频提示词");
+    expect(html).toContain("生成视频");
+    expect(html).toContain("预计扣费");
+    expect(html).toContain("参考图");
     expect(html).toContain("平台模型");
     expect(html).toContain("自有模型");
-    expect(html).toContain("批量 SKU");
+    expect(html).not.toContain("<span>比例</span>");
+    expect(html).not.toContain("<span>时长</span>");
+    expect(html).not.toContain("参考图 9 张");
+    expect(html).not.toContain("9:16");
+    expect(html).not.toContain("10s");
+    expect(html).not.toContain("日文");
+    expect(html).not.toContain("seedance-2.0");
+    expect(html).not.toContain("牛革");
+    expect(html).not.toContain("財布");
+    expect(html).not.toContain("商品素材总览");
+    expect(html).not.toContain("广告图扩展");
+    expect(html).not.toContain("生成中");
   });
 
   it("renders an audit-ready public homepage with capability, payment, trust, and CTA sections", () => {
@@ -850,7 +868,8 @@ describe("marketing SEO renderer", () => {
     expect(html).toContain('class="trust-band"');
     expect(html).toContain('class="final-cta"');
     expect(html).toContain("围绕商品图片和短视频的工作流");
-    expect(html).toContain("图片创作功能后续接入");
+    expect(html).toContain("图片提示词和参考图生成");
+    expect(html).toContain("完整主图、场景图和广告图套件继续完善");
     expect(html).toContain("充值余额，按实际 AI 服务消耗");
     expect(html).toContain("充值中心选择金额");
     expect(html).toContain("Stripe Checkout");

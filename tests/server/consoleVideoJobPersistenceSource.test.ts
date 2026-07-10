@@ -8,15 +8,15 @@ const storePath = "src/server/consoleVideoJobStore.ts";
 const completionPath = "src/server/consoleVideoJobCompletion.ts";
 
 describe("console video job persistence source boundaries", () => {
-  it("keeps database indexing and wallet settlement out of the local job queue class", async () => {
+  it("keeps database statements and wallet store construction out of the local job queue class", async () => {
     const queueSource = await readFile(queuePath, "utf8");
     const completionSource = await readFile(completionPath, "utf8");
 
     await expect(access(persistencePath)).resolves.toBeUndefined();
     expect(queueSource).toContain('from "./consoleVideoJobPersistence.js"');
-    expect(queueSource).not.toContain("captureVideoJobWalletCharge(");
+    expect(queueSource).toContain("captureVideoJobWalletCharge(");
     expect(queueSource).toContain("releaseVideoJobWalletReservation(");
-    expect(completionSource).toContain("captureVideoJobWalletCharge(");
+    expect(completionSource).not.toContain("captureVideoJobWalletCharge(");
     expect(queueSource).not.toContain("persistVideoJobRecord(");
     expect(queueSource).not.toContain('from "./walletStore.js"');
     expect(queueSource).not.toContain("new WalletStore(");

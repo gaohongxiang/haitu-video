@@ -16,10 +16,14 @@ export async function sendAuthEmailOtp(input: {
   env?: NodeJS.ProcessEnv;
   message: AuthEmailOtpMessage;
 }): Promise<void> {
-  await appendAuthEmailOutbox(input.dataDir, input.message);
-  if (input.env?.RESEND_API_KEY && input.env.HAITU_AUTH_EMAIL_FROM) {
+  const env = input.env ?? process.env;
+  const emailConfigured = Boolean(env.RESEND_API_KEY && env.HAITU_AUTH_EMAIL_FROM);
+  if (!emailConfigured || env.HAITU_AUTH_EMAIL_OUTBOX === "1") {
+    await appendAuthEmailOutbox(input.dataDir, input.message);
+  }
+  if (emailConfigured) {
     await sendResendEmail({
-      env: input.env,
+      env,
       message: input.message
     });
   }

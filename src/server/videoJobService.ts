@@ -35,6 +35,7 @@ export interface MakeVideoRequest {
   referenceImages?: string[];
   confirmPaid?: boolean;
   reuseManifest?: string;
+  idempotencyKey?: string;
 }
 
 export interface BatchVideoJobRequest extends MakeVideoRequest {
@@ -66,6 +67,7 @@ interface EnqueueProductVideoJobsBySkuOptions extends EnqueueBatchVideoJobsOptio
 }
 
 type VideoRequestModel = Awaited<ReturnType<typeof resolveVideoRequestModel>>;
+const videoQueueLocks = new WeakMap<LocalVideoJobQueue, Promise<void>>();
 
 interface PreparedVideoJob {
   productPath: string;
@@ -99,6 +101,7 @@ export async function enqueueBatchVideoJobs(
   for (let index = 1; index <= versions; index += 1) {
     jobs.push(await enqueueVideoJob({
       ...body,
+      idempotencyKey: body.idempotencyKey ? `${body.idempotencyKey}:v${index}` : undefined,
       outDirName: body.outDirName
         ? `${sanitizePathSegment(body.outDirName)}-v${index}`
         : undefined
@@ -111,37 +114,72 @@ export async function enqueueVideoJob(
   body: MakeVideoRequest,
   options: EnqueueVideoJobOptions
 ) {
-  const prepared = await prepareVideoJob(body, options);
-  const billing = reserveVideoJobBilling({
-    walletStore: options.walletStore,
-    provider: prepared.providerName,
-    modelConfig: prepared.videoModel.config,
-    durationSeconds: prepared.durationSeconds,
-    resolution: prepared.resolution,
-    aspectRatio: prepared.aspectRatio,
-    billingPolicyStore: options.billingPolicyStore,
-    modelPricingCatalog: options.modelPricingCatalog,
-    modelPricingCatalogVersion: options.modelPricingCatalogVersion
+  return withVideoQueueLock(options.videoJobQueue, async () => {
+    const clientRequestId = normalizeIdempotencyKey(body.idempotencyKey);
+    if (clientRequestId) {
+      const existing = (await options.videoJobQueue.list()).find((job) => job.clientRequestId === clientRequestId);
+      if (existing) {
+        return existing;
+      }
+    }
+    const prepared = await prepareVideoJob(body, options);
+    const billing = reserveVideoJobBilling({
+      walletStore: options.walletStore,
+      provider: prepared.providerName,
+      modelConfig: prepared.videoModel.config,
+      durationSeconds: prepared.durationSeconds,
+      resolution: prepared.resolution,
+      aspectRatio: prepared.aspectRatio,
+      billingPolicyStore: options.billingPolicyStore,
+      modelPricingCatalog: options.modelPricingCatalog,
+      modelPricingCatalogVersion: options.modelPricingCatalogVersion
+    });
+    return options.videoJobQueue.enqueue({
+      productPath: prepared.productPath,
+      outDirName: body.outDirName,
+      provider: body.provider,
+      providerModelConfigId: prepared.videoModel.providerModelConfigId,
+      providerModel: prepared.videoModel.providerModel,
+      duration: body.duration,
+      resolution: prepared.resolution,
+      aspectRatio: prepared.aspectRatio,
+      template: body.template,
+      finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? prepared.settings.defaultLanguage),
+      cta: body.cta,
+      scriptLines: sanitizeLines(body.scriptLines),
+      storyboardLines: sanitizeLines(body.storyboardLines),
+      referenceImages: sanitizeReferenceImages(body.referenceImages),
+      confirmPaid: body.confirmPaid ?? prepared.providerName !== "mock",
+      clientRequestId,
+      ...billing,
+      reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
+    });
   });
-  return options.videoJobQueue.enqueue({
-    productPath: prepared.productPath,
-    outDirName: body.outDirName,
-    provider: body.provider,
-    providerModelConfigId: prepared.videoModel.providerModelConfigId,
-    providerModel: prepared.videoModel.providerModel,
-    duration: body.duration,
-    resolution: prepared.resolution,
-    aspectRatio: prepared.aspectRatio,
-    template: body.template,
-    finalLanguage: normalizeFinalVideoLanguage(body.finalLanguage ?? prepared.settings.defaultLanguage),
-    cta: body.cta,
-    scriptLines: sanitizeLines(body.scriptLines),
-    storyboardLines: sanitizeLines(body.storyboardLines),
-    referenceImages: sanitizeReferenceImages(body.referenceImages),
-    confirmPaid: body.confirmPaid ?? prepared.providerName !== "mock",
-    ...billing,
-    reuseManifest: body.reuseManifest ? resolveWithin(options.rootDir, body.reuseManifest) : undefined
+}
+
+async function withVideoQueueLock<T>(queue: LocalVideoJobQueue, action: () => Promise<T>): Promise<T> {
+  const previous = videoQueueLocks.get(queue) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolveLock) => {
+    release = resolveLock;
   });
+  videoQueueLocks.set(queue, previous.then(() => current));
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+  }
+}
+
+function normalizeIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{8,160}$/.test(value)) {
+    throw new Error("Video idempotencyKey must be 8-160 safe characters.");
+  }
+  return value;
 }
 
 export async function enqueueProductVideoJobsBySku(

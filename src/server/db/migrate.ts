@@ -61,6 +61,18 @@ const migrations: Migration[] = [
   {
     id: "0014_model_service_preference_model_choices",
     sql: readMigrationSql("0014_model_service_preference_model_choices.sql")
+  },
+  {
+    id: "0015_traffic_analytics",
+    sql: readMigrationSql("0015_traffic_analytics.sql")
+  },
+  {
+    id: "0016_isolate_platform_model_configs",
+    sql: readMigrationSql("0016_isolate_platform_model_configs.sql")
+  },
+  {
+    id: "0017_recharge_reversals",
+    sql: readMigrationSql("0017_recharge_reversals.sql")
   }
 ];
 
@@ -123,6 +135,11 @@ export function ensureDefaultWorkspace(handle: DatabaseHandle): void {
   handle.sqlite.prepare(`
     INSERT INTO workspaces (id, name, created_at, updated_at)
     VALUES ('default', 'Default Workspace', @now, @now)
+    ON CONFLICT(id) DO NOTHING
+  `).run({ now });
+  handle.sqlite.prepare(`
+    INSERT INTO workspaces (id, name, created_at, updated_at)
+    VALUES ('__platform__', 'Platform Model Credentials', @now, @now)
     ON CONFLICT(id) DO NOTHING
   `).run({ now });
 }

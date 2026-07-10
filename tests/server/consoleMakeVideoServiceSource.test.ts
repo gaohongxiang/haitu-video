@@ -12,7 +12,8 @@ describe("console make-video service source boundaries", () => {
     const videoRoutesSource = await readFile(videoRoutesPath, "utf8");
 
     await expect(access(servicePath)).resolves.toBeUndefined();
-    expect(videoRoutesSource).toContain('from "./consoleMakeVideoService.js"');
+    expect(videoRoutesSource).not.toContain('from "./consoleMakeVideoService.js"');
+    expect(videoRoutesSource).toContain("await enqueueVideoJob(body");
     expect(consoleServerSource).not.toContain('from "./consoleMakeVideoService.js"');
     expect(consoleServerSource).not.toContain("async function runConsoleMakeVideo(");
     expect(consoleServerSource).not.toContain("const outDirName = sanitizePathSegment(body.outDirName");

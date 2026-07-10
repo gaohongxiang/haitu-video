@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
+import { recordTrafficEvent } from "./adminTraffic.js";
 import type { DatabaseHandle } from "./db/client.js";
 import { centsToCny, cnyToCents } from "./walletLedger.js";
 import type { RechargeFxRateSnapshot } from "./rechargePaymentAmount.js";
 
-export type WalletRechargeOrderStatus = "pending" | "paid" | "expired" | "failed";
+export type WalletRechargeOrderStatus = "pending" | "paid" | "expired" | "failed" | "partially_refunded" | "refunded" | "disputed";
 export type WalletRechargeProvider = "stripe" | "infini";
 
 export interface WalletRechargeOrder {
@@ -19,6 +20,8 @@ export interface WalletRechargeOrder {
   walletCurrency: "cny";
   creditCny: number;
   creditCents: number;
+  reversedCreditCny: number;
+  reversedCreditCents: number;
   fxRateSnapshot?: RechargeFxRateSnapshot;
   status: WalletRechargeOrderStatus;
   checkoutUrl?: string;
@@ -39,6 +42,7 @@ interface WalletRechargeOrderRow {
   amount_cents: number;
   currency: string;
   credit_cents: number;
+  reversed_credit_cents: number;
   status: WalletRechargeOrderStatus;
   checkout_url: string | null;
   failure_reason: string | null;
@@ -120,6 +124,18 @@ export class WalletRechargeOrderStore {
       createdAt: now,
       updatedAt: now
     });
+    safeRecordRechargeTrafficEvent({
+      handle: this.input.handle,
+      eventName: "wallet_recharge_created",
+      workspaceId: input.workspaceId,
+      occurredAt: now,
+      metadata: {
+        orderId: id,
+        provider: input.provider ?? "stripe",
+        creditCny: centsToCny(creditCents),
+        paymentCurrency
+      }
+    });
     return this.getById(id);
   }
 
@@ -159,6 +175,69 @@ export class WalletRechargeOrderStore {
     return row ? walletRechargeOrderFromRow(row) : undefined;
   }
 
+  findStripeOrderForReversal(input: {
+    paymentIntentId?: string;
+    chargeId?: string;
+  }): WalletRechargeOrder | undefined {
+    if (!input.paymentIntentId && !input.chargeId) {
+      return undefined;
+    }
+    const row = this.input.handle.sqlite.prepare(`
+      SELECT *
+      FROM wallet_recharge_orders
+      WHERE provider = 'stripe'
+        AND (
+          (@paymentIntentId IS NOT NULL AND provider_payment_intent_id = @paymentIntentId)
+          OR (@chargeId IS NOT NULL AND json_extract(metadata_json, '$.stripeChargeId') = @chargeId)
+        )
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get({
+      paymentIntentId: input.paymentIntentId ?? null,
+      chargeId: input.chargeId ?? null
+    }) as WalletRechargeOrderRow | undefined;
+    return row ? walletRechargeOrderFromRow(row) : undefined;
+  }
+
+  markReversed(input: {
+    orderId: string;
+    targetReversedCreditCents: number;
+    status: "partially_refunded" | "refunded" | "disputed";
+    reason: string;
+    metadata?: Record<string, unknown>;
+  }): { order: WalletRechargeOrder; deltaCreditCents: number } {
+    const existing = this.getById(input.orderId);
+    const targetReversedCreditCents = Math.max(
+      existing.reversedCreditCents,
+      Math.min(existing.creditCents, Math.round(input.targetReversedCreditCents))
+    );
+    const deltaCreditCents = targetReversedCreditCents - existing.reversedCreditCents;
+    const metadata = {
+      ...(existing.metadata ?? {}),
+      ...(input.metadata ?? {})
+    };
+    this.input.handle.sqlite.prepare(`
+      UPDATE wallet_recharge_orders
+      SET status = @status,
+        reversed_credit_cents = @reversedCreditCents,
+        failure_reason = @reason,
+        metadata_json = @metadataJson,
+        updated_at = @updatedAt
+      WHERE id = @orderId
+    `).run({
+      orderId: input.orderId,
+      status: input.status,
+      reversedCreditCents: targetReversedCreditCents,
+      reason: input.reason,
+      metadataJson: JSON.stringify(metadata),
+      updatedAt: this.nowIso()
+    });
+    return {
+      order: this.getById(input.orderId),
+      deltaCreditCents
+    };
+  }
+
   markPaid(input: {
     orderId: string;
     providerPaymentIntentId?: string;
@@ -187,7 +266,20 @@ export class WalletRechargeOrderStore {
       completedAt: now,
       updatedAt: now
     });
-    return this.getById(input.orderId);
+    const paid = this.getById(input.orderId);
+    safeRecordRechargeTrafficEvent({
+      handle: this.input.handle,
+      eventName: "wallet_recharge_paid",
+      workspaceId: paid.workspaceId,
+      occurredAt: now,
+      metadata: {
+        orderId: paid.id,
+        provider: paid.provider,
+        creditCny: paid.creditCny,
+        paymentCurrency: paid.paymentCurrency
+      }
+    });
+    return paid;
   }
 
   markExpired(provider: WalletRechargeProvider, providerSessionId: string): WalletRechargeOrder | undefined {
@@ -349,6 +441,8 @@ export function walletRechargeOrderFromRow(row: WalletRechargeOrderRow): WalletR
     walletCurrency: "cny",
     creditCny: centsToCny(row.credit_cents),
     creditCents: row.credit_cents,
+    reversedCreditCny: centsToCny(row.reversed_credit_cents),
+    reversedCreditCents: row.reversed_credit_cents,
     fxRateSnapshot: fxRateSnapshotFromMetadata(row.metadata_json),
     status: row.status,
     checkoutUrl: row.checkout_url ?? undefined,
@@ -432,4 +526,25 @@ function parseMetadata(value: string | null): Record<string, unknown> | undefine
 
 function isSqliteConstraint(error: unknown): boolean {
   return error instanceof Error && "code" in error && String(error.code).startsWith("SQLITE_CONSTRAINT");
+}
+
+function safeRecordRechargeTrafficEvent(input: {
+  handle: DatabaseHandle;
+  eventName: "wallet_recharge_created" | "wallet_recharge_paid";
+  workspaceId: string;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
+}): void {
+  try {
+    recordTrafficEvent({
+      handle: input.handle,
+      eventName: input.eventName,
+      path: "/console/wallet",
+      workspaceId: input.workspaceId,
+      occurredAt: new Date(input.occurredAt),
+      metadata: input.metadata
+    });
+  } catch {
+    // Analytics must not block wallet operations.
+  }
 }

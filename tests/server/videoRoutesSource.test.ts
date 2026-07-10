@@ -28,7 +28,7 @@ describe("video routes source boundaries", () => {
     expect(consoleServerSource).not.toContain("const providerTaskMatch");
   });
 
-  it("centralizes video preflight, direct generation, queued jobs, and provider task routes", async () => {
+  it("centralizes video preflight, billed compatibility generation, queued jobs, and provider task routes", async () => {
     const routesSource = await readFile(routesPath, "utf8");
 
     expect(routesSource).toContain("export async function handleVideoRoutes(");
@@ -38,7 +38,8 @@ describe("video routes source boundaries", () => {
     expect(routesSource).toContain("videoJobCancelMatch");
     expect(routesSource).toContain("videoJobRetryMatch");
     expect(routesSource).toContain("providerTaskMatch");
-    expect(routesSource).toContain("runConsoleMakeVideo");
+    expect(routesSource).toContain("await enqueueVideoJob(body");
+    expect(routesSource).toContain("waitForIdle(queued.id)");
     expect(routesSource).toContain("reserveRetryVideoJobBilling");
   });
 });

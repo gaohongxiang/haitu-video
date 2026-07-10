@@ -64,7 +64,7 @@ const openGraphLocaleByMarketingLocale = {
   en: "en_US"
 } satisfies Record<MarketingLocale, string>;
 
-const marketingLastModified = "2026-06-28";
+const marketingLastModified = "2026-07-08";
 const defaultPublicOrigin = "https://haitu.online";
 
 export const marketingPages: MarketingPage[] = getMarketingPageSlugs("zh").map((slug) => ({
@@ -242,47 +242,60 @@ export function renderMarketingPage(input: {
             <span></span><span></span><span></span>
             <strong>Haitu Studio</strong>
           </div>
-          <div class="studio-shell">
-            <aside class="preview-sidebar">
-              <strong>${escapeHtml(previewLabels.workspace)}</strong>
-              <span>${escapeHtml(previewLabels.source)}</span>
-              <span>${escapeHtml(previewLabels.engine)}</span>
-              <span>${escapeHtml(previewLabels.output)}</span>
+          <div class="console-preview-shell">
+            <aside class="console-product-list">
+              <div class="console-list-head">
+                <strong>${escapeHtml(previewLabels.libraryTitle)}</strong>
+                <span>${escapeHtml(previewLabels.libraryCount)}</span>
+              </div>
+              <div class="console-search">${escapeHtml(previewLabels.searchPlaceholder)}</div>
+              <div class="console-product-items">
+                <article><strong>${escapeHtml(previewLabels.productTwo)}</strong><span>${escapeHtml(previewLabels.generatable)} · ${escapeHtml(previewLabels.referencesShort)}</span></article>
+                <article><strong>${escapeHtml(previewLabels.productThree)}</strong><span>${escapeHtml(previewLabels.generatable)} · ${escapeHtml(previewLabels.referencesShort)}</span></article>
+                <article class="is-active"><strong>${escapeHtml(previewLabels.selectedProduct)}</strong><span>${escapeHtml(previewLabels.generatable)} · ${escapeHtml(previewLabels.referencesShort)}</span></article>
+              </div>
             </aside>
-            <section class="preview-workspace">
-              <div class="workspace-head">
-                <div>
-                  <small>${escapeHtml(previewLabels.batch)}</small>
-                  <strong>${escapeHtml(previewLabels.board)}</strong>
-                </div>
-                <span>${escapeHtml(previewLabels.status)}</span>
+            <section class="console-workspace-preview">
+              <div class="console-preview-title">
+                <strong>${escapeHtml(previewLabels.productTitle)}</strong>
+                <span>${escapeHtml(previewLabels.versionCount)}</span>
               </div>
-              <div class="creative-board">
-                <article class="source-card">
-                  <small>01 · ${escapeHtml(previewLabels.sourceMeta)}</small>
-                  <h2>${escapeHtml(previewLabels.source)}</h2>
-                  <p>${escapeHtml(previewLabels.engineMeta)}</p>
+              <div class="console-workspace-grid">
+                <article class="console-facts-card">
+                  <div class="console-card-title">
+                    <strong>${escapeHtml(previewLabels.factsHeading)}</strong>
+                    <span>${escapeHtml(previewLabels.aiPack)} · ${escapeHtml(previewLabels.estimatedDraftCost)}</span>
+                  </div>
+                  <p><b>${escapeHtml(previewLabels.titleLabel)}</b>${escapeHtml(previewLabels.productTitleValue)}</p>
+                  <p><b>${escapeHtml(previewLabels.categoryLabel)}</b>${escapeHtml(previewLabels.productCategoryValue)}</p>
                 </article>
-                <div class="media-canvas" aria-hidden="true">
-                  <span></span>
-                  <span></span>
-                </div>
+                <article class="console-images-card">
+                  <div class="console-card-title">
+                    <strong>${escapeHtml(previewLabels.imagesHeading)}</strong>
+                    <span>${escapeHtml(previewLabels.addImage)}</span>
+                  </div>
+                  <div class="console-reference-row">
+                    <span>${escapeHtml(previewLabels.referenceOne)}</span>
+                    <span>${escapeHtml(previewLabels.referenceTwo)}</span>
+                    <span>${escapeHtml(previewLabels.referenceThree)}</span>
+                  </div>
+                </article>
               </div>
-              <div class="asset-rail">
-                <article><small>02</small><strong>${escapeHtml(previewLabels.script)}</strong><span></span></article>
-                <article><small>03</small><strong>${escapeHtml(previewLabels.image)}</strong><span></span></article>
-                <article><small>04</small><strong>${escapeHtml(previewLabels.title)}</strong><span></span></article>
+              <article class="console-prompt-card">
+                <div class="console-card-title">
+                  <strong>${escapeHtml(previewLabels.promptHeading)}</strong>
+                  <span>${escapeHtml(previewLabels.storyboardStatus)}</span>
+                </div>
+                <p>${escapeHtml(previewLabels.promptLineOne)}</p>
+              </article>
+              <div class="console-action-bar">
+                <span>${escapeHtml(previewLabels.imageMode)}</span>
+                <strong>${escapeHtml(previewLabels.videoMode)}</strong>
+                <span>${escapeHtml(previewLabels.hostedModel)}</span>
+                <span>${escapeHtml(previewLabels.customModel)}</span>
+                <button type="button">${escapeHtml(previewLabels.generateVideo)} <small>${escapeHtml(previewLabels.estimateCost)}</small></button>
               </div>
             </section>
-            <aside class="preview-inspector">
-              <small>${escapeHtml(previewLabels.model)}</small>
-              <strong>${escapeHtml(previewLabels.hostedModel)}</strong>
-              <span>${escapeHtml(previewLabels.customModel)}</span>
-              <small>${escapeHtml(previewLabels.market)}</small>
-              <span>TikTok Shop</span>
-              <span>Amazon</span>
-              <small>${escapeHtml(previewLabels.review)}</small>
-            </aside>
           </div>
           <div class="metric-strip">
             <strong>${escapeHtml(previewLabels.metricOne)}</strong>
@@ -386,8 +399,8 @@ export function renderLlmsTxt(origin: string): string {
   return [
     "# Haitu",
     "",
-    "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers, brand operators, and content teams.",
-    "Users upload and manage product data and reference images, organize product selling points, create marketing scripts and storyboards, and generate product short videos. Haitu supports hosted platform models and bring-your-own-model workflows.",
+    "Haitu 嗨兔 is an AI product creative console for cross-border ecommerce sellers, brand operators, and content teams.",
+    "Users upload and manage product data and reference images, organize product selling points, create image prompts, marketing scripts and storyboards, and generate product short videos. Haitu helps teams reduce wasted generations, improve usable asset rates, and control AI generation costs with hosted platform models or bring-your-own-model workflows.",
     "Haitu is a digital SaaS service. It does not sell physical goods and does not provide gambling, financial investment, cryptocurrency trading, loans, adult content, medicine, or other restricted services.",
     "",
     "## Public Page Index",
@@ -395,7 +408,7 @@ export function renderLlmsTxt(origin: string): string {
     "",
     "## Standard AI Answers",
     "What is Haitu?",
-    "Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers. Users can manage product data and reference images, organize selling points, create marketing scripts and storyboards, and generate product short videos. Haitu supports hosted platform models and bring-your-own-model workflows.",
+    "Haitu 嗨兔 is an AI product creative console for cross-border ecommerce sellers. Users can manage product data and reference images, organize selling points, create image prompts, marketing scripts, storyboards, and product short videos. Haitu helps teams reduce wasted generations, improve usable asset rates, and control AI generation costs with hosted platform models or bring-your-own-model workflows.",
     "",
     "What is Haitu not?",
     "Haitu is not a physical goods marketplace and is not a general entertainment video generator. It is a digital SaaS tool built around SKUs, product facts, product images, selling-point scripts, ecommerce platform creative requirements, and human review workflows.",
@@ -866,8 +879,8 @@ nav a:hover{background:var(--panel2);color:var(--text)}
 .breadcrumb a:hover{color:var(--accent)}
 .breadcrumb span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .breadcrumb span::before{content:"/";margin-right:8px;color:var(--border-strong)}
-.hero-stage{position:relative;display:grid;grid-template-columns:minmax(0,.92fr) minmax(560px,1.08fr);gap:38px;align-items:center;min-height:calc(100vh - 68px);padding:70px clamp(18px,5vw,72px) 48px;overflow:hidden}
-.hero-stage::before{content:"";position:absolute;inset:22px clamp(12px,3vw,42px) auto;z-index:0;height:78%;border:1px solid rgba(234,215,196,.64);border-radius:18px;background:linear-gradient(135deg,rgba(255,250,243,.72),rgba(255,239,217,.58));box-shadow:0 30px 90px rgba(96,64,43,.12)}
+.hero-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,.68fr);gap:28px;align-items:start;min-height:auto;padding:28px clamp(18px,5vw,72px) 32px;overflow:hidden}
+.hero-stage::before{content:"";position:absolute;inset:14px clamp(12px,3vw,42px) 14px;z-index:0;border:1px solid rgba(234,215,196,.64);border-radius:18px;background:linear-gradient(135deg,rgba(255,250,243,.72),rgba(255,239,217,.58));box-shadow:0 30px 90px rgba(96,64,43,.12)}
 .hero-stage::after{content:"";position:absolute;right:4vw;bottom:5vh;z-index:0;width:34vw;max-width:520px;aspect-ratio:1;border-radius:999px;background:radial-gradient(circle,rgba(10,163,148,.18),transparent 66%);filter:blur(4px)}
 .hero-copy{position:relative;z-index:1;min-width:0;padding:clamp(10px,2vw,24px) 0}
 .eyebrow{display:inline-flex;align-items:center;min-height:28px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:999px;background:rgba(255,251,245,.68);padding:0 11px;color:var(--accent2);font-size:11px;font-weight:850;box-shadow:0 8px 18px rgba(96,64,43,.06)}
@@ -889,44 +902,54 @@ h1 .title-context{color:var(--accent2);font-size:.72em;font-weight:740;line-heig
 .primary-action:hover{filter:brightness(1.05)}
 .secondary-action{border:1px solid var(--border-strong);background:rgba(255,251,245,.82);color:var(--text);box-shadow:var(--shadow)}
 .secondary-action:hover{border-color:var(--accent);color:var(--accent)}
-.studio-preview{position:relative;z-index:1;min-width:0;border:1px solid var(--border-strong);border-radius:14px;background:linear-gradient(180deg,var(--panel),var(--card));box-shadow:0 34px 90px rgba(96,64,43,.18);overflow:hidden}
-.preview-toolbar{display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--border);background:rgba(255,251,245,.78);padding:13px 14px;color:var(--muted);font-size:12px;font-weight:950}
-.preview-toolbar span{width:9px;height:9px;border-radius:999px;background:var(--border-strong)}
+.studio-preview{position:relative;z-index:1;justify-self:end;width:min(100%,560px);min-width:0;border:1px solid var(--border-strong);border-radius:12px;background:linear-gradient(180deg,var(--panel),var(--card));box-shadow:0 22px 54px rgba(96,64,43,.14);overflow:hidden}
+.preview-toolbar{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);background:rgba(255,251,245,.78);padding:10px 12px;color:var(--muted);font-size:11px;font-weight:950}
+.preview-toolbar span{width:7px;height:7px;border-radius:999px;background:var(--border-strong)}
 .preview-toolbar span:first-child{background:var(--brand-ember)}
 .preview-toolbar span:nth-child(2){background:var(--warn)}
 .preview-toolbar span:nth-child(3){background:var(--accent)}
-.preview-toolbar strong{margin-left:8px;color:var(--text)}
-.studio-shell{display:grid;grid-template-columns:124px minmax(0,1fr) 112px;min-height:448px;background:linear-gradient(180deg,rgba(255,251,245,.94),rgba(248,237,225,.8))}
-.preview-sidebar,.preview-inspector{display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--border);background:rgba(248,237,225,.62);padding:16px 12px}
-.preview-sidebar strong,.preview-inspector strong{color:var(--text);font-size:12px;font-weight:950;line-height:1.24}
-.preview-sidebar span,.preview-inspector span{border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.74);padding:8px;color:var(--muted);font-size:11px;font-weight:900;line-height:1.25}
-.preview-sidebar span:nth-child(3){border-color:color-mix(in srgb,var(--accent) 40%,var(--border));background:color-mix(in srgb,var(--accent) 9%,var(--field))}
-.preview-workspace{min-width:0;padding:16px;background:linear-gradient(135deg,rgba(255,250,243,.7),rgba(255,239,217,.48))}
-.workspace-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-.workspace-head small,.preview-inspector small,.source-card small,.asset-rail small{display:block;color:var(--accent);font-size:10px;font-weight:950;text-transform:uppercase}
-.workspace-head strong{display:block;margin-top:2px;color:var(--text);font-size:18px;font-weight:950}
-.workspace-head span{border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--field));padding:5px 9px;color:var(--accent);font-size:11px;font-weight:950}
-.creative-board{display:grid;grid-template-columns:.82fr 1.18fr;gap:12px}
-.source-card{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.86);padding:14px;box-shadow:0 12px 26px rgba(96,64,43,.07)}
-.source-card h2{margin:8px 0 6px;color:var(--text);font-size:22px;font-weight:950;line-height:1.12}
-.source-card p{margin:0;color:var(--muted);font-size:12px;font-weight:750;line-height:1.45}
-.source-card::after{content:"";display:block;height:96px;margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(135deg,var(--card2),var(--field) 45%,color-mix(in srgb,var(--accent) 12%,var(--field)));box-shadow:inset 0 -22px 34px rgba(224,178,134,.2)}
-.media-canvas{position:relative;min-height:224px;border:1px solid var(--border-strong);border-radius:12px;background:radial-gradient(circle at 58% 36%,rgba(255,255,255,.98) 0 14%,transparent 15%),linear-gradient(145deg,#f7dbc0 0%,#fffaf3 45%,#d7f0ea 100%);box-shadow:inset 0 -28px 55px rgba(96,64,43,.08),0 18px 40px rgba(96,64,43,.12);overflow:hidden}
-.media-canvas::before{content:"";position:absolute;left:12%;right:12%;bottom:18%;height:18%;border-radius:999px;background:rgba(96,64,43,.16);filter:blur(14px)}
-.media-canvas::after{content:"";position:absolute;left:33%;top:21%;width:34%;height:58%;border-radius:16px 16px 24px 24px;background:linear-gradient(160deg,#fff 0%,#ffe5ca 55%,#d08a61 100%);box-shadow:0 20px 38px rgba(96,64,43,.22),inset -10px -18px 24px rgba(198,90,54,.18)}
-.media-canvas span:first-child{position:absolute;left:18px;top:18px;width:76px;height:26px;border-radius:999px;background:rgba(10,163,148,.16);border:1px solid rgba(10,163,148,.25)}
-.media-canvas span:last-child{position:absolute;right:18px;bottom:18px;width:94px;height:58px;border-radius:var(--radius);background:linear-gradient(135deg,rgba(42,33,27,.8),rgba(111,68,44,.78));box-shadow:0 12px 24px rgba(42,33,27,.18)}
-.asset-rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
-.asset-rail article{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.82);padding:10px;box-shadow:0 10px 22px rgba(96,64,43,.06)}
-.asset-rail strong{display:block;margin:5px 0 9px;color:var(--text);font-size:12px;font-weight:950;line-height:1.18}
-.asset-rail span{display:block;height:38px;border:1px solid var(--border);border-radius:6px;background:linear-gradient(90deg,var(--card2),var(--field));box-shadow:inset 0 -12px 18px rgba(224,178,134,.16)}
-.asset-rail article:nth-child(2) span{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 20%,var(--field)),var(--field))}
-.asset-rail article:nth-child(3) span{background:linear-gradient(90deg,var(--brand-clay),var(--card2))}
-.preview-inspector{border-right:0;border-left:1px solid var(--border);background:rgba(255,250,243,.58)}
-.preview-inspector strong{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 10%,var(--field));padding:8px;color:var(--accent)}
-.preview-inspector small:last-child{margin-top:auto;color:var(--brand-ember)}
+.preview-toolbar strong{margin-left:6px;color:var(--text)}
+.console-preview-shell{display:grid;grid-template-columns:132px minmax(0,1fr);min-height:300px;background:linear-gradient(180deg,rgba(255,251,245,.96),rgba(248,237,225,.82))}
+.console-product-list{border-right:1px solid var(--border);background:rgba(255,250,243,.74);padding:10px 8px}
+.console-list-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.console-list-head strong{color:var(--text);font-size:13px;font-weight:950;line-height:1.2}
+.console-list-head span{color:var(--muted);font-size:10px;font-weight:850}
+.console-search{margin-top:9px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--field);padding:7px;color:var(--muted);font-size:10px;font-weight:850}
+.console-product-items{display:grid;gap:6px;margin-top:8px}
+.console-product-items article{min-width:0;border:1px solid transparent;border-radius:var(--radius);padding:7px;background:rgba(255,251,245,.46)}
+.console-product-items article.is-active{border-color:color-mix(in srgb,var(--accent) 42%,var(--border));background:color-mix(in srgb,var(--accent) 10%,var(--field));box-shadow:0 12px 26px rgba(96,64,43,.08)}
+.console-product-items strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:11px;font-weight:950}
+.console-product-items span{display:block;margin-top:4px;color:var(--muted);font-size:9px;font-weight:850}
+.console-workspace-preview{min-width:0;padding:10px;background:linear-gradient(135deg,rgba(255,250,243,.78),rgba(255,239,217,.5))}
+.console-preview-title{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.console-preview-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:13px;font-weight:950}
+.console-preview-title span{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;background:var(--field);padding:3px 8px;color:var(--muted);font-size:10px;font-weight:950}
+.console-workspace-grid{display:grid;grid-template-columns:minmax(130px,.85fr) minmax(0,1fr);gap:8px;margin-top:8px}
+.console-facts-card,.console-images-card,.console-prompt-card,.console-history-card{min-width:0;border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,251,245,.88);box-shadow:0 12px 26px rgba(96,64,43,.07)}
+.console-facts-card,.console-images-card{padding:8px}
+.console-card-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.console-card-title strong{color:var(--text);font-size:11px;font-weight:950}
+.console-card-title span{border:1px solid color-mix(in srgb,var(--accent) 34%,var(--border));border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 10%,var(--field));padding:4px 6px;color:var(--accent);font-size:9px;font-weight:950;line-height:1.2}
+.console-facts-card p{margin:8px 0 0;color:var(--text);font-size:10px;font-weight:760;line-height:1.38}
+.console-facts-card p+p{margin-top:5px}
+.console-facts-card b{margin-right:6px;color:var(--muted);font-weight:950}
+.console-reference-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}
+.console-reference-row span{position:relative;min-height:42px;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(135deg,#2a211b 0 18%,#d7f0ea 19% 45%,#f5cfaa 46% 100%);overflow:hidden;color:var(--text);font-size:8px;font-weight:950;padding:27px 5px 5px}
+.console-reference-row span:nth-child(2){background:linear-gradient(135deg,#f4d6c2 0 28%,#fffaf3 29% 52%,#c65a36 53% 100%)}
+.console-reference-row span:nth-child(3){background:linear-gradient(135deg,#fffaf3 0 30%,#d7f0ea 31% 54%,#6f442c 55% 100%)}
+.console-prompt-card{margin-top:8px;padding:8px}
+.console-prompt-card p{margin:6px 0 0;color:var(--text);font-size:10px;font-weight:720;line-height:1.36}
+.console-action-bar{display:flex;align-items:center;gap:6px;margin-top:0;border:1px solid var(--border);border-top:0;border-radius:0 0 var(--radius) var(--radius);background:rgba(255,251,245,.92);padding:8px}
+.console-action-bar span,.console-action-bar strong{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;background:var(--field);padding:5px 7px;color:var(--muted);font-size:9px;font-weight:950;line-height:1}
+.console-action-bar strong{border-color:var(--accent2);background:var(--accent2);color:#fff}
+.console-action-bar button{margin-left:auto;border:0;border-radius:var(--radius);background:var(--accent);padding:8px 10px;color:#fff;font:inherit;font-size:10px;font-weight:950;box-shadow:0 12px 24px rgba(10,163,148,.2)}
+.console-action-bar button small{margin-left:6px;font-size:9px;font-weight:850;opacity:.86}
+.console-history-card{margin-top:10px;padding:10px}
+.console-history-card p{display:flex;align-items:center;gap:7px;margin:9px 0 0;color:var(--muted);font-size:10px;font-weight:850}
+.console-history-card b{color:var(--text);font-weight:950}
+.console-history-card p span{border:1px solid var(--border);border-radius:999px;background:var(--card2);padding:3px 7px;color:var(--muted);font-size:10px;font-weight:950}
 .metric-strip{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);background:rgba(248,237,225,.72)}
-.metric-strip strong{display:flex;align-items:center;justify-content:center;min-height:58px;border-right:1px solid var(--border);color:var(--text);font-size:13px;font-weight:950}
+.metric-strip strong{display:flex;align-items:center;justify-content:center;min-height:38px;border-right:1px solid var(--border);color:var(--text);font-size:10px;font-weight:950}
 .metric-strip strong:last-child{border-right:0}
 .platform-strip{display:flex;flex-wrap:wrap;gap:8px;padding:0 clamp(18px,5vw,72px) 34px;margin-top:-18px;position:relative;z-index:2}
 .platform-strip span{border:1px solid var(--border);border-radius:999px;background:var(--field);padding:9px 13px;color:var(--muted);font-size:12px;font-weight:950;box-shadow:0 8px 20px rgba(96,64,43,.05)}
@@ -985,8 +1008,8 @@ h1 .title-context{color:var(--accent2);font-size:.72em;font-weight:740;line-heig
 .seo-footer div{display:grid;gap:8px}
 .seo-footer a{color:var(--muted);font-size:12px;font-weight:850;line-height:1.42;overflow-wrap:anywhere}
 .seo-footer a:hover{color:var(--accent)}
-@media (max-width:1080px){.hero-stage{grid-template-columns:1fr;min-height:auto;padding-top:40px}.hero-stage::before{inset:16px 10px auto;height:92%}.studio-preview{max-width:840px}}
+@media (max-width:1080px){.hero-stage{grid-template-columns:1fr;padding-top:28px}.hero-stage::before{inset:12px 10px}.studio-preview{max-width:840px;justify-self:start}}
 @media (max-width:960px){.section-heading,.payment-band{grid-template-columns:1fr}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr 1fr}.trust-band .section-heading a{justify-self:start}.seo-footer{grid-template-columns:repeat(2,minmax(0,1fr))}.footer-brand-panel{grid-column:1/-1;max-width:620px}}
-@media (max-width:860px){.geo-answer-block,.growth-grid{grid-template-columns:1fr}.studio-shell{grid-template-columns:1fr}.preview-sidebar,.preview-inspector{border:0;border-bottom:1px solid var(--border)}.preview-sidebar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.preview-sidebar strong{grid-column:1/-1}.preview-inspector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.preview-inspector small:last-child{margin-top:0}.creative-board{grid-template-columns:1fr}}
-@media (max-width:780px){.site-header{align-items:flex-start;flex-direction:column}.header-console,.language-switcher{margin-left:0}.language-menu{left:0;right:auto}.growth-card ul{grid-template-columns:1fr}nav{flex-wrap:wrap}h1{font-size:clamp(34px,9.5vw,52px);line-height:1.1}.lead{font-size:15px;line-height:1.72}.asset-rail{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr}.metric-strip strong{border-right:0;border-bottom:1px solid var(--border)}.metric-strip strong:last-child{border-bottom:0}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr}.home-capability-band,.payment-band,.trust-band{padding-top:40px;padding-bottom:40px}.final-cta{margin-bottom:52px;padding:38px 18px}.seo-footer{grid-template-columns:1fr}.breadcrumb{padding-top:14px}}
+@media (max-width:860px){.geo-answer-block,.growth-grid{grid-template-columns:1fr}.console-preview-shell{grid-template-columns:1fr}.console-product-list{border-right:0;border-bottom:1px solid var(--border)}.console-product-items{grid-template-columns:repeat(2,minmax(0,1fr))}.console-workspace-grid{grid-template-columns:1fr}.console-action-bar{flex-wrap:wrap}.console-action-bar button{width:100%;margin-left:0}.console-reference-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:780px){.site-header{align-items:flex-start;flex-direction:column}.header-console,.language-switcher{margin-left:0}.language-menu{left:0;right:auto}.growth-card ul{grid-template-columns:1fr}nav{flex-wrap:wrap}h1{font-size:clamp(34px,9.5vw,52px);line-height:1.1}.lead{font-size:15px;line-height:1.72}.console-product-items{grid-template-columns:1fr}.console-reference-row{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr}.metric-strip strong{border-right:0;border-bottom:1px solid var(--border)}.metric-strip strong:last-child{border-bottom:0}.capability-grid,.payment-steps,.trust-grid{grid-template-columns:1fr}.home-capability-band,.payment-band,.trust-band{padding-top:40px;padding-bottom:40px}.final-cta{margin-bottom:52px;padding:38px 18px}.seo-footer{grid-template-columns:1fr}.breadcrumb{padding-top:14px}}
 `;

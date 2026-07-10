@@ -33,6 +33,7 @@ export interface MakeVideoPipelineInput {
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   tokenPriceCnyPerMillion?: number;
   forceRegenerate?: boolean;
+  onProviderTaskCreated?: (taskId: string) => Promise<void> | void;
   reuseManifestPath?: string;
   postprocessVideo?: (manifest: ProductJobManifest, finalDir: string) => Promise<NonNullable<MakeVideoReport["final"]>>;
 }
@@ -124,7 +125,8 @@ export async function runMakeVideoPipeline(input: MakeVideoPipelineInput): Promi
       storyboardLines: input.storyboardLines,
       durationSeconds: input.durationSeconds,
       resolution: input.resolution,
-      aspectRatio: input.aspectRatio
+      aspectRatio: input.aspectRatio,
+      onProviderTaskCreated: input.onProviderTaskCreated
     }));
   const recoveredRawOutput = await ensureRawOutput(rawManifest, input);
   return writePipelineReport({

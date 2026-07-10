@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { LocalVideoJobQueueOptions } from "./consoleVideoJobQueue.js";
 import {
   nodeRequestToFetch,
+  RequestBodyTooLargeError,
   writeNodeResponse
 } from "./consoleHttpService.js";
 import {
@@ -64,7 +65,7 @@ export function createConsoleServer(options: ConsoleServerOptions = {}): Console
           .then((fetchResponse) => writeNodeResponse(response, fetchResponse))
           .catch((error: unknown) => {
             const message = error instanceof Error ? error.message : String(error);
-            response.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+            response.writeHead(error instanceof RequestBodyTooLargeError ? 413 : 500, { "content-type": "application/json; charset=utf-8" });
             response.end(JSON.stringify({ error: message }));
           });
       });

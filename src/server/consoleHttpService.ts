@@ -1,8 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZodError } from "zod";
+
+const maxRequestBodyBytes = 30 * 1024 * 1024;
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
@@ -62,8 +65,18 @@ export async function staticResponse(fileName: string): Promise<Response> {
 
 export async function nodeRequestToFetch(request: IncomingMessage): Promise<Request> {
   const chunks: Buffer[] = [];
+  const declaredLength = Number(request.headers["content-length"] ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > maxRequestBodyBytes) {
+    throw new RequestBodyTooLargeError();
+  }
+  let totalBytes = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.from(chunk));
+    const buffer = Buffer.from(chunk);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxRequestBodyBytes) {
+      throw new RequestBodyTooLargeError();
+    }
+    chunks.push(buffer);
   }
   const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
   return new Request(`${requestOrigin(request)}${request.url ?? "/"}`, {
@@ -73,9 +86,25 @@ export async function nodeRequestToFetch(request: IncomingMessage): Promise<Requ
   });
 }
 
+export class RequestBodyTooLargeError extends Error {
+  constructor() {
+    super("Request body exceeds the 30 MB limit.");
+  }
+}
+
 export async function writeNodeResponse(response: ServerResponse, fetchResponse: Response): Promise<void> {
   response.writeHead(fetchResponse.status, Object.fromEntries(fetchResponse.headers.entries()));
-  response.end(Buffer.from(await fetchResponse.arrayBuffer()));
+  if (!fetchResponse.body) {
+    response.end();
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const body = Readable.fromWeb(fetchResponse.body as import("node:stream/web").ReadableStream);
+    body.once("error", reject);
+    response.once("error", reject);
+    response.once("finish", resolve);
+    body.pipe(response);
+  });
 }
 
 function isMissingFileError(error: unknown): boolean {

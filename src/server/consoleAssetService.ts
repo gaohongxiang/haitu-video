@@ -1,4 +1,6 @@
 import { access, readFile, readdir, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
@@ -56,6 +58,10 @@ export function resolveWithin(rootDir: string, path: string): string {
   return resolved;
 }
 
+export function isPathWithin(rootDir: string, path: string): boolean {
+  return isPathInsideRoot(rootDir, resolve(rootDir, path));
+}
+
 export function publicBaseUrlFromEnv(): string | undefined {
   return process.env.HAITU_PUBLIC_BASE_URL ?? process.env.BETTER_AUTH_URL;
 }
@@ -79,6 +85,7 @@ export async function mediaResponse(
   options: {
     rootDir: string;
     head: boolean;
+    rangeHeader?: string | null;
   }
 ): Promise<Response> {
   if (!path) {
@@ -86,9 +93,42 @@ export async function mediaResponse(
   }
   const filePath = resolveWithin(options.rootDir, path);
   const contentType = mediaContentType(filePath);
-  return new Response(options.head ? undefined : await readFile(filePath), {
-    headers: { "content-type": contentType }
+  const fileStat = await stat(filePath);
+  if (!fileStat.isFile()) {
+    return jsonResponse({ error: "Media file not found." }, 404);
+  }
+  const range = parseByteRange(options.rangeHeader, fileStat.size);
+  const headers = new Headers({
+    "content-type": contentType,
+    "accept-ranges": "bytes",
+    "content-length": String(range ? range.end - range.start + 1 : fileStat.size)
   });
+  if (range) {
+    headers.set("content-range", `bytes ${range.start}-${range.end}/${fileStat.size}`);
+  }
+  const body = options.head
+    ? undefined
+    : Readable.toWeb(createReadStream(filePath, range ? { start: range.start, end: range.end } : undefined)) as ReadableStream;
+  return new Response(body, {
+    status: range ? 206 : 200,
+    headers
+  });
+}
+
+function parseByteRange(value: string | null | undefined, size: number): { start: number; end: number } | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const match = /^bytes=(\d+)-(\d*)$/.exec(value.trim());
+  if (!match) {
+    throw new Error("Invalid media byte range.");
+  }
+  const start = Number(match[1]);
+  const requestedEnd = match[2] ? Number(match[2]) : size - 1;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(requestedEnd) || start < 0 || start >= size || requestedEnd < start) {
+    throw new Error("Invalid media byte range.");
+  }
+  return { start, end: Math.min(requestedEnd, size - 1) };
 }
 
 export async function publicAssetResponse(

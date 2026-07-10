@@ -30,6 +30,7 @@ export async function runMeteredAiAction<T>(input: {
   reserveDescription: string;
   chargeDescription: string;
   action: () => Promise<T | MeteredAiActionResult<T>>;
+  beforeCapture?: (result: T) => Promise<void>;
   actualUnits?: (result: T) => number;
   modelPricingCatalog?: readonly ModelPricingEntry[];
   modelPricingCatalogVersion?: string;
@@ -67,6 +68,7 @@ export async function runMeteredAiAction<T>(input: {
   try {
     const actionResult = normalizeMeteredAiActionResult(await input.action());
     const result = actionResult.value;
+    await input.beforeCapture?.(result);
     const actualUnits = Math.max(1, input.actualUnits?.(result) ?? estimatedUnits);
     const actualUpstreamCostCny = apiBillingMode === "platform"
       ? estimateAiUpstreamCostCny(input.kind, input.modelConfig?.model, actualUnits, actionResult.metering?.textUsage, input.modelPricingCatalog)

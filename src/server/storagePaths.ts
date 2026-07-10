@@ -1,6 +1,7 @@
 import { isAbsolute, join, resolve } from "node:path";
 
 export const DEFAULT_WORKSPACE_ID = "default";
+export const PLATFORM_WORKSPACE_ID = "__platform__";
 
 export function resolveDataDir(input: {
   rootDir: string;

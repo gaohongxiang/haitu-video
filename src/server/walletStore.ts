@@ -78,6 +78,10 @@ export class WalletStore {
     };
   }
 
+  reservedCnyForReservation(reservationId: string): number {
+    return centsToCny(this.repository.reservedCentsForReservation(reservationId));
+  }
+
   topUp(input: {
     amountCny: number;
     description?: string;
@@ -111,6 +115,31 @@ export class WalletStore {
       amountCents,
       description: input.description,
       metadata: input.metadata
+    });
+    return this.getSummary();
+  }
+
+  reverseRecharge(input: {
+    amountCny: number;
+    rechargeOrderId: string;
+    providerEventId: string;
+    reason: string;
+    metadata?: Record<string, unknown>;
+  }): WalletSummary {
+    const amountCents = positiveCents(input.amountCny);
+    const state = this.repository.currentState();
+    this.repository.appendTransaction({
+      type: "adjustment",
+      amountCents: -amountCents,
+      balanceAfterCents: state.balanceCents - amountCents,
+      reservedAfterCents: state.reservedCents,
+      description: input.reason,
+      metadata: {
+        rechargeReversal: true,
+        rechargeOrderId: input.rechargeOrderId,
+        providerEventId: input.providerEventId,
+        ...(input.metadata ?? {})
+      }
     });
     return this.getSummary();
   }

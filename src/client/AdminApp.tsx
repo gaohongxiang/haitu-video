@@ -13,6 +13,7 @@ import {
   MailCheck,
   Package,
   RefreshCcw,
+  Route,
   Search,
   Settings2,
   ShieldAlert,
@@ -62,6 +63,7 @@ function adminLabel(item: (typeof adminNavigationItems)[number]): string {
   if (item.translationKey === "overview") return tAdmin("navigation.overview.label");
   if (item.translationKey === "users") return tAdmin("navigation.users.label");
   if (item.translationKey === "content") return tAdmin("navigation.content.label");
+  if (item.translationKey === "traffic") return tAdmin("navigation.traffic.label");
   if (item.translationKey === "finance") return tAdmin("navigation.finance.label");
   if (item.translationKey === "paymentBilling") return tAdmin("navigation.paymentBilling.label");
   if (item.translationKey === "modelServices") return tAdmin("navigation.modelServices.label");
@@ -74,6 +76,7 @@ function adminDescription(item: (typeof adminNavigationItems)[number]): string {
   if (item.translationKey === "overview") return tAdmin("navigation.overview.description");
   if (item.translationKey === "users") return tAdmin("navigation.users.description");
   if (item.translationKey === "content") return tAdmin("navigation.content.description");
+  if (item.translationKey === "traffic") return tAdmin("navigation.traffic.description");
   if (item.translationKey === "finance") return tAdmin("navigation.finance.description");
   if (item.translationKey === "paymentBilling") return tAdmin("navigation.paymentBilling.description");
   if (item.translationKey === "modelServices") return tAdmin("navigation.modelServices.description");
@@ -89,8 +92,8 @@ function adminStringArray(key: string): string[] {
 }
 
 type AuthFlowMode = "entry" | "verify-email";
-type AdminSection = "overview" | "users" | "content" | "finance" | "payment-billing" | "model-services" | "model-pricing" | "site-settings" | "system";
-type AdminTranslationKey = "overview" | "users" | "content" | "finance" | "paymentBilling" | "modelServices" | "modelPricing" | "siteSettings" | "system";
+type AdminSection = "overview" | "users" | "content" | "traffic" | "finance" | "payment-billing" | "model-services" | "model-pricing" | "site-settings" | "system";
+type AdminTranslationKey = "overview" | "users" | "content" | "traffic" | "finance" | "paymentBilling" | "modelServices" | "modelPricing" | "siteSettings" | "system";
 type AdminNavigationGroup = "operate" | "commercial" | "configuration" | "system";
 type AdminTranslator = (key: string, options?: Record<string, unknown>) => string;
 type AdminContentView = "products" | "videoJobs";
@@ -119,6 +122,12 @@ const adminNavigationItems: Array<{
     translationKey: "content",
     group: "operate",
     icon: Package
+  },
+  {
+    id: "traffic",
+    translationKey: "traffic",
+    group: "operate",
+    icon: Route
   },
   {
     id: "finance",
@@ -455,6 +464,139 @@ interface AdminContentVideoJobsResponse {
   videoJobs: AdminContentVideoJobView[];
 }
 
+interface AdminTrafficOverviewResponse {
+  metrics: {
+    visitors: number;
+    pageViews: number;
+    ctaClicks: number;
+    signups: number;
+    logins: number;
+    rechargeOrders: number;
+    paidRecharges: number;
+    creativeJobs: number;
+    completedCreativeJobs: number;
+    indexSubmissions: number;
+  };
+  trend: Array<{
+    date: string;
+    visitors: number;
+    pageViews: number;
+    ctaClicks: number;
+    signups: number;
+    paidRecharges: number;
+    completedCreativeJobs: number;
+  }>;
+}
+
+interface AdminTrafficSourcesResponse {
+  sources: Array<{
+    source: string;
+    visitors: number;
+    pageViews: number;
+    ctaClicks: number;
+    signups: number;
+    paidRecharges: number;
+    completedCreativeJobs: number;
+  }>;
+}
+
+interface AdminTrafficPagesResponse {
+  pages: Array<{
+    path: string;
+    locale?: string;
+    pageType: string;
+    visitors: number;
+    pageViews: number;
+    searchClicks: number;
+    searchImpressions: number;
+    searchCtr?: number;
+    averagePosition?: number;
+    ctaClicks: number;
+    signups: number;
+    paidRecharges: number;
+    completedCreativeJobs: number;
+  }>;
+}
+
+interface AdminTrafficIndexingResponse {
+  submissions: Array<{
+    id: string;
+    submittedAt: string;
+    provider: string;
+    submissionType: string;
+    url: string;
+    statusCode?: number;
+    responseExcerpt?: string;
+    errorMessage?: string;
+    retryCount: number;
+  }>;
+}
+
+interface AdminTrafficSettingsResponse {
+  integrations: Array<{
+    id: string;
+    label: string;
+    configured: boolean;
+    status: "configured" | "not_configured";
+    description: string;
+  }>;
+}
+
+interface AdminTrafficSearchResponse {
+  rows: Array<{
+    date: string;
+    query: string;
+    page: string;
+    country?: string;
+    device?: string;
+    clicks: number;
+    impressions: number;
+    ctr?: number;
+    position?: number;
+  }>;
+}
+
+interface AdminTrafficCloudflareResponse {
+  rows: Array<{
+    date: string;
+    country?: string;
+    status?: string;
+    crawler?: string;
+    requests: number;
+  }>;
+}
+
+interface AdminTrafficGeoSummaryResponse {
+  pagesReviewed: number;
+  searchClicks: number;
+  searchImpressions: number;
+  edgeRequests: number;
+  opportunities: Array<{
+    path: string;
+    reason: string;
+    searchClicks: number;
+    searchImpressions: number;
+    searchCtr?: number;
+    averagePosition?: number;
+    pageViews: number;
+    ctaClicks: number;
+  }>;
+}
+
+interface AdminTrafficActionResponse {
+  ok: boolean;
+  status: "not_configured" | "synced" | "partial_error" | "error" | "submitted" | "failed";
+  provider?: string;
+  providers?: Array<{
+    id: string;
+    configured: boolean;
+    status: "not_configured" | "synced" | "error";
+    rowsSynced: number;
+    error?: string;
+  }>;
+  statusCode?: number;
+}
+
 type AdminModelPricingKind = "text" | "image" | "video";
 type AdminModelPricingProviderId = "openai" | "deepseek" | "gemini" | "volcengine";
 type AdminModelPricingStatus = "verified" | "official-reference";
@@ -633,6 +775,14 @@ export function AdminApp() {
   const [contentSummary, setContentSummary] = useState<AdminContentSummaryResponse | undefined>();
   const [contentProducts, setContentProducts] = useState<AdminContentProductView[]>([]);
   const [contentVideoJobs, setContentVideoJobs] = useState<AdminContentVideoJobView[]>([]);
+  const [trafficOverview, setTrafficOverview] = useState<AdminTrafficOverviewResponse | undefined>();
+  const [trafficSources, setTrafficSources] = useState<AdminTrafficSourcesResponse | undefined>();
+  const [trafficPages, setTrafficPages] = useState<AdminTrafficPagesResponse | undefined>();
+  const [trafficIndexing, setTrafficIndexing] = useState<AdminTrafficIndexingResponse | undefined>();
+  const [trafficSettings, setTrafficSettings] = useState<AdminTrafficSettingsResponse | undefined>();
+  const [trafficSearch, setTrafficSearch] = useState<AdminTrafficSearchResponse | undefined>();
+  const [trafficCloudflare, setTrafficCloudflare] = useState<AdminTrafficCloudflareResponse | undefined>();
+  const [trafficGeoSummary, setTrafficGeoSummary] = useState<AdminTrafficGeoSummaryResponse | undefined>();
   const [modelPricingCatalog, setModelPricingCatalog] = useState<AdminModelPricingCatalogResponse | undefined>();
   const [siteSettings, setSiteSettings] = useState<AdminSiteSettingsResponse | undefined>();
 
@@ -712,6 +862,30 @@ export function AdminApp() {
         }, failedModules),
         loadAdminModule(tAdmin("navigation.content.label"), () => getJson<AdminContentVideoJobsResponse>("/api/admin/content/video-jobs"), (contentVideoJobsResponse) => {
           setContentVideoJobs(contentVideoJobsResponse.videoJobs);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficOverviewResponse>("/api/admin/traffic/overview"), (trafficResponse) => {
+          setTrafficOverview(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficSourcesResponse>("/api/admin/traffic/sources"), (trafficResponse) => {
+          setTrafficSources(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficPagesResponse>("/api/admin/traffic/pages"), (trafficResponse) => {
+          setTrafficPages(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficIndexingResponse>("/api/admin/traffic/indexing"), (trafficResponse) => {
+          setTrafficIndexing(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficSearchResponse>("/api/admin/traffic/search"), (trafficResponse) => {
+          setTrafficSearch(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficSettingsResponse>("/api/admin/traffic/settings"), (trafficResponse) => {
+          setTrafficSettings(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficCloudflareResponse>("/api/admin/traffic/cloudflare"), (trafficResponse) => {
+          setTrafficCloudflare(trafficResponse);
+        }, failedModules),
+        loadAdminModule(tAdmin("navigation.traffic.label"), () => getJson<AdminTrafficGeoSummaryResponse>("/api/admin/traffic/geo-summary"), (trafficResponse) => {
+          setTrafficGeoSummary(trafficResponse);
         }, failedModules),
         loadAdminModule(tAdmin("navigation.modelPricing.label"), () => getJson<AdminModelPricingCatalogResponse>("/api/admin/model-pricing-catalog"), (modelPricingCatalogResponse) => {
           setModelPricingCatalog(modelPricingCatalogResponse);
@@ -1032,6 +1206,36 @@ export function AdminApp() {
     }
   }
 
+  async function syncTrafficData() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await postJson<AdminTrafficActionResponse>("/api/admin/traffic/sync", {});
+      setStatus(tAdmin("traffic.actions.syncResult", { status: response.status }));
+      await refreshOverview();
+      return response;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      return undefined;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitIndexNowUrls(urls: string[]) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await postJson<AdminTrafficActionResponse>("/api/admin/traffic/indexnow/submit", { urls });
+      setStatus(tAdmin("traffic.actions.indexNowResult", { status: response.statusCode ?? response.status }));
+      await refreshOverview();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (session && !session.authenticated) {
     return (
       <AdminLoginScreen
@@ -1087,6 +1291,14 @@ export function AdminApp() {
       contentSummary={contentSummary}
       contentProducts={contentProducts}
       contentVideoJobs={contentVideoJobs}
+      trafficOverview={trafficOverview}
+      trafficSources={trafficSources}
+      trafficPages={trafficPages}
+      trafficIndexing={trafficIndexing}
+      trafficSettings={trafficSettings}
+      trafficSearch={trafficSearch}
+      trafficCloudflare={trafficCloudflare}
+      trafficGeoSummary={trafficGeoSummary}
       modelPricingCatalog={modelPricingCatalog}
       siteSettings={siteSettings}
       onTogglePaymentMethodEnabled={togglePaymentMethodEnabled}
@@ -1094,6 +1306,8 @@ export function AdminApp() {
       onSaveBillingSettings={saveBillingSettings}
       onSaveModelPricingDraft={saveModelPricingDraft}
       onPublishModelPricingDraft={publishModelPricingDraft}
+      onSyncTrafficData={syncTrafficData}
+      onSubmitIndexNowUrls={submitIndexNowUrls}
     />
   );
 }
@@ -1239,6 +1453,8 @@ function AdminDashboard({
   onSaveBillingSettings,
   onSaveModelPricingDraft,
   onPublishModelPricingDraft,
+  onSyncTrafficData,
+  onSubmitIndexNowUrls,
   onSubmitWalletAdjustment,
   onTogglePaymentMethodEnabled,
   overview,
@@ -1249,6 +1465,14 @@ function AdminDashboard({
   contentSummary,
   contentProducts,
   contentVideoJobs,
+  trafficOverview,
+  trafficSources,
+  trafficPages,
+  trafficIndexing,
+  trafficSettings,
+  trafficSearch,
+  trafficCloudflare,
+  trafficGeoSummary,
   modelPricingCatalog,
   siteSettings,
   paymentMethods,
@@ -1277,6 +1501,8 @@ function AdminDashboard({
   onSaveBillingSettings: (rules: Array<Pick<BillingPriceRuleView, "usageKind" | "serviceFeeCny" | "enabled">>) => Promise<void>;
   onSaveModelPricingDraft: (input: { version: string; entries: AdminModelPricingEntry[] }) => Promise<string | undefined>;
   onPublishModelPricingDraft: (draftId: string) => Promise<void>;
+  onSyncTrafficData: () => Promise<AdminTrafficActionResponse | undefined>;
+  onSubmitIndexNowUrls: (urls: string[]) => Promise<void>;
   overview?: AdminOverview;
   adminWallets: AdminWalletSummary[];
   walletTransactions: AdminWalletTransactionView[];
@@ -1285,6 +1511,14 @@ function AdminDashboard({
   contentSummary?: AdminContentSummaryResponse;
   contentProducts: AdminContentProductView[];
   contentVideoJobs: AdminContentVideoJobView[];
+  trafficOverview?: AdminTrafficOverviewResponse;
+  trafficSources?: AdminTrafficSourcesResponse;
+  trafficPages?: AdminTrafficPagesResponse;
+  trafficIndexing?: AdminTrafficIndexingResponse;
+  trafficSettings?: AdminTrafficSettingsResponse;
+  trafficSearch?: AdminTrafficSearchResponse;
+  trafficCloudflare?: AdminTrafficCloudflareResponse;
+  trafficGeoSummary?: AdminTrafficGeoSummaryResponse;
   modelPricingCatalog?: AdminModelPricingCatalogResponse;
   siteSettings?: AdminSiteSettingsResponse;
   paymentMethods: PaymentMethodView[];
@@ -1389,6 +1623,22 @@ function AdminDashboard({
           summary={contentSummary}
           products={contentProducts}
           videoJobs={contentVideoJobs}
+        />
+      );
+    }
+    if (activeSection === "traffic") {
+      return (
+        <AdminTrafficPanel
+          indexing={trafficIndexing}
+          overview={trafficOverview}
+          pages={trafficPages}
+          search={trafficSearch}
+          settings={trafficSettings}
+          sources={trafficSources}
+          cloudflare={trafficCloudflare}
+          geoSummary={trafficGeoSummary}
+          onSubmitIndexNowUrls={onSubmitIndexNowUrls}
+          onSyncTrafficData={onSyncTrafficData}
         />
       );
     }
@@ -1988,6 +2238,369 @@ function AdminContentSignalStrip({
       </div>
     </div>
   );
+}
+
+function AdminTrafficPanel({
+  cloudflare,
+  geoSummary,
+  indexing,
+  overview,
+  pages,
+  search,
+  settings,
+  sources,
+  onSubmitIndexNowUrls,
+  onSyncTrafficData
+}: {
+  cloudflare?: AdminTrafficCloudflareResponse;
+  geoSummary?: AdminTrafficGeoSummaryResponse;
+  indexing?: AdminTrafficIndexingResponse;
+  overview?: AdminTrafficOverviewResponse;
+  pages?: AdminTrafficPagesResponse;
+  search?: AdminTrafficSearchResponse;
+  settings?: AdminTrafficSettingsResponse;
+  sources?: AdminTrafficSourcesResponse;
+  onSubmitIndexNowUrls: (urls: string[]) => Promise<void>;
+  onSyncTrafficData: () => Promise<AdminTrafficActionResponse | undefined>;
+}) {
+  const trafficTrendOption = useMemo(() => buildTrafficTrendOption(overview?.trend ?? []), [overview]);
+  const topPage = pages?.pages[0];
+  const configuredIntegrations = settings?.integrations.filter((integration) => integration.configured).length ?? 0;
+  const [lastSyncResult, setLastSyncResult] = useState<AdminTrafficActionResponse | undefined>();
+  const indexNowUrls = (pages?.pages ?? [])
+    .filter((page) => page.path.startsWith("/"))
+    .slice(0, 10)
+    .map((page) => `https://haitu.online${page.path === "/" ? "/" : page.path}`);
+  return (
+    <AdminWorkbench
+      summary={(
+        <AdminSummaryStrip
+          items={[
+            { label: tAdmin("traffic.metrics.visitors"), value: overview?.metrics.visitors ?? 0, hint: tAdmin("traffic.hints.firstParty") },
+            { label: tAdmin("traffic.metrics.pageViews"), value: overview?.metrics.pageViews ?? 0, hint: tAdmin("traffic.hints.publicPages") },
+            { label: tAdmin("traffic.metrics.ctaClicks"), value: overview?.metrics.ctaClicks ?? 0, hint: tAdmin("traffic.hints.cta") },
+            { label: tAdmin("traffic.metrics.signups"), value: overview?.metrics.signups ?? 0, hint: tAdmin("traffic.hints.conversion") },
+            { label: tAdmin("traffic.metrics.paidRecharges"), value: overview?.metrics.paidRecharges ?? 0, hint: tAdmin("traffic.hints.revenue") },
+            { label: tAdmin("traffic.metrics.completedCreativeJobs"), value: overview?.metrics.completedCreativeJobs ?? 0, hint: tAdmin("traffic.hints.jobs") },
+            { label: tAdmin("traffic.metrics.indexSubmissions"), value: overview?.metrics.indexSubmissions ?? 0, hint: tAdmin("traffic.hints.indexing") }
+          ]}
+        />
+      )}
+      side={(
+        <AdminSidePanel title={tAdmin("traffic.settings.title")} icon={<Settings2 size={16} />}>
+          <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" onClick={() => void onSyncTrafficData().then((result) => {
+                if (result) setLastSyncResult(result);
+              })}>
+                <RefreshCcw size={14} />
+                {tAdmin("traffic.actions.sync")}
+              </Button>
+              <Button type="button" disabled={indexNowUrls.length === 0} onClick={() => void onSubmitIndexNowUrls(indexNowUrls)}>
+                <Search size={14} />
+                {tAdmin("traffic.actions.indexNow")}
+              </Button>
+            </div>
+            {lastSyncResult ? (
+              <div className="rounded-[8px] border border-[var(--border)] bg-[var(--card)] p-3 text-[11px] font-semibold text-[var(--muted)]">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <strong className="text-[var(--text)]">{tAdmin("traffic.actions.syncResult", { status: lastSyncResult.status })}</strong>
+                  <Badge tone={lastSyncResult.status === "synced" ? "ok" : lastSyncResult.status === "partial_error" || lastSyncResult.status === "error" ? "warn" : "neutral"}>{lastSyncResult.status}</Badge>
+                </div>
+                <div className="grid gap-1">
+                  {(lastSyncResult.providers ?? []).map((provider) => (
+                    <div key={provider.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                      <span className="truncate">{provider.id}</span>
+                      <span>{provider.status === "synced" ? tAdmin("traffic.actions.rowsSynced", { count: provider.rowsSynced }) : provider.error ?? provider.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <Badge tone={configuredIntegrations > 0 ? "ok" : "neutral"}>{tAdmin("traffic.settings.configuredCount", { count: configuredIntegrations, total: settings?.integrations.length ?? 0 })}</Badge>
+            {(settings?.integrations ?? []).map((integration) => (
+              <div key={integration.id} className="rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-[12px]">{integration.label}</strong>
+                  <Badge tone={integration.configured ? "ok" : "neutral"}>{integration.configured ? tAdmin("traffic.settings.configured") : tAdmin("traffic.settings.notConfigured")}</Badge>
+                </div>
+                <p className="m-0 mt-1 text-[11px] font-semibold leading-5 text-[var(--muted)]">{integration.description}</p>
+              </div>
+            ))}
+            {settings?.integrations.length === 0 || !settings ? <EmptyAdminDetail text={tAdmin("traffic.emptySettings")} /> : null}
+          </div>
+        </AdminSidePanel>
+      )}
+    >
+      <div className="grid gap-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+          <AdminDataPanel
+            title={tAdmin("traffic.trend")}
+            icon={<BarChart3 size={16} />}
+            right={<Badge>{tAdmin("traffic.range")}</Badge>}
+          >
+            <AdminChart option={trafficTrendOption} empty={(overview?.trend ?? []).length === 0} />
+          </AdminDataPanel>
+          <AdminDataPanel
+            title={tAdmin("traffic.sources.title")}
+            icon={<Route size={16} />}
+            right={<Badge>{tAdmin("traffic.sources.badge", { count: sources?.sources.length ?? 0 })}</Badge>}
+          >
+            <div className="divide-y divide-[var(--border)]">
+              {(sources?.sources ?? []).map((source) => (
+                <div key={source.source} className="grid gap-2 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-sm">{source.source}</strong>
+                    <Badge>{formatNumber(source.visitors)} {tAdmin("traffic.metrics.visitors")}</Badge>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                    <span>{tAdmin("traffic.metrics.pageViews")}: {formatNumber(source.pageViews)}</span>
+                    <span>{tAdmin("traffic.metrics.ctaClicks")}: {formatNumber(source.ctaClicks)}</span>
+                    <span>{tAdmin("traffic.metrics.signups")}: {formatNumber(source.signups)}</span>
+                    <span>{tAdmin("traffic.metrics.paidRecharges")}: {formatNumber(source.paidRecharges)}</span>
+                  </div>
+                </div>
+              ))}
+              {sources?.sources.length === 0 || !sources ? <div className="p-4"><EmptyAdminDetail text={tAdmin("traffic.emptySources")} /></div> : null}
+            </div>
+          </AdminDataPanel>
+        </div>
+
+        <AdminDataPanel
+          title={tAdmin("traffic.pages.title")}
+          icon={<Globe2 size={16} />}
+          right={<Badge tone={topPage ? "ok" : "neutral"}>{topPage ? topPage.path : tAdmin("traffic.pages.noTopPage")}</Badge>}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] border-separate border-spacing-0 text-left text-xs">
+              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                <tr>
+                  <AdminTh>{tAdmin("traffic.pages.path")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.pages.type")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.visitors")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.pageViews")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.clicks")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.impressions")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.position")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.ctaClicks")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.signups")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.paidRecharges")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.metrics.completedCreativeJobs")}</AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {(pages?.pages ?? []).map((page) => (
+                  <tr key={`${page.path}-${page.locale ?? "all"}`} className="bg-[var(--card)]">
+                    <AdminTd>
+                      <div className="font-black text-[var(--text)]">{page.path}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{page.locale ?? "-"}</div>
+                    </AdminTd>
+                    <AdminTd><Badge>{page.pageType}</Badge></AdminTd>
+                    <AdminTd>{formatNumber(page.visitors)}</AdminTd>
+                    <AdminTd>{formatNumber(page.pageViews)}</AdminTd>
+                    <AdminTd>{formatNumber(page.searchClicks)}</AdminTd>
+                    <AdminTd>{formatNumber(page.searchImpressions)}</AdminTd>
+                    <AdminTd>{page.averagePosition ? page.averagePosition.toFixed(1) : "-"}</AdminTd>
+                    <AdminTd>{formatNumber(page.ctaClicks)}</AdminTd>
+                    <AdminTd>{formatNumber(page.signups)}</AdminTd>
+                    <AdminTd>{formatNumber(page.paidRecharges)}</AdminTd>
+                    <AdminTd>{formatNumber(page.completedCreativeJobs)}</AdminTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pages?.pages.length === 0 || !pages ? <div className="p-4"><EmptyAdminDetail text={tAdmin("traffic.emptyPages")} /></div> : null}
+        </AdminDataPanel>
+
+        <AdminDataPanel
+          title={tAdmin("traffic.search.title")}
+          icon={<Search size={16} />}
+          right={<Badge>{tAdmin("traffic.search.badge", { count: search?.rows.length ?? 0 })}</Badge>}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] border-separate border-spacing-0 text-left text-xs">
+              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                <tr>
+                  <AdminTh>{tAdmin("traffic.search.query")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.page")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.clicks")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.impressions")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.ctr")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.position")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.search.date")}</AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {(search?.rows ?? []).slice(0, 40).map((row) => (
+                  <tr key={`${row.date}-${row.query}-${row.page}`} className="bg-[var(--card)]">
+                    <AdminTd>
+                      <div className="max-w-[300px] truncate font-black text-[var(--text)]">{row.query}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{[row.country, row.device].filter(Boolean).join(" / ") || "-"}</div>
+                    </AdminTd>
+                    <AdminTd><div className="max-w-[360px] truncate">{row.page}</div></AdminTd>
+                    <AdminTd>{formatNumber(row.clicks)}</AdminTd>
+                    <AdminTd>{formatNumber(row.impressions)}</AdminTd>
+                    <AdminTd>{row.ctr !== undefined ? `${(row.ctr * 100).toFixed(1)}%` : "-"}</AdminTd>
+                    <AdminTd>{row.position !== undefined ? row.position.toFixed(1) : "-"}</AdminTd>
+                    <AdminTd>{row.date}</AdminTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {search?.rows.length === 0 || !search ? <div className="p-4"><EmptyAdminDetail text={tAdmin("traffic.emptySearch")} /></div> : null}
+        </AdminDataPanel>
+
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
+          <AdminDataPanel
+            title={tAdmin("traffic.cloudflare.title")}
+            icon={<Globe2 size={16} />}
+            right={<Badge>{tAdmin("traffic.cloudflare.badge", { count: cloudflare?.rows.length ?? 0 })}</Badge>}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] border-separate border-spacing-0 text-left text-xs">
+                <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                  <tr>
+                    <AdminTh>{tAdmin("traffic.search.date")}</AdminTh>
+                    <AdminTh>{tAdmin("traffic.cloudflare.country")}</AdminTh>
+                    <AdminTh>{tAdmin("traffic.cloudflare.status")}</AdminTh>
+                    <AdminTh>{tAdmin("traffic.cloudflare.crawler")}</AdminTh>
+                    <AdminTh>{tAdmin("traffic.cloudflare.requests")}</AdminTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(cloudflare?.rows ?? []).slice(0, 20).map((row) => (
+                    <tr key={`${row.date}-${row.country ?? "-"}-${row.status ?? "-"}-${row.crawler ?? "-"}`} className="bg-[var(--card)]">
+                      <AdminTd>{row.date}</AdminTd>
+                      <AdminTd>{row.country ?? "-"}</AdminTd>
+                      <AdminTd>{row.status ?? "-"}</AdminTd>
+                      <AdminTd>{row.crawler ?? "-"}</AdminTd>
+                      <AdminTd>{formatNumber(row.requests)}</AdminTd>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {cloudflare?.rows.length === 0 || !cloudflare ? <div className="p-4"><EmptyAdminDetail text={tAdmin("traffic.emptyCloudflare")} /></div> : null}
+          </AdminDataPanel>
+          <AdminDataPanel
+            title={tAdmin("traffic.geo.title")}
+            icon={<Activity size={16} />}
+            right={<Badge>{tAdmin("traffic.geo.badge", { count: geoSummary?.opportunities.length ?? 0 })}</Badge>}
+          >
+            <div className="grid gap-3 p-4 text-xs">
+              <div className="grid gap-2 min-[760px]:grid-cols-4">
+                <Badge>{tAdmin("traffic.geo.pagesReviewed", { count: geoSummary?.pagesReviewed ?? 0 })}</Badge>
+                <Badge>{tAdmin("traffic.search.clicks")}: {formatNumber(geoSummary?.searchClicks ?? 0)}</Badge>
+                <Badge>{tAdmin("traffic.search.impressions")}: {formatNumber(geoSummary?.searchImpressions ?? 0)}</Badge>
+                <Badge>{tAdmin("traffic.cloudflare.requests")}: {formatNumber(geoSummary?.edgeRequests ?? 0)}</Badge>
+              </div>
+              <div className="grid gap-2">
+                {(geoSummary?.opportunities ?? []).slice(0, 8).map((item) => (
+                  <div key={item.path} className="grid gap-1 rounded-[8px] border border-[var(--border)] bg-[var(--panel2)] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="truncate text-[var(--text)]">{item.path}</strong>
+                      <Badge tone="warn">{item.reason}</Badge>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                      <span>{tAdmin("traffic.search.clicks")}: {formatNumber(item.searchClicks)}</span>
+                      <span>{tAdmin("traffic.search.impressions")}: {formatNumber(item.searchImpressions)}</span>
+                      <span>{tAdmin("traffic.metrics.pageViews")}: {formatNumber(item.pageViews)}</span>
+                      <span>{tAdmin("traffic.metrics.ctaClicks")}: {formatNumber(item.ctaClicks)}</span>
+                    </div>
+                  </div>
+                ))}
+                {geoSummary?.opportunities.length === 0 || !geoSummary ? <EmptyAdminDetail text={tAdmin("traffic.emptyGeoSummary")} /> : null}
+              </div>
+            </div>
+          </AdminDataPanel>
+        </div>
+
+        <AdminDataPanel
+          title={tAdmin("traffic.indexing.title")}
+          icon={<Search size={16} />}
+          right={<Badge>{tAdmin("traffic.indexing.badge", { count: indexing?.submissions.length ?? 0 })}</Badge>}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left text-xs">
+              <thead className="bg-[var(--panel2)] text-[var(--muted)]">
+                <tr>
+                  <AdminTh>{tAdmin("traffic.indexing.url")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.indexing.provider")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.indexing.status")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.indexing.submittedAt")}</AdminTh>
+                  <AdminTh>{tAdmin("traffic.indexing.message")}</AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {(indexing?.submissions ?? []).map((submission) => (
+                  <tr key={submission.id} className="bg-[var(--card)]">
+                    <AdminTd>
+                      <div className="max-w-[420px] truncate font-black text-[var(--text)]">{submission.url}</div>
+                      <div className="mt-0.5 text-[11px] text-[var(--muted)]">{submission.submissionType}</div>
+                    </AdminTd>
+                    <AdminTd>{submission.provider}</AdminTd>
+                    <AdminTd><Badge tone={submission.errorMessage ? "warn" : "ok"}>{submission.statusCode ?? "-"}</Badge></AdminTd>
+                    <AdminTd>{formatDateTime(submission.submittedAt)}</AdminTd>
+                    <AdminTd>{submission.errorMessage ?? submission.responseExcerpt ?? "-"}</AdminTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {indexing?.submissions.length === 0 || !indexing ? <div className="p-4"><EmptyAdminDetail text={tAdmin("traffic.emptyIndexing")} /></div> : null}
+        </AdminDataPanel>
+      </div>
+    </AdminWorkbench>
+  );
+}
+
+function buildTrafficTrendOption(rows: AdminTrafficOverviewResponse["trend"]): EChartsOption {
+  return {
+    color: ["#0aa394", "#315c75", "#d07a2d", "#6f7f3f"],
+    tooltip: { trigger: "axis" },
+    legend: {
+      bottom: 4,
+      textStyle: { color: "#7b7068", fontSize: 11 }
+    },
+    grid: { left: 36, right: 18, top: 22, bottom: 62 },
+    xAxis: {
+      type: "category",
+      data: rows.map((row) => row.date),
+      axisLabel: { color: "#7b7068" }
+    },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: { color: "#7b7068" },
+      splitLine: { lineStyle: { color: "rgba(117,105,95,.18)" } }
+    },
+    series: [
+      {
+        name: tAdmin("traffic.metrics.pageViews"),
+        type: "line",
+        smooth: true,
+        data: rows.map((row) => row.pageViews)
+      },
+      {
+        name: tAdmin("traffic.metrics.visitors"),
+        type: "line",
+        smooth: true,
+        data: rows.map((row) => row.visitors)
+      },
+      {
+        name: tAdmin("traffic.metrics.signups"),
+        type: "bar",
+        data: rows.map((row) => row.signups)
+      },
+      {
+        name: tAdmin("traffic.metrics.paidRecharges"),
+        type: "bar",
+        data: rows.map((row) => row.paidRecharges)
+      }
+    ]
+  };
 }
 
 function AdminFinancePanel({

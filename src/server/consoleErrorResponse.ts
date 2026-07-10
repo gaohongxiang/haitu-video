@@ -1,8 +1,12 @@
 import { aiInsufficientBalanceMessage } from "./aiBilling.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import { InsufficientWalletBalanceError } from "./walletStore.js";
+import { RequestBodyTooLargeError } from "./consoleHttpService.js";
 
 export function consoleErrorResponse(error: unknown, message: string): Response {
+  if (error instanceof RequestBodyTooLargeError) {
+    return jsonResponse({ error: message }, 413);
+  }
   if (message.includes("outside project root") || message.includes("outside data root")) {
     return jsonResponse({ error: message }, 403);
   }

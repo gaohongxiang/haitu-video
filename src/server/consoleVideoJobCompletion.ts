@@ -8,9 +8,6 @@ import {
 import {
   completedVideoJobPatch
 } from "./consoleVideoJobStatePatch.js";
-import {
-  captureVideoJobWalletCharge
-} from "./consoleVideoJobPersistence.js";
 import type { BillingPolicyStore } from "./billingPolicyStore.js";
 
 export async function completeVideoJob(input: {
@@ -33,18 +30,6 @@ export async function completeVideoJob(input: {
     completedAt: input.completedAt,
     mediaUrlForPath: input.mediaUrlForPath,
     billingPolicyStore: input.billingPolicyStore
-  });
-  captureVideoJobWalletCharge({
-    databaseHandle: input.databaseHandle,
-    workspaceId: input.workspaceId,
-    now: input.now,
-    billingPolicyStore: input.billingPolicyStore,
-    modelPricingCatalog: input.modelPricingCatalog,
-    modelPricingCatalogVersion: input.modelPricingCatalogVersion,
-    record: {
-      ...input.record,
-      estimatedCostCny: patch.upstreamEstimatedCostCny ?? input.report.billing?.estimatedCostCny
-    }
   });
   return patch;
 }

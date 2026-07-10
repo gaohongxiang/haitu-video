@@ -91,7 +91,7 @@ describe("admin app source", () => {
     const source = await readFile(adminAppPath, "utf8");
     const dashboardSource = source.slice(source.indexOf("function AdminDashboard"), source.indexOf("function modelServicesEndpoint"));
 
-    expect(source).toContain('type AdminSection = "overview" | "users" | "content" | "finance" | "payment-billing" | "model-services" | "model-pricing" | "site-settings" | "system";');
+    expect(source).toContain('type AdminSection = "overview" | "users" | "content" | "traffic" | "finance" | "payment-billing" | "model-services" | "model-pricing" | "site-settings" | "system";');
     expect(source).toContain("const adminNavigationItems");
     expect(source).toContain('group: "operate"');
     expect(source).toContain('group: "commercial"');
@@ -170,6 +170,34 @@ describe("admin app source", () => {
     expect(source).toContain('activeSection === "content"');
     expect(source).toContain('activeSection === "model-pricing"');
     expect(source).toContain('activeSection === "site-settings"');
+  });
+
+  it("connects the traffic growth section to admin traffic APIs", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+    const trafficSection = source.slice(source.indexOf('activeSection === "traffic"'), source.indexOf('if (activeSection === "finance")'));
+
+    expect(source).toContain("AdminTrafficPanel");
+    expect(source).toContain('translationKey: "traffic"');
+    expect(source).toContain('getJson<AdminTrafficOverviewResponse>("/api/admin/traffic/overview")');
+    expect(source).toContain('getJson<AdminTrafficSourcesResponse>("/api/admin/traffic/sources")');
+    expect(source).toContain('getJson<AdminTrafficPagesResponse>("/api/admin/traffic/pages")');
+    expect(source).toContain('getJson<AdminTrafficIndexingResponse>("/api/admin/traffic/indexing")');
+    expect(source).toContain('getJson<AdminTrafficSearchResponse>("/api/admin/traffic/search")');
+    expect(source).toContain('getJson<AdminTrafficSettingsResponse>("/api/admin/traffic/settings")');
+    expect(source).toContain('getJson<AdminTrafficCloudflareResponse>("/api/admin/traffic/cloudflare")');
+    expect(source).toContain('getJson<AdminTrafficGeoSummaryResponse>("/api/admin/traffic/geo-summary")');
+    expect(source).toContain('postJson<AdminTrafficActionResponse>("/api/admin/traffic/sync"');
+    expect(source).toContain('postJson<AdminTrafficActionResponse>("/api/admin/traffic/indexnow/submit"');
+    expect(source).toContain('activeSection === "traffic"');
+    expect(trafficSection).toContain("<AdminTrafficPanel");
+    expect(source).toContain("lastSyncResult.providers");
+    expect(source).toContain('tAdmin("traffic.actions.rowsSynced"');
+    expect(source).toContain('tAdmin("traffic.settings.title")');
+    expect(source).toContain('tAdmin("traffic.pages.title")');
+    expect(source).toContain('tAdmin("traffic.search.title")');
+    expect(source).toContain('tAdmin("traffic.cloudflare.title")');
+    expect(source).toContain('tAdmin("traffic.geo.title")');
+    expect(source).toContain('tAdmin("traffic.indexing.title")');
   });
 
   it("keeps the admin shell usable when secondary admin modules fail to load", async () => {

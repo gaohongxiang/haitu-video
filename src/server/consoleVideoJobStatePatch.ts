@@ -77,12 +77,14 @@ export function queuedRetryVideoJobPatch(input: {
 
 export function queuedRecoverDownloadVideoJobPatch(input: {
   reuseManifest?: string;
+  walletReservationId?: string;
   expiresAt: string;
 }): Partial<VideoJobRecord> {
   return {
     status: "queued",
     confirmPaid: false,
     reuseManifest: input.reuseManifest,
+    walletReservationId: input.walletReservationId,
     ...resetGeneratedResultFields(),
     canRecoverDownload: false,
     expiresAt: input.expiresAt

@@ -16,6 +16,7 @@ import type { DatabaseHandle } from "./db/client.js";
 import {
   closeDatabase,
   createConsoleDatabaseHandle,
+  startTrafficExternalSync,
   startVideoRetentionCleanup
 } from "./consoleLifecycleService.js";
 import type { ModelConfigStore } from "./modelConfigStore.js";
@@ -26,6 +27,7 @@ import { PublicAssetTokenStore } from "./publicAssetTokenStore.js";
 import { FileReviewStore } from "./reviewStore.js";
 import {
   DEFAULT_WORKSPACE_ID,
+  PLATFORM_WORKSPACE_ID,
   getStorageRoots,
   getWorkspacePaths,
   resolveDataDir
@@ -52,6 +54,7 @@ export interface ConsoleServerRuntime {
   publicBaseUrl?: string;
   databaseHandle: DatabaseHandle;
   defaultModelConfigStore: ModelConfigStore;
+  platformModelConfigStore: ModelConfigStore;
   auditLog: FileAuditLog;
   authStore: ConsoleAuthStore;
   videoJobQueue: LocalVideoJobQueue;
@@ -85,6 +88,10 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
     databaseHandle,
     workspaceId: DEFAULT_WORKSPACE_ID
   });
+  const platformModelConfigStore = createModelConfigStore({
+    databaseHandle,
+    workspaceId: PLATFORM_WORKSPACE_ID
+  });
   const defaultModelServicePreferenceStore = new ModelServicePreferenceStore({
     handle: databaseHandle,
     workspaceId: DEFAULT_WORKSPACE_ID,
@@ -110,11 +117,12 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
   const authStore = new BetterAuthConsoleAuthStore({
     handle: databaseHandle,
     dataDir,
-    env: process.env
+    env: process.env,
+    now: options.now
   });
   const runConfiguredMakeVideoPipeline = createConfiguredMakeVideoPipeline({
     modelConfigStore: defaultModelConfigStore,
-    platformModelConfigStore: defaultModelConfigStore,
+    platformModelConfigStore,
     modelServicePreferenceStore: defaultModelServicePreferenceStore,
     billingPolicyStore,
     modelPricingCatalog: getModelPricingCatalogContext().catalog,
@@ -136,6 +144,7 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
     fetchImpl: options.fetchImpl,
     runMakeVideoPipeline: runConfiguredMakeVideoPipeline,
     referenceImageUrlResolver: defaultReferenceImageUrlResolver,
+    now: options.now,
     databaseHandle,
     billingPolicyStore,
     modelPricingCatalog: getModelPricingCatalogContext().catalog,
@@ -148,6 +157,12 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
     dataDir,
     databaseHandle,
     auditLog
+  });
+  const trafficExternalSyncTimer = startTrafficExternalSync({
+    databaseHandle,
+    auditLog,
+    fetchImpl: options.fetchImpl,
+    now: options.now
   });
   if (options.autoStartSavedJobs !== false) {
     void videoJobQueue.startSavedJobs();
@@ -163,12 +178,16 @@ export function createConsoleServerRuntime(options: ConsoleServerRuntimeOptions 
     publicBaseUrl,
     databaseHandle,
     defaultModelConfigStore,
+    platformModelConfigStore,
     auditLog,
     authStore,
     videoJobQueue,
     workspaceVideoJobQueues,
     close() {
       clearInterval(videoRetentionTimer);
+      if (trafficExternalSyncTimer) {
+        clearInterval(trafficExternalSyncTimer);
+      }
       closeDatabase(databaseHandle);
     }
   };

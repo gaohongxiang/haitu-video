@@ -1272,6 +1272,10 @@
         "label": "创作运营",
         "description": "视频任务、商品素材、失败排查"
       },
+      "traffic": {
+        "label": "流量增长",
+        "description": "访问、来源、索引、转化"
+      },
       "finance": {
         "label": "财务账务",
         "description": "余额、充值、消费、调账"
@@ -1509,6 +1513,91 @@
         "assets": "资产",
         "createdAt": "创建时间"
       }
+    },
+    "traffic": {
+      "range": "近 28 天",
+      "trend": "访问与转化趋势",
+      "metrics": {
+        "visitors": "访客",
+        "pageViews": "浏览",
+        "ctaClicks": "CTA",
+        "signups": "注册",
+        "paidRecharges": "充值成功",
+        "completedCreativeJobs": "生成完成",
+        "indexSubmissions": "索引提交"
+      },
+      "hints": {
+        "firstParty": "Haitu 自有事件",
+        "publicPages": "公开页 page_view",
+        "cta": "公开页按钮点击",
+        "conversion": "注册转化",
+        "revenue": "支付成功",
+        "jobs": "生成任务完成",
+        "indexing": "IndexNow / sitemap 记录"
+      },
+      "sources": {
+        "title": "来源渠道",
+        "badge": "{{count}} 个来源"
+      },
+      "pages": {
+        "title": "页面表现",
+        "noTopPage": "暂无入口页",
+        "path": "路径",
+        "type": "类型"
+      },
+      "search": {
+        "title": "搜索表现",
+        "badge": "{{count}} 条搜索记录",
+        "query": "查询词",
+        "page": "页面",
+        "clicks": "点击",
+        "impressions": "曝光",
+        "ctr": "CTR",
+        "position": "排名",
+        "date": "日期"
+      },
+      "indexing": {
+        "title": "索引与提交",
+        "badge": "{{count}} 条记录",
+        "url": "URL",
+        "provider": "平台",
+        "status": "状态",
+        "submittedAt": "提交时间",
+        "message": "响应 / 错误"
+      },
+      "cloudflare": {
+        "title": "边缘请求",
+        "badge": "{{count}} 条边缘记录",
+        "country": "国家",
+        "status": "状态码",
+        "crawler": "爬虫",
+        "requests": "请求"
+      },
+      "geo": {
+        "title": "SEO/GEO 摘要",
+        "badge": "{{count}} 个机会",
+        "pagesReviewed": "{{count}} 个页面"
+      },
+      "settings": {
+        "title": "集成状态",
+        "configuredCount": "{{count}}/{{total}} 已配置",
+        "configured": "已配置",
+        "notConfigured": "未配置"
+      },
+      "actions": {
+        "sync": "同步",
+        "indexNow": "提交 IndexNow",
+        "syncResult": "流量同步状态：{{status}}",
+        "rowsSynced": "{{count}} 行",
+        "indexNowResult": "IndexNow 提交状态：{{status}}"
+      },
+      "emptySources": "还没有来源数据。公开站访问被记录后，这里会显示搜索、直接访问、AI 和外链来源。",
+      "emptyPages": "还没有记录到公开页面访问。",
+      "emptySearch": "还没有 Search Console 缓存数据。配置 Google 凭证并同步后，这里会显示查询词和页面表现。",
+      "emptyCloudflare": "还没有 Cloudflare 边缘请求缓存数据。",
+      "emptyGeoSummary": "还没有足够的搜索或访问数据生成页面机会。",
+      "emptyIndexing": "还没有 IndexNow 或 sitemap 提交记录。",
+      "emptySettings": "还没有可展示的流量集成状态。"
     },
     "finance": {
       "ariaLabel": "财务账务",

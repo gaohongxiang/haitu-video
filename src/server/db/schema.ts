@@ -186,6 +186,7 @@ export const walletRechargeOrders = sqliteTable("wallet_recharge_orders", {
   amountCents: integer("amount_cents").notNull(),
   currency: text("currency").notNull(),
   creditCents: integer("credit_cents").notNull(),
+  reversedCreditCents: integer("reversed_credit_cents").notNull().default(0),
   status: text("status").notNull(),
   checkoutUrl: text("checkout_url"),
   failureReason: text("failure_reason"),
@@ -296,6 +297,64 @@ export const auditLogs = sqliteTable("audit_logs", {
   actorIndex: index("audit_logs_actor_user_id_idx").on(table.actorUserId)
 }));
 
+export const trafficEvents = sqliteTable("traffic_events", {
+  id: text("id").primaryKey(),
+  occurredAt: text("occurred_at").notNull(),
+  eventName: text("event_name").notNull(),
+  path: text("path").notNull(),
+  canonicalPath: text("canonical_path").notNull(),
+  locale: text("locale"),
+  pageType: text("page_type").notNull(),
+  sourceGroup: text("source_group").notNull(),
+  referrerHost: text("referrer_host"),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  sessionHash: text("session_hash"),
+  userId: text("user_id"),
+  workspaceId: text("workspace_id"),
+  metadataJson: text("metadata_json")
+}, (table) => ({
+  occurredAtIndex: index("traffic_events_occurred_at_idx").on(table.occurredAt),
+  nameTimeIndex: index("traffic_events_name_time_idx").on(table.eventName, table.occurredAt),
+  pageTimeIndex: index("traffic_events_page_time_idx").on(table.canonicalPath, table.occurredAt),
+  sourceTimeIndex: index("traffic_events_source_time_idx").on(table.sourceGroup, table.occurredAt)
+}));
+
+export const trafficDailyMetrics = sqliteTable("traffic_daily_metrics", {
+  id: text("id").primaryKey(),
+  metricDate: text("metric_date").notNull(),
+  provider: text("provider").notNull(),
+  dataset: text("dataset").notNull(),
+  dimensionJson: text("dimension_json").notNull(),
+  metricJson: text("metric_json").notNull(),
+  syncedAt: text("synced_at").notNull()
+}, (table) => ({
+  metricUnique: uniqueIndex("traffic_daily_metrics_unique_idx").on(
+    table.metricDate,
+    table.provider,
+    table.dataset,
+    table.dimensionJson
+  ),
+  providerDateIndex: index("traffic_daily_metrics_provider_date_idx").on(table.provider, table.metricDate)
+}));
+
+export const indexingSubmissions = sqliteTable("indexing_submissions", {
+  id: text("id").primaryKey(),
+  submittedAt: text("submitted_at").notNull(),
+  provider: text("provider").notNull(),
+  submissionType: text("submission_type").notNull(),
+  url: text("url").notNull(),
+  payloadHash: text("payload_hash"),
+  statusCode: integer("status_code"),
+  responseExcerpt: text("response_excerpt"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0)
+}, (table) => ({
+  submittedAtIndex: index("indexing_submissions_submitted_at_idx").on(table.submittedAt),
+  providerTimeIndex: index("indexing_submissions_provider_time_idx").on(table.provider, table.submittedAt)
+}));
+
 export const userSessions = sqliteTable("user_sessions", {
   tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -312,6 +371,7 @@ export const schema = {
   auditLogs,
   billingPolicies,
   billingPriceRules,
+  indexingSubmissions,
   productAssets,
   products,
   modelCredentials,
@@ -320,6 +380,8 @@ export const schema = {
   modelServicePreferences,
   modelVariants,
   storyboards,
+  trafficDailyMetrics,
+  trafficEvents,
   userSessions,
   users,
   videoAssets,

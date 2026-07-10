@@ -27,6 +27,7 @@ export interface VideoJobRequest {
   billingCatalogVersion?: string;
   billingPriceSnapshot?: ModelPricingSnapshot;
   reuseManifest?: string;
+  clientRequestId?: string;
 }
 
 export interface VideoJobRecord {
@@ -55,6 +56,7 @@ export interface VideoJobRecord {
   billingCatalogVersion?: string;
   billingPriceSnapshot?: ModelPricingSnapshot;
   reuseManifest?: string;
+  clientRequestId?: string;
   outDir: string;
   reportPath?: string;
   reportUrl?: string;

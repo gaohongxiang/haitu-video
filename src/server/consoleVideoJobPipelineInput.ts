@@ -9,6 +9,7 @@ export function createMakeVideoPipelineInput(input: {
   fetchImpl?: typeof fetch;
   referenceImageUrlResolver?: ReferenceImageUrlResolver;
   tokenPriceCnyPerMillion?: number;
+  onProviderTaskCreated?: (taskId: string) => Promise<void> | void;
 }): MakeVideoPipelineInput {
   return {
     productPath: input.record.productPath,
@@ -29,6 +30,7 @@ export function createMakeVideoPipelineInput(input: {
     reuseManifestPath: input.record.reuseManifest,
     fetchImpl: input.fetchImpl,
     referenceImageUrlResolver: input.referenceImageUrlResolver,
-    tokenPriceCnyPerMillion: input.tokenPriceCnyPerMillion
+    tokenPriceCnyPerMillion: input.tokenPriceCnyPerMillion,
+    onProviderTaskCreated: input.onProviderTaskCreated
   };
 }

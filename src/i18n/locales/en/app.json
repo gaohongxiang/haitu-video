@@ -1272,6 +1272,10 @@
         "label": "Creation Ops",
         "description": "Video jobs, product assets, failures"
       },
+      "traffic": {
+        "label": "Traffic Growth",
+        "description": "Visits, sources, indexing, conversion"
+      },
       "finance": {
         "label": "Finance Ledger",
         "description": "Balances, top-ups, charges, adjustments"
@@ -1509,6 +1513,91 @@
         "assets": "Assets",
         "createdAt": "Created"
       }
+    },
+    "traffic": {
+      "range": "Last 28 days",
+      "trend": "Traffic and Conversion Trend",
+      "metrics": {
+        "visitors": "Visitors",
+        "pageViews": "Views",
+        "ctaClicks": "CTA",
+        "signups": "Signups",
+        "paidRecharges": "Paid Top-ups",
+        "completedCreativeJobs": "Completed Jobs",
+        "indexSubmissions": "Index Submits"
+      },
+      "hints": {
+        "firstParty": "Haitu first-party events",
+        "publicPages": "Public page views",
+        "cta": "Public CTA clicks",
+        "conversion": "Signup conversion",
+        "revenue": "Successful payments",
+        "jobs": "Completed generation jobs",
+        "indexing": "IndexNow / sitemap records"
+      },
+      "sources": {
+        "title": "Traffic Sources",
+        "badge": "{{count}} sources"
+      },
+      "pages": {
+        "title": "Page Performance",
+        "noTopPage": "No entry page",
+        "path": "Path",
+        "type": "Type"
+      },
+      "search": {
+        "title": "Search Performance",
+        "badge": "{{count}} search rows",
+        "query": "Query",
+        "page": "Page",
+        "clicks": "Clicks",
+        "impressions": "Impressions",
+        "ctr": "CTR",
+        "position": "Position",
+        "date": "Date"
+      },
+      "indexing": {
+        "title": "Indexing and Submission",
+        "badge": "{{count}} records",
+        "url": "URL",
+        "provider": "Provider",
+        "status": "Status",
+        "submittedAt": "Submitted",
+        "message": "Response / Error"
+      },
+      "cloudflare": {
+        "title": "Edge Requests",
+        "badge": "{{count}} edge rows",
+        "country": "Country",
+        "status": "Status",
+        "crawler": "Crawler",
+        "requests": "Requests"
+      },
+      "geo": {
+        "title": "SEO/GEO Summary",
+        "badge": "{{count}} opportunities",
+        "pagesReviewed": "{{count}} pages"
+      },
+      "settings": {
+        "title": "Integration Status",
+        "configuredCount": "{{count}}/{{total}} configured",
+        "configured": "Configured",
+        "notConfigured": "Not configured"
+      },
+      "actions": {
+        "sync": "Sync",
+        "indexNow": "Submit IndexNow",
+        "syncResult": "Traffic sync status: {{status}}",
+        "rowsSynced": "{{count}} rows",
+        "indexNowResult": "IndexNow submit status: {{status}}"
+      },
+      "emptySources": "No source data yet. Search, direct, AI, and referral sources will appear after public visits are recorded.",
+      "emptyPages": "No public page visits recorded yet.",
+      "emptySearch": "No cached Search Console data yet. Configure Google credentials and sync to show query and page performance.",
+      "emptyCloudflare": "No cached Cloudflare edge request data yet.",
+      "emptyGeoSummary": "No search or visit data yet for page opportunities.",
+      "emptyIndexing": "No IndexNow or sitemap submission records yet.",
+      "emptySettings": "No traffic integration status to show yet."
     },
     "finance": {
       "ariaLabel": "Finance Ledger",

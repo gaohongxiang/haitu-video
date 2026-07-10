@@ -141,6 +141,37 @@ export async function reserveRetryVideoJobBilling(input: {
   });
 }
 
+export function ensureRecoverDownloadVideoJobBilling(input: {
+  record: VideoJobRecord;
+  walletStore: WalletStore;
+}): string | undefined {
+  if (!input.record.walletReservationId || input.record.provider === "mock") {
+    return input.record.walletReservationId;
+  }
+  if (input.walletStore.reservedCnyForReservation(input.record.walletReservationId) > 0) {
+    return input.record.walletReservationId;
+  }
+  const amountCny = roundMoney(
+    (input.record.platformFeeCny ?? 0)
+      + (input.record.apiBillingMode === "platform" ? input.record.upstreamEstimatedCostCny ?? 0 : 0)
+  );
+  if (amountCny <= 0) {
+    return input.record.walletReservationId;
+  }
+  return input.walletStore.reserve({
+    amountCny,
+    jobId: input.record.id,
+    description: "视频下载恢复重新预扣",
+    metadata: {
+      recovery: true,
+      apiBillingMode: input.record.apiBillingMode,
+      platformFeeCny: input.record.platformFeeCny,
+      upstreamEstimatedCostCny: input.record.upstreamEstimatedCostCny,
+      priceSnapshot: input.record.billingPriceSnapshot
+    }
+  }).reservationId;
+}
+
 export async function assertRetryVideoJobAllowed(input: {
   jobId: string;
   confirmPaid?: boolean;

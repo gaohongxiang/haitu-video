@@ -28,6 +28,7 @@
 ## 策略
 
 - [SEO / GEO 全局规划](marketing/seo-geo-roadmap.md)：当前公开站获客、AI 答案、合规和页面矩阵规划。
+- [后台流量与 SEO/GEO 数据看板规划](marketing/traffic-analytics-admin-plan.md)：把访问、搜索、IndexNow、sitemap 和转化集中到 `/admin` 查看。
 
 ## 文档规则
 

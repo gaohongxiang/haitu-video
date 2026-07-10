@@ -17,6 +17,7 @@ describe("console lifecycle service source boundaries", () => {
     expect(consoleServerSource).not.toContain("startVideoRetentionCleanup(");
     expect(runtimeSource).toContain('from "./consoleLifecycleService.js"');
     expect(runtimeSource).toContain("startVideoRetentionCleanup(");
+    expect(runtimeSource).toContain("startTrafficExternalSync(");
     expect(consoleServerSource).not.toContain("function createDatabaseHandle(");
     expect(consoleServerSource).not.toContain("function retentionWorkspaceIds(");
     expect(consoleServerSource).not.toContain("const ensurePlatformBundlesForAllWorkspaces");

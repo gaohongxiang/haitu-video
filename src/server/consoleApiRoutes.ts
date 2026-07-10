@@ -113,7 +113,8 @@ export async function handleConsoleApiRoutes(input: {
     rootDir: dataDir,
     outputsDir,
     reviewStore,
-    auditLog
+    auditLog,
+    authStore
   });
   if (assetReportRouteResponse) {
     return assetReportRouteResponse;

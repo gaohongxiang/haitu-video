@@ -152,6 +152,7 @@ export function listAdminWallets(handle: DatabaseHandle): { wallets: AdminWallet
       AND lw.row_number = 1
     LEFT JOIN transaction_counts tc ON tc.workspace_id = w.id
     LEFT JOIN member_counts mc ON mc.workspace_id = w.id
+    WHERE w.id <> '__platform__'
     ORDER BY
       COALESCE(lw.created_at, w.created_at) DESC,
       w.created_at DESC
@@ -353,7 +354,7 @@ function adminRechargeOrderFromRow(row: AdminRechargeOrderRow): AdminRechargeOrd
 }
 
 function assertWorkspaceExists(handle: DatabaseHandle, workspaceId: string): void {
-  const row = handle.sqlite.prepare("SELECT id FROM workspaces WHERE id = ?").get(workspaceId) as { id: string } | undefined;
+  const row = handle.sqlite.prepare("SELECT id FROM workspaces WHERE id = ? AND id <> '__platform__'").get(workspaceId) as { id: string } | undefined;
   if (!row) {
     throw new Error("工作区不存在，无法调整余额。");
   }

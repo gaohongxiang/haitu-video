@@ -62,6 +62,7 @@ export async function runProductJob(input: {
   scriptLines?: string[];
   storyboardLines?: string[];
   finalLanguage?: FinalVideoLanguage;
+  onProviderTaskCreated?: (taskId: string) => Promise<void> | void;
 }): Promise<ProductJobManifest> {
   const durationSeconds = input.durationSeconds ?? 8;
   const aspectRatio = normalizeVideoAspectRatio(input.aspectRatio);
@@ -97,7 +98,8 @@ export async function runProductJob(input: {
     resolution: input.resolution,
     outputDir,
     referenceImages: generationProduct.reference_images,
-    finalLanguage
+    finalLanguage,
+    onTaskCreated: input.onProviderTaskCreated
   });
   const qc = runBasicQc({
     product: input.product,

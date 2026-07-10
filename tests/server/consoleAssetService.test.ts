@@ -81,7 +81,8 @@ describe("console asset service", () => {
     const resolvedUrl = await resolver?.("https://cdn.example.test/reference.jpg?x=1");
 
     expect(resolvedUrl).toMatch(/^https:\/\/console\.example\.test\/app\/api\/public-assets\/[A-Za-z0-9_-]+$/);
-    expect(fetchImpl).toHaveBeenCalledWith("https://cdn.example.test/reference.jpg?x=1");
+    expect(String(vi.mocked(fetchImpl).mock.calls[0]?.[0])).toBe("https://cdn.example.test/reference.jpg?x=1");
+    expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]).toEqual(expect.objectContaining({ redirect: "manual" }));
     const token = resolvedUrl?.split("/").pop() ?? "";
     const record = store.resolve(token);
     expect(record).toEqual(expect.objectContaining({

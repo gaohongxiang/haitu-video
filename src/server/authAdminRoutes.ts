@@ -26,6 +26,19 @@ import {
 } from "./adminContent.js";
 import { buildAdminOverview, buildAdminUserDetail } from "./adminDashboard.js";
 import { getAdminSiteSettings } from "./adminSiteSettings.js";
+import {
+  buildAdminTrafficIndexing,
+  buildAdminTrafficCloudflare,
+  buildAdminTrafficGeoSummary,
+  buildAdminTrafficOverview,
+  buildAdminTrafficPages,
+  buildAdminTrafficSearch,
+  buildAdminTrafficSettings,
+  buildAdminTrafficSources,
+  parseAdminTrafficDateRange,
+  recordIndexingSubmission,
+  submitIndexNow
+} from "./adminTraffic.js";
 import type { ConsoleAuthStore } from "./consoleAuth.js";
 import { jsonResponse } from "./consoleHttpService.js";
 import type { ConsoleSettingsStore } from "./consoleSettings.js";
@@ -36,6 +49,7 @@ import {
   type PaymentMethodUpdateRequest
 } from "./paymentMethodService.js";
 import { ModelPricingCatalogStore } from "./modelPricingCatalogStore.js";
+import { syncExternalTrafficMetrics } from "./trafficExternalSync.js";
 
 export async function handleAuthAdminRoutes(input: {
   request: Request;
@@ -44,6 +58,7 @@ export async function handleAuthAdminRoutes(input: {
   settingsStore: ConsoleSettingsStore;
   databaseHandle: DatabaseHandle;
   auditLog: FileAuditLog;
+  fetchImpl?: typeof fetch;
   now?: () => Date;
 }): Promise<Response | undefined> {
   const {
@@ -53,6 +68,7 @@ export async function handleAuthAdminRoutes(input: {
     settingsStore,
     databaseHandle,
     auditLog,
+    fetchImpl,
     now
   } = input;
 
@@ -112,6 +128,183 @@ export async function handleAuthAdminRoutes(input: {
       return adminResponse;
     }
     return jsonResponse(buildAdminOverview(databaseHandle, now?.() ?? new Date()));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/overview") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficOverview({ handle: databaseHandle, ...range }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/sources") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficSources({ handle: databaseHandle, ...range }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/pages") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficPages({
+      handle: databaseHandle,
+      ...range,
+      pageType: url.searchParams.get("type") ?? undefined,
+      locale: url.searchParams.get("locale") ?? undefined
+    }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/indexing") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficIndexing({ handle: databaseHandle, ...range }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/search") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficSearch({
+      handle: databaseHandle,
+      ...range,
+      page: url.searchParams.get("page") ?? undefined,
+      query: url.searchParams.get("query") ?? undefined
+    }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/settings") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    return jsonResponse(buildAdminTrafficSettings({ handle: databaseHandle, env: process.env }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/cloudflare") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficCloudflare({ handle: databaseHandle, ...range }));
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/traffic/geo-summary") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const range = parseAdminTrafficDateRange(url, now?.() ?? new Date());
+    if (range instanceof Response) {
+      return range;
+    }
+    return jsonResponse(buildAdminTrafficGeoSummary({ handle: databaseHandle, ...range }));
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/traffic/sync") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const result = await syncExternalTrafficMetrics({
+      handle: databaseHandle,
+      env: process.env,
+      fetchImpl,
+      now: now?.() ?? new Date()
+    });
+    await auditLog.append({
+      action: "admin.traffic.sync_requested",
+      metadata: {
+        status: result.status,
+        checkedAt: result.checkedAt,
+        providers: result.providers.map((provider) => ({
+          id: provider.id,
+          configured: provider.configured,
+          status: provider.status,
+          rowsSynced: provider.rowsSynced,
+          error: provider.error
+        }))
+      }
+    });
+    return jsonResponse(result);
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/traffic/indexnow/submit") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const body = await request.json() as { urls?: unknown };
+    const urls = Array.isArray(body.urls)
+      ? body.urls.filter((item): item is string => typeof item === "string")
+      : [];
+    const result = await submitIndexNow({
+      handle: databaseHandle,
+      urls,
+      env: process.env,
+      fetchImpl,
+      now: now?.() ?? new Date()
+    });
+    await auditLog.append({
+      action: "admin.traffic.indexnow_submitted",
+      metadata: {
+        status: result.status,
+        statusCode: result.statusCode,
+        urlCount: urls.length
+      }
+    });
+    return jsonResponse(result, result.ok ? 200 : 400);
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/traffic/sitemap/submit") {
+    const adminResponse = await authStore.requireAdmin(request);
+    if (adminResponse) {
+      return adminResponse;
+    }
+    const body = await request.json().catch(() => ({})) as { url?: unknown };
+    const sitemapUrl = typeof body.url === "string" && body.url.trim()
+      ? body.url.trim()
+      : "https://haitu.online/sitemap.xml";
+    recordIndexingSubmission({
+      handle: databaseHandle,
+      provider: "sitemap",
+      submissionType: "manual",
+      url: sitemapUrl,
+      responseExcerpt: "Recorded manual sitemap submission/check action.",
+      submittedAt: now?.() ?? new Date()
+    });
+    await auditLog.append({
+      action: "admin.traffic.sitemap_submit_recorded",
+      metadata: {
+        url: sitemapUrl
+      }
+    });
+    return jsonResponse({
+      ok: true,
+      provider: "sitemap",
+      status: "recorded",
+      url: sitemapUrl
+    });
   }
   if (request.method === "GET" && url.pathname === "/api/admin/payment-methods") {
     const adminResponse = await authStore.requireAdmin(request);

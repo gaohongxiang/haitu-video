@@ -20,6 +20,7 @@ export interface VideoProviderRequest {
   outputDir: string;
   referenceImages?: string[];
   finalLanguage?: FinalVideoLanguage;
+  onTaskCreated?: (taskId: string) => Promise<void> | void;
 }
 
 export interface VideoOutput {

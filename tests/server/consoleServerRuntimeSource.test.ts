@@ -55,5 +55,6 @@ describe("console server runtime source boundaries", () => {
     expect(runtimeSource).toContain("createReferenceImageUrlResolver(");
     expect(runtimeSource).not.toContain("ensurePlatformBundlesForAllWorkspaces(");
     expect(runtimeSource).toContain("startVideoRetentionCleanup(");
+    expect(runtimeSource).toContain("startTrafficExternalSync(");
   });
 });

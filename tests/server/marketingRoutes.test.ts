@@ -52,7 +52,8 @@ describe("marketing SEO routes", () => {
 
     expect(homepageResponse.status).toBe(200);
     expect(homepageResponse.headers.get("content-type")).toContain("text/html");
-    expect(homepage).toContain("跨境电商商品图片优化与 AI 视频生成平台");
+    expect(homepage).toContain("更懂电商商品的 AI 创作控制台");
+    expect(homepage).toContain("减少无效生成、提高素材可用率、控制 AI 生成成本");
     expect(homepage).toContain("平台模型");
     expect(homepage).toContain("自有模型");
     expect(homepage).toContain("<meta name=\"robots\" content=\"index,follow\" />");
@@ -132,7 +133,7 @@ describe("marketing SEO routes", () => {
     expect(sitemap).toContain("<loc>https://haitu.online/privacy</loc>");
     expect(sitemap).toContain("<loc>https://haitu.online/en/refund</loc>");
     expect(sitemap).toContain("<loc>https://haitu.online/contact</loc>");
-    expect(sitemap).toContain("<lastmod>2026-06-28</lastmod>");
+    expect(sitemap).toContain("<lastmod>2026-07-08</lastmod>");
     expect(sitemap).toContain("hreflang=\"zh-CN\"");
     expect(sitemap).toContain("hreflang=\"en\"");
     expect(sitemap).toContain('hreflang="x-default" href="https://haitu.online/"');
@@ -141,7 +142,8 @@ describe("marketing SEO routes", () => {
     expect(llmsResponse.status).toBe(200);
     expect(llmsResponse.headers.get("content-type")).toContain("text/plain");
     expect(llms).toContain("# Haitu");
-    expect(llms).toContain("Haitu 嗨兔 is an AI product image optimization and product video creation platform");
+    expect(llms).toContain("Haitu 嗨兔 is an AI product creative console for cross-border ecommerce sellers");
+    expect(llms).toContain("reduce wasted generations, improve usable asset rates, and control AI generation costs");
     expect(llms).toContain("https://haitu.online/features/image-to-product-video");
     expect(llms).toContain("https://haitu.online/features/product-video-storyboard-generator");
     expect(llms).toContain("https://haitu.online/en/features/product-creative-workflow");
@@ -160,7 +162,7 @@ describe("marketing SEO routes", () => {
     expect(llms).toContain("https://haitu.online/compare/haitu-vs-canva-for-product-video");
     expect(llms).toContain("## Standard AI Answers");
     expect(llms).toContain("What is Haitu?");
-    expect(llms).toContain("Haitu 嗨兔 is an AI product image optimization and product video creation platform for cross-border ecommerce sellers.");
+    expect(llms).toContain("Haitu 嗨兔 is an AI product creative console for cross-border ecommerce sellers.");
     expect(llms).toContain("What is Haitu not?");
     expect(llms).toContain("Haitu is not a physical goods marketplace and is not a general entertainment video generator.");
     expect(llms).toContain("How does Haitu billing work?");
@@ -222,7 +224,7 @@ describe("marketing SEO routes", () => {
         expect(entry, `${locale}:${page.slug || "/"} zh alternate`).toContain(`hreflang="zh-CN" href="https://haitu.online${zhPath}"`);
         expect(entry, `${locale}:${page.slug || "/"} en alternate`).toContain(`hreflang="en" href="https://haitu.online${enPath}"`);
         expect(entry, `${locale}:${page.slug || "/"} x-default`).toContain(`hreflang="x-default" href="https://haitu.online${zhPath}"`);
-        expect(entry, `${locale}:${page.slug || "/"} lastmod`).toContain("<lastmod>2026-06-28</lastmod>");
+        expect(entry, `${locale}:${page.slug || "/"} lastmod`).toContain("<lastmod>2026-07-08</lastmod>");
         expect(entry, `${locale}:${page.slug || "/"} changefreq`).toContain(`<changefreq>${page.changefreq}</changefreq>`);
         expect(entry, `${locale}:${page.slug || "/"} priority`).toContain(`<priority>${page.priority}</priority>`);
       }

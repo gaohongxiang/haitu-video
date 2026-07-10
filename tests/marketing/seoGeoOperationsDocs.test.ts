@@ -31,7 +31,15 @@ describe("SEO/GEO operations documentation", () => {
     expect(doc).toContain("X-Robots-Tag: noindex, nofollow");
     expect(doc).toContain("## 3. Google Search Console 和 Bing Webmaster Tools");
     expect(doc).toContain("提交 sitemap");
+    expect(doc).toContain("提交分两类：站长平台提交 sitemap，IndexNow 提交 URL 更新通知");
+    expect(doc).toContain("Google Search Console 的 `Sitemaps`");
+    expect(doc).toContain("Bing Webmaster Tools 的 `Sitemaps`");
     expect(doc).toContain("https://haitu.online/sitemap.xml");
+    expect(doc).toContain("https://api.indexnow.org/indexnow");
+    expect(doc).toContain("公开页面 URL 列表，即 sitemap 中的 `<loc>` URL");
+    expect(doc).toContain("https://haitu.online/<INDEXNOW_KEY>.txt");
+    expect(doc).toContain("Cloudflare Crawler Hints 可以作为额外补充");
+    expect(doc).toContain("不要提交静态资源、控制台、后台、API、用户媒体或临时链接");
     expect(doc).toContain("## 4. GEO 月度监控");
     expect(doc).toContain("ChatGPT Search");
     expect(doc).toContain("Perplexity");
@@ -42,6 +50,8 @@ describe("SEO/GEO operations documentation", () => {
     expect(doc).toContain("## 6. 记录模板");
     expect(doc).toContain("是否提及 Haitu");
     expect(doc).toContain("是否链接到 https://haitu.online");
+    expect(doc).toContain("AI 商品创作控制台");
+    expect(doc).toContain("减少无效生成、提高素材可用率、控制 AI 生成成本");
   });
 
   it("links the operations runbook from the roadmap and marketing module docs", async () => {
@@ -52,6 +62,39 @@ describe("SEO/GEO operations documentation", () => {
     expect(roadmap).toContain("[SEO / GEO 监控记录](seo-geo-monitoring-log.md)");
     expect(moduleDoc).toContain("[SEO / GEO 运营手册](../marketing/seo-geo-operations.md)");
     expect(moduleDoc).toContain("[SEO / GEO 监控记录](../marketing/seo-geo-monitoring-log.md)");
+    expect(moduleDoc).toContain("AI 商品创作控制台");
+    expect(moduleDoc).toContain("减少无效生成、提高素材可用率、控制 AI 生成成本");
+  });
+
+  it("documents the SEO/GEO capability map across research, pages, technology, content, pSEO, off-page, AI search, analytics, and strategy", async () => {
+    const roadmap = await readFile(roadmapPath, "utf8");
+    const moduleDoc = await readFile(moduleDocPath, "utf8");
+
+    expect(roadmap).toContain("## 3. SEO / GEO 能力地图");
+    expect(roadmap).toContain("### 3.1 Keyword Research / 关键词研究");
+    expect(roadmap).toContain("Search Intent / 搜索意图");
+    expect(roadmap).toContain("Long Tail Keywords / 长尾关键词");
+    expect(roadmap).toContain("Competitor Gaps / 竞品词差距");
+    expect(roadmap).toContain("### 3.2 On Page SEO / 页面优化");
+    expect(roadmap).toContain("Answer First Content / 先给答案的内容结构");
+    expect(roadmap).toContain("### 3.3 Technical SEO / 技术 SEO");
+    expect(roadmap).toContain("Core Web Vitals / 核心网页指标");
+    expect(roadmap).toContain("### 3.4 Content SEO / 内容 SEO");
+    expect(roadmap).toContain("Best Tools Pages / 工具榜单页");
+    expect(roadmap).toContain("### 3.5 Programmatic SEO / 程序化 SEO");
+    expect(roadmap).toContain("Quality Gates / 质量门槛");
+    expect(roadmap).toContain("Duplicate Control / 重复内容控制");
+    expect(roadmap).toContain("### 3.6 Off Page SEO / 站外 SEO");
+    expect(roadmap).toContain("Community Mentions / 社区提及");
+    expect(roadmap).toContain("### 3.7 GEO / AI Search Optimization");
+    expect(roadmap).toContain("Entity Signals / 实体信号");
+    expect(roadmap).toContain("Quotable Content / 可引用内容");
+    expect(roadmap).toContain("### 3.8 Analytics / 数据分析");
+    expect(roadmap).toContain("Revenue Attribution / 收入归因");
+    expect(roadmap).toContain("AI Traffic / AI 流量");
+    expect(roadmap).toContain("### 3.9 Strategy / 增长策略");
+    expect(roadmap).toContain("Compounding Systems / 复利增长系统");
+    expect(moduleDoc).toContain("SEO / GEO 能力地图");
   });
 
   it("provides an append-only monitoring log template for search, GEO, media evidence, and thin content reviews", async () => {

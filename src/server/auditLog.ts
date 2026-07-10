@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export interface AuditLogEvent {
@@ -29,14 +29,13 @@ export class FileAuditLog {
     const event: AuditLogEvent = {
       id: randomUUID(),
       at: new Date().toISOString(),
-      actor: input.actor ?? "admin",
+      actor: input.actor ?? "system",
       action: input.action,
       target: input.target,
       metadata: sanitizeMetadata(input.metadata)
     };
     await mkdir(dirname(this.filePath), { recursive: true });
-    const existing = await this.readRaw();
-    await writeFile(this.filePath, `${existing}${JSON.stringify(event)}\n`, "utf8");
+    await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8");
     return event;
   }
 

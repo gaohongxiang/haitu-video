@@ -86,7 +86,7 @@ describe("SEO/GEO production checker", () => {
       }
       return response(html({
         canonical: `https://haitu.online${url.pathname === "/" ? "/" : url.pathname}`,
-        content: url.pathname === "/" ? "跨境电商商品图片优化与 AI 视频生成平台" : "Haitu public policy page",
+        content: url.pathname === "/" ? "更懂电商商品的 AI 创作控制台" : "Haitu public policy page",
         siteName: url.pathname.startsWith("/en") ? "Haitu" : "Haitu 嗨兔"
       }));
     };

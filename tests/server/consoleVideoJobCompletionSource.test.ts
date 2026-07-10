@@ -6,7 +6,7 @@ const queuePath = "src/server/consoleVideoJobQueue.ts";
 const completionPath = "src/server/consoleVideoJobCompletion.ts";
 
 describe("console video job completion source boundaries", () => {
-  it("keeps completed job patch and wallet capture out of the local job queue class", async () => {
+  it("persists the completed job before the local queue captures its wallet charge", async () => {
     const queueSource = await readFile(queuePath, "utf8");
     const runSource = queueSource.slice(
       queueSource.indexOf("private async run("),
@@ -18,18 +18,18 @@ describe("console video job completion source boundaries", () => {
     expect(queueSource).toContain("completeVideoJob(");
     expect(runSource).not.toContain("readHashtagsFromRawManifest(");
     expect(runSource).not.toContain("completedVideoJobPatch(");
-    expect(runSource).not.toContain("captureVideoJobWalletCharge(");
+    expect(runSource).toContain("const completedRecord = await this.update(record, completedPatch)");
+    expect(runSource).toContain("captureVideoJobWalletCharge(");
     expect(runSource).not.toContain("estimatedCostCny: report.billing?.estimatedCostCny");
   });
 
-  it("centralizes completed job hashtags, patch construction, and wallet capture", async () => {
+  it("centralizes completed job hashtags and patch construction", async () => {
     const completionSource = await readFile(completionPath, "utf8");
 
     expect(completionSource).toContain("export async function completeVideoJob(");
     expect(completionSource).toContain("readHashtagsFromRawManifest(");
     expect(completionSource).toContain("completedVideoJobPatch(");
-    expect(completionSource).toContain("captureVideoJobWalletCharge(");
+    expect(completionSource).not.toContain("captureVideoJobWalletCharge(");
     expect(completionSource).toContain("billingPolicyStore: input.billingPolicyStore");
-    expect(completionSource).toContain("estimatedCostCny: patch.upstreamEstimatedCostCny ?? input.report.billing?.estimatedCostCny");
   });
 });

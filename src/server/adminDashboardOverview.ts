@@ -44,7 +44,7 @@ export function buildAdminOverview(handle: DatabaseHandle, now = new Date()): Ad
   const verifiedUsers = count(handle, "SELECT COUNT(*) AS count FROM auth_users WHERE email_verified = 1");
   const newUsersToday = count(handle, "SELECT COUNT(*) AS count FROM auth_users WHERE date(created_at) = date(?)", today);
   const newUsers7d = count(handle, "SELECT COUNT(*) AS count FROM auth_users WHERE date(created_at) >= date(?)", sevenDayStart);
-  const totalWorkspaces = count(handle, "SELECT COUNT(*) AS count FROM workspaces");
+  const totalWorkspaces = count(handle, "SELECT COUNT(*) AS count FROM workspaces WHERE id <> '__platform__'");
   const totalProducts = count(handle, "SELECT COUNT(*) AS count FROM products");
   const totalVideoJobs = count(handle, "SELECT COUNT(*) AS count FROM video_jobs");
   const activeUsers7d = count(handle, `

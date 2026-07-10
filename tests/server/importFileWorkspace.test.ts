@@ -100,7 +100,7 @@ describe("file workspace import", () => {
         videoAssets: 2
       });
       expect(await rowCount(handle, "users")).toBe(1);
-      expect(await rowCount(handle, "workspaces")).toBe(1);
+      expect(await rowCount(handle, "workspaces")).toBe(2);
       expect(await rowCount(handle, "workspace_members")).toBe(1);
       expect(await rowCount(handle, "products")).toBe(1);
       expect(await rowCount(handle, "product_assets")).toBe(1);

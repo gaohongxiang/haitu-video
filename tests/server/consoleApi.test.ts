@@ -173,7 +173,8 @@ describe("console API", () => {
     const refFile = join(dataDir, "workspaces", "default", "products", "REMOTE-REF-001", "refs", "reference-01.jpg");
     const productFile = join(dataDir, "workspaces", "default", "products", "REMOTE-REF-001", "product.json");
     const stored = JSON.parse(await readFile(productFile, "utf8"));
-    expect(fetchImpl).toHaveBeenCalledWith(imageUrl);
+    expect(String(vi.mocked(fetchImpl).mock.calls[0]?.[0])).toBe(imageUrl);
+    expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]).toEqual(expect.objectContaining({ redirect: "manual" }));
     expect(response.product.reference_images).toEqual(["refs/reference-01.jpg"]);
     expect(response.product.reference_image_statuses[0]).toEqual(expect.objectContaining({
       previewUrl: `/media?path=${encodeURIComponent(refFile)}`,
@@ -409,10 +410,7 @@ describe("console API", () => {
     const root = await mkdtemp(join(tmpdir(), "haitu-console-audit-"));
     tempDirs.push(root);
     const dataDir = join(root, "data");
-    const outputsDir = join(dataDir, "workspaces", "default", "jobs");
-    const videoPath = join(outputsDir, "wallet-final", "final", "wallet.final.mp4");
-    await mkdir(join(videoPath, ".."), { recursive: true });
-    await writeFile(videoPath, Buffer.from("final-video"));
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
     const auditEntry = await server.fetch("/api/auth/enter", {
@@ -455,11 +453,6 @@ describe("console API", () => {
     await server.fetchJson("/api/model-configs/volcengine-seedance", {
       method: "DELETE"
     });
-    await server.fetchJson("/api/video-assets", {
-      method: "DELETE",
-      body: JSON.stringify({ path: videoPath, confirm: true })
-    });
-
     const audit = await server.fetchJson("/api/audit-log");
     const events = audit.events.map((event: { action: string }) => event.action);
     const auditFile = await readFile(join(dataDir, "system", "audit-log.jsonl"), "utf8");
@@ -470,13 +463,12 @@ describe("console API", () => {
       "auth.enter",
       "auth.email_verified",
       "model_config.saved",
-      "model_config.deleted",
-      "video_asset.deleted"
+      "model_config.deleted"
     ]));
     expect(audit.events[0]).toEqual(expect.objectContaining({
       id: expect.any(String),
       at: expect.any(String),
-      actor: "admin",
+      actor: "system",
       action: expect.any(String)
     }));
     expect(audit.summary.totalEvents).toBeGreaterThanOrEqual(5);
@@ -7764,7 +7756,8 @@ describe("console API", () => {
         reference_images: ["refs/reference-01.jpg"]
       })
     }));
-    expect(fetchImpl).toHaveBeenCalledWith(imageUrl);
+    expect(String(vi.mocked(fetchImpl).mock.calls[0]?.[0])).toBe(imageUrl);
+    expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]).toEqual(expect.objectContaining({ redirect: "manual" }));
     await expect(readFile(refFile, "utf8")).resolves.toBe("remote-image-bytes");
     const products = await server.fetchJson("/api/products");
     expect(products.products.map((product: { sku: string }) => product.sku)).toEqual(["ARM-001", "WALLET-001"]);
@@ -8299,6 +8292,7 @@ describe("console API", () => {
     tempDirs.push(outsideDir);
     const outsideImagePath = join(outsideDir, "wallet.jpg");
     await writeFile(outsideImagePath, Buffer.from("wallet-image"));
+    vi.stubEnv("HAITU_LOCAL_IMPORT_ROOT", outsideDir);
     const fixturesDir = testProductsDir(root);
     const productPath = testProductPath(fixturesDir, "wallet");
     await writeProduct(productPath, {
@@ -9055,7 +9049,7 @@ describe("console API", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: expect.stringContaining("outside project root")
+      error: "Admin access required"
     });
   });
 
@@ -10308,6 +10302,7 @@ describe("console API", () => {
     });
     await mkdir(join(walletProductPath, "..", "refs"), { recursive: true });
     await writeFile(join(walletProductPath, "..", "refs", "reference-01.jpg"), Buffer.from("image-bytes"));
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
     const server = createConsoleServer({ rootDir: root, outputsDir, fixturesDir });
 
     const response = await server.fetchJson("/api/storage-backup");
@@ -10374,6 +10369,7 @@ describe("console API", () => {
     });
     await mkdir(join(walletProductPath, "..", "refs"), { recursive: true });
     await writeFile(join(walletProductPath, "..", "refs", "reference-01.jpg"), Buffer.from("image-bytes"));
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
     const server = createConsoleServer({ rootDir: root, outputsDir, fixturesDir });
 
     const created = await server.fetchJson("/api/backups", {
@@ -10443,6 +10439,7 @@ describe("console API", () => {
     await writeFile(join(jobDir, "raw", "source.mp4"), Buffer.from("raw-video"));
     await writeFile(join(jobDir, "final", "final.mp4"), Buffer.from("final-video"));
     await writeFile(join(dataDir, "backups", "old-backup.tar.gz"), Buffer.from("old"));
+    vi.stubEnv("HAITU_ADMIN_EMAIL", "console-test@example.com");
     const server = createConsoleServer({ rootDir: root, dataDir, autoStartSavedJobs: false });
 
     const report = await server.fetchJson("/api/storage-backup");
@@ -10730,6 +10727,12 @@ describe("console API", () => {
           model: "doubao-seedance-2-0-fast-260128"
         })
       });
+      const walletHandle = openDatabase({ dataDir: server.dataDir, env: process.env });
+      try {
+        new WalletStore({ handle: walletHandle, workspaceId: server.workspaceId }).topUp({ amountCny: 10 });
+      } finally {
+        closeDatabase(walletHandle);
+      }
 
       const response = await server.fetchJson("/api/make-video", {
         method: "POST",
@@ -11196,7 +11199,8 @@ describe("console API", () => {
       await waitForJobStatus(server, queued.job.id, "completed");
       const publicAssetResponse = await server.raw.fetch(new URL(resolvedUrl).pathname);
 
-      expect(fetchImpl).toHaveBeenCalledWith(remoteImageUrl);
+      expect(String(vi.mocked(fetchImpl).mock.calls[0]?.[0])).toBe(remoteImageUrl);
+      expect(vi.mocked(fetchImpl).mock.calls[0]?.[1]).toEqual(expect.objectContaining({ redirect: "manual" }));
       expect(resolvedUrl).toMatch(/^https:\/\/haitu\.online\/api\/public-assets\/[A-Za-z0-9_-]+$/);
       expect(publicAssetResponse.status).toBe(200);
       await expect(publicAssetResponse.text()).resolves.toBe("remote-image-bytes");

@@ -25,6 +25,7 @@ import {
 } from "./productService.js";
 import { WalletStore } from "./walletStore.js";
 import { runMeteredAiAction } from "./aiBilling.js";
+import { fetchRemoteImage } from "./remoteImageFetch.js";
 
 export interface GenerateProductReferenceImagesRequest {
   count?: number;
@@ -202,7 +203,9 @@ export async function generateProductReferenceImages(input: {
   if (!imageModel.config.apiKey) {
     throw new Error("请先在 API 管理配置图片模型 API Key。");
   }
-  const images = await runMeteredAiAction({
+  const nextReferenceImages = [...product.reference_images];
+  const generated: GeneratedProductReferenceImage[] = [];
+  await runMeteredAiAction({
     walletStore: input.walletStore,
     billingPolicyStore: input.billingPolicyStore,
     kind: "image",
@@ -233,39 +236,39 @@ export async function generateProductReferenceImages(input: {
         fetchImpl: input.fetchImpl
       })
     }),
-    actualUnits: (result) => result.length
+    actualUnits: (result) => result.length,
+    beforeCapture: async (images) => {
+      for (const image of images) {
+        const target = await nextAvailableReferenceImageTarget({
+          productFilePath,
+          referenceImages: nextReferenceImages,
+          startIndex: nextReferenceImages.length + 1,
+          extension: extensionFromMimeType(image.mimeType)
+        });
+        const targetPath = target.path;
+        await mkdir(dirname(targetPath), { recursive: true });
+        await writeFile(targetPath, image.bytes);
+        const reference = target.reference;
+        nextReferenceImages.push(reference);
+        generated.push({
+          path: targetPath,
+          reference
+        });
+      }
+      await writeFile(
+        productFilePath,
+        JSON.stringify(
+          {
+            ...rawProduct,
+            reference_images: nextReferenceImages
+          },
+          null,
+          2
+        ),
+        "utf8"
+      );
+    }
   });
-  const nextReferenceImages = [...product.reference_images];
-  const generated: GeneratedProductReferenceImage[] = [];
-  for (const image of images) {
-    const target = await nextAvailableReferenceImageTarget({
-      productFilePath,
-      referenceImages: nextReferenceImages,
-      startIndex: nextReferenceImages.length + 1,
-      extension: extensionFromMimeType(image.mimeType)
-    });
-    const targetPath = target.path;
-    await mkdir(dirname(targetPath), { recursive: true });
-    await writeFile(targetPath, image.bytes);
-    const reference = target.reference;
-    nextReferenceImages.push(reference);
-    generated.push({
-      path: targetPath,
-      reference
-    });
-  }
-  await writeFile(
-    productFilePath,
-    JSON.stringify(
-      {
-        ...rawProduct,
-        reference_images: nextReferenceImages
-      },
-      null,
-      2
-    ),
-    "utf8"
-  );
   return {
     generated,
     product: await getProductBySku({
@@ -298,14 +301,10 @@ async function imageGenerationReferences(input: {
 
 async function imageGenerationReference(reference: string, fetchImpl?: typeof fetch) {
   if (reference.startsWith("http://") || reference.startsWith("https://")) {
-    const fetchReference = fetchImpl ?? fetch;
-    const response = await fetchReference(reference);
-    if (!response.ok) {
-      throw new Error("参考图地址无法访问。请重新上传这张图，或换一张能稳定访问的图片后再生成。");
-    }
-    const mimeType = normalizeReferenceMimeType(response.headers.get("content-type") ?? undefined);
+    const remote = await fetchRemoteImage({ url: reference, fetchImpl });
+    const mimeType = normalizeReferenceMimeType(remote.contentType || undefined);
     return {
-      bytes: Buffer.from(await response.arrayBuffer()),
+      bytes: remote.bytes,
       fileName: imageReferenceFileName(reference, mimeType),
       mimeType
     };
