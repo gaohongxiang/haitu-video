@@ -39,6 +39,46 @@ interface PlatformUserRow {
 
 const minPasswordLength = 8;
 
+interface MemoryRateLimitEntry {
+  key: string;
+  count: number;
+  lastRequest: number;
+}
+
+export function createAtomicMemoryRateLimitStorage(now: () => number = Date.now) {
+  const entries = new Map<string, MemoryRateLimitEntry>();
+
+  return {
+    get: async (key: string) => entries.get(key),
+    set: async (key: string, value: MemoryRateLimitEntry) => {
+      entries.set(key, value);
+    },
+    consume: async (key: string, rule: { window: number; max: number }) => {
+      const requestedAt = now();
+      const current = entries.get(key);
+      const windowMilliseconds = rule.window * 1_000;
+
+      if (!current || requestedAt - current.lastRequest >= windowMilliseconds) {
+        entries.set(key, { key, count: 1, lastRequest: requestedAt });
+        return { allowed: true, retryAfter: null };
+      }
+
+      if (current.count >= rule.max) {
+        return {
+          allowed: false,
+          retryAfter: Math.max(1, Math.ceil((current.lastRequest + windowMilliseconds - requestedAt) / 1_000))
+        };
+      }
+
+      entries.set(key, {
+        ...current,
+        count: current.count + 1
+      });
+      return { allowed: true, retryAfter: null };
+    }
+  };
+}
+
 export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
   private readonly auth: {
     handler(request: Request): Promise<Response>;
@@ -54,7 +94,6 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     }
   ) {
     this.env = input.env ?? process.env;
-    const rateLimitEntries = new Map<string, { key: string; count: number; lastRequest: number }>();
     this.auth = betterAuth({
       appName: "Haitu",
       database: input.handle.sqlite,
@@ -66,12 +105,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
         storage: "memory",
         window: 60,
         max: 30,
-        customStorage: {
-          get: async (key) => rateLimitEntries.get(key),
-          set: async (key, value) => {
-            rateLimitEntries.set(key, value);
-          }
-        }
+        customStorage: createAtomicMemoryRateLimitStorage()
       },
       advanced: {
         database: {
