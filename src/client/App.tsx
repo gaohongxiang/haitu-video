@@ -1726,8 +1726,13 @@ export function App() {
       setSecondarySnapshotStatus("ready");
     } catch (error) {
       setSecondarySnapshotStatus("error");
+      const message = errorMessage(error);
+      if (message === "Authentication required") {
+        showError(error);
+        return;
+      }
       if (options.toastOnError !== false) {
-        showConsoleToast(tApp("status.backgroundSyncFailed", { message: errorMessage(error) }));
+        showConsoleToast(tApp("status.backgroundSyncFailed", { message }));
       }
     }
   }

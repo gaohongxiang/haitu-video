@@ -70,6 +70,9 @@ describe("console refresh source", () => {
     expect(secondarySource).toContain("await fetchConsoleSnapshotSecondary<");
     expect(secondarySource).toContain("setReports(reportsResponse.reports);");
     expect(secondarySource).toContain("setLedger(attachQcToLedger(ledgerResponse, qcSummaryResponse));");
+    expect(secondarySource).toContain('if (message === "Authentication required")');
+    expect(secondarySource).toContain("showError(error);");
+    expect(secondarySource.indexOf("showError(error);")).toBeLessThan(secondarySource.indexOf('showConsoleToast(tApp("status.backgroundSyncFailed"'));
     expect(secondarySource).toContain('showConsoleToast(tApp("status.backgroundSyncFailed"');
     expect(renderSource).toContain("<ConsoleSecondarySyncNotice");
   });

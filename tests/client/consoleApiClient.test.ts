@@ -70,13 +70,15 @@ afterEach(() => {
 });
 
 describe("console API snapshots", () => {
-  it("preserves authentication failures so an expired session returns to the login screen", async () => {
+  it("preserves authentication failures across every console snapshot", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "Authentication required" }), {
       status: 401,
       headers: { "content-type": "application/json" }
     })));
 
     await expect(fetchConsoleSnapshotPrimary()).rejects.toThrow("Authentication required");
+    await expect(fetchConsoleSnapshotSecondary()).rejects.toThrow("Authentication required");
+    await expect(fetchConsoleSnapshotPolling()).rejects.toThrow("Authentication required");
   });
 
   it("loads only first-screen data for the primary console snapshot", async () => {
