@@ -108,6 +108,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
         customStorage: createAtomicMemoryRateLimitStorage()
       },
       advanced: {
+        cookiePrefix: "haitu-auth-v2",
         database: {
           generateId: "uuid"
         }

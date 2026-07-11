@@ -942,7 +942,7 @@ export function AdminApp() {
       setSession(nextSession);
       setEmail("");
       setPassword("");
-      await refreshOverview();
+      window.location.reload();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -971,7 +971,7 @@ export function AdminApp() {
       setPassword("");
       setOtp("");
       setOtpCooldownSeconds(0);
-      await refreshOverview();
+      window.location.reload();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -4457,7 +4457,7 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path);
+  const response = await fetch(path, { credentials: "same-origin" });
   return readJsonResponse<T>(response, path);
 }
 
@@ -4480,6 +4480,7 @@ async function loadAdminModule<T>(
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
+    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
@@ -4489,6 +4490,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "PUT",
+    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });

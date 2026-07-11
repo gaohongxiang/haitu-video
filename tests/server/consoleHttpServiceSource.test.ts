@@ -31,6 +31,8 @@ describe("console HTTP service source boundaries", () => {
     expect(serviceSource).toContain("export async function staticResponse(");
     expect(serviceSource).toContain("export async function nodeRequestToFetch(");
     expect(serviceSource).toContain("export async function writeNodeResponse(");
+    expect(serviceSource).toContain("export function nodeResponseHeaders(");
+    expect(serviceSource).toContain("headers.getSetCookie()");
     expect(serviceSource).toContain("ZodError");
   });
 });

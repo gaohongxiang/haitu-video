@@ -21,7 +21,7 @@ describe("console refresh source", () => {
     expect(refreshSource).not.toContain("if (!polling) {\n      setIsLoading(true);");
     expect(refreshSource).not.toContain("if (!polling) {\n        setIsLoading(false);");
     expect(bootSource).toContain("await refreshConsole({ applySettings: true, showLoading: true });");
-    expect(authEntrySource).toContain("await refreshConsole({ applySettings: true, showLoading: true });");
+    expect(authEntrySource).toContain("window.location.reload();");
     expect(source).toContain("onRefresh={() => void refreshConsole()}");
   });
 

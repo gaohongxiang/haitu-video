@@ -73,7 +73,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       authenticated: false
     });
     expect(verifyResponse.status).toBe(200);
-    expect(verifiedCookie).toContain("better-auth.session_token=");
+    expect(verifiedCookie).toContain("haitu-auth-v2.session_token=");
     expect(verifyBody).toMatchObject({
       authEnabled: true,
       authenticated: true,
@@ -204,7 +204,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(await reset.json()).toEqual({ success: true });
     expect(oldPassword.status).toBe(401);
     expect(newPassword.status).toBe(200);
-    expect(newPassword.headers.get("set-cookie")).toContain("better-auth.session_token=");
+    expect(newPassword.headers.get("set-cookie")).toContain("haitu-auth-v2.session_token=");
     expect(oldSessionProducts.status).toBe(401);
   });
 
@@ -1032,7 +1032,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     });
 
     expect(login.status).toBe(200);
-    expect(login.headers.get("set-cookie")).toContain("better-auth.session_token=");
+    expect(login.headers.get("set-cookie")).toContain("haitu-auth-v2.session_token=");
     expect(session).toMatchObject({
       authenticated: true,
       user: {

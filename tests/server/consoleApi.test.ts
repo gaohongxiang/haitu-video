@@ -382,7 +382,7 @@ describe("console API", () => {
     expect(verified.status).toBe(200);
     expect(failedEntry.status).toBe(401);
     expect(secondEntry.status).toBe(200);
-    expect(cookie).toContain("better-auth.session_token=");
+    expect(cookie).toContain("haitu-auth-v2.session_token=");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(authedProducts.status).toBe(200);

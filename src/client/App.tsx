@@ -1566,7 +1566,7 @@ export function App() {
     setActiveSection(defaultConsoleSection);
     setAuthStatus(tApp("status.loadingConsole"));
     setConsoleReady(false);
-    await refreshConsole({ applySettings: true, showLoading: true });
+    window.location.reload();
   }
 
   function changeAuthFlowMode(mode: AuthFlowMode) {

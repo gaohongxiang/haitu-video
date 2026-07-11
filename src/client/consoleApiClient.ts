@@ -1,7 +1,7 @@
 import { notifyAuthenticationEstablished, notifyAuthenticationRequired } from "./authExpiry.js";
 
 export async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path);
+  const response = await fetch(path, { credentials: "same-origin" });
   return readJsonResponse<T>(response, path);
 }
 
@@ -17,7 +17,7 @@ class ConsoleApiResponseError extends Error {
 
 async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<T> {
   try {
-    const response = await fetch(path, { signal });
+    const response = await fetch(path, { signal, credentials: "same-origin" });
     return await readJsonResponse<T>(response, path);
   } catch (error) {
     if (error instanceof ConsoleApiResponseError && error.status === 401) {
@@ -30,6 +30,7 @@ async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
+    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
@@ -39,6 +40,7 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
 export async function postJsonWithSignal<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
+    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     signal
@@ -49,6 +51,7 @@ export async function postJsonWithSignal<T>(path: string, body: unknown, signal:
 export async function putJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "PUT",
+    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
@@ -57,7 +60,8 @@ export async function putJson<T>(path: string, body: unknown): Promise<T> {
 
 export async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
-    method: "DELETE"
+    method: "DELETE",
+    credentials: "same-origin"
   });
   return readJsonResponse<T>(response, path);
 }

@@ -93,7 +93,7 @@ export class RequestBodyTooLargeError extends Error {
 }
 
 export async function writeNodeResponse(response: ServerResponse, fetchResponse: Response): Promise<void> {
-  response.writeHead(fetchResponse.status, Object.fromEntries(fetchResponse.headers.entries()));
+  response.writeHead(fetchResponse.status, nodeResponseHeaders(fetchResponse.headers));
   if (!fetchResponse.body) {
     response.end();
     return;
@@ -105,6 +105,20 @@ export async function writeNodeResponse(response: ServerResponse, fetchResponse:
     response.once("finish", resolve);
     body.pipe(response);
   });
+}
+
+export function nodeResponseHeaders(headers: Headers): Record<string, string | string[]> {
+  const result: Record<string, string | string[]> = {};
+  for (const [name, value] of headers.entries()) {
+    if (name !== "set-cookie") {
+      result[name] = value;
+    }
+  }
+  const setCookies = headers.getSetCookie();
+  if (setCookies.length > 0) {
+    result["set-cookie"] = setCookies;
+  }
+  return result;
 }
 
 function isMissingFileError(error: unknown): boolean {
