@@ -19,14 +19,13 @@ describe("admin app source", () => {
     expect(source).not.toContain('useState<AuthSession>({ authEnabled: true, authenticated: false })');
   });
 
-  it("returns every protected admin request to login when its session expires", async () => {
+  it("returns protected admin requests to login without a global browser event layer", async () => {
     const source = await readFile(adminAppPath, "utf8");
     const moduleLoaderSource = source.slice(source.indexOf("async function loadAdminModule"), source.indexOf("async function postJson"));
 
-    expect(source).toContain("subscribeAuthenticationRequired(expireAdminSession)");
-    expect(source).toContain("notifyAuthenticationRequired(response, requestPath);");
-    expect(source).toContain("notifyAuthenticationEstablished(response, requestPath, body);");
     expect(source).toContain("function expireAdminSession()");
+    expect(source).not.toContain("subscribeAuthenticationRequired");
+    expect(source).not.toContain("notifyAuthenticationRequired");
     expect(moduleLoaderSource).toContain("error.status === 401 || error.status === 403");
     expect(moduleLoaderSource).toContain("throw error;");
   });

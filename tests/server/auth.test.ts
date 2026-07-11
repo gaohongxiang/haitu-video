@@ -73,7 +73,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
       authenticated: false
     });
     expect(verifyResponse.status).toBe(200);
-    expect(verifiedCookie).toContain("haitu-auth-v2.session_token=");
+    expect(verifiedCookie).toContain("better-auth.session_token=");
     expect(verifyBody).toMatchObject({
       authEnabled: true,
       authenticated: true,
@@ -156,6 +156,49 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(afterLogout.status).toBe(401);
   });
 
+  it("never rate limits read-only session validation during a busy console load", async () => {
+    const root = await makeTempDir();
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    const cookie = await registerUser(root, server, "busy-console@example.com");
+
+    const responses = await Promise.all(Array.from({ length: 60 }, () => server.fetch("/api/auth/session", {
+      headers: { cookie }
+    })));
+    const bodies = await Promise.all(responses.map((response) => response.json()));
+
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(bodies.every((body) => body.authenticated === true)).toBe(true);
+  });
+
+  it("rate limits password attempts per trusted client IP instead of one shared global bucket", async () => {
+    const root = await makeTempDir();
+    const server = createConsoleServer({
+      rootDir: root,
+      autoStartSavedJobs: false
+    });
+    await registerUser(root, server, "rate-limit@example.com", "correct horse battery staple");
+    const attempt = (ip: string) => server.fetch("/api/auth/enter", {
+      method: "POST",
+      headers: { "cf-connecting-ip": ip },
+      body: JSON.stringify({
+        email: "rate-limit@example.com",
+        password: "wrong password"
+      })
+    });
+
+    const sameIpStatuses: number[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      sameIpStatuses.push((await attempt("198.51.100.10")).status);
+    }
+    const otherIpStatus = (await attempt("198.51.100.11")).status;
+
+    expect(sameIpStatuses).toEqual([401, 401, 401, 429]);
+    expect(otherIpStatus).toBe(401);
+  });
+
   it("resets forgotten passwords with an email verification code and revokes old sessions", async () => {
     const root = await makeTempDir();
     process.env.HAITU_SECRET_KEY = "0123456789abcdef0123456789abcdef";
@@ -204,7 +247,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     expect(await reset.json()).toEqual({ success: true });
     expect(oldPassword.status).toBe(401);
     expect(newPassword.status).toBe(200);
-    expect(newPassword.headers.get("set-cookie")).toContain("haitu-auth-v2.session_token=");
+    expect(newPassword.headers.get("set-cookie")).toContain("better-auth.session_token=");
     expect(oldSessionProducts.status).toBe(401);
   });
 
@@ -1032,7 +1075,7 @@ describe("SQLite-backed user auth and workspace resolution", () => {
     });
 
     expect(login.status).toBe(200);
-    expect(login.headers.get("set-cookie")).toContain("haitu-auth-v2.session_token=");
+    expect(login.headers.get("set-cookie")).toContain("better-auth.session_token=");
     expect(session).toMatchObject({
       authenticated: true,
       user: {

@@ -21,7 +21,7 @@ describe("console refresh source", () => {
     expect(refreshSource).not.toContain("if (!polling) {\n      setIsLoading(true);");
     expect(refreshSource).not.toContain("if (!polling) {\n        setIsLoading(false);");
     expect(bootSource).toContain("await refreshConsole({ applySettings: true, showLoading: true });");
-    expect(authEntrySource).toContain("window.location.reload();");
+    expect(authEntrySource).toContain("await refreshConsole({ applySettings: true, showLoading: true });");
     expect(source).toContain("onRefresh={() => void refreshConsole()}");
   });
 
@@ -108,17 +108,16 @@ describe("console refresh source", () => {
     expect(apiClientSource).not.toContain("/api/model-bundles");
   });
 
-  it("handles protected API session expiry centrally across foreground and silent requests", async () => {
+  it("handles protected API session expiry without a global browser event layer", async () => {
     const source = await readFile(appPath, "utf8");
     const apiClientSource = await readFile(apiClientPath, "utf8");
 
-    expect(source).toContain("subscribeAuthenticationRequired(expireConsoleSession)");
     expect(source).toContain("function expireConsoleSession()");
     expect(source).toContain("setConsoleReady(false);");
     expect(source).toContain("setConsoleToast(undefined);");
-    expect(source).not.toContain('if (message === "Authentication required") {\n      expireConsoleSession();');
-    expect(apiClientSource).toContain("notifyAuthenticationRequired(response, requestPath);");
-    expect(apiClientSource).toContain("notifyAuthenticationEstablished(response, requestPath, body);");
-    expect(apiClientSource).toContain("readJsonResponse<T>(response, path)");
+    expect(source).toContain('if (message === "Authentication required") {\n      expireConsoleSession();');
+    expect(source).not.toContain("subscribeAuthenticationRequired");
+    expect(apiClientSource).not.toContain("notifyAuthenticationRequired");
+    expect(apiClientSource).toContain("readJsonResponse<T>(response)");
   });
 });

@@ -1,8 +1,6 @@
-import { notifyAuthenticationEstablished, notifyAuthenticationRequired } from "./authExpiry.js";
-
 export async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, { credentials: "same-origin" });
-  return readJsonResponse<T>(response, path);
+  const response = await fetch(path);
+  return readJsonResponse<T>(response);
 }
 
 class ConsoleApiResponseError extends Error {
@@ -17,8 +15,8 @@ class ConsoleApiResponseError extends Error {
 
 async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<T> {
   try {
-    const response = await fetch(path, { signal, credentials: "same-origin" });
-    return await readJsonResponse<T>(response, path);
+    const response = await fetch(path, { signal });
+    return await readJsonResponse<T>(response);
   } catch (error) {
     if (error instanceof ConsoleApiResponseError && error.status === 401) {
       throw error;
@@ -30,40 +28,36 @@ async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
 export async function postJsonWithSignal<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     signal
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
 export async function putJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "PUT",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
 export async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
-    method: "DELETE",
-    credentials: "same-origin"
+    method: "DELETE"
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
 export interface ConsoleSnapshotTypes {
@@ -237,15 +231,11 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
   } as T;
 }
 
-export async function readJsonResponse<T>(response: Response, requestPath?: string): Promise<T> {
-  if (!response.ok) {
-    notifyAuthenticationRequired(response, requestPath);
-  }
+export async function readJsonResponse<T>(response: Response): Promise<T> {
   const body = await response.json();
   if (!response.ok) {
     throw new ConsoleApiResponseError(body.error || `HTTP ${response.status}`, response.status);
   }
-  notifyAuthenticationEstablished(response, requestPath, body);
   return body as T;
 }
 

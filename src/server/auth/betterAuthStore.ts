@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { betterAuth } from "better-auth";
+import { splitSetCookieHeader } from "better-auth/cookies";
 import { emailOTP } from "better-auth/plugins";
 
 import type {
@@ -103,12 +104,17 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       rateLimit: {
         enabled: true,
         storage: "memory",
-        window: 60,
-        max: 30,
+        window: 10,
+        max: 100,
+        customRules: {
+          "/get-session": false
+        },
         customStorage: createAtomicMemoryRateLimitStorage()
       },
       advanced: {
-        cookiePrefix: "haitu-auth-v2",
+        ipAddress: {
+          ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"]
+        },
         database: {
           generateId: "uuid"
         }
@@ -273,13 +279,14 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     };
   }
 
-  async enter(input: ConsoleAuthLoginInput): Promise<Response> {
+  async enter(input: ConsoleAuthLoginInput, request?: Request): Promise<Response> {
     const email = normalizeEmail(input.email);
     const password = normalizePassword(input.password);
     const existing = this.findAuthUserByEmail(email);
     if (!existing) {
       const response = await this.callBetterAuth("/sign-up/email", {
         method: "POST",
+        request,
         body: {
           email,
           password,
@@ -298,7 +305,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       }, 202);
     }
     if (!existing.email_verified) {
-      await this.resendVerificationOtp(email);
+      await this.resendVerificationOtp(email, request);
       return jsonResponse({
         authEnabled: true,
         authenticated: false,
@@ -308,6 +315,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     }
     const response = await this.callBetterAuth("/sign-in/email", {
       method: "POST",
+      request,
       body: {
         email,
         password,
@@ -326,11 +334,12 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     return sessionResponse;
   }
 
-  async verifyEmail(input: ConsoleAuthVerifyEmailInput): Promise<Response> {
+  async verifyEmail(input: ConsoleAuthVerifyEmailInput, request?: Request): Promise<Response> {
     const email = normalizeEmail(input.email);
     const otp = normalizeOtp(input.otp);
     const response = await this.callBetterAuth("/email-otp/verify-email", {
       method: "POST",
+      request,
       body: {
         email,
         otp
@@ -351,10 +360,11 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     return sessionResponse;
   }
 
-  async requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput): Promise<Response> {
+  async requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput, request?: Request): Promise<Response> {
     const email = normalizeEmail(input.email);
     const response = await this.callBetterAuth("/email-otp/request-password-reset", {
       method: "POST",
+      request,
       body: {
         email
       }
@@ -365,12 +375,13 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     return jsonResponse({ success: true });
   }
 
-  async resetPassword(input: ConsoleAuthPasswordResetInput): Promise<Response> {
+  async resetPassword(input: ConsoleAuthPasswordResetInput, request?: Request): Promise<Response> {
     const email = normalizeEmail(input.email);
     const otp = normalizeOtp(input.otp);
     const password = normalizePassword(input.password);
     const response = await this.callBetterAuth("/email-otp/reset-password", {
       method: "POST",
+      request,
       body: {
         email,
         otp,
@@ -394,9 +405,10 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
     }, 200, copySetCookieHeaders(response.headers));
   }
 
-  private async resendVerificationOtp(email: string): Promise<void> {
+  private async resendVerificationOtp(email: string, request?: Request): Promise<void> {
     await this.callBetterAuth("/email-otp/send-verification-otp", {
       method: "POST",
+      request,
       body: {
         email,
         type: "email-verification"
@@ -444,7 +456,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
       headers: request.headers
     }));
     if (!response.ok) {
-      return undefined;
+      throw new Error(`Authentication session lookup failed with HTTP ${response.status}`);
     }
     const body = await response.json() as { user?: { id: string; email: string; name?: string } } | null;
     return body?.user ? { user: body.user } : undefined;
@@ -453,12 +465,16 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
   private async callBetterAuth(path: string, input: {
     method: "POST";
     body: unknown;
+    request?: Request;
   }): Promise<Response> {
+    const headers = new Headers({ "content-type": "application/json" });
+    for (const name of ["cf-connecting-ip", "x-forwarded-for", "x-real-ip", "user-agent"]) {
+      const value = input.request?.headers.get(name);
+      if (value) headers.set(name, value);
+    }
     return await this.auth.handler(new Request(`http://localhost/api/auth${path}`, {
       method: input.method,
-      headers: {
-        "content-type": "application/json"
-      },
+      headers,
       body: JSON.stringify(input.body)
     }));
   }
@@ -660,27 +676,7 @@ function cookieRequestHeaderFromSetCookie(headers: Headers): string {
 }
 
 function setCookieHeaderValues(headers: Headers): string[] {
-  const values = headers.getSetCookie();
-  const candidates = values.length > 0 ? values : [headers.get("set-cookie") ?? ""];
-  return candidates.flatMap(splitCombinedSetCookieHeader).filter(Boolean);
-}
-
-function splitCombinedSetCookieHeader(value: string): string[] {
-  const result: string[] = [];
-  let start = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    if (value[index] !== ",") continue;
-    let cursor = index + 1;
-    while (value[cursor] === " ") cursor += 1;
-    while (cursor < value.length && !["=", ";", ","].includes(value[cursor] ?? "")) cursor += 1;
-    if (value[cursor] !== "=") continue;
-    const cookie = value.slice(start, index).trim();
-    if (cookie) result.push(cookie);
-    start = index + 1;
-  }
-  const finalCookie = value.slice(start).trim();
-  if (finalCookie) result.push(finalCookie);
-  return result;
+  return splitSetCookieHeader(headers.get("set-cookie") ?? "");
 }
 
 async function safeJson(response: Response): Promise<Record<string, unknown> | undefined> {

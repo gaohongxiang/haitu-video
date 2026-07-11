@@ -157,7 +157,6 @@ import {
   putJson,
   readJsonResponse
 } from "./consoleApiClient.js";
-import { subscribeAuthenticationRequired } from "./authExpiry.js";
 import {
   defaultProductDraft,
   draftReferenceImageStatuses,
@@ -1315,10 +1314,6 @@ export function App() {
   ]);
 
   useEffect(() => {
-    return subscribeAuthenticationRequired(expireConsoleSession);
-  }, []);
-
-  useEffect(() => {
     void bootConsole();
   }, []);
 
@@ -1566,7 +1561,7 @@ export function App() {
     setActiveSection(defaultConsoleSection);
     setAuthStatus(tApp("status.loadingConsole"));
     setConsoleReady(false);
-    window.location.reload();
+    await refreshConsole({ applySettings: true, showLoading: true });
   }
 
   function changeAuthFlowMode(mode: AuthFlowMode) {
@@ -2117,7 +2112,7 @@ export function App() {
       const response = await fetch(path, {
         method: "DELETE"
       });
-      const body = await readJsonResponse<ModelConfigStatusResponse>(response, path);
+      const body = await readJsonResponse<ModelConfigStatusResponse>(response);
       setProviderConfig((current) => updateProviderConfigStatus(current, body.provider));
       setModelConfigDrafts((current) => ({
         ...current,
@@ -3238,7 +3233,7 @@ export function App() {
           confirm: true
         })
       });
-      const body = await readJsonResponse<{ deleted: true; path: string; sizeBytes: number }>(response, "/api/video-assets");
+      const body = await readJsonResponse<{ deleted: true; path: string; sizeBytes: number }>(response);
       setStatusText(tApp("status.assetDeleted", { path: body.path, size: formatBytes(body.sizeBytes) }));
       await refreshConsole();
     } catch (error) {
@@ -3251,8 +3246,7 @@ export function App() {
   function showError(error: unknown) {
     const message = errorMessage(error);
     if (message === "Authentication required") {
-      // The centralized handler revalidates the current server session before
-      // expiring it, so a late 401 from an older request cannot undo a new login.
+      expireConsoleSession();
       return;
     }
     setStatusText(message);

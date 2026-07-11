@@ -31,11 +31,6 @@ import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input, Select, Textarea } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
-import {
-  notifyAuthenticationEstablished,
-  notifyAuthenticationRequired,
-  subscribeAuthenticationRequired
-} from "./authExpiry.js";
 import { getLocaleMeta, supportedLocales, type AppLocale } from "../i18n/config.js";
 import { clientLocaleStorageKey, i18n } from "../i18n/client.js";
 import {
@@ -792,10 +787,6 @@ export function AdminApp() {
   const [siteSettings, setSiteSettings] = useState<AdminSiteSettingsResponse | undefined>();
 
   useEffect(() => {
-    return subscribeAuthenticationRequired(expireAdminSession);
-  }, []);
-
-  useEffect(() => {
     void bootstrap();
   }, []);
 
@@ -913,8 +904,7 @@ export function AdminApp() {
         setForbidden(true);
         setStatus("");
       } else if (error instanceof HttpError && error.status === 401) {
-        // Session expiry is confirmed centrally before changing auth state.
-        return;
+        expireAdminSession();
       } else {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -942,7 +932,7 @@ export function AdminApp() {
       setSession(nextSession);
       setEmail("");
       setPassword("");
-      window.location.reload();
+      await refreshOverview();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -971,7 +961,7 @@ export function AdminApp() {
       setPassword("");
       setOtp("");
       setOtpCooldownSeconds(0);
-      window.location.reload();
+      await refreshOverview();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1116,7 +1106,7 @@ export function AdminApp() {
       const response = await fetch(`${modelServicesEndpoint(providerId)}${suffix}`, {
         method: "DELETE"
       });
-      await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response, `${modelServicesEndpoint(providerId)}${suffix}`);
+      await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response);
       await refreshOverview();
       setStatus(tAdmin("status.platformDeleted"));
     } catch (error) {
@@ -4457,8 +4447,8 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, { credentials: "same-origin" });
-  return readJsonResponse<T>(response, path);
+  const response = await fetch(path);
+  return readJsonResponse<T>(response);
 }
 
 async function loadAdminModule<T>(
@@ -4480,32 +4470,26 @@ async function loadAdminModule<T>(
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
 async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "PUT",
-    credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response, path);
+  return readJsonResponse<T>(response);
 }
 
-async function readJsonResponse<T>(response: Response, requestPath?: string): Promise<T> {
-  if (!response.ok) {
-    notifyAuthenticationRequired(response, requestPath);
-  }
+async function readJsonResponse<T>(response: Response): Promise<T> {
   const body = await response.json();
   if (!response.ok) {
     throw new HttpError(body.error || `HTTP ${response.status}`, response.status);
   }
-  notifyAuthenticationEstablished(response, requestPath, body);
   return body as T;
 }
 

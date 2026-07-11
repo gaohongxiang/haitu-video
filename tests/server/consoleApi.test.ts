@@ -382,7 +382,7 @@ describe("console API", () => {
     expect(verified.status).toBe(200);
     expect(failedEntry.status).toBe(401);
     expect(secondEntry.status).toBe(200);
-    expect(cookie).toContain("haitu-auth-v2.session_token=");
+    expect(cookie).toContain("better-auth.session_token=");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(authedProducts.status).toBe(200);
@@ -396,9 +396,9 @@ describe("console API", () => {
     expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
     expect(logoutResponse.headers.getSetCookie()).toHaveLength(3);
     expect(logoutResponse.headers.getSetCookie()).toEqual(expect.arrayContaining([
-      expect.stringContaining("haitu-auth-v2.session_token="),
-      expect.stringContaining("haitu-auth-v2.session_data="),
-      expect.stringContaining("haitu-auth-v2.dont_remember=")
+      expect.stringContaining("better-auth.session_token="),
+      expect.stringContaining("better-auth.session_data="),
+      expect.stringContaining("better-auth.dont_remember=")
     ]));
     expect(blockedAfterLogout.status).toBe(401);
   });

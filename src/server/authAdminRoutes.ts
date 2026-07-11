@@ -76,7 +76,7 @@ export async function handleAuthAdminRoutes(input: {
     return jsonResponse(await authStore.sessionStatus(request));
   }
   if (request.method === "POST" && url.pathname === "/api/auth/enter") {
-    const response = await authStore.enter(await request.json());
+    const response = await authStore.enter(await request.json(), request);
     await auditLog.append({
       action: response.ok ? "auth.enter" : "auth.enter_failed",
       metadata: {
@@ -86,7 +86,7 @@ export async function handleAuthAdminRoutes(input: {
     return response;
   }
   if (request.method === "POST" && url.pathname === "/api/auth/verify-email") {
-    const response = await authStore.verifyEmail(await request.json());
+    const response = await authStore.verifyEmail(await request.json(), request);
     await auditLog.append({
       action: response.ok ? "auth.email_verified" : "auth.email_verification_failed",
       metadata: {
@@ -96,7 +96,7 @@ export async function handleAuthAdminRoutes(input: {
     return response;
   }
   if (request.method === "POST" && url.pathname === "/api/auth/request-password-reset") {
-    const response = await authStore.requestPasswordReset(await request.json());
+    const response = await authStore.requestPasswordReset(await request.json(), request);
     await auditLog.append({
       action: response.ok ? "auth.password_reset_requested" : "auth.password_reset_request_failed",
       metadata: {
@@ -106,7 +106,7 @@ export async function handleAuthAdminRoutes(input: {
     return response;
   }
   if (request.method === "POST" && url.pathname === "/api/auth/reset-password") {
-    const response = await authStore.resetPassword(await request.json());
+    const response = await authStore.resetPassword(await request.json(), request);
     await auditLog.append({
       action: response.ok ? "auth.password_reset" : "auth.password_reset_failed",
       metadata: {

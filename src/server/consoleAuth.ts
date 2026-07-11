@@ -5,10 +5,10 @@ export interface ConsoleAuthStore {
   requireAdmin(request: Request): Promise<Response | undefined>;
   resolveCurrentWorkspace(request: Request): Promise<ConsoleWorkspaceContext>;
   resolveAdminUser(request: Request): Promise<ConsoleAdminContext>;
-  enter(input: ConsoleAuthLoginInput): Promise<Response>;
-  verifyEmail(input: ConsoleAuthVerifyEmailInput): Promise<Response>;
-  requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput): Promise<Response>;
-  resetPassword(input: ConsoleAuthPasswordResetInput): Promise<Response>;
+  enter(input: ConsoleAuthLoginInput, request?: Request): Promise<Response>;
+  verifyEmail(input: ConsoleAuthVerifyEmailInput, request?: Request): Promise<Response>;
+  requestPasswordReset(input: ConsoleAuthPasswordResetRequestInput, request?: Request): Promise<Response>;
+  resetPassword(input: ConsoleAuthPasswordResetInput, request?: Request): Promise<Response>;
   logout(request: Request): Promise<Response>;
 }
 
