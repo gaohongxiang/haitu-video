@@ -1,4 +1,4 @@
-import { notifyAuthenticationRequired } from "./authExpiry.js";
+import { notifyAuthenticationEstablished, notifyAuthenticationRequired } from "./authExpiry.js";
 
 export async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
@@ -241,6 +241,7 @@ export async function readJsonResponse<T>(response: Response, requestPath?: stri
   if (!response.ok) {
     throw new ConsoleApiResponseError(body.error || `HTTP ${response.status}`, response.status);
   }
+  notifyAuthenticationEstablished(response, requestPath, body);
   return body as T;
 }
 

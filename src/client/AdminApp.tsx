@@ -31,7 +31,11 @@ import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input, Select, Textarea } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
-import { notifyAuthenticationRequired, subscribeAuthenticationRequired } from "./authExpiry.js";
+import {
+  notifyAuthenticationEstablished,
+  notifyAuthenticationRequired,
+  subscribeAuthenticationRequired
+} from "./authExpiry.js";
 import { getLocaleMeta, supportedLocales, type AppLocale } from "../i18n/config.js";
 import { clientLocaleStorageKey, i18n } from "../i18n/client.js";
 import {
@@ -909,7 +913,8 @@ export function AdminApp() {
         setForbidden(true);
         setStatus("");
       } else if (error instanceof HttpError && error.status === 401) {
-        expireAdminSession();
+        // Session expiry is confirmed centrally before changing auth state.
+        return;
       } else {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -4498,6 +4503,7 @@ async function readJsonResponse<T>(response: Response, requestPath?: string): Pr
   if (!response.ok) {
     throw new HttpError(body.error || `HTTP ${response.status}`, response.status);
   }
+  notifyAuthenticationEstablished(response, requestPath, body);
   return body as T;
 }
 

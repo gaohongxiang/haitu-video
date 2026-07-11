@@ -3251,7 +3251,8 @@ export function App() {
   function showError(error: unknown) {
     const message = errorMessage(error);
     if (message === "Authentication required") {
-      expireConsoleSession();
+      // The centralized handler revalidates the current server session before
+      // expiring it, so a late 401 from an older request cannot undo a new login.
       return;
     }
     setStatusText(message);

@@ -116,7 +116,9 @@ describe("console refresh source", () => {
     expect(source).toContain("function expireConsoleSession()");
     expect(source).toContain("setConsoleReady(false);");
     expect(source).toContain("setConsoleToast(undefined);");
+    expect(source).not.toContain('if (message === "Authentication required") {\n      expireConsoleSession();');
     expect(apiClientSource).toContain("notifyAuthenticationRequired(response, requestPath);");
+    expect(apiClientSource).toContain("notifyAuthenticationEstablished(response, requestPath, body);");
     expect(apiClientSource).toContain("readJsonResponse<T>(response, path)");
   });
 });

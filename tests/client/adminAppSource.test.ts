@@ -25,6 +25,7 @@ describe("admin app source", () => {
 
     expect(source).toContain("subscribeAuthenticationRequired(expireAdminSession)");
     expect(source).toContain("notifyAuthenticationRequired(response, requestPath);");
+    expect(source).toContain("notifyAuthenticationEstablished(response, requestPath, body);");
     expect(source).toContain("function expireAdminSession()");
     expect(moduleLoaderSource).toContain("error.status === 401 || error.status === 403");
     expect(moduleLoaderSource).toContain("throw error;");
