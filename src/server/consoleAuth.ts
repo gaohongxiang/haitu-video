@@ -92,11 +92,12 @@ export function isPublicConsoleRoute(request: Request): boolean {
 }
 
 export function jsonResponse(body: unknown, status = 200, headers: HeadersInit = {}): Response {
+  const responseHeaders = new Headers(headers);
+  if (!responseHeaders.has("content-type")) {
+    responseHeaders.set("content-type", "application/json; charset=utf-8");
+  }
   return new Response(JSON.stringify(body, null, 2), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      ...headers
-    }
+    headers: responseHeaders
   });
 }

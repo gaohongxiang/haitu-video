@@ -394,6 +394,12 @@ describe("console API", () => {
       }
     });
     expect(logoutResponse.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(logoutResponse.headers.getSetCookie()).toHaveLength(3);
+    expect(logoutResponse.headers.getSetCookie()).toEqual(expect.arrayContaining([
+      expect.stringContaining("haitu-auth-v2.session_token="),
+      expect.stringContaining("haitu-auth-v2.session_data="),
+      expect.stringContaining("haitu-auth-v2.dont_remember=")
+    ]));
     expect(blockedAfterLogout.status).toBe(401);
   });
 

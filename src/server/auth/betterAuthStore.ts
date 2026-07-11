@@ -405,7 +405,7 @@ export class BetterAuthConsoleAuthStore implements ConsoleAuthStore {
   }
 
   private async sessionResponseFromAuthResponse(response: Response): Promise<Response> {
-    const cookie = response.headers.get("set-cookie") ?? "";
+    const cookie = cookieRequestHeaderFromSetCookie(response.headers);
     const session = await this.sessionStatus(new Request("http://localhost/api/auth/session", {
       headers: cookie ? { cookie } : {}
     }));
@@ -645,8 +645,42 @@ function normalizeOtp(value: unknown): string {
 }
 
 function copySetCookieHeaders(headers: Headers): HeadersInit {
-  const setCookie = headers.get("set-cookie");
-  return setCookie ? { "set-cookie": setCookie } : {};
+  const result = new Headers();
+  for (const setCookie of setCookieHeaderValues(headers)) {
+    result.append("set-cookie", setCookie);
+  }
+  return result;
+}
+
+function cookieRequestHeaderFromSetCookie(headers: Headers): string {
+  return setCookieHeaderValues(headers)
+    .map((setCookie) => setCookie.split(";", 1)[0] ?? "")
+    .filter(Boolean)
+    .join("; ");
+}
+
+function setCookieHeaderValues(headers: Headers): string[] {
+  const values = headers.getSetCookie();
+  const candidates = values.length > 0 ? values : [headers.get("set-cookie") ?? ""];
+  return candidates.flatMap(splitCombinedSetCookieHeader).filter(Boolean);
+}
+
+function splitCombinedSetCookieHeader(value: string): string[] {
+  const result: string[] = [];
+  let start = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== ",") continue;
+    let cursor = index + 1;
+    while (value[cursor] === " ") cursor += 1;
+    while (cursor < value.length && !["=", ";", ","].includes(value[cursor] ?? "")) cursor += 1;
+    if (value[cursor] !== "=") continue;
+    const cookie = value.slice(start, index).trim();
+    if (cookie) result.push(cookie);
+    start = index + 1;
+  }
+  const finalCookie = value.slice(start).trim();
+  if (finalCookie) result.push(finalCookie);
+  return result;
 }
 
 async function safeJson(response: Response): Promise<Record<string, unknown> | undefined> {
