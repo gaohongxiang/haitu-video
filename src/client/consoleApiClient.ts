@@ -1,6 +1,8 @@
+import { notifyAuthenticationRequired } from "./authExpiry.js";
+
 export async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 class ConsoleApiResponseError extends Error {
@@ -16,7 +18,7 @@ class ConsoleApiResponseError extends Error {
 async function getJsonWithSignal<T>(path: string, signal: AbortSignal): Promise<T> {
   try {
     const response = await fetch(path, { signal });
-    return await readJsonResponse<T>(response);
+    return await readJsonResponse<T>(response, path);
   } catch (error) {
     if (error instanceof ConsoleApiResponseError && error.status === 401) {
       throw error;
@@ -31,7 +33,7 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 export async function postJsonWithSignal<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
@@ -41,7 +43,7 @@ export async function postJsonWithSignal<T>(path: string, body: unknown, signal:
     body: JSON.stringify(body),
     signal
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 export async function putJson<T>(path: string, body: unknown): Promise<T> {
@@ -50,14 +52,14 @@ export async function putJson<T>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 export async function deleteJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     method: "DELETE"
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 export interface ConsoleSnapshotTypes {
@@ -231,7 +233,10 @@ export async function fetchConsoleSnapshot<T extends ConsoleSnapshotTypes>(): Pr
   } as T;
 }
 
-export async function readJsonResponse<T>(response: Response): Promise<T> {
+export async function readJsonResponse<T>(response: Response, requestPath?: string): Promise<T> {
+  if (!response.ok) {
+    notifyAuthenticationRequired(response, requestPath);
+  }
   const body = await response.json();
   if (!response.ok) {
     throw new ConsoleApiResponseError(body.error || `HTTP ${response.status}`, response.status);

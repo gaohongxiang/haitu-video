@@ -31,6 +31,7 @@ import { Button } from "./components/ui/button.js";
 import { Card, CardHeader } from "./components/ui/card.js";
 import { Field, Input, Select, Textarea } from "./components/ui/field.js";
 import { cn } from "./lib/utils.js";
+import { notifyAuthenticationRequired, subscribeAuthenticationRequired } from "./authExpiry.js";
 import { getLocaleMeta, supportedLocales, type AppLocale } from "../i18n/config.js";
 import { clientLocaleStorageKey, i18n } from "../i18n/client.js";
 import {
@@ -787,6 +788,10 @@ export function AdminApp() {
   const [siteSettings, setSiteSettings] = useState<AdminSiteSettingsResponse | undefined>();
 
   useEffect(() => {
+    return subscribeAuthenticationRequired(expireAdminSession);
+  }, []);
+
+  useEffect(() => {
     void bootstrap();
   }, []);
 
@@ -904,8 +909,7 @@ export function AdminApp() {
         setForbidden(true);
         setStatus("");
       } else if (error instanceof HttpError && error.status === 401) {
-        setSession({ authEnabled: true, authenticated: false });
-        setStatus(tAdmin("status.authExpired"));
+        expireAdminSession();
       } else {
         setStatus(error instanceof Error ? error.message : String(error));
       }
@@ -939,6 +943,12 @@ export function AdminApp() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function expireAdminSession() {
+    setSession({ authEnabled: true, authenticated: false });
+    setForbidden(false);
+    setStatus(tAdmin("status.authExpired"));
   }
 
   async function verifyEmail(event: FormEvent<HTMLFormElement>) {
@@ -1101,7 +1111,7 @@ export function AdminApp() {
       const response = await fetch(`${modelServicesEndpoint(providerId)}${suffix}`, {
         method: "DELETE"
       });
-      await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response);
+      await readJsonResponse<{ provider: Pick<ProviderConfigItem, "id" | "configId" | "configured" | "keySource" | "keyPreview"> }>(response, `${modelServicesEndpoint(providerId)}${suffix}`);
       await refreshOverview();
       setStatus(tAdmin("status.platformDeleted"));
     } catch (error) {
@@ -4443,7 +4453,7 @@ function buildActivityOption(overview?: AdminOverview): EChartsOption {
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path);
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 async function loadAdminModule<T>(
@@ -4454,7 +4464,10 @@ async function loadAdminModule<T>(
 ): Promise<void> {
   try {
     apply(await load());
-  } catch {
+  } catch (error) {
+    if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
+      throw error;
+    }
     failedModules.push(moduleName);
   }
 }
@@ -4465,7 +4478,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
 async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
@@ -4474,10 +4487,13 @@ async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return readJsonResponse<T>(response);
+  return readJsonResponse<T>(response, path);
 }
 
-async function readJsonResponse<T>(response: Response): Promise<T> {
+async function readJsonResponse<T>(response: Response, requestPath?: string): Promise<T> {
+  if (!response.ok) {
+    notifyAuthenticationRequired(response, requestPath);
+  }
   const body = await response.json();
   if (!response.ok) {
     throw new HttpError(body.error || `HTTP ${response.status}`, response.status);

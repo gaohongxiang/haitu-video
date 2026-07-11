@@ -107,4 +107,16 @@ describe("console refresh source", () => {
     expect(apiClientSource).toContain("export const consoleSecondarySnapshotPaths");
     expect(apiClientSource).not.toContain("/api/model-bundles");
   });
+
+  it("handles protected API session expiry centrally across foreground and silent requests", async () => {
+    const source = await readFile(appPath, "utf8");
+    const apiClientSource = await readFile(apiClientPath, "utf8");
+
+    expect(source).toContain("subscribeAuthenticationRequired(expireConsoleSession)");
+    expect(source).toContain("function expireConsoleSession()");
+    expect(source).toContain("setConsoleReady(false);");
+    expect(source).toContain("setConsoleToast(undefined);");
+    expect(apiClientSource).toContain("notifyAuthenticationRequired(response, requestPath);");
+    expect(apiClientSource).toContain("readJsonResponse<T>(response, path)");
+  });
 });

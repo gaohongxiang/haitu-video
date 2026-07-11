@@ -157,6 +157,7 @@ import {
   putJson,
   readJsonResponse
 } from "./consoleApiClient.js";
+import { subscribeAuthenticationRequired } from "./authExpiry.js";
 import {
   defaultProductDraft,
   draftReferenceImageStatuses,
@@ -1314,6 +1315,10 @@ export function App() {
   ]);
 
   useEffect(() => {
+    return subscribeAuthenticationRequired(expireConsoleSession);
+  }, []);
+
+  useEffect(() => {
     void bootConsole();
   }, []);
 
@@ -2108,10 +2113,11 @@ export function App() {
     setIsBusy(true);
     try {
       const suffix = modelConfigDeleteQuery(configIds);
-      const response = await fetch(`/api/model-configs/${providerId}${suffix}`, {
+      const path = `/api/model-configs/${providerId}${suffix}`;
+      const response = await fetch(path, {
         method: "DELETE"
       });
-      const body = await readJsonResponse<ModelConfigStatusResponse>(response);
+      const body = await readJsonResponse<ModelConfigStatusResponse>(response, path);
       setProviderConfig((current) => updateProviderConfigStatus(current, body.provider));
       setModelConfigDrafts((current) => ({
         ...current,
@@ -3232,7 +3238,7 @@ export function App() {
           confirm: true
         })
       });
-      const body = await readJsonResponse<{ deleted: true; path: string; sizeBytes: number }>(response);
+      const body = await readJsonResponse<{ deleted: true; path: string; sizeBytes: number }>(response, "/api/video-assets");
       setStatusText(tApp("status.assetDeleted", { path: body.path, size: formatBytes(body.sizeBytes) }));
       await refreshConsole();
     } catch (error) {
@@ -3245,11 +3251,18 @@ export function App() {
   function showError(error: unknown) {
     const message = errorMessage(error);
     if (message === "Authentication required") {
-      setAuthSession({ authEnabled: true, authenticated: false });
-      setAuthStatus(tApp("status.authExpired"));
+      expireConsoleSession();
       return;
     }
     setStatusText(message);
+  }
+
+  function expireConsoleSession() {
+    setAuthSession({ authEnabled: true, authenticated: false });
+    setAuthStatus(tApp("status.authExpired"));
+    setConsoleReady(false);
+    setConsoleLoadError("");
+    setConsoleToast(undefined);
   }
 
   function renderCreativeWorkspace() {

@@ -19,6 +19,17 @@ describe("admin app source", () => {
     expect(source).not.toContain('useState<AuthSession>({ authEnabled: true, authenticated: false })');
   });
 
+  it("returns every protected admin request to login when its session expires", async () => {
+    const source = await readFile(adminAppPath, "utf8");
+    const moduleLoaderSource = source.slice(source.indexOf("async function loadAdminModule"), source.indexOf("async function postJson"));
+
+    expect(source).toContain("subscribeAuthenticationRequired(expireAdminSession)");
+    expect(source).toContain("notifyAuthenticationRequired(response, requestPath);");
+    expect(source).toContain("function expireAdminSession()");
+    expect(moduleLoaderSource).toContain("error.status === 401 || error.status === 403");
+    expect(moduleLoaderSource).toContain("throw error;");
+  });
+
   it("renders admin user video jobs with compact metadata instead of oversized right-side badges", async () => {
     const source = await readFile(adminAppPath, "utf8");
     const expandedRowSource = source.slice(source.indexOf("function AdminUserExpandedRow"), source.indexOf("function AdminUserRecentLedgerList"));
